@@ -3,15 +3,18 @@
 Each target has one active pointer. Changes name the head they expect, so a
 stale view writes nothing; rollback restores only an earlier baseline or
 activate entry; and triggers refuse updates, deletes and inserts from another
-schema version. Real child processes race for one head and are killed inside
-a write transaction.
+schema version. Reviews of Autotune decisions from a fake-evaluator ledger are
+recorded and activated without writing the ledger. Real child processes race
+for one head and are killed inside a write transaction.
 """
 
 from __future__ import annotations
 
+import asyncio
 from contextlib import closing
 import hashlib
 import os
+import shutil
 import sqlite3
 import stat
 import time
@@ -22,9 +25,14 @@ from fakes import kill_and_reap, launch_child, wait_for_barrier
 from smythe.optimize import (
     ActivationEvent,
     ActiveVersion,
+    OptimizationRunner,
     PolicyRegistry,
+    PolicyReview,
     RegistryConflictError,
     RegistryError,
+    TrialContext,
+    TrialOutcome,
+    canonical_json_bytes,
 )
 from smythe.optimize.contracts import Candidate, ExperimentContract, MetricObjective, MutableFieldRule
 from smythe.optimize.ledger import ExperimentLedger
@@ -524,6 +532,389 @@ def test_a_new_registry_and_its_sidecars_are_owner_only(tmp_path):
         assert modes == {"": 0o600, "-wal": 0o600, "-shm": 0o600}
     finally:
         os.umask(previous)
+
+
+# ---------------------------------------------------------------------------
+# Reviews of Autotune decisions, and their activation
+# ---------------------------------------------------------------------------
+
+FIELD = TARGET + ".max_sections"
+# Each campaign compares an incumbent section count with one challenger's.
+CAMPAIGNS = {"promoted": (4, 6), "rejected": (4, 3), "chained": (6, 7), "sibling": (4, 5)}
+
+
+def _sections_contract() -> ExperimentContract:
+    return ExperimentContract(
+        name="report_sections",
+        objectives=(MetricObjective("quality", "maximize", primary=True),),
+        mutable_fields=(FIELD,),
+        mutable_field_rules={FIELD: MutableFieldRule("integer", minimum=1, maximum=12)},
+        required_gates=("valid",),
+        development_repetitions=1,
+        confirmation_repetitions=3,
+        holdout_repetitions=3,
+        max_candidates=2,
+        max_parallel_candidates=2,
+        max_trials=14,
+        max_wall_seconds=600,
+        max_budget_microusd=0,
+        per_trial_reservation_microusd=0,
+        confidence=0.8,
+        min_improvement=0.1,
+        base_seed=17,
+    )
+
+
+async def _more_sections_score_higher(context: TrialContext) -> TrialOutcome:
+    return TrialOutcome(metrics={"quality": float(context.candidate.policy[FIELD])},
+                        gates={"valid": True}, actual_cost_microusd=0)
+
+
+@pytest.fixture(scope="module")
+def campaigns(tmp_path_factory):
+    """A closed v4 ledger with one terminal decision per campaign, and their results."""
+    path = tmp_path_factory.mktemp("campaigns") / "optimize.sqlite3"
+    contract = _sections_contract()
+    results = {}
+    with ExperimentLedger(path, durability="normal") as ledger:
+        for name, (incumbent, challenger) in CAMPAIGNS.items():
+            first = Candidate(contract, {FIELD: incumbent}, f"{incumbent} sections")
+            second = Candidate(contract, {FIELD: challenger}, f"{challenger} sections",
+                               parent=first)
+            runner = OptimizationRunner(contract, ledger, _more_sections_score_higher,
+                                        evaluator_hash="sha256:" + "e" * 64,
+                                        bootstrap_resamples=10, campaign_id=name)
+            results[name] = asyncio.run(runner.run(first, (second,)))
+        # A sealed campaign that has not decided yet.
+        first = Candidate(contract, {FIELD: 4}, "4 sections")
+        second = Candidate(contract, {FIELD: 8}, "8 sections", parent=first)
+        ledger.create_campaign(contract, first.candidate_id, (first, second),
+                               plan_hash="sha256:" + "a" * 64, campaign_id="undecided")
+    assert [results[name].promoted for name in CAMPAIGNS] == [True, False, True, True]
+    return path, results
+
+
+@pytest.fixture(scope="module")
+def empty_registry(tmp_path_factory):
+    path = tmp_path_factory.mktemp("empty") / "registry.sqlite3"
+    PolicyRegistry(path).close()
+    return path
+
+
+@pytest.fixture
+def ledger_path(campaigns, tmp_path):
+    path = tmp_path / "optimize.sqlite3"
+    shutil.copyfile(campaigns[0], path)
+    return path
+
+
+@pytest.fixture
+def registry_path(empty_registry, tmp_path):
+    path = tmp_path / "registry.sqlite3"
+    shutil.copyfile(empty_registry, path)
+    return path
+
+
+def _approve(registry, ledger, campaign="promoted", reviewer="reviewer"):
+    return registry.record_review(ledger, campaign, reviewer=reviewer, verdict="approve")
+
+
+def _activate_review(registry, review, *, expected_seq, target=TARGET):
+    return registry.activate(target, review.review_id, expected_seq=expected_seq,
+                             actor="release-operator", reason="approved by review")
+
+
+def test_a_promoted_decision_is_reviewed_activated_and_rolled_back(
+    campaigns, ledger_path, registry_path, tmp_path,
+):
+    promoted = campaigns[1]["promoted"]
+    ledger_bytes = ledger_path.read_bytes()
+    with PolicyRegistry(registry_path) as registry:
+        rejection = registry.record_review(ledger_path, "promoted", reviewer="first reviewer",
+                                           verdict="reject", note="wants a second task pack")
+        approval = registry.record_review(ledger_path, "promoted", reviewer="second reviewer",
+                                          verdict="approve", evidence_sha256="ab" * 32,
+                                          note="holdout gain is large")
+        assert isinstance(approval, PolicyReview)
+        assert approval.to_dict() == {
+            "review_id": approval.review_id,
+            "campaign_id": "promoted",
+            "plan_hash": promoted.optimization_plan_hash,
+            "holdout_commitment": promoted.holdout_seed_commitment,
+            "decision_id": promoted.decision_id,
+            "decision_payload_sha256": promoted.decision_id.removeprefix("decision_v1_"),
+            "promoted": True,
+            "candidate_id": promoted.selected_candidate_id,
+            "policy_hash": approval.policy_hash,
+            "policy": {FIELD: 6},
+            "incumbent_candidate_id": promoted.incumbent_candidate_id,
+            "incumbent_policy_hash": approval.incumbent_policy_hash,
+            "incumbent_policy": {FIELD: 4},
+            "verdict": "approve",
+            "reviewer": "second reviewer",
+            "evidence_sha256": "ab" * 32,
+            "note": "holdout gain is large",
+            "created_at_ns": approval.created_at_ns,
+        }
+        contract = _sections_contract()
+        assert approval.policy_hash == Candidate(contract, {FIELD: 6}, "six").policy_hash
+        assert approval.incumbent_policy_hash == Candidate(contract, {FIELD: 4}, "four").policy_hash
+        payload = {key: value for key, value in approval.to_dict().items()
+                   if key not in ("review_id", "created_at_ns")}
+        assert approval.review_id == (
+            "review_v1_" + hashlib.sha256(canonical_json_bytes(payload)).hexdigest())
+        # Recording the same review again returns the stored one.
+        assert registry.record_review(ledger_path, "promoted", reviewer="second reviewer",
+                                      verdict="approve", evidence_sha256="ab" * 32,
+                                      note="holdout gain is large") == approval
+        # The rejecting review is kept beside the approval.
+        assert registry.reviews("promoted") == (rejection, approval)
+        assert registry.review(rejection.review_id) == rejection
+        assert registry.reviews("rejected") == ()
+
+        activated = _activate_review(registry, approval, expected_seq=0)
+        baseline, event = registry.history(TARGET)
+        assert (baseline.seq, baseline.action, baseline.policy, baseline.review_id) == (
+            1, "baseline", {FIELD: 4}, None)
+        assert baseline.policy_hash == approval.incumbent_policy_hash
+        assert event == activated
+        assert (event.seq, event.action, event.policy, event.review_id, event.actor) == (
+            2, "activate", {FIELD: 6}, approval.review_id, "release-operator")
+        assert registry.resolve(TARGET) == ActiveVersion(
+            TARGET, 2, approval.policy_hash, {FIELD: 6}, approval.review_id, 2)
+
+        # A campaign run against the policy in effect can replace it.
+        chained = _approve(registry, ledger_path, "chained")
+        _activate_review(registry, chained, expected_seq=2)
+        assert registry.resolve(TARGET).policy == {FIELD: 7}
+
+        # Rollback restores the first campaign's incumbent baseline.
+        restored = registry.rollback(TARGET, to_seq=1, expected_seq=3, actor="release-operator",
+                                     reason="seven sections overflow the page")
+        assert restored.restores_seq == 1
+        assert registry.resolve(TARGET) == ActiveVersion(
+            TARGET, 4, approval.incumbent_policy_hash, {FIELD: 4}, None, 1)
+    # Review, activation and rollback never write the ledger, and rows hold no paths.
+    assert ledger_path.read_bytes() == ledger_bytes
+    assert sorted(item.name for item in tmp_path.iterdir()) == [
+        "optimize.sqlite3", "registry.sqlite3"]
+    assert not any(str(tmp_path) in line or tmp_path.name in line
+                   for line in _dump(registry_path))
+
+
+def _downgrade_to_v3(path) -> None:
+    """Rewrite a closed v4 ledger as schema v3, which had no ownership tables."""
+    with closing(sqlite3.connect(path, isolation_level=None)) as raw:
+        for name in ExperimentLedger._barrier_sql():
+            raw.execute(f"DROP TRIGGER {name}")
+        for table in ("trial_dispatch_owners", "campaign_leases", "campaign_lease_epochs"):
+            raw.execute(f"DROP TABLE {table}")
+        raw.execute("UPDATE ledger_meta SET version = 3")
+
+
+@pytest.mark.parametrize("source", ["v4 path", "v4 read-only", "v4 writable", "v3 path"])
+def test_reviews_read_v3_and_v4_ledgers_without_writing_them(
+    campaigns, ledger_path, registry_path, source,
+):
+    if source == "v3 path":
+        _downgrade_to_v3(ledger_path)
+    ledger_bytes = ledger_path.read_bytes()
+    with PolicyRegistry(registry_path) as registry:
+        if source.endswith("path"):
+            review = _approve(registry, ledger_path)
+        else:
+            with ExperimentLedger(ledger_path, read_only=source == "v4 read-only") as ledger:
+                review = _approve(registry, ledger)
+        _activate_review(registry, review, expected_seq=0)
+        assert registry.resolve(TARGET).policy == {FIELD: 6}
+    assert ledger_path.read_bytes() == ledger_bytes
+    promoted = campaigns[1]["promoted"]
+    assert (review.decision_id, review.plan_hash) == (
+        promoted.decision_id, promoted.optimization_plan_hash)
+    with ExperimentLedger(ledger_path, read_only=True) as ledger:
+        assert ledger.lease_supported is (source != "v3 path")
+
+
+def test_a_ledger_path_with_an_open_writer_is_not_read(ledger_path, registry_path):
+    with PolicyRegistry(registry_path) as registry, ExperimentLedger(ledger_path) as writer:
+        before = list(registry._connection.iterdump())
+        with pytest.raises(RegistryError, match="cannot be reviewed: read-only inspection "
+                                                "requires a closed, checkpointed ledger"):
+            _approve(registry, ledger_path)
+        assert list(registry._connection.iterdump()) == before
+        # The open ledger itself can be reviewed instead.
+        assert _approve(registry, writer).decision_id == writer.list_decisions(
+            "promoted")[0]["decision_id"]
+
+
+@pytest.fixture(scope="module")
+def reviewed(campaigns, tmp_path_factory):
+    """A closed registry where 'promoted' is active and the other campaigns are reviewed."""
+    path = tmp_path_factory.mktemp("reviewed") / "registry.sqlite3"
+    with PolicyRegistry(path) as registry:
+        reviews = {name: _approve(registry, campaigns[0], name)
+                   for name in ("promoted", "chained", "sibling")}
+        reviews["rejected"] = registry.record_review(campaigns[0], "rejected",
+                                                     reviewer="reviewer", verdict="reject")
+        _activate_review(registry, reviews["promoted"], expected_seq=0)
+    return path, reviews
+
+
+def _review_row(review, *, review_id=None, **changes):
+    """The row of *review* with *changes*, as a client that skips review checks writes it."""
+    payload = {key: value for key, value in review.to_dict().items()
+               if key not in ("review_id", "created_at_ns")} | changes
+    text = canonical_json_bytes(payload).decode("utf-8")
+    review_id = review_id or "review_v1_" + hashlib.sha256(text.encode("utf-8")).hexdigest()
+    return (review_id, payload["campaign_id"], payload["decision_id"], payload["verdict"],
+            payload["reviewer"], text, 1)
+
+
+def _forged_approval(reviews):
+    # Approves the decision that was not promoted, under a matching identifier.
+    return _review_row(reviews["rejected"], verdict="approve")
+
+
+def _edited_review(reviews):
+    # Changes a stored payload without changing its identifier.
+    return _review_row(reviews["sibling"], review_id="review_v1_" + "1" * 64, note="edited")
+
+
+def _store(make_row):
+    def prepare(registry, ledger, reviews):
+        with closing(sqlite3.connect(registry.path, isolation_level=None)) as raw:
+            raw.create_function(WRITER, 0, lambda: 1)
+            raw.execute("INSERT INTO reviews VALUES (?, ?, ?, ?, ?, ?, ?)", make_row(reviews))
+    return prepare
+
+
+def _retire(registry, ledger, reviews):
+    registry.retire(TARGET, expected_seq=2, actor="operator", reason="paused")
+
+
+def _tamper_ledger(registry, ledger, reviews):
+    # Changes a sealed candidate row, so the campaign inventory no longer validates.
+    with closing(sqlite3.connect(ledger, isolation_level=None)) as raw:
+        raw.create_function("smythe_autotune_writer_version", 0, lambda: 4)
+        raw.execute("UPDATE candidates SET candidate_json = replace(candidate_json, "
+                    "'7 sections', 'seven sections') WHERE campaign_id = 'chained'")
+
+
+def _activation(name, *, expected_seq=2, target=TARGET):
+    return lambda registry, ledger, reviews: _activate_review(
+        registry, reviews[name], expected_seq=expected_seq, target=target)
+
+
+REFUSALS = {
+    "approving a decision that was not promoted": (
+        None, RegistryError, "was not promoted; only a promoted decision can be approved",
+        lambda registry, ledger, reviews: _approve(registry, ledger, "rejected", "another")),
+    "activating a rejecting review": (
+        None, RegistryError, "rejects decision", _activation("rejected")),
+    "activating a missing review": (
+        None, RegistryError, "unknown review 'review_v1_0+'",
+        lambda registry, ledger, reviews: registry.activate(
+            TARGET, "review_v1_" + "0" * 64, expected_seq=2, actor="operator", reason="none")),
+    "activating a stored approval of a decision that was not promoted": (
+        _store(_forged_approval), RegistryError, "was not promoted",
+        lambda registry, ledger, reviews: registry.activate(
+            TARGET, _forged_approval(reviews)[0], expected_seq=2, actor="operator",
+            reason="forged")),
+    "activating a stored review that does not match its identifier": (
+        _store(_edited_review), RegistryError, "stored review 'review_v1_1+' is invalid",
+        lambda registry, ledger, reviews: registry.activate(
+            TARGET, _edited_review(reviews)[0], expected_seq=2, actor="operator",
+            reason="edited")),
+    "activating a review of a campaign run against another incumbent": (
+        None, RegistryError, "does not have the reviewed campaign's incumbent in effect",
+        _activation("sibling")),
+    "activating on a retired target": (
+        _retire, RegistryError, "does not have the reviewed campaign's incumbent in effect",
+        _activation("chained", expected_seq=3)),
+    "activating a policy outside the target": (
+        None, ValueError, "is not target 'planner.template.repo' or under it",
+        _activation("chained", expected_seq=0, target="planner.template.repo")),
+    "activating a policy above the target": (
+        None, ValueError, "is not target", _activation("chained", target=FIELD + ".limit")),
+    "activating from a stale head": (
+        None, RegistryConflictError, "at seq 2, not expected_seq 1",
+        _activation("chained", expected_seq=1)),
+    "activating as a first activation over a head": (
+        None, RegistryConflictError, "at seq 2, not expected_seq 0",
+        _activation("chained", expected_seq=0)),
+    "reviewing a ledger whose inventory no longer validates": (
+        _tamper_ledger, RegistryError,
+        "campaign 'chained' cannot be reviewed: campaign candidate row differs",
+        lambda registry, ledger, reviews: _approve(registry, ledger, "chained", "another")),
+    "reviewing a campaign without a terminal decision": (
+        None, RegistryError, "campaign 'undecided' has no terminal decision",
+        lambda registry, ledger, reviews: _approve(registry, ledger, "undecided")),
+    "reviewing a missing campaign": (
+        None, RegistryError, "campaign 'missing' cannot be reviewed",
+        lambda registry, ledger, reviews: _approve(registry, ledger, "missing")),
+}
+
+
+@pytest.mark.parametrize("case", sorted(REFUSALS))
+def test_review_and_activation_refuse_without_writing(reviewed, ledger_path, tmp_path, case):
+    prepare, error, message, refused = REFUSALS[case]
+    path = tmp_path / "registry.sqlite3"
+    shutil.copyfile(reviewed[0], path)
+    with PolicyRegistry(path) as registry:
+        if prepare is not None:
+            prepare(registry, ledger_path, reviewed[1])
+        before = list(registry._connection.iterdump())
+        ledger_bytes = ledger_path.read_bytes()
+        with pytest.raises(error, match=message):
+            refused(registry, ledger_path, reviewed[1])
+        assert list(registry._connection.iterdump()) == before
+        in_effect = None if prepare is _retire else {FIELD: 6}
+        assert getattr(registry.resolve(TARGET), "policy", None) == in_effect
+    assert ledger_path.read_bytes() == ledger_bytes
+    assert sorted(item.name for item in tmp_path.iterdir()) == [
+        "optimize.sqlite3", "registry.sqlite3"]
+
+
+@pytest.mark.parametrize("arguments, error, message", [
+    ({"verdict": "approved"}, ValueError, "verdict must be 'approve' or 'reject'"),
+    ({"verdict": None}, ValueError, "verdict must be"),
+    ({"reviewer": " "}, ValueError, "reviewer must be a non-empty string"),
+    ({"reviewer": "r" * 129}, ValueError, "reviewer must be at most 128"),
+    ({"evidence_sha256": "AB" * 32}, ValueError, "evidence_sha256 must be 64 lowercase hex"),
+    ({"evidence_sha256": "sha256:" + "ab" * 32}, ValueError, "evidence_sha256"),
+    ({"note": "line\nbreak"}, ValueError, "note cannot contain control characters"),
+    ({"note": "n" * 1025}, ValueError, "note must be at most 1024"),
+    ({"campaign_id": "../promoted"}, ValueError, "campaign_id must be a safe"),
+    ({"ledger": "missing.sqlite3"}, FileNotFoundError, "missing.sqlite3"),
+    ({"ledger": 7}, TypeError, None),
+])
+def test_record_review_refuses_malformed_arguments(ledger_path, registry_path, tmp_path,
+                                                   arguments, error, message):
+    call = {"ledger": ledger_path, "campaign_id": "promoted", "reviewer": "reviewer",
+            "verdict": "approve"} | arguments
+    if call["ledger"] == "missing.sqlite3":
+        call["ledger"] = tmp_path / "missing.sqlite3"
+    ledger_bytes = ledger_path.read_bytes()
+    with PolicyRegistry(registry_path) as registry:
+        before = list(registry._connection.iterdump())
+        with pytest.raises(error, match=message):
+            registry.record_review(call.pop("ledger"), call.pop("campaign_id"), **call)
+        assert list(registry._connection.iterdump()) == before
+    assert ledger_path.read_bytes() == ledger_bytes
+    assert not (tmp_path / "missing.sqlite3").exists()
+
+
+def test_a_read_only_registry_records_and_activates_nothing(reviewed, ledger_path, tmp_path):
+    path = tmp_path / "registry.sqlite3"
+    shutil.copyfile(reviewed[0], path)
+    data = path.read_bytes()
+    with PolicyRegistry(path, read_only=True) as reader:
+        assert reader.reviews("chained") == (reviewed[1]["chained"],)
+        with pytest.raises(RegistryError, match="read-only"):
+            _approve(reader, ledger_path, "chained", "another")
+        with pytest.raises(RegistryError, match="read-only"):
+            _activate_review(reader, reviewed[1]["chained"], expected_seq=2)
+    assert path.read_bytes() == data
 
 
 # ---------------------------------------------------------------------------

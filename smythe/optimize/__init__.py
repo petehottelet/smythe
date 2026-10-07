@@ -39,6 +39,7 @@ from smythe.optimize.registry import (
     ActivationEvent,
     ActiveVersion,
     PolicyRegistry,
+    PolicyReview,
     RegistryConflictError,
     RegistryError,
 )
@@ -68,6 +69,7 @@ __all__ = [
     "OptimizationResult",
     "OptimizationRunner",
     "PolicyRegistry",
+    "PolicyReview",
     "PromotionAssessment",
     "PromotionDecision",
     "RegistryConflictError",

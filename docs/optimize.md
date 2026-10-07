@@ -29,7 +29,7 @@ ambiguous after a connection failure.
 | `smythe.optimize.engine` | Bounded development, confirmation, and holdout orchestration with conservative recovery |
 | `smythe.optimize.workflow_eval` | A trial evaluator that runs one durable text workflow per trial and reports its exact cost |
 | `smythe.optimize.inspection` and `smythe.optimize.report` | Read-only evidence collection and standalone HTML reports |
-| `smythe.optimize.registry` | Append-only history of the policy version in effect for each target, with rollback and retirement |
+| `smythe.optimize.registry` | Append-only reviews of terminal decisions and history of the policy version in effect for each target, with activation, rollback and retirement |
 
 These modules are deliberately separable from proposal generation. A human,
 an agent, or a deterministic grid can propose candidates, but every candidate
@@ -936,17 +936,17 @@ automatic retry or reconciliation command for these ambiguous trials.
 A promoted decision is a statistical result, not a change to what runs.
 `PolicyRegistry` records which policy version is in effect for each
 **target**, a dotted policy name such as `planner.template.report`, and how
-that changed: review, activation and rollback are separate, explicit records.
-The registry never edits application configuration; callers resolve the
-active version when they build new work.
+that changed: review, activation and rollback are separate, explicit
+operations, each with its own record. The registry never edits application
+configuration; callers resolve the active version when they build new work.
 
 The registry is its own SQLite file, `~/.smythe/policy-registry.sqlite3` by
 default, with schema version 1. It never writes an Autotune ledger: the ledger
 schema (version 4), its writer barrier, `snapshot()` and
 `smythe optimize inspect --json` are unchanged, and a writable open refuses a
 database that already holds other tables, such as a ledger. Review records
-refer to a ledger decision by identity, its campaign and decision ID, never
-by file path.
+refer to a ledger campaign by its ID, plan hash and holdout commitment and to
+its decision by ID and payload digest, never by file path.
 
 Each target has one active pointer and an append-only history numbered 1, 2,
 3, and so on:
@@ -963,8 +963,97 @@ the same `sha256:` digest of canonical JSON as an Autotune candidate's
 `policy_hash`, so one policy has one identity across campaigns and the
 registry.
 
+### Review and activate a decision
+
+A campaign's terminal decision is reviewed, and an approving review of a
+promoted decision is then activated for a target:
+
 ```python
-from smythe.optimize import PolicyRegistry, RegistryConflictError
+from smythe.optimize import PolicyRegistry, RegistryConflictError, RegistryError
+
+target = "planner.template.report"
+with PolicyRegistry("policy-registry.sqlite3") as registry:
+    try:
+        review = registry.record_review(
+            "optimize.sqlite3",                    # a closed Autotune ledger
+            result.campaign_id,                    # from OptimizationRunner.run()
+            reviewer="report-owner",               # declared, not authenticated
+            verdict="approve",
+            note="holdout gain holds on the long-report task pack",
+        )
+        registry.activate(
+            target,
+            review.review_id,
+            expected_seq=len(registry.history(target)),  # 0 for a new target
+            actor="release-operator",
+            reason="approved for new report runs",
+        )
+    except RegistryConflictError:
+        ...  # someone changed the target first; read it again and decide
+    except RegistryError:
+        ...  # refused, such as a decision that was not promoted; nothing was written
+```
+
+`record_review(ledger, campaign_id, *, reviewer, verdict, evidence_sha256=None,
+note="")` records `"approve"` or `"reject"` for the campaign's terminal
+decision. `ledger` is a ledger path or an open `ExperimentLedger`. A path is
+opened read-only for the read, so the ledger must be closed and checkpointed,
+as for `smythe optimize inspect`, and a version 3 ledger is read without
+migration. An open ledger is used as it is: a writable open of a version 4
+ledger writes nothing, but a writable open migrates a version 3 ledger, so
+open one read-only. The review never writes the ledger. It first validates
+the campaign's decision inventory with
+`ExperimentLedger.validate_decision_inventory()`. A ledger path that a writer
+still holds open, a missing campaign, a campaign without a terminal decision,
+and evidence that no longer validates are refused with `RegistryError`, the
+ledger's error chained. Only a promoted decision can be approved; any
+decision can be rejected.
+
+The returned `PolicyReview` names the campaign (`campaign_id`, `plan_hash`,
+`holdout_commitment`) and its decision (`decision_id`, and
+`decision_payload_sha256`, the plain hex SHA-256 of the decision's canonical
+payload) and records `promoted`, the decision candidate's `candidate_id`,
+`policy_hash` and `policy`, the campaign incumbent's `incumbent_candidate_id`,
+`incumbent_policy_hash` and `incumbent_policy`, the `verdict`, the
+`reviewer`, the optional `evidence_sha256` (the plain hex SHA-256 of evidence
+the reviewer examined, kept outside Smythe) and `note` (one line of up to
+1,024 characters), and `created_at_ns`. Its `review_id` is `review_v1_` followed by
+the SHA-256 of the canonical record without its time, so recording the same
+review again returns the stored one. Reviews are append-only: a rejecting
+review is kept, and a later review never changes an earlier one or revokes
+its approval, since activation names the review it acts on.
+`reviews(campaign_id)` returns every review of a campaign in recorded order,
+`review(review_id)` returns one, and `to_dict()` gives JSON.
+
+A review is not authentication. `reviewer` is whatever name the caller
+declares, and anyone who can write the registry file can record any name.
+Establish who may approve outside Smythe before recording a review.
+
+`activate(target, review_id, *, expected_seq, actor, reason)` puts the
+review's policy in effect and returns the `activate` event. The review must
+approve a promoted decision, and every policy path must be the target or lie
+under it: `planner.template.report` covers
+`planner.template.report.max_sections` but not `planner.template.reporting`.
+The first activation of a target (`expected_seq=0`) appends the campaign
+incumbent's policy as the `baseline`, naming no review, and then the
+`activate` event, in one transaction. A later activation requires the policy
+in effect to be that incumbent, compared by policy hash, so the decision
+always compared the candidate with the policy it replaces: a review of a
+campaign run against another incumbent is refused, and a retired target needs
+a rollback first. Rolling back to `seq` 1 restores the incumbent baseline.
+A refused review or activation raises `RegistryError`, a stale
+`expected_seq` raises `RegistryConflictError`, and malformed arguments or a
+policy path outside the target raise `ValueError`; none of them writes
+anything.
+
+### Resolve, roll back and retire
+
+This snippet opens or creates the default
+`~/.smythe/policy-registry.sqlite3`; pass a path to use another file. It
+assumes the target has history, whose first event is its baseline:
+
+```python
+from smythe.optimize import PolicyRegistry, RegistryConflictError, RegistryError
 
 with PolicyRegistry() as registry:
     target = "planner.template.report"
@@ -980,6 +1069,8 @@ with PolicyRegistry() as registry:
         )
     except RegistryConflictError:
         ...  # someone changed the target first; read it again and decide
+    except RegistryError:
+        ...  # refused, such as when seq 1 is already in effect; nothing was written
 ```
 
 `resolve(target)` returns an `ActiveVersion` with the head event's `seq`, the
@@ -1000,10 +1091,6 @@ and writes nothing; malformed arguments raise `ValueError`. `actor` is a
 declared reference to whoever made the change, recorded with the reason. It is
 not authentication.
 
-Recording reviews of promoted decisions and activating them is not part of
-the public API yet; this release provides the store, resolution, history,
-rollback and retirement.
-
 The registry uses SQLite WAL with full synchronous durability. A writer that
 is killed before its transaction commits leaves the previous head; nothing
 partial is visible on reopen. A writable open creates a missing file
@@ -1022,7 +1109,7 @@ triggers or rewrite the file.
 the file to exist and every writer to be closed, with no `-wal` or `-shm`
 file, and repeats that check and the file fingerprint check immediately after
 opening and at close, like ledger inspection. A read-only registry refuses
-`rollback` and `retire`.
+`record_review`, `activate`, `rollback` and `retire`.
 
 ## Current boundaries
 
@@ -1034,7 +1121,7 @@ The following pieces remain future work:
   per-trial price ceilings;
 - calibrated sample-size guidance and a multiple-comparison correction across
   development challengers; and
-- cross-campaign comparison, and recording reviews and activations in the
+- cross-campaign comparison, and authenticated reviewers for the
   [policy registry](#policy-registry).
 
 The runner bounds what a campaign may vary:

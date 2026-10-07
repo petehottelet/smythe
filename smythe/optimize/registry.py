@@ -7,6 +7,8 @@ active pointer. Every change appends the target's next event: ``baseline`` or
 A writer names the sequence number it last saw, so two operators cannot both
 change a target from the same view.
 
+A review records one reviewer's verdict on an Autotune campaign's terminal
+decision, and only an approving review of a promoted decision is activated.
 The registry is its own file and never writes an Autotune ledger. Its review
 records name ledger decisions by identity, never by path.
 """
@@ -15,6 +17,8 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
+import re
 import sqlite3
 import threading
 import time
@@ -28,6 +32,8 @@ from smythe._sqlite import enable_wal
 from smythe.optimize.contracts import _DOTTED_FIELD_RE
 from smythe.optimize.ledger import (
     _SQLITE_INT_MAX,
+    ExperimentLedger,
+    ExperimentLedgerError,
     _create_private_file,
     _deep_freeze_json,
     _json_text,
@@ -40,6 +46,7 @@ _WRITER_FUNCTION = "smythe_policy_registry_writer_version"
 _ACTIONS = ("baseline", "activate", "rollback", "retire")
 # The actions that put a policy of their own in effect.
 _RESTORABLE = _ACTIONS[:2]
+_SHA256_HEX_RE = re.compile(r"[0-9a-f]{64}")
 _TABLES = {
     "registry_meta": ("version", "created_at_ns"),
     # Written by review recording; an activate event must name one.
@@ -135,11 +142,12 @@ class _Record:
     __slots__ = ()
 
     def to_dict(self) -> dict[str, Any]:
-        """Every field as plain JSON values, the policy as a mutable copy."""
+        """Every field as plain JSON values, policies as mutable copies."""
 
         result = {name: getattr(self, name) for name in self.__dataclass_fields__}
-        if result["policy"] is not None:
-            result["policy"] = json.loads(_json_text(result["policy"]))
+        for name, value in result.items():
+            if isinstance(value, Mapping):
+                result[name] = json.loads(_json_text(value))
         return result
 
 
@@ -173,6 +181,101 @@ class ActiveVersion(_Record):
     policy: Mapping[str, Any]
     review_id: str | None
     source_seq: int
+
+
+@dataclass(frozen=True, slots=True)
+class PolicyReview(_Record):
+    """One reviewer's immutable verdict on an Autotune campaign's terminal decision.
+
+    The campaign is named by ``campaign_id``, ``plan_hash`` and
+    ``holdout_commitment``, and the decision by ``decision_id`` and the plain
+    hex SHA-256 of its canonical payload, never by ledger path. ``policy`` is
+    the decision candidate's policy and ``incumbent_policy`` the campaign
+    incumbent's, which a target's first activation records as its baseline.
+    ``reviewer`` is declared by the caller, not authenticated.
+    """
+
+    review_id: str
+    campaign_id: str
+    plan_hash: str
+    holdout_commitment: str
+    decision_id: str
+    decision_payload_sha256: str
+    promoted: bool
+    candidate_id: str
+    policy_hash: str
+    policy: Mapping[str, Any]
+    incumbent_candidate_id: str
+    incumbent_policy_hash: str
+    incumbent_policy: Mapping[str, Any]
+    verdict: str
+    reviewer: str
+    evidence_sha256: str | None
+    note: str
+    created_at_ns: int
+
+
+# A review's stored payload: every field except its identifier and time.
+_REVIEW_FIELDS = tuple(PolicyReview.__dataclass_fields__)[1:-1]
+
+
+def _review_id(payload_json: str) -> str:
+    return "review_v1_" + hashlib.sha256(payload_json.encode("utf-8")).hexdigest()
+
+
+def _stored_review(row: sqlite3.Row | Mapping[str, Any]) -> PolicyReview:
+    """Rebuild a review row whose canonical payload matches its identifier and columns."""
+
+    text = row["payload_json"]
+    try:
+        payload = json.loads(text)
+        valid = (
+            set(payload) == set(_REVIEW_FIELDS) and _json_text(payload) == text
+            and _review_id(text) == row["review_id"]
+            and [payload[key] for key in ("campaign_id", "decision_id", "verdict", "reviewer")]
+            == [row[key] for key in ("campaign_id", "decision_id", "verdict", "reviewer_ref")]
+            and all(isinstance(payload[name], dict)
+                    and _digest(_json_text(payload[name])) == payload[name + "_hash"]
+                    for name in ("policy", "incumbent_policy"))
+        )
+    except (TypeError, ValueError):
+        valid = False
+    if not valid:
+        raise RegistryError(f"stored review {row['review_id']!r} is invalid")
+    for name in ("policy", "incumbent_policy"):
+        payload[name] = _deep_freeze_json(payload[name])
+    return PolicyReview(row["review_id"], **payload, created_at_ns=row["created_at_ns"])
+
+
+def _decision_reference(ledger: ExperimentLedger, campaign_id: str) -> dict[str, Any]:
+    """A campaign's validated terminal decision and the two policies it compared."""
+
+    decision_ids = ledger.validate_decision_inventory(campaign_id)
+    campaign = ledger.open_campaign(campaign_id)
+    decisions = ledger.list_decisions(campaign_id)
+    if not decision_ids:
+        raise RegistryError(f"campaign {campaign_id!r} has no terminal decision to review")
+    (decision,) = decisions
+    payload = {key: value for key, value in decision.items()
+               if key not in ("decision_id", "created_at_ns")}
+    digest = _digest(_json_text(payload)).removeprefix("sha256:")
+    if decision["decision_id"] != decision_ids[0] or decision_ids[0] != "decision_v1_" + digest:
+        raise RegistryError(f"decision {decision_ids[0]!r} does not match its payload")
+    reference = {
+        "campaign_id": campaign["campaign_id"],
+        "plan_hash": campaign["plan_hash"],
+        "holdout_commitment": campaign["holdout_seed_commitment"],
+        "decision_id": decision_ids[0],
+        "decision_payload_sha256": digest,
+        "promoted": decision["promoted"],
+    }
+    inventory = {item["candidate_id"]: item for item in campaign["candidate_inventory"]}
+    for prefix, candidate_id in (("", decision["candidate_id"]),
+                                 ("incumbent_", campaign["incumbent_candidate_id"])):
+        reference[prefix + "candidate_id"] = candidate_id
+        reference[prefix + "policy_hash"] = inventory[candidate_id]["policy_hash"]
+        reference[prefix + "policy"] = inventory[candidate_id]["policy"]
+    return reference
 
 
 def _target(value: object) -> str:
@@ -439,6 +542,7 @@ class PolicyRegistry:
         expected_seq: int,
         actor: str,
         reason: str,
+        replaces: str | None = None,
     ) -> tuple[ActivationEvent, ...]:
         """Append ``(action, policy, review_id, restores_seq)`` entries atomically.
 
@@ -447,7 +551,8 @@ class PolicyRegistry:
         baseline must be a target's first event, an activate names a review,
         a rollback names only the earlier baseline or activate entry it
         restores and copies that entry's policy and review, and a retire needs
-        a policy in effect.
+        a policy in effect. With ``replaces``, a target with events must have
+        the policy of that hash in effect.
         """
 
         name = _target(target)
@@ -482,6 +587,11 @@ class PolicyRegistry:
             if len(history) != head:
                 raise RegistryConflictError(
                     f"target {name!r} is at seq {len(history)}, not expected_seq {head}"
+                )
+            if replaces is not None and history and (
+                    getattr(_in_effect(history), "policy_hash", None) != replaces):
+                raise RegistryError(
+                    f"target {name!r} does not have the reviewed campaign's incumbent in effect"
                 )
             appended = []
             for action, policy_json, review_id, restores_seq in pending:
@@ -532,6 +642,112 @@ class PolicyRegistry:
         with self._lock:
             return tuple(self._history(self._connection, name))
 
+    def record_review(
+        self,
+        ledger: ExperimentLedger | str | os.PathLike[str],
+        campaign_id: str,
+        *,
+        reviewer: str,
+        verdict: str,
+        evidence_sha256: str | None = None,
+        note: str = "",
+    ) -> PolicyReview:
+        """Record *reviewer*'s ``"approve"`` or ``"reject"`` verdict on a campaign's decision.
+
+        *ledger* is an open :class:`ExperimentLedger` or the path of a closed,
+        checkpointed one, which is opened read-only for the read, so a v3
+        ledger is not migrated. The ledger is never written. Its decision
+        inventory must validate, and only a promoted decision can be approved.
+        The review copies the decision candidate's and the campaign
+        incumbent's policies, so activation needs no ledger. *reviewer* is a
+        declared name, not an authenticated identity, and *evidence_sha256*
+        the plain hex SHA-256 of what the reviewer examined. Recording an
+        identical review again returns the stored one.
+        """
+
+        if verdict not in ("approve", "reject"):
+            raise ValueError("verdict must be 'approve' or 'reject'")
+        reviewer = _nonempty(reviewer, "reviewer", maximum=128)
+        if evidence_sha256 is not None and (
+                not isinstance(evidence_sha256, str)
+                or _SHA256_HEX_RE.fullmatch(evidence_sha256) is None):
+            raise ValueError("evidence_sha256 must be 64 lowercase hex characters")
+        if note != "":
+            note = _nonempty(note, "note", maximum=1024)
+        try:
+            if isinstance(ledger, ExperimentLedger):
+                reference = _decision_reference(ledger, campaign_id)
+            else:
+                # Its close repeats the quiescence check before anything is written.
+                with ExperimentLedger(ledger, read_only=True) as source:
+                    reference = _decision_reference(source, campaign_id)
+        except ExperimentLedgerError as exc:
+            raise RegistryError(f"campaign {campaign_id!r} cannot be reviewed: {exc}") from exc
+        if verdict == "approve" and reference["promoted"] is not True:
+            raise RegistryError(f"decision {reference['decision_id']!r} was not promoted; "
+                                "only a promoted decision can be approved")
+        text = _json_text({**reference, "verdict": verdict, "reviewer": reviewer,
+                           "evidence_sha256": evidence_sha256, "note": note})
+        row = {"review_id": _review_id(text), "campaign_id": reference["campaign_id"],
+               "decision_id": reference["decision_id"], "verdict": verdict,
+               "reviewer_ref": reviewer, "payload_json": text, "created_at_ns": time.time_ns()}
+        review = _stored_review(row)
+        columns = _TABLES["reviews"]
+        with self._transaction() as cursor:
+            stored = cursor.execute(
+                "SELECT * FROM reviews WHERE review_id = ?", (review.review_id,)
+            ).fetchone()
+            if stored is not None:
+                return _stored_review(stored)
+            cursor.execute(f"INSERT INTO reviews ({', '.join(columns)}) "
+                           f"VALUES ({', '.join(':' + column for column in columns)})", row)
+        return review
+
+    def review(self, review_id: str) -> PolicyReview:
+        """Return a stored review; an unknown ``review_id`` raises :class:`RegistryError`."""
+
+        with self._lock:
+            row = self._connection.execute(
+                "SELECT * FROM reviews WHERE review_id = ?", (review_id,)
+            ).fetchone()
+        if row is None:
+            raise RegistryError(f"unknown review {review_id!r}")
+        return _stored_review(row)
+
+    def reviews(self, campaign_id: str) -> tuple[PolicyReview, ...]:
+        """Return every review of a campaign's decision, rejections included, in recorded order."""
+
+        with self._lock:
+            rows = self._connection.execute(
+                "SELECT * FROM reviews WHERE campaign_id = ? ORDER BY rowid", (campaign_id,)
+            ).fetchall()
+        return tuple(_stored_review(row) for row in rows)
+
+    def activate(
+        self, target: str, review_id: str, *, expected_seq: int, actor: str, reason: str
+    ) -> ActivationEvent:
+        """Put the policy of an approving review of a promoted decision in effect.
+
+        Every path of the policy must be *target* or lie under it. A target's
+        first activation (``expected_seq=0``) first records the campaign
+        incumbent's policy as its ``baseline``; a later one requires that
+        incumbent to be the policy in effect, so the decision compared the
+        candidate with the policy it replaces. Returns the ``activate`` event.
+        """
+
+        name = _target(target)
+        review = self.review(review_id)
+        if review.verdict != "approve":
+            raise RegistryError(
+                f"review {review.review_id!r} rejects decision {review.decision_id!r}")
+        if review.promoted is not True:
+            raise RegistryError(f"decision {review.decision_id!r} was not promoted")
+        entries = [("activate", review.policy, review.review_id, None)]
+        if expected_seq == 0:
+            entries.insert(0, ("baseline", review.incumbent_policy, None, None))
+        return self._append(name, entries, expected_seq=expected_seq, actor=actor,
+                            reason=reason, replaces=review.incumbent_policy_hash)[-1]
+
     def rollback(
         self, target: str, *, to_seq: int, expected_seq: int, actor: str, reason: str
     ) -> ActivationEvent:
@@ -559,6 +775,7 @@ __all__ = [
     "ActivationEvent",
     "ActiveVersion",
     "PolicyRegistry",
+    "PolicyReview",
     "RegistryConflictError",
     "RegistryError",
 ]

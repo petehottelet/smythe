@@ -648,15 +648,26 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   `resolve()` returns the `ActiveVersion` in effect, or `None` after
   retirement; `history()` lists every `ActivationEvent`; `rollback()`
   restores an earlier baseline or activate entry as a new event; and
-  `retire()` leaves no policy in effect. Each change names the head it
-  expects, and a stale `expected_seq` raises `RegistryConflictError` without
-  writing, so of two writers on the same head exactly one succeeds. Triggers
-  refuse every update and delete, an insert that would replace a review or
-  event (as `INSERT OR REPLACE` does) or skip a target's next number, and
-  inserts from another schema version; a writable open refuses a database
-  holding other tables, and a read-only open requires a closed, checkpointed
-  file. The ledger schema and
-  `smythe optimize inspect --json` output are unchanged. See
+  `retire()` leaves no policy in effect. `record_review()` records an
+  approving or rejecting `PolicyReview` of an Autotune campaign's terminal
+  decision after validating the campaign's decision inventory, and never
+  writes the ledger; a ledger path is opened read-only, so a version 3
+  ledger is not migrated. The review names the campaign by ID, plan hash and
+  holdout commitment and the decision by ID and payload SHA-256, copies the
+  decision candidate's and the incumbent's policies, and records a declared,
+  unauthenticated reviewer. Only a promoted decision can be approved, and
+  rejecting reviews are kept. `activate()` puts an approving review's policy
+  in effect when every policy path lies under the target: a target's first
+  activation records the campaign incumbent's policy as its baseline, and a
+  later one requires that incumbent to be in effect. Each change names the
+  head it expects, and a stale `expected_seq` raises `RegistryConflictError`
+  without writing, so of two writers on the same head exactly one succeeds.
+  Triggers refuse every update and delete, an insert that would replace a
+  review or event (as `INSERT OR REPLACE` does) or skip a target's next
+  number, and inserts from another schema version; a writable open refuses a
+  database holding other tables, and a read-only open requires a closed,
+  checkpointed file. The ledger schema and `smythe optimize inspect --json`
+  output are unchanged. See
   [policy registry](docs/optimize.md#policy-registry).
 - `smythe.optimize.workflow_eval.workflow_trial_evaluator(runtime_factory,
   task_for, measure)` runs each Autotune trial as one durable text workflow.
