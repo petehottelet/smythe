@@ -28,6 +28,7 @@ ambiguous after a connection failure.
 | `smythe.optimize.ledger` | Durable campaign, candidate, trial-event, cost-exposure, and decision history |
 | `smythe.optimize.engine` | Bounded development, confirmation, and holdout orchestration with conservative recovery |
 | `smythe.optimize.inspection` and `smythe.optimize.report` | Read-only evidence collection and standalone HTML reports |
+| `smythe.optimize.registry` | Append-only history of the policy version in effect for each target, with rollback and retirement |
 
 These modules are deliberately separable from proposal generation. A human,
 an agent, or a deterministic grid can propose candidates, but every candidate
@@ -849,6 +850,96 @@ Lease expiry permits a new owner to acquire the campaign; it does not prove
 that a previous external request was unexecuted or unbilled. There is no
 automatic retry or reconciliation command for these ambiguous trials.
 
+## Policy registry
+
+A promoted decision is a statistical result, not a change to what runs.
+`PolicyRegistry` records which policy version is in effect for each
+**target**, a dotted policy name such as `planner.template.report`, and how
+that changed: review, activation and rollback are separate, explicit records.
+The registry never edits application configuration; callers resolve the
+active version when they build new work.
+
+The registry is its own SQLite file, `~/.smythe/policy-registry.sqlite3` by
+default, with schema version 1. It never writes an Autotune ledger: the ledger
+schema (version 4), its writer barrier, `snapshot()` and
+`smythe optimize inspect --json` are unchanged, and a writable open refuses a
+database that already holds other tables, such as a ledger. Review records
+refer to a ledger decision by identity, its campaign and decision ID, never
+by file path.
+
+Each target has one active pointer and an append-only history numbered 1, 2,
+3, and so on:
+
+| Event | Effect |
+|---|---|
+| `baseline` | The target's first event: the policy in effect before any activation |
+| `activate` | Puts a reviewed policy in effect; it names its review record |
+| `rollback` | Restores an earlier `baseline` or `activate` entry as a new event, copying its policy and review |
+| `retire` | Leaves the target with no policy in effect |
+
+Every policy path is the target or lies under it, and a stored policy hash is
+the same `sha256:` digest of canonical JSON as an Autotune candidate's
+`policy_hash`, so one policy has one identity across campaigns and the
+registry.
+
+```python
+from smythe.optimize import PolicyRegistry, RegistryConflictError
+
+with PolicyRegistry() as registry:
+    target = "planner.template.report"
+    active = registry.resolve(target)          # ActiveVersion or None
+    history = registry.history(target)         # every event, in order
+    try:
+        registry.rollback(
+            target,
+            to_seq=1,
+            expected_seq=len(history),             # the head this decision saw
+            actor="release-operator",
+            reason="v2 drops a required section",
+        )
+    except RegistryConflictError:
+        ...  # someone changed the target first; read it again and decide
+```
+
+`resolve(target)` returns an `ActiveVersion` with the head event's `seq`, the
+policy and its hash, the authorizing review, and `source_seq`, the baseline or
+activate entry that supplied the policy. It returns `None` for a target with
+no events or whose last event is `retire`. `history(target)` returns every
+`ActivationEvent` in sequence order, and `to_dict()` on either gives JSON.
+
+Every change names the head it expects as `expected_seq` (0 for a target
+without events). The check and the append happen in one `BEGIN IMMEDIATE`
+transaction, so of two writers working from the same head exactly one
+succeeds; the other gets `RegistryConflictError` and writes nothing.
+`rollback(target, to_seq=..., expected_seq=..., actor=..., reason=...)` accepts
+only an earlier `baseline` or `activate` entry that is not already in effect,
+and can restore a retired target. `retire(target, expected_seq=..., actor=...,
+reason=...)` needs a policy in effect. A refused change raises `RegistryError`
+and writes nothing; malformed arguments raise `ValueError`. `actor` is a
+declared reference to whoever made the change, recorded with the reason. It is
+not authentication.
+
+Recording reviews of promoted decisions and activating them is not part of
+the public API yet; this release provides the store, resolution, history,
+rollback and retirement.
+
+The registry uses SQLite WAL with full synchronous durability. A writer that
+is killed before its transaction commits leaves the previous head; nothing
+partial is visible on reopen. A writable open creates a missing file
+owner-only (`0600`), and the `-wal` and `-shm` files inherit that mode.
+Triggers refuse every `UPDATE` and `DELETE` on registry tables, from Smythe
+or any other SQLite client, and refuse inserts from a writer of another
+schema version. A writable open checks the schema version before it writes
+and refuses a missing or altered trigger. As with the ledger, this protects
+the history from accidental edits, not from an operator who can drop
+triggers or rewrite the file.
+
+`PolicyRegistry(path, read_only=True)` inspects without writing. It requires
+the file to exist and every writer to be closed, with no `-wal` or `-shm`
+file, and repeats that check and the file fingerprint check immediately after
+opening and at close, like ledger inspection. A read-only registry refuses
+`rollback` and `retire`.
+
 ## Current boundaries
 
 The following pieces remain future work:
@@ -859,7 +950,8 @@ The following pieces remain future work:
   per-trial price ceilings;
 - calibrated sample-size guidance and a multiple-comparison correction across
   development challengers; and
-- cross-campaign comparison and human-approval surfaces.
+- cross-campaign comparison, and recording reviews and activations in the
+  [policy registry](#policy-registry).
 
 The runner bounds what a campaign may vary:
 [reserved fields](#experiment-contracts-and-budgets) such as acceptance,

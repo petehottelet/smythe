@@ -640,6 +640,22 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   explicit campaign ID created with the other setting is refused as campaign
   binding drift. See
   [experiment contracts and budgets](docs/optimize.md#experiment-contracts-and-budgets).
+- `smythe.optimize.PolicyRegistry` records which policy version is in effect
+  for each dotted target, in its own SQLite file
+  (`~/.smythe/policy-registry.sqlite3` by default, schema version 1) that
+  never writes an Autotune ledger. Each target has an append-only history of
+  `baseline`, `activate`, `rollback` and `retire` events numbered in order.
+  `resolve()` returns the `ActiveVersion` in effect, or `None` after
+  retirement; `history()` lists every `ActivationEvent`; `rollback()`
+  restores an earlier baseline or activate entry as a new event; and
+  `retire()` leaves no policy in effect. Each change names the head it
+  expects, and a stale `expected_seq` raises `RegistryConflictError` without
+  writing, so of two writers on the same head exactly one succeeds. Triggers
+  refuse every update and delete and inserts from another schema version, a
+  writable open refuses a database holding other tables, and a read-only open
+  requires a closed, checkpointed file. The ledger schema and
+  `smythe optimize inspect --json` output are unchanged. See
+  [policy registry](docs/optimize.md#policy-registry).
 - Recorded read steps in durable text workflows. A `ReadProfile` declares one
   versioned read: an HTTP `GET` of a URL whose path or query placeholders take
   a step's checked input, a decoder and its version, whether a read can be
