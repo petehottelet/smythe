@@ -99,6 +99,19 @@ def _split(data: bytes, where: str) -> tuple[bytes, str, str]:
     return normalized, match.group(1), text[match.end():]
 
 
+def _shown(value: Any) -> str:
+    """Describe a refused value briefly; only short text is repeated as it is.
+
+    YAML aliases share one object many times over, so a few hundred bytes can
+    build a list whose ``repr`` runs to gigabytes.
+    """
+    if value is None or isinstance(value, str) and len(value) <= 2 * MAX_NAME_CHARS:
+        return repr(value)
+    if isinstance(value, str):
+        return f"text of {len(value)} characters"
+    return type(value).__name__
+
+
 def _text(fields: dict[Any, Any], key: str, where: str, limit: int | None = None) -> str | None:
     value = fields.get(key)
     if value is None:
@@ -134,7 +147,7 @@ def parse_skill_md(data: bytes, *, skill_id: str | None = None) -> AgentSkill:
     if not isinstance(name, str) or len(name) > MAX_NAME_CHARS or not _NAME.fullmatch(name):
         raise AgentSkillError(
             f"{where}: name must be 1 to {MAX_NAME_CHARS} lowercase letters, digits and single "
-            f"hyphens, not starting or ending with a hyphen; got {name!r}"
+            f"hyphens, not starting or ending with a hyphen; got {_shown(name)}"
         )
     if skill_id is not None and name != skill_id:
         raise AgentSkillError(f"{where}: name {name!r} must equal its directory name")

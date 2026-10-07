@@ -125,6 +125,41 @@ def test_a_non_utf8_file_is_refused():
         parse_skill_md(skill_text().encode() + b"\xff")
 
 
+def nested_aliases(levels):
+    """YAML of a few hundred bytes whose last anchor is a list of 9 ** levels strings."""
+    lines = ['a0: &a0 ["lol", "lol", "lol", "lol", "lol", "lol", "lol", "lol", "lol"]']
+    lines += [f"a{level}: &a{level} [" + ", ".join([f"*a{level - 1}"] * 9) + "]"
+              for level in range(1, levels)]
+    return "\n".join(lines) + f"\nname: *a{levels - 1}\n"
+
+
+def test_a_refused_name_is_described_briefly_however_large_its_value(tmp_path):
+    hostile = {
+        "nested-aliases": (f"---\n{nested_aliases(6)}description: Aliases.\n---\n", "got list"),
+        "long-text": (skill_text("a" * 60_000), "got text of 60000 characters"),
+        "long-integer": (skill_text("0x" + "f" * 4_000), "got int"),
+    }
+    for label, (text, shown) in hostile.items():
+        assert len(text.encode()) <= 65_536, label
+        with pytest.raises(AgentSkillError, match=NAME_RULE) as raised:
+            parse_skill_md(text.encode(), skill_id="release-notes")
+        message = str(raised.value)
+        assert len(message) < 300 and message.endswith(shown), (label, len(message))
+
+    # Discovery and refresh() refuse the same file just as briefly.
+    root = tmp_path / "skills"
+    write_skill(root, text=hostile["nested-aliases"][0])
+    with pytest.raises(AgentSkillError, match=NAME_RULE) as raised:
+        AgentSkillsProvider({"writer": [root]})
+    assert len(str(raised.value)) < 300
+    (root / "release-notes" / "SKILL.md").write_bytes(skill_text().encode())
+    provider = AgentSkillsProvider({"writer": [root]})
+    (root / "release-notes" / "SKILL.md").write_bytes(hostile["nested-aliases"][0].encode())
+    with pytest.raises(AgentSkillError, match=NAME_RULE) as raised:
+        provider.refresh()
+    assert len(str(raised.value)) < 300
+
+
 def test_the_version_changes_with_any_edit_but_not_with_crlf_line_endings():
     original = parse_skill_md(skill_text().encode())
     crlf = parse_skill_md(skill_text().replace("\n", "\r\n").encode())
