@@ -6,21 +6,33 @@ and the inputs it was given, as ids, versions and SHA-256 digests. A run opts
 in with a `LineagePolicy`, which also declares the access scope its results
 belong to and whether they may be reused.
 
-This release adds the policy, the recipe opt-in, the versioned record
-format, `ArtifactLineage`, and the record each opted-in run
-[writes when it completes](#the-record-a-run-writes), with its
-[coverage](#coverage). It also adds [reuse decisions](#reuse-decisions):
-a pure evaluator that says what a record calls for under the current
-sources, tools and validators, [repair plans](#plan-a-repair), which
-show before anything is dispatched what each run of an archive calls for
-and the work that would take, [repair in place](#repair-a-run-in-place),
-which decides a run again or publishes its damaged document again without
-running a node, the records of a
-[successor run](#reuse-in-a-successor-run) that reuses a completed run's
-results, [applying a plan](#apply-a-repair-plan) under an explicit
-allowance, and [source restriction](#restrict-a-source), which withdraws a
-source's text from every run that used it and can delete their published
-documents.
+With those records an archive of accepted artifacts stays current as its
+inputs change. When a source gets a new version, a validator changes or a
+published file is damaged, lineage shows which artifacts that affects, which
+of their results still stand, and what work makes each one accepted again:
+
+1. [Opt runs in](#opt-a-run-in). Each completed run
+   [writes its record](#the-record-a-run-writes), whose
+   [coverage](#coverage) says whether it declares every node's inputs.
+2. [Plan a repair](#plan-a-repair). A read-only plan applies the
+   [reuse decisions](#reuse-decisions), with their [rules](#rules) and
+   [reason codes](#reason-codes), to the runs of an access scope, and
+   predicts the work each calls for before anything is dispatched.
+3. [Apply the plan](#apply-a-repair-plan) under an explicit allowance. A run
+   whose inputs are all current but whose validators or published document
+   changed is [decided or published again in place](#repair-a-run-in-place);
+   a run with a changed input gets a [successor run](#reuse-in-a-successor-run)
+   that keeps its unaffected results and computes the rest.
+   [`reuse=False`](#the-reuse-switch) computes affected work again in full.
+4. [Restrict a source](#restrict-a-source) when its retention ends or
+   access to it is revoked.
+
+Lineage covers durable text workflows. [Where lineage applies](#where-lineage-applies)
+says what ordinary runs and Jobs support, [cache and access](#cache-and-access)
+where reused results come from and who may reuse them, and
+[inspect lineage](#inspect-lineage) how to read all of it without changing
+anything. Two offline [examples](#examples) show a durable research run and
+an archive of such runs kept current with lineage.
 
 ## Opt a run in
 
@@ -937,3 +949,120 @@ decision follows it:
   completes.
 - **Files elsewhere.** Only the files a run published into its artifact
   directory are purged, never copies made elsewhere.
+
+## Cache and access
+
+Lineage keeps no cache of its own. A result is reused only from the journal
+that holds it, through a `reuse` operation that names the run and the node
+it comes from; nothing is looked up by its digest.
+
+- **One store.** A successor reuses only from a completed predecessor in the
+  same journal, whose applied lineage record has the digest the plan was
+  made from. Results never move between journals.
+- **Scope before digest.** The evaluator, a plan, `archive_heads`, reuse and
+  `restrict_source` compare the [access scope](#access-scope) before they
+  read any digest. Identical content under another scope is never offered,
+  because a matching hash identifies content; it does not grant access to
+  it.
+- **Checked when kept.** A kept result must still have the digest its record
+  gives, its inputs must be declared, and no source it names may be
+  withdrawn; gates and the nodes they judge are never kept. A refusal
+  creates no run and makes no call.
+  [Reused results](workflow-accounting.md#reused-results) lists every check.
+- **Copied, never shared.** A kept result is copied byte for byte into the
+  successor's journal, so once its `reuse` operation commits, resume replays
+  it without reading the predecessor. The predecessor's rows, document and
+  decisions are never changed.
+- **Documents are rendered again, never copied.** A published document is
+  checked against the digest its publication recorded. One that is missing
+  or changed is rendered again from its own run's saved synthesis and
+  decided again; a document is never copied from another run.
+- **Freshness costs nothing.** Sources are described by the
+  [source catalog](#the-source-catalog), a zero-cost local read; a catalog
+  declared metered is refused, so a plan never spends to find out what
+  changed.
+- **The journal file.** A scope is a declared label, not a credential: it
+  says whose runs these are, not who may read the journal. `inspect_run()`,
+  `list_runs()` and journal events never return a lineage record or kept
+  text, and `smythe runs inspect` shows a summary without text. The journal
+  itself holds the text of sources, outputs and kept results, so protect it
+  as the [durable workflow guide](workflow-accounting.md#inspect-a-run)
+  describes.
+
+## Inspect lineage
+
+None of these takes a lease, writes anything or calls a provider:
+
+| To see | Use |
+|---|---|
+| A run's record | `smythe.lineage.load_lineage(store, run_id)`: the record of its latest applied `lineage` operation, or None before it has one |
+| A run's coverage, sources, document integrity, predecessor, successors and derived status | `smythe runs --journal <path> inspect <run id>`, whose [lineage summary](runs.md#lineage) holds no text |
+| What each run in a scope calls for, and the work it would take | `Swarm.plan_repair(sources=...)`, or `smythe.reuse.repair_plan(store, recipe, catalog)` |
+| What one record calls for | `smythe.reuse.evaluate(record, state)` |
+| The runs that nothing supersedes | `archive_heads(store, scope)` |
+| The tombstones that restrict a run | `smythe.lineage.restricted_sources(store, run_id)` |
+| The published files a restriction deleted | `smythe.lineage.purged_artifacts(store, run_id)` |
+
+Applying a plan returns a [`RepairResult`](#the-result) with each item's
+outcome, decision, successor and work. A record, a decision and a plan
+convert with `to_dict()` to JSON data that holds no source text, prompt or
+output, so they can be kept or reviewed apart from the journal.
+
+## Where lineage applies
+
+- **Durable text workflows** support everything on this page, with a
+  `run_store` and a strict acceptance policy.
+- **Ordinary runs** keep no journal, so they record no lineage. `lineage`
+  without a `run_store` raises `WorkflowBindingError` before any routing,
+  planning or node call, and `plan_repair()` and `repair()` raise
+  `ValueError`. An ordinary run still records each artifact file's SHA-256
+  and size with its node ([artifact records](architecture.md#artifact-records-and-lineage)).
+- **Jobs** write no lineage record and repair accepted output only within
+  its own run: an [integrity repair](jobs.md#repair-corrupted-accepted-outputs)
+  regenerates a missing or changed accepted file as a new attempt, a
+  [recheck](jobs.md#recheck-accepted-outputs) decides accepted files again
+  under changed validators, and the read-only
+  [repair preview](jobs.md#preview-repairs) gives each operation an action
+  and reason codes from the [same vocabulary](#reason-codes). An operation's
+  [input digest](jobs.md#operation-identity-and-input-digest) identifies
+  what it asks its provider for, but no run reuses another run's output by
+  it.
+
+The [support matrix](support-matrix.md#lineage-and-repair) names the test
+behind each of these.
+
+## What lineage does not cover
+
+- **Automatic repair.** Nothing repairs on its own: a plan is applied only
+  by a `Swarm.repair` call that names the digest a person approved, and the
+  Jobs preview repairs nothing.
+- **Reuse across Jobs runs.** A Jobs run never adopts another run's accepted
+  output, even for the same input digest; repairing an operation makes a new
+  attempt in its own run, under its own approval.
+- **Reuse across journals.** A successor reuses only from a run in its own
+  store.
+- **Supervised repairs.** A repair refuses a configured `supervisor`,
+  because a revision could change the graph a successor keeps results in.
+- **Another graph.** A successor runs its predecessor's task and graph. A
+  run with a different graph is a new run, and nothing is reused for it.
+- **Reused gates.** A gate and the nodes it judges or depends on are
+  computed again whenever their item computes anything.
+- **Erasure.** A restriction withdraws text and can delete published files,
+  but copies in the journal remain (see the [limits](#limits) of
+  restriction).
+
+## Examples
+
+Both run offline and without keys, reading bundled sources from a server on
+the loopback address:
+
+- [Source to artifact](../examples/16_source_to_artifact.py) runs one durable
+  research run of the kind a lineage record describes: journaled read steps
+  of bundled sources, context snapshots, source evidence, an interruption
+  and resume, and a published document accepted under a strict policy.
+- [Archive maintenance](../examples/18_archive_maintenance.py) records the
+  lineage of four such runs, which share two sources between them. It
+  revises one shared source, damages one published brief and bumps a
+  validator's version, prints the repair plan, applies it, then computes the
+  four runs again in full in a second journal and compares their documents,
+  decisions and work.

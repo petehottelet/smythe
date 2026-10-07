@@ -897,7 +897,9 @@ token verification, gates judged by a
 declared with `LocalOnly(..., role="validator")`,
 [recorded read steps](#recorded-read-steps) of declared profiles, and
 [published documents](#published-documents) from `MarkdownRenderer` or a
-renderer declared with `LocalOnly(..., role="renderer")`. Every reachable router tier
+renderer declared with `LocalOnly(..., role="renderer")`, and opt-in
+[artifact lineage](lineage.md) with read-only repair plans and repairs that
+reuse unaffected results. Every reachable router tier
 and template is checked before routing can make a paid call. Provider
 instances are snapshotted per run.
 

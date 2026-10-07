@@ -1159,6 +1159,10 @@ runner = JobRunner(store, validators=validators)
   policy in the runtime. Repairs are too: the
   [repair preview](#preview-repairs) shows what each operation calls for,
   and nothing repairs an operation automatically.
+- Jobs write no [artifact lineage](lineage.md) record. Integrity repairs,
+  rechecks and the repair preview work within one run, and no run reuses
+  another run's accepted output, even for the same
+  [input digest](#operation-identity-and-input-digest).
 - Unknown provider outcomes require human investigation, then explicit
   duplicate acknowledgment or adoption of the bytes the attempt published.
 - Jobs do not read a response's `stop_reason`. A response that the provider

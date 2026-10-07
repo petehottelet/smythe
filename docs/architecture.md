@@ -378,6 +378,32 @@ complete worst-case preflight, approval bound to the exact plan and ceiling,
 SQLite attempt/event journaling, explicit unknown outcomes, selective rerolls,
 and portable exports. See [Jobs](jobs.md).
 
+### Artifact records and lineage
+
+Each path records what it delivered by digest, to a different depth:
+
+- **Ordinary runs** record each artifact file's path, MIME type, SHA-256 and
+  size with its node, and a strict policy hashes delivered files again when
+  it decides.
+- **Durable text workflows** can
+  [publish the delivered document](workflow-accounting.md#published-documents)
+  as a local file whose SHA-256 the run's delivery decision binds. With a
+  [lineage policy](lineage.md), each completed run also records how that
+  document was made: the decision, and each node's result and inputs (read
+  profiles, sources by id, version and digest, context snapshots,
+  components and agents) as ids, versions and digests, without text. A
+  read-only [repair plan](lineage.md#plan-a-repair) compares those records
+  with the current sources, tools and validators, and
+  [applying it](lineage.md#apply-a-repair-plan) decides a run again,
+  publishes its document again, or starts a successor run that keeps the
+  unaffected results, so a changed source recomputes only what depends on
+  it.
+- **Jobs** record every attempt's artifacts with their SHA-256 in the
+  dispatch journal. Within its own run, a damaged accepted output can be
+  [regenerated](jobs.md#repair-corrupted-accepted-outputs) and an accepted
+  output [decided again](jobs.md#recheck-accepted-outputs) under changed
+  validators; no run reuses another run's output.
+
 ## Tools and skills
 
 Agents can carry MCP server specifications. The runtime discovers an allowed
@@ -447,6 +473,10 @@ prompt mutation.
   the snapshot it was first given, and new sources enter a run only through
   `refresh_context`, which re-evaluates its nodes. See
   [context snapshots](tasks.md#context-snapshots).
+- With a lineage policy, a run's results are reused only by an explicit
+  repair under an allowance, from a completed run in the same journal and
+  access scope, which is compared before any digest. See
+  [cache and access](lineage.md#cache-and-access).
 - A supervisor may change only pending work. It cannot drop a verification
   gate or the node it judges, or leave the gate no longer depending on that
   node; a step it adds after that node is not judged by the gate. One

@@ -200,6 +200,7 @@ memo. Its saved graph, trace, and expected output make the workflow inspectable.
 | Control spending and parallel work | Request reservations and bounded concurrency |
 | Recover interrupted work | Checkpoints, native response replay, [recorded read steps](docs/workflow-accounting.md#recorded-read-steps), and durable job journals |
 | Check the deliverable | Output verification, opt-in strict acceptance of the exact output returned, [source-evidence checks](docs/source-evidence.md) that quotes and listed contradictions hold, and artifact receipts |
+| Keep accepted documents current | Opt-in [artifact lineage](docs/lineage.md) for durable runs: a read-only repair plan shows what a changed source, a changed validator or a damaged file affects, and applying it keeps the results that still stand |
 | Understand a run | Graph exports, traces, costs, inspection reports, and [read-only run inspection](docs/runs.md) that reports execution, acceptance and cost separately, with a research run's sources, reads, evidence and open questions |
 
 [Architecture](docs/architecture.md) · [Execution](docs/execution.md) ·
