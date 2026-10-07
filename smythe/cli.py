@@ -1064,9 +1064,10 @@ def _emit_actions(actions: dict[str, Any]) -> None:
         risk = "; duplicate risk" if item["duplicate_risk"] else ""
         if item["contradiction"] is not None:
             risk += "; " + item["contradiction"].replace("_", " ")
+        attempts = len(item["attempts"])
         print(f"  Action {_terminal_text(item['slot'])}/{item['sequence']} ({_terminal_text(item['action_id'])}): "
-              f"{item['state']}; {len(item['attempts'])} attempts; {item['confirmed_nanousd']} confirmed, "
-              f"{item['unknown_nanousd']} unknown {unit}{risk}; next {item['next_action'] or 'none'}")
+              f"{item['state']}; {attempts} attempt{'' if attempts == 1 else 's'}; {item['confirmed_nanousd']} "
+              f"confirmed, {item['unknown_nanousd']} unknown {unit}{risk}; next {item['next_action'] or 'none'}")
         for approval in item["approvals"]:
             principal, expiry = approval["principal"], approval["expires_at_ns"]
             standing = (f"revoked {approval['revocation']}" if approval["revoked_at_ns"] is not None

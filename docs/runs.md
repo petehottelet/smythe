@@ -325,7 +325,7 @@ approvals and its record kinds:
 
 ```text
 External actions: 1; 0 confirmed, 0 reserved, 2000000 unknown nanoUSD; 1 unresolved
-  Action publish/1 (5b2d9e70c4a1): outcome_unknown; 1 attempts; 0 confirmed, 2000000 unknown nanoUSD; next operator_review
+  Action publish/1 (5b2d9e70c4a1): outcome_unknown; 1 attempt; 0 confirmed, 2000000 unknown nanoUSD; next operator_review
     Approval 0e7f13c2d98b: editor-1 of acme (identity-host); approved; expires at 1791820800000000000 ns
     Records: finding 1
 ```

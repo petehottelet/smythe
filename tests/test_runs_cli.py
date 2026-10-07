@@ -1513,6 +1513,19 @@ def test_exit_code_12_is_new():
     assert (args.runs_command, args.target, args.reason, args.journal) == ("revoke-action", "abc", "why", "j.db")
 
 
+def test_the_actions_block_counts_attempts_in_words(capsys):
+    def entry(attempts):
+        return {"slot": "publish", "sequence": attempts + 1, "action_id": f"action-{attempts}",
+                "state": "dispatched", "attempts": [{}] * attempts, "confirmed_nanousd": 0, "unknown_nanousd": 0,
+                "duplicate_risk": False, "contradiction": None, "next_action": None, "approvals": [], "records": []}
+
+    cli._emit_actions({"unit": "nanoUSD", "confirmed_nanousd": 0, "reserved_nanousd": 0, "unknown_nanousd": 0,
+                       "unresolved": [], "items": [entry(0), entry(1), entry(2)]})
+
+    lines = capsys.readouterr().out.splitlines()
+    assert [line.split("; ")[1] for line in lines[1:]] == ["0 attempts", "1 attempt", "2 attempts"]
+
+
 def test_inspection_shows_external_actions_read_only_and_exits_12_while_one_is_unresolved(
         tmp_path, capsys, monkeypatch, scripted_replies):  # noqa: F811
     path, action, host, _ = action_journal(tmp_path, scripted_replies)
@@ -1565,7 +1578,7 @@ def test_inspection_shows_external_actions_read_only_and_exits_12_while_one_is_u
     assert main(["runs", "--journal", str(path), "inspect", action.run_id]) == EXIT_RUN_ACTION_UNRESOLVED
     text = capsys.readouterr().out
     assert f"External actions: 1; 0 confirmed, 0 reserved, {write} unknown nanoUSD; 1 unresolved" in text
-    assert (f"  Action publish/1 ({action.action_id}): outcome_unknown; 1 attempts; 0 confirmed, "
+    assert (f"  Action publish/1 ({action.action_id}): outcome_unknown; 1 attempt; 0 confirmed, "
             f"{write} unknown nanoUSD; next operator_review") in text
     assert (f"    Approval {approval['approval_id']}: editor-1 of acme ({host.issuer}); approved; "
             f"expires at {approval['expires_at_ns']} ns") in text
