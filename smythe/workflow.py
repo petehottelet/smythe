@@ -416,47 +416,58 @@ def _decision_inputs(synthesis_key, policy_sha256, task_digest, output_sha256, s
     return inputs
 
 
+# The fields of a gate's final record that its verdict is read from (see
+# smythe.verifier.gate_disposition), which a policy's decision binds.
+_GATE_RECEIPT_FIELDS = ("version", "state", "target_id", "target_generation",
+                        "judge_generation", "outcome", "passed")
+
+
 def _gate_receipts(graph):
     """The SHA-256 of the final receipt of each gate in *graph*, which a policy's decision binds.
 
-    Each gate is named by its node id with the ``target_generation``,
-    ``outcome`` and ``passed`` of the record its final verdict is read from
-    (see :func:`~smythe.verifier.gate_disposition`), or with None when it
-    has no record. Nothing changes a gate once the run completes, so its
-    saved graph keeps these receipts for as long as the run is kept.
+    Each gate is named by its node id and status with the fields of the
+    record its final verdict is read from (``_GATE_RECEIPT_FIELDS``; see
+    :func:`~smythe.verifier.gate_disposition`): its version and state, the
+    target id and generation and the judge generation it is bound to, and
+    its ``outcome`` and ``passed``; or with None when it has no record.
+    Nothing changes a gate once the run completes, so its saved graph keeps
+    these receipts for as long as the run is kept.
     """
     receipts = []
     for node in sorted(graph.nodes, key=lambda item: item.id):
         if node.verifies:
             record = node.metadata.get("verification_receipt" if node.max_regenerations > 0
                                        else ADVISORY_VERDICT_KEY)
-            receipts.append({"node_id": node.id, "receipt": {
-                key: record.get(key) for key in ("target_generation", "outcome", "passed")
+            receipts.append({"node_id": node.id, "status": node.status.value, "receipt": {
+                key: record.get(key) for key in _GATE_RECEIPT_FIELDS
             } if isinstance(record, dict) else None})
     return _hash(receipts)
 
 
 def _gate_problems(history, graph):
-    """Why a completed run's saved *graph* no longer holds the gate receipts its decisions bound.
+    """Why a completed run's decisions no longer bind its journal and saved *graph*.
 
-    *history* is the run's :func:`decision_history`. Each decision's key
-    must still be the digest of its inputs, and each that binds gate
-    receipts (:func:`_gate_receipts`) must bind those of *graph*, whichever
-    decision is current. A decision recorded before decisions bound gate
-    receipts binds none. One reason, or none when everything matches.
+    *history* is the run's :func:`decision_history`, whichever decision is
+    current. Each decision's inputs must be a JSON object whose digest is
+    still its key, and each that binds gate receipts (:func:`_gate_receipts`)
+    must bind those of *graph*. A decision recorded before decisions bound
+    gate receipts binds none. One reason for each decision whose inputs are
+    unreadable or no longer match its key, and one when the gate receipts
+    differ; none when everything matches.
     """
-    digest = None
+    problems, digest, changed = [], None, False
     for decision in history:
-        bound = decision["inputs"]
-        if decision["operation_key"] != _decision_key(bound):
-            break
-        if "gate_receipts_sha256" in bound:
+        bound, sequence = decision["inputs"], decision["sequence"]
+        if type(bound) is not dict:
+            problems.append(f"the inputs of the journal's decision {sequence} are not a JSON object")
+        elif decision["operation_key"] != _decision_key(bound):
+            problems.append(f"the inputs of the journal's decision {sequence} do not match its key")
+        elif "gate_receipts_sha256" in bound:
             digest = digest or _gate_receipts(graph)
-            if bound["gate_receipts_sha256"] != digest:
-                break
-    else:
-        return []
-    return ["the saved gate verdicts are not those the run's decision bound"]
+            changed = changed or bound["gate_receipts_sha256"] != digest
+    if changed:
+        problems.append("the saved gate verdicts are not those the run's decision bound")
+    return problems
 
 
 def _repair_record(plan_sha256, reason):
@@ -726,9 +737,10 @@ def _decision_problems(store, run_id, graph, output, record, *, task, policy_sha
     the source generations must be those it binds, and the record must be
     the journal's :func:`current_decision`, made under the run's policy
     (*policy_sha256*) or, for a re-evaluation, the policy it names, and under
-    tombstones the journal holds. The saved *graph*'s gates must hold the
-    final receipts the run's decisions bound (:func:`_gate_problems`),
-    whichever decision is current. With *removed*, a source the run delivered
+    tombstones the journal holds. Every decision's inputs must still match
+    its key, and the saved *graph*'s gates must hold the final receipts the
+    run's decisions bound (:func:`_gate_problems`), whichever decision is
+    current. With *removed*, a source the run delivered
     from that was removed after the decision
     (:meth:`WorkflowRuntime.remove_source`), and any tombstone that restricts
     a lineage run (:func:`_restriction_problems`), is a problem too. An empty list
@@ -738,7 +750,9 @@ def _decision_problems(store, run_id, graph, output, record, *, task, policy_sha
     problems = _delivery_problems(record, output, graph, task)
     history = decision_history(store, run_id)
     decision = history[-1] if history else None
-    holds = decision is not None and decision["record"].to_dict() == record.to_dict()
+    # Unreadable inputs are reported by _gate_problems.
+    holds = (decision is not None and type(decision["inputs"]) is dict
+             and decision["record"].to_dict() == record.to_dict())
     considered = []
     if holds:
         sequence, bound = decision["sequence"], decision["inputs"]

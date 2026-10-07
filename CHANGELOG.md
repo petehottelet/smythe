@@ -784,15 +784,18 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   checkpoint, leaving calls, charges and the recipe unchanged;
   `smythe.workflow.current_decision()` and `decision_history()` read the
   decisions back. Each decision a policy makes, the run's own included,
-  binds the SHA-256 of every gate's final receipt (`gate_receipts_sha256`),
-  so a gate verdict changed in the journal afterwards is refused by
-  re-evaluation, with nothing written, and gives `indeterminate` on resume
-  and inspection. Resume returns the current decision and never makes a new
-  one: a strict `Swarm` resuming a completed run without a record, or one
-  decided under another policy, behaves as before, and a durable run still
-  resumes only under the policy its recipe records. `smythe runs inspect`
-  adds a `decisions` block with the current decision's sequence and the
-  decisions before it, and its exit codes follow the current decision. See
+  binds the SHA-256 of every gate's status and final receipt
+  (`gate_receipts_sha256`): everything its verdict is read from, including
+  the target and judge generations it is bound to. A gate verdict or binding
+  changed in the journal afterwards, or a decision whose inputs no longer
+  match its key, is refused by re-evaluation, with nothing written, and gives
+  `indeterminate` on resume and inspection, each with its own reason. Resume
+  returns the current decision and never makes a new one: a strict `Swarm`
+  resuming a completed run without a record, or one decided under another
+  policy, behaves as before, and a durable run still resumes only under the
+  policy its recipe records. `smythe runs inspect` adds a `decisions` block
+  with the current decision's sequence and the decisions before it, and its
+  exit codes follow the current decision. See
   [re-evaluation](docs/verifier.md#re-evaluation).
 - Durable text workflows can publish their delivered output as a local
   document. `Swarm(run_store=..., renderer=MarkdownRenderer())`, or a
