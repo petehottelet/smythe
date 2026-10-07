@@ -15,8 +15,8 @@ Action money is the ``external_actions`` accounting scope: whole nanoUSD kept
 on these rows, never in a run's balances, which stay equal to its call ledger.
 :func:`audit_actions` runs inside a ``SQLiteWorkflowStore`` transaction; the
 other functions open their own. Preparation, verdicts, revocations, a run's
-action stop and notices need no run lease and are called by
-``smythe.actions``. The dispatch
+action stop, notices and an operator's decisions with their evidence need no
+run lease and are called by ``smythe.actions``. The dispatch
 journal, :func:`begin_attempt` to :func:`recover_actions`, the runner's
 releases and readback records, and reconciliation's lookups, same-key
 retries and findings are fenced by the run's lease.
@@ -32,9 +32,9 @@ from uuid import uuid4
 from smythe._money import NANOUSD
 from smythe._redact import redact_account_identifiers
 from smythe.actions import (
-    _CLOSED, _FINISHED, _SECURITY_STOP, _SHOWN, ACTION_STATES, ActionIntent, ActionNotAuthorized,
+    _CLOSED, _DECISIONS, _FINISHED, _SECURITY_STOP, _SHOWN, ACTION_STATES, ActionIntent, ActionNotAuthorized,
     ActionStateError, ApprovalRejected, ConnectorProfile, ConnectorReceipt, PreparedAction, Principal,
-    _receipt_of, _undeliverable, _window_open, action_key,
+    _held_digest, _next_action, _receipt_of, _undeliverable, _window_open, action_key,
 )
 from smythe.workflow_store import (
     WorkflowBudgetError, WorkflowConflictError, WorkflowCorruptionError, WorkflowLeaseError,
@@ -222,14 +222,18 @@ def _prepared(row):
 
 
 def load(store, action_id):
-    """An action, after its run's actions pass the audit, and its approval rows, newest first."""
+    """An action, after its run's actions pass the audit; its approval rows, newest first; its risk.
+
+    The risk is the number of attempts an operator's latest ``not_executed``
+    decision found, or None without one (see :func:`_risk`).
+    """
     if store.store_version < 2:
         raise WorkflowNotFoundError(action_id)  # Version 1 journals have no action tables.
     with store._transaction(write=False) as db:
         row = _row(db, action_id)
         audit_actions(store, db, row["run_id"])
         return _prepared(row), db.execute("SELECT * FROM workflow_action_approvals WHERE action_id=? "
-                                          "ORDER BY rowid DESC", (action_id,)).fetchall()
+                                          "ORDER BY rowid DESC", (action_id,)).fetchall(), _risk(db, action_id)
 
 
 def prepare(store, run_id, slot, intent, profile, compensates=None):
@@ -287,34 +291,44 @@ def effect_target(store, action_id):
         return _prepared(row), receipt.target if receipt else None
 
 
-def record_verdict(store, action, verdict, principal, identity, assertion, ceiling, expires_at_ns):
+def record_verdict(store, action, verdict, principal, identity, assertion, ceiling, expires_at_ns, risk=None):
     """Record a verified approval or rejection of *action*; return its row.
 
     A rejection cancels the action and releases, with its reservation, an
-    attempt prepared but not claimed: nothing was sent. An assertion is
-    recorded once in a journal: the same verdict on the same action again
-    returns its row, and anything else raises ``ApprovalRejected``.
+    attempt prepared but not claimed: nothing was sent. An approval with a
+    *risk* accepts the duplicate risk an operator's ``not_executed`` decision
+    found at that many attempts, which must still be the action's. An
+    assertion is recorded once in a journal: the same verdict on the same
+    action again returns its row, and anything else raises
+    ``ApprovalRejected``.
     """
     assertion_sha, ceiling = _sha(assertion), None if ceiling is None else str(ceiling)
+    duplicate_risk = int(risk is not None)
     with store._transaction() as db:
         row = _row(db, action.action_id)
         if row["intent_sha"] != action.intent.digest():
             raise WorkflowConflictError("The action's recorded intent changed")
         if row["state"] in _CLOSED or verdict == "rejected" and row["state"] != "not_dispatched":
             raise ActionStateError(f"Action {action.action_id!r} is {row['state']}; it cannot be {verdict}")
+        if verdict == "approved" and _risk(db, action.action_id) != risk:
+            raise WorkflowConflictError("The action's duplicate risk changed while it was approved; approve "
+                                        "it again")
         existing = db.execute("SELECT * FROM workflow_action_approvals WHERE assertion_sha=?",
                               (assertion_sha,)).fetchone()
         if existing is not None:
             if ((existing["action_id"], existing["verdict"], existing["ceiling"], existing["expires_at_ns"],
-                 existing["revoked_at_ns"]) != (action.action_id, verdict, ceiling, expires_at_ns, None)):
+                 existing["revoked_at_ns"], existing["duplicate_risk"]) != (
+                    action.action_id, verdict, ceiling, expires_at_ns, None, duplicate_risk)):
                 raise ApprovalRejected("This assertion is already recorded in the journal; each approval "
                                        "needs its own assertion")
             return existing
         approval_id, now = uuid4().hex, store._clock_ns()
         db.execute("""INSERT INTO workflow_action_approvals(approval_id,action_id,intent_sha,verdict,principal_json,
-          verifier_json,assertion,assertion_sha,ceiling,expires_at_ns,created) VALUES (?,?,?,?,?,?,?,?,?,?,?)""",
+          verifier_json,assertion,assertion_sha,ceiling,expires_at_ns,duplicate_risk,created)
+          VALUES (?,?,?,?,?,?,?,?,?,?,?,?)""",
                    (approval_id, action.action_id, row["intent_sha"], verdict, _canonical(principal.to_dict()),
-                    _canonical({"identity": identity}), assertion, assertion_sha, ceiling, expires_at_ns, now))
+                    _canonical({"identity": identity}), assertion, assertion_sha, ceiling, expires_at_ns,
+                    duplicate_risk, now))
         if verdict == "rejected":
             for attempt in db.execute("SELECT * FROM workflow_action_attempts WHERE action_id=? "
                                       "AND state='prepared'", (action.action_id,)).fetchall():
@@ -362,13 +376,14 @@ def stop_run(store, run_id, reason):
         return revoked
 
 
-def _authorizing(action_id, state, intent_sha, ceiling, approvals, now, approval_id=None):
+def _authorizing(action_id, state, intent_sha, ceiling, approvals, now, approval_id=None, risk=None):
     """The approval row that authorizes an action now, as its journal rows alone say.
 
     *approvals* are the action's approval rows, newest first. The action must
     not be finished or need compensation, and its newest approval, which must
     be *approval_id* when one is named, must be unrevoked, unconsumed,
-    unexpired at *now*, bind *intent_sha* and cover *ceiling*. Raises
+    unexpired at *now*, bind *intent_sha*, cover *ceiling* and, with a
+    duplicate *risk* (see :func:`_risk`), accept it. Raises
     ``ActionNotAuthorized``.
     """
     approval = next((row for row in approvals if row["verdict"] == "approved"), None)
@@ -383,7 +398,9 @@ def _authorizing(action_id, state, intent_sha, ceiling, approvals, now, approval
         or approval["expires_at_ns"] <= now
         else "its approval binds another intent" if approval["intent_sha"] != intent_sha
         else "its approval does not cover the action's ceiling"
-        if approval["ceiling"] is None or _amount(approval["ceiling"]) < ceiling else None)
+        if approval["ceiling"] is None or _amount(approval["ceiling"]) < ceiling
+        else "its approval does not accept the duplicate risk an operator's not_executed decision left"
+        if risk is not None and approval["duplicate_risk"] != 1 else None)
     if problem:
         raise ActionNotAuthorized(f"Action {action_id!r} is not authorized: {problem}")
     return approval
@@ -442,7 +459,7 @@ def _authorized(store, db, run, action, approval_id):
     approvals = db.execute("SELECT * FROM workflow_action_approvals WHERE action_id=? ORDER BY rowid DESC",
                            (action["action_id"],)).fetchall()
     return _authorizing(action["action_id"], action["state"], action["intent_sha"], _amount(action["ceiling"]),
-                        approvals, store._clock_ns(), approval_id)
+                        approvals, store._clock_ns(), approval_id, _risk(db, action["action_id"]))
 
 
 def _note(store, db, action, attempt_id, state):
@@ -857,12 +874,45 @@ def _found(db, action_id):
 
 
 def _unsettled(db, action_id):
-    """IDs of the action's ``outcome_unknown`` attempts that no ``not_executed`` finding settled."""
+    """IDs of the action's ``outcome_unknown`` attempts that no ``not_executed`` finding or decision settled.
+
+    An operator's ``not_executed`` decision settles every attempt it found.
+    """
     settled = {payload.get("attempt_id") for _, payload in _payloads(db, action_id, "finding")
                if payload.get("finding") == "not_executed"}
-    rows = db.execute("SELECT attempt_id FROM workflow_action_attempts WHERE action_id=? AND state='outcome_unknown' "
-                      "ORDER BY number", (action_id,)).fetchall()
-    return [row[0] for row in rows if row[0] not in settled]
+    found = _risk(db, action_id) or 0
+    rows = db.execute("SELECT attempt_id,number FROM workflow_action_attempts WHERE action_id=? "
+                      "AND state='outcome_unknown' ORDER BY number", (action_id,)).fetchall()
+    return [row[0] for row in rows if row[0] not in settled and row[1] > found]
+
+
+def _risk(db, action_id):
+    """The number of attempts an operator's latest ``not_executed`` decision found, or None without one.
+
+    Another dispatch may then repeat an effect, so only an approval that
+    accepts that duplicate risk authorizes it.
+    """
+    found = [payload["attempts"] for _, payload in _payloads(db, action_id, "decision")
+             if payload.get("decision") == "not_executed" and type(payload.get("attempts")) is int]
+    return found[-1] if found else None
+
+
+def _shown(db, action):
+    """IDs of the action's readback records whose object held its bound content at its target.
+
+    The object must be in the intent's tenant and collection, be its object
+    when it names one, and carry the action's key when the read showed a key.
+    """
+    target, digest, shown = action.intent.target, _held_digest(action.intent), []
+    for record_id, payload in _payloads(db, action.action_id, "readback"):
+        seen = payload.get("observed")
+        where = seen.get("target") if type(seen) is dict else None
+        if (type(where) is dict and type(seen.get("content")) is dict
+                and seen["content"].get("sha256") == digest and seen.get("key") in (None, action.action_key)
+                and (where.get("tenant"), where.get("collection")) == (target.tenant, target.collection)
+                and target.object_id in (None, where.get("object_id"))):
+            shown.append(record_id)
+    return shown
 
 
 def _append(store, db, action, kind, payload, cost=None):
@@ -886,10 +936,12 @@ def reconcile_status(store, action_id):
     ``claims``, each claimed attempt's dispatch time on the journal clock;
     ``ceilings``, each approval's nanoUSD ceiling; ``spent``, the action's
     confirmed, reserved and unknown nanoUSD together; ``unsettled``, the
-    ``outcome_unknown`` attempts no ``not_executed`` finding settled, oldest
-    first; ``lookups`` and ``reads``, the number of lookup and readback
+    ``outcome_unknown`` attempts no ``not_executed`` finding or decision
+    settled, oldest first; ``lookups`` and ``reads``, the number of lookup and readback
     records of each attempt; ``found``, the receipt a lookup found for an
-    attempt; and ``finding``, the payload of the latest finding, or None.
+    attempt; ``finding``, the payload of the latest finding, or None;
+    ``duplicate_risk``, as :func:`_risk` finds it; and ``shown``, the
+    readback records that showed the bound content (see :func:`_shown`).
     Attempts and approvals are keyed by ID.
     """
     if store.store_version < 2:
@@ -897,29 +949,36 @@ def reconcile_status(store, action_id):
     with store._transaction(write=False) as db:
         row = _row(db, action_id)
         audit_actions(store, db, row["run_id"])
-        attempts = db.execute("SELECT * FROM workflow_action_attempts WHERE action_id=? ORDER BY number",
-                              (action_id,)).fetchall()
-        latest = attempts[-1] if attempts else None
-        receipt = latest and latest["receipt_json"] and _stored(latest["receipt_json"], ConnectorReceipt.from_dict)
-        counts = {"lookup": {}, "readback": {}}
-        for kind, tally in counts.items():
-            for _, payload in _payloads(db, action_id, kind):
-                tally[payload.get("attempt_id")] = tally.get(payload.get("attempt_id"), 0) + 1
-        findings = _payloads(db, action_id, "finding")
-        return {
-            "action": _prepared(row), "attempts": [_attempt_item(attempt) for attempt in attempts],
-            "receipt": receipt or None,
-            "claims": {attempt["attempt_id"]: attempt["dispatched"] for attempt in attempts
-                       if attempt["dispatched"] is not None},
-            "ceilings": {approval["approval_id"]: _amount(approval["ceiling"]) for approval in db.execute(
-                "SELECT approval_id,ceiling FROM workflow_action_approvals WHERE action_id=? AND verdict='approved'",
-                (action_id,))},
-            "spent": sum(_amount(row[name]) for name in ("confirmed", "reserved", "unknown")),
-            "unsettled": _unsettled(db, action_id), "lookups": counts["lookup"], "reads": counts["readback"],
-            "found": {attempt_id: _stored(_canonical(found), ConnectorReceipt.from_dict)
-                      for attempt_id, found in _found(db, action_id).items()},
-            "finding": findings[-1][1] if findings else None,
-        }
+        return _status(db, row)
+
+
+def _status(db, row):
+    """:func:`reconcile_status` of the action *row*, inside the caller's transaction."""
+    action_id, action = row["action_id"], _prepared(row)
+    attempts = db.execute("SELECT * FROM workflow_action_attempts WHERE action_id=? ORDER BY number",
+                          (action_id,)).fetchall()
+    latest = attempts[-1] if attempts else None
+    receipt = latest and latest["receipt_json"] and _stored(latest["receipt_json"], ConnectorReceipt.from_dict)
+    counts = {"lookup": {}, "readback": {}}
+    for kind, tally in counts.items():
+        for _, payload in _payloads(db, action_id, kind):
+            tally[payload.get("attempt_id")] = tally.get(payload.get("attempt_id"), 0) + 1
+    findings = _payloads(db, action_id, "finding")
+    return {
+        "action": action, "attempts": [_attempt_item(attempt) for attempt in attempts],
+        "receipt": receipt or None,
+        "claims": {attempt["attempt_id"]: attempt["dispatched"] for attempt in attempts
+                   if attempt["dispatched"] is not None},
+        "ceilings": {approval["approval_id"]: _amount(approval["ceiling"]) for approval in db.execute(
+            "SELECT approval_id,ceiling FROM workflow_action_approvals WHERE action_id=? AND verdict='approved'",
+            (action_id,))},
+        "spent": sum(_amount(row[name]) for name in ("confirmed", "reserved", "unknown")),
+        "unsettled": _unsettled(db, action_id), "lookups": counts["lookup"], "reads": counts["readback"],
+        "found": {attempt_id: _stored(_canonical(found), ConnectorReceipt.from_dict)
+                  for attempt_id, found in _found(db, action_id).items()},
+        "finding": findings[-1][1] if findings else None,
+        "duplicate_risk": _risk(db, action_id), "shown": _shown(db, action),
+    }
 
 
 def _unknown_attempt(store, db, lease, attempt_id):
@@ -1059,3 +1118,81 @@ def record_finding(store, lease, attempt_id, finding, reason, evidence=()):
         store._event(db, lease.run_id, "action_finding", payload={
             "action_id": action["action_id"], "record_id": record_id, "finding": finding, "state": state})
     return record_id
+
+
+# Operator decisions on open outcomes, and the operator's view of a run's actions.
+
+# An action in these states has an effect that is unknown, wrong or abandoned; see inspect().
+_OPEN = ("outcome_unknown", "compensation_required", "unresolved")
+
+
+def decide(store, action, attempts, decision, verified, evidence=None):
+    """Append an operator's verified *decision* on *action* and apply it; return the action.
+
+    The action must still have the state and the number of *attempts* that
+    the decision's assertion bound, or ``WorkflowConflictError`` is raised,
+    and a security stop on its run raises ``ActionNotAuthorized``.
+    *evidence*, an ``ActionEvidence``, becomes an ``evidence`` record. The
+    ``decision`` record holds *verified* (the principal, the verifier's
+    identity, the digest the assertion approved and the note) with the
+    decision, the state it was made in, *attempts* and, as ``evidence``, the
+    records it rests on: that evidence and, for ``adopt_observed``, the
+    readbacks that showed the bound content. No attempt, approval or balance
+    changes, and an ``action_decision`` event names the record.
+    """
+    state = _DECISIONS[decision][1]
+    with store._transaction() as db:
+        row = _row(db, action.action_id)
+        count = db.execute("SELECT count(*) FROM workflow_action_attempts WHERE action_id=?",
+                           (action.action_id,)).fetchone()[0]
+        if (row["state"], count, row["intent_sha"]) != (action.state, attempts, action.intent.digest()):
+            raise WorkflowConflictError(f"Action {action.action_id!r} changed while its decision was verified; "
+                                        "decide again")
+        if store._run(db, row["run_id"])["blocked_reason"] == _SECURITY_STOP:
+            raise ActionNotAuthorized(f"Action {action.action_id!r} cannot be decided: a security stop holds "
+                                      "the run")
+        cited = [] if evidence is None else [_append(store, db, row, "evidence", evidence.to_dict())]
+        if decision == "adopt_observed":
+            cited += _shown(db, action)
+        record_id = _append(store, db, row, "decision", {
+            **verified, "decision": decision, "state": action.state, "attempts": attempts, "evidence": cited})
+        db.execute("UPDATE workflow_actions SET state=?,updated=? WHERE action_id=?",
+                   (state, store._clock_ns(), action.action_id))
+        store._event(db, row["run_id"], "action_decision", payload={
+            "action_id": action.action_id, "record_id": record_id, "decision": decision, "state": state})
+        return _prepared(_row(db, action.action_id))
+
+
+def inspect(store, run_id):
+    """A run's actions as :func:`audit_actions` projects them, with what each needs next.
+
+    Each action adds ``duplicate_risk`` and ``next_action``; ``unresolved``
+    lists the actions that are ``outcome_unknown``, ``compensation_required``
+    or ``unresolved``, or ``dispatched`` with no read left to confirm them.
+    One read transaction; a version 1 journal has no actions.
+    """
+    with store._transaction(write=False) as db:
+        store._run(db, run_id)
+        if store.store_version < 2:
+            block = {"accounting_scope": ACCOUNTING_SCOPE, "unit": NANOUSD, **dict.fromkeys(_BALANCES, 0),
+                     "items": []}
+        else:
+            block = audit_actions(store, db, run_id)
+        unresolved, now = [], store._clock_ns()
+        for item in block["items"]:
+            row = _row(db, item["action_id"])
+            status = _status(db, row)
+            step, risk = _next_action(status), status["duplicate_risk"]
+            if step == "dispatch":
+                approvals = db.execute("SELECT * FROM workflow_action_approvals WHERE action_id=? "
+                                       "ORDER BY rowid DESC", (row["action_id"],)).fetchall()
+                try:
+                    _authorizing(row["action_id"], row["state"], row["intent_sha"], _amount(row["ceiling"]),
+                                 approvals, now, risk=risk)
+                except ActionNotAuthorized:
+                    step = "approve" if risk is None else "approve_duplicate_risk"
+            item.update(duplicate_risk=risk is not None, next_action=step)
+            if item["state"] in _OPEN or item["state"] == "dispatched" and step != "readback":
+                unresolved.append(item["action_id"])
+    items = block.pop("items")
+    return {**block, "unresolved": unresolved, "items": items}

@@ -108,6 +108,7 @@
     "tests/test_action_compensation.py",
     "tests/test_action_contract.py",
     "tests/test_action_journal.py",
+    "tests/test_action_operator.py",
     "tests/test_action_process_loss.py",
     "tests/test_action_reconciliation.py",
     "tests/test_action_runner.py",

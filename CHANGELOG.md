@@ -368,6 +368,26 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   `compensation_required` with its unknown exposure. A security stop refuses
   it as it refuses every action. See
   [compensation](docs/actions.md#compensation).
+- Operator decisions on external actions in `smythe.actions`.
+  `resolve(store, action_id, decision, *, assertion, verifier, evidence=None,
+  note)` records `adopt_observed`, `not_executed` or `abandon` on an action
+  whose outcome reconciliation left open, only when the host's verifier
+  accepts the assertion for exactly `decision_sha256()`, which binds the
+  action, its state and attempts, the decision and the evidence, from a
+  principal of the intent's tenant; a security stop refuses every decision.
+  `adopt_observed` needs a readback that showed the bound content, or
+  evidence, and makes the action `reconciled` without a submission.
+  `not_executed` needs evidence and returns the action to `not_dispatched`
+  with duplicate risk: its earlier approval no longer authorizes a dispatch,
+  and only `approve(..., duplicate_risk=True)` with an assertion for
+  `duplicate_risk_sha256()`, bound to the attempts the decision found, does.
+  `abandon` closes the action in the new `unresolved` state. `ActionEvidence`
+  is kept as a SHA-256 and a redacted summary of at most 500 characters,
+  never its bytes. Decisions only append `decision` and `evidence` records:
+  no attempt, approval or balance changes, so unknown exposure stays.
+  `inspect_actions(store, run_id)` adds each action's duplicate risk and next
+  action and lists the unresolved actions. See
+  [operator decisions](docs/actions.md#operator-decisions).
 - Jobs operations have a semantic input digest.
   `smythe.jobs.operation_input_digest()` hashes the provider kind and its
   adapter version (`smythe.jobs.providers.ADAPTER_VERSIONS`), the model,

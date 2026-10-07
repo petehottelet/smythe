@@ -730,7 +730,7 @@ def test_verifier_check_closes_the_coroutine_an_async_identity_returns():
 def test_action_vocabulary_and_errors():
     assert ACTION_CONTRACT_VERSION == "smythe.action.v1"
     assert ACTION_STATES == ("not_dispatched", "dispatched", "outcome_unknown", "observed",
-                             "reconciled", "compensation_required", "canceled")
+                             "reconciled", "compensation_required", "canceled", "unresolved")
     assert issubclass(ActionStateError, WorkflowStateError)
     for error in (ConnectorRefused, ConnectorAmbiguous, ApprovalRejected):
         assert issubclass(error, Exception)

@@ -11,8 +11,10 @@ through your connector, reads their results back,
 [reconciles](#reconciliation) outcomes a dispatch left unknown and keeps the
 service's [notices](#notices) as untrusted records.
 [Revocation](#revocation) takes precedence over dispatch, and a
-[compensation](#compensation) is a new action with its own approval. These
-types and functions may
+[compensation](#compensation) is a new action with its own approval. An
+[operator](#operator-decisions) records a verified decision on an outcome
+that reconciliation left open, and [inspection](#inspecting-actions) shows
+what each action needs next. These types and functions may
 change before they leave preview. `import smythe` loads neither module;
 import them explicitly.
 
@@ -181,13 +183,14 @@ synchronous host code that misbehaves.
 
 | State | Meaning |
 |---|---|
-| `not_dispatched` | No attempt has been sent, the last one was refused, or [reconciliation](#reconciliation) found that the last one was never made. |
+| `not_dispatched` | No attempt has been sent, the last one was refused, or [reconciliation](#reconciliation) or an [operator](#operator-decisions) found that the last one was never made. |
 | `dispatched` | An attempt was sent, and no read has confirmed its result yet. |
 | `outcome_unknown` | An attempt may or may not have taken effect. |
 | `observed` | A read of the target showed the intended result. |
-| `reconciled` | An uncertain outcome was resolved from the service's records. |
+| `reconciled` | An uncertain outcome was resolved from the service's records, or an operator adopted it. |
 | `compensation_required` | The target does not hold the intended result. |
 | `canceled` | The action closed before any dispatch. |
+| `unresolved` | An operator [abandoned](#operator-decisions) the action with its effect unknown, unverified or wrong. It is closed and keeps its exposure. |
 
 `ActionStateError` reports a transition that an action's recorded state does
 not allow.
@@ -280,8 +283,11 @@ verified `principal`, `ceiling_nanousd` and `expires_at_ns`. It refuses:
 - a ceiling below the action's `ceiling_nanousd`, and an expiry that is not
   later than the journal's clock, with `WorkflowValidationError`, before the
   verifier is called;
-- an action that is `observed`, `reconciled`, `canceled` or
-  `compensation_required`, with `ActionStateError`; and
+- an action that is `observed`, `reconciled`, `canceled`,
+  `compensation_required` or `unresolved`, with `ActionStateError`;
+- for an action an operator found [not executed](#duplicate-risk), an
+  approval without `duplicate_risk=True`, and `duplicate_risk=True` for any
+  other action, with `ActionStateError`; and
 - content the run can no longer deliver, with `ActionNotAuthorized`.
 
 An assertion is recorded once in a journal. The same approval again returns
@@ -315,11 +321,12 @@ every action of a run at once.
 authorizes the action now, or raises `ActionNotAuthorized` naming why not. It
 checks that:
 
-- the action is not `observed`, `reconciled`, `canceled` or
-  `compensation_required`;
+- the action is not `observed`, `reconciled`, `canceled`,
+  `compensation_required` or `unresolved`;
 - its newest approval is not revoked or consumed, has not expired on the
-  journal's clock, binds the action's intent digest, covers its ceiling and
-  was recorded by this verifier;
+  journal's clock, binds the action's intent digest, covers its ceiling,
+  accepts any [duplicate risk](#duplicate-risk) and was recorded by this
+  verifier;
 - the verifier accepts the stored assertion again, for the same principal,
   and still authorizes that principal; and
 - the content is still deliverable, as for `prepare_action()`: no security
@@ -674,7 +681,8 @@ window means that nothing is sent.
 
 **Unresolved outcomes.** What reconciliation cannot settle gets an
 `unresolved` finding with its reason, and the next action is
-`operator_review` until another attempt begins. An acknowledged attempt
+`operator_review` until another attempt begins, or until an
+[operator decision](#operator-decisions) settles it. An acknowledged attempt
 whose reads are used up, or no longer fit under the approval's ceiling,
 without confirming the receipt is unresolved in the same way. Reconciling
 again makes no lookup or read beyond the bounds and records no duplicate
@@ -742,7 +750,7 @@ last read, or None, the `next_action`, and the `refusal` of an action that
 | `reconcile` | The outcome is unknown, or the reads did not settle it. |
 | `operator_review` | Reconciliation found it can do no more: the outcome stays unknown or unverified. |
 | `compensate` | The action is `compensation_required`: a [compensation](#compensation) can undo its effect where the connector supports one. |
-| None | The action is settled, has used every attempt, or `dispatch_pending()` refused it. |
+| None | The action is settled or `unresolved`, has used every attempt, or `dispatch_pending()` refused it. |
 
 Errors from the journal's checks, such as `ActionNotAuthorized`,
 `ActionStateError` and `WorkflowBudgetError`, propagate unchanged from every
@@ -844,6 +852,122 @@ does, as it refuses every action.
 effect no read has shown, and for a profile that declares
 `compensation="unsupported"`: nothing is recorded, and the action stays
 `compensation_required`, or as it was, with its unknown exposure, for an
-operator to resolve. An operation the profile does not declare raises
-`WorkflowValidationError`, and a run that a security stop holds raises
-`ActionNotAuthorized`.
+[operator](#operator-decisions) to resolve. An operation the profile does
+not declare raises `WorkflowValidationError`, and a run that a security stop
+holds raises `ActionNotAuthorized`.
+
+## Operator decisions
+
+Reconciliation settles an outcome only as far as the connector's
+declarations allow. When it can do no more, the action's next action is
+`operator_review`: a person looks at the service and decides. Smythe
+records that decision only when your host's
+[approval verifier](#connectors-and-approval-verifiers) authenticates it,
+and the decision never authorizes a write by itself.
+
+```python
+from smythe.actions import ActionEvidence, decision_sha256, resolve
+
+evidence = ActionEvidence.for_bytes(audit_log_export, "No write under the action's key in the audit log")
+digest = decision_sha256(store, action.action_id, "not_executed", evidence)
+assertion = identity_host.issue(digest, ...)   # your host's approval flow
+resolve(store, action.action_id, "not_executed", assertion=assertion, verifier=identity_host,
+        evidence=evidence, note="Checked the service's audit log with its support team")
+```
+
+`resolve(store, action_id, decision, *, assertion, verifier, evidence=None,
+note)` records one of `ACTION_DECISIONS` and returns the action:
+
+| Decision | Applies to | Needs | The action becomes |
+|---|---|---|---|
+| `adopt_observed` | `outcome_unknown`, or `dispatched` with an acknowledged latest attempt | a `readback` record whose object held the bound content, or `evidence` | `reconciled`; nothing is submitted |
+| `not_executed` | `outcome_unknown` | `evidence` | `not_dispatched`, with [duplicate risk](#duplicate-risk) |
+| `abandon` | `outcome_unknown`, `dispatched` with an acknowledged latest attempt, or `compensation_required` | nothing more | `unresolved`, closed |
+
+A readback record shows the bound content when its object is in the
+intent's tenant and collection, is the intent's object when it names one,
+holds bytes whose SHA-256 is the content digest, and carries the action's
+key when the read showed one: for example, reads that found the right bytes
+at a version older than the receipt's, which decide nothing by themselves.
+An acknowledged write is never found `not_executed`, and an attempt whose
+dispatch is claimed but not recorded refuses every decision until its
+outcome is recorded or [recovered](#recovery). Anything else raises
+`ActionStateError`, and a missing `evidence` raises
+`WorkflowValidationError`.
+
+**Authority.** `decision_sha256(store, action_id, decision, evidence=None)`
+is the digest the assertion must approve. It binds the action's key and
+intent digest, its state and number of attempts, the decision and the
+evidence, so an assertion decides one action at one point in its history:
+the action's approval assertion, an assertion for another decision or other
+evidence, and one issued before the action changed are all refused. The
+verifier must return a principal of the intent's tenant and still authorize
+it, as for [`approve()`](#approvals); its refusals raise `ApprovalRejected`.
+The verifier is called outside any journal transaction, and an action that
+changes meanwhile raises `WorkflowConflictError`. A
+[security stop](workflow-accounting.md#security-stops) on the run refuses
+every decision with `ActionNotAuthorized`. No lease is needed.
+
+**Records.** Decisions only append. Each is a `decision` record holding the
+decision, the state and number of attempts it was made in, the principal,
+the verifier's identity, the digest the assertion approved, the records it
+rests on and `note`, kept with account identifiers redacted and at most 500
+characters, with an `action_decision` event. No attempt, approval, cost or
+balance changes: an uncertain write keeps its unknown exposure after
+`adopt_observed` or `abandon`, as after reconciliation. An `unresolved`
+action is closed like `compensation_required`: no approval authorizes it,
+nothing reads or reconciles it, preparing the same intent returns it, and
+its slot takes no other intent.
+
+### Evidence
+
+`ActionEvidence(sha256, summary)` names evidence your host keeps, such as an
+export from the service: its SHA-256 and a summary. The summary is kept with
+account identifiers redacted and at most 500 characters.
+`ActionEvidence.for_bytes(data, summary)` hashes the bytes. The journal keeps
+an `evidence` record of the digest and summary, never the bytes, and the
+decision's assertion binds both.
+
+### Duplicate risk
+
+An operator's `not_executed` rests on evidence, not on a lookup that proves
+absence, so another dispatch may repeat an effect the action already had.
+The action returns to `not_dispatched`, but its earlier approval no longer
+authorizes a dispatch, even unconsumed: `check_authority()`,
+`begin_attempt()` and the claim refuse it. Only a new approval that accepts
+the risk does:
+
+```python
+from smythe.actions import approve, duplicate_risk_sha256
+
+assertion = identity_host.issue(duplicate_risk_sha256(store, action.action_id), ...)
+approve(store, action.action_id, assertion, identity_host, ceiling_nanousd=action.ceiling_nanousd,
+        expires_at_ns=expiry_ns, duplicate_risk=True)
+```
+
+`duplicate_risk_sha256(store, action_id)` binds the action's key and intent
+digest and the number of attempts the latest `not_executed` decision found,
+so an approval accepts one decision's risk: after another uncertain attempt
+and decision, it no longer authorizes, and the next dispatch needs a new
+one. The journal keeps the approval's `duplicate_risk` flag. An approval
+with `duplicate_risk=True` is refused for an action without that risk. A
+`not_executed` finding from [reconciliation](#reconciliation) proves absence
+and leaves no duplicate risk.
+
+### Inspecting actions
+
+`inspect_actions(store, run_id)` shows a run's actions as an operator needs
+them, reading a journal opened read-only:
+
+| Field | Meaning |
+|---|---|
+| `accounting_scope`, `unit` | `external_actions` and `nanoUSD` |
+| `confirmed_nanousd`, `reserved_nanousd`, `unknown_nanousd` | The run's action balances |
+| `unresolved` | The IDs of actions whose effect is unknown, unverified, wrong or abandoned: `outcome_unknown`, `compensation_required` and `unresolved` actions, and `dispatched` ones with no read left to confirm them |
+| `items` | Each action as `inspect_run()` shows it: identity, intent digest, operation, target, state, balances, attempts, approvals by principal, verifier, ceiling, expiry, consumption and revocation, and records by kind and digest, with `duplicate_risk` and `next_action` |
+
+`next_action` is as [progress](#progress) names it, except that a
+`not_dispatched` action that no approval authorizes needs `approve`, or
+`approve_duplicate_risk` while it carries duplicate risk. Assertions,
+parameters, receipts, error text, evidence summaries, notes and record
+payloads are never shown.

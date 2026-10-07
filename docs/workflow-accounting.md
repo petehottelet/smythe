@@ -958,8 +958,9 @@ late receipts in the [dispatch journal](actions.md#dispatch-journal); the
 [action runner](actions.md#readback) writes readback records, each charged
 its read's cost, and its [reconciliation](actions.md#reconciliation) writes
 lookup records, each charged its lookup's cost, and finding records; and
-[`record_notice()`](actions.md#notices) keeps notices, marked untrusted.
-Nothing writes decision or evidence records yet.
+[`record_notice()`](actions.md#notices) keeps notices, marked untrusted; and
+an [operator's decision](actions.md#operator-decisions) writes a decision
+record and an evidence record of the digest and summary it rests on.
 
 Action money is its own accounting scope, `external_actions`, in whole
 nanoUSD. It never enters a run's balances or `workflow_accounting`, which stay

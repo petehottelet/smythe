@@ -15,8 +15,11 @@ controls; :func:`check_authority` checks them again; and
 dispatch and outcome. :class:`ActionRunner` submits each attempt once through
 a connector, reads the result back and reconciles an unknown outcome as the
 connector's declarations allow, and :func:`record_notice` keeps a
-service's callbacks as untrusted records. Only trusted host code calls these
-functions, and ``import smythe`` does not load this module.
+service's callbacks as untrusted records. :func:`resolve` records an
+operator's verified decision on an outcome reconciliation left open, and
+:func:`inspect_actions` shows a run's actions and what each needs next. Only
+trusted host code calls these functions, and ``import smythe`` does not load
+this module.
 """
 
 from __future__ import annotations
@@ -50,15 +53,25 @@ ACTION_CONTRACT_VERSION = "smythe.action.v1"
 _CONTRACT_VERSIONS = (ACTION_CONTRACT_VERSION,)
 
 # ``canceled`` closes an action that was rejected, expired or revoked before
-# any dispatch.
+# any dispatch, and ``unresolved`` one an operator abandoned with its effect
+# unknown, unverified or wrong.
 ACTION_STATES = (
     "not_dispatched", "dispatched", "outcome_unknown", "observed", "reconciled",
-    "compensation_required", "canceled",
+    "compensation_required", "canceled", "unresolved",
 )
 # A finished action makes no further effect, so its slot can take a new action.
 _FINISHED = ("observed", "reconciled", "canceled")
 # No approval authorizes an action in these states.
-_CLOSED = (*_FINISHED, "compensation_required")
+_CLOSED = (*_FINISHED, "compensation_required", "unresolved")
+# What an operator can decide: the states each decision applies to, and the state it records.
+_DECISIONS = {
+    "adopt_observed": (("dispatched", "outcome_unknown"), "reconciled"),
+    "not_executed": (("outcome_unknown",), "not_dispatched"),
+    "abandon": (("dispatched", "outcome_unknown", "compensation_required"), "unresolved"),
+}
+ACTION_DECISIONS = tuple(_DECISIONS)
+# The most characters of an operator's note or evidence summary that the journal keeps.
+_NOTE_CHARS = 500
 # A read showed what the action's write did, so a compensation can undo it.
 _SHOWN = ("observed", "reconciled", "compensation_required")
 # A run blocked for this reason authorizes no action.
@@ -459,6 +472,30 @@ class Principal(_Flat):
             _text(getattr(self, name), f"principal {name}")
 
 
+@dataclass(frozen=True)
+class ActionEvidence(_Flat):
+    """Evidence an operator decided on: the SHA-256 of what the host keeps, and a summary.
+
+    The summary is kept with account identifiers redacted and cut to 500
+    characters. The evidence itself never enters the journal.
+    """
+
+    sha256: str
+    summary: str
+
+    def __post_init__(self) -> None:
+        _require_sha256(self.sha256, "evidence sha256")
+        if type(self.summary) is not str or not self.summary.strip():
+            raise ValueError("evidence summary must be a non-empty string")
+        object.__setattr__(self, "summary", redact_account_identifiers(self.summary)[:_NOTE_CHARS])
+
+    @classmethod
+    def for_bytes(cls, data: bytes, summary: str) -> ActionEvidence:
+        if not isinstance(data, bytes):
+            raise TypeError("evidence must be bytes")
+        return cls(hashlib.sha256(data).hexdigest(), summary)
+
+
 class WriteConnector(Protocol):
     """Trusted host code that writes to one service; each call makes one request, no retries.
 
@@ -654,9 +691,13 @@ def _assertion(assertion: Any) -> str:
     return assertion
 
 
-def _verified(verifier: Any, assertion: str, intent: ActionIntent, now_ns: int) -> Principal:
-    """The principal *verifier* says issued *assertion* for *intent*, who may still approve it."""
-    principal = verifier.verify(assertion, intent.digest(), now_ns)
+def _verified(verifier: Any, assertion: str, intent: ActionIntent, now_ns: int,
+              digest: str | None = None) -> Principal:
+    """The principal *verifier* says issued *assertion* for *intent*, who may still approve it.
+
+    The assertion must approve *digest*, by default the intent's digest.
+    """
+    principal = verifier.verify(assertion, digest or intent.digest(), now_ns)
     if not isinstance(principal, Principal):
         raise ApprovalRejected("The approval verifier did not return a Principal")
     if principal.tenant != intent.target.tenant:
@@ -748,7 +789,7 @@ def prepare_compensation(store: Any, action_id: str, *, operation: str,
 
 
 def approve(store: Any, action_id: str, assertion: str, verifier: Any, *, ceiling_nanousd: int,
-            expires_at_ns: int) -> ActionApproval:
+            expires_at_ns: int, duplicate_risk: bool = False) -> ActionApproval:
     """Record the verified approval of one action, up to a ceiling and until an expiry.
 
     *verifier* must verify *assertion* for exactly the action's intent
@@ -760,6 +801,13 @@ def approve(store: Any, action_id: str, assertion: str, verifier: Any, *, ceilin
     assertion recorded for anything else raises ``ApprovalRejected``. The
     newest approval supersedes earlier ones. The verifier is called outside
     any journal transaction, and no lease is needed.
+
+    After an operator decided that the action was ``not_executed`` (see
+    :func:`resolve`), another dispatch may repeat an effect, so only an
+    approval with *duplicate_risk* authorizes one: its assertion approves
+    :func:`duplicate_risk_sha256` of the action, bound to the number of
+    attempts that decision found, instead of the intent digest. Otherwise
+    *duplicate_risk* is refused; either refusal raises ``ActionStateError``.
     """
     from smythe.workflow_actions import load, record_verdict
 
@@ -768,21 +816,29 @@ def approve(store: Any, action_id: str, assertion: str, verifier: Any, *, ceilin
     for value, name in ((ceiling_nanousd, "ceiling_nanousd"), (expires_at_ns, "expires_at_ns")):
         if type(value) is not int or value < 0:
             raise WorkflowValidationError(f"{name} must be a non-negative integer")
-    action = load(store, action_id)[0]
+    if type(duplicate_risk) is not bool:
+        raise WorkflowValidationError("duplicate_risk must be True or False")
+    action, _, risk = load(store, action_id)
     if action.state in _CLOSED:
         raise ActionStateError(f"Action {action_id!r} is {action.state} and cannot be approved")
+    if duplicate_risk != (risk is not None):
+        raise ActionStateError(
+            f"Action {action_id!r} carries duplicate risk: an operator decided it was not executed, so "
+            "only an approval with duplicate_risk=True authorizes another dispatch" if risk is not None
+            else f"Action {action_id!r} carries no duplicate risk for an approval to accept")
     if ceiling_nanousd < action.ceiling_nanousd:
         raise WorkflowValidationError(
             f"ceiling_nanousd must cover the action's ceiling of {action.ceiling_nanousd} nanoUSD")
     now = store._clock_ns()
     if expires_at_ns <= now:
         raise WorkflowValidationError("expires_at_ns must be later than the journal's clock")
-    principal = _verified(verifier, assertion, action.intent, now)
+    principal = _verified(verifier, assertion, action.intent, now,
+                          None if risk is None else _risk_sha256(action, risk))
     problem = _undeliverable(store, action.run_id, action.intent.content)
     if problem:
         raise ActionNotAuthorized(f"Action {action_id!r} cannot be approved: {problem}")
     row = record_verdict(store, action, "approved", principal, identity, assertion,
-                         ceiling_nanousd, expires_at_ns)
+                         ceiling_nanousd, expires_at_ns, risk)
     return ActionApproval(row["approval_id"], action_id, principal, ceiling_nanousd, expires_at_ns)
 
 
@@ -849,27 +905,29 @@ def check_authority(store: Any, action_id: str, verifier: Any) -> ActionApproval
 
     The action must not be finished or need compensation. Its newest
     approval must be unrevoked, unconsumed and unexpired on the journal's
-    clock, bind the action's intent digest, cover its ceiling and have been
-    recorded by this verifier. *verifier* must verify the stored assertion
-    again for the same principal and still authorize it, and the run's
-    content must still be deliverable (see :func:`prepare_action`). Only
-    reads are made; the verifier is called outside any journal transaction.
+    clock, bind the action's intent digest, cover its ceiling, accept any
+    duplicate risk (see :func:`approve`) and have been recorded by this
+    verifier. *verifier* must verify the stored assertion again for the same
+    principal and still authorize it, and the run's content must still be
+    deliverable (see :func:`prepare_action`). Only reads are made; the
+    verifier is called outside any journal transaction.
     """
     from smythe.workflow_actions import _authorizing, load
 
     identity = check_verifier(verifier)
-    action, approvals = load(store, action_id)
+    action, approvals, risk = load(store, action_id)
 
     def refused(reason: str) -> ActionNotAuthorized:
         return ActionNotAuthorized(f"Action {action_id!r} is not authorized: {reason}")
 
     now = store._clock_ns()
     approval = _authorizing(action_id, action.state, action.intent.digest(), action.ceiling_nanousd,
-                            approvals, now)
+                            approvals, now, risk=risk)
     if json.loads(approval["verifier_json"]) != {"identity": identity}:
         raise refused("another approval verifier recorded its approval")
     try:
-        principal = _verified(verifier, approval["assertion"], action.intent, now)
+        principal = _verified(verifier, approval["assertion"], action.intent, now,
+                              None if risk is None else _risk_sha256(action, risk))
     except ApprovalRejected as error:
         raise refused(f"the approval verifier refuses it: {error}") from error
     if principal.to_dict() != json.loads(approval["principal_json"]):
@@ -879,6 +937,140 @@ def check_authority(store: Any, action_id: str, verifier: Any) -> ActionApproval
         raise refused(problem)
     return ActionApproval(approval["approval_id"], action_id, principal, int(approval["ceiling"]),
                           approval["expires_at_ns"])
+
+
+def _bound_sha256(kind: str, action: PreparedAction, attempts: int, **values: Any) -> str:
+    """An operator assertion's digest: *kind*, the action's key and intent, its attempts and *values*."""
+    return sha256_hex({"type": f"smythe.action-{kind}", "action_key": action.action_key,
+                       "intent_sha256": action.intent.digest(), "attempts": attempts, **values})
+
+
+def _risk_sha256(action: PreparedAction, attempts: int) -> str:
+    return _bound_sha256("duplicate-risk", action, attempts)
+
+
+def _decision_sha256(action: PreparedAction, attempts: int, decision: str,
+                     evidence: ActionEvidence | None) -> str:
+    return _bound_sha256("decision", action, attempts, state=action.state, decision=decision,
+                         evidence=None if evidence is None else evidence.to_dict())
+
+
+def _decision_inputs(decision: Any, evidence: Any) -> None:
+    if decision not in ACTION_DECISIONS:
+        raise WorkflowValidationError(f"decision must be one of {ACTION_DECISIONS}")
+    if evidence is not None and not isinstance(evidence, ActionEvidence):
+        raise TypeError("evidence must be an ActionEvidence or None")
+
+
+def decision_sha256(store: Any, action_id: str, decision: str,
+                    evidence: ActionEvidence | None = None) -> str:
+    """The digest an assertion for *decision* on action *action_id* must approve now.
+
+    It binds the action's key and intent digest, its state and number of
+    attempts, the decision and *evidence*, so an assertion decides one action
+    at one point in its history and nothing else. Only reads are made.
+    """
+    from smythe.workflow_actions import reconcile_status
+
+    _decision_inputs(decision, evidence)
+    status = reconcile_status(store, _text(action_id, "action_id"))
+    return _decision_sha256(status["action"], len(status["attempts"]), decision, evidence)
+
+
+def duplicate_risk_sha256(store: Any, action_id: str) -> str:
+    """The digest an assertion for ``approve(..., duplicate_risk=True)`` must approve now.
+
+    It binds the action's key and intent digest and the number of attempts an
+    operator's latest ``not_executed`` decision found. Raises
+    ``ActionStateError`` for an action without that duplicate risk. Only reads
+    are made.
+    """
+    from smythe.workflow_actions import reconcile_status
+
+    status = reconcile_status(store, _text(action_id, "action_id"))
+    if status["duplicate_risk"] is None:
+        raise ActionStateError(f"Action {action_id!r} carries no duplicate risk")
+    return _risk_sha256(status["action"], status["duplicate_risk"])
+
+
+def resolve(store: Any, action_id: str, decision: str, *, assertion: str, verifier: Any,
+            evidence: ActionEvidence | None = None, note: str) -> PreparedAction:
+    """Record an operator's verified decision on an action whose outcome is open; return the action.
+
+    *decision* is one of :data:`ACTION_DECISIONS`:
+
+    - ``adopt_observed``: the write took effect as intended. It needs a
+      readback record whose object held the bound content at the intent's
+      target, under the action's key where the read shows one, or
+      *evidence*. The action becomes ``reconciled``; nothing is submitted.
+    - ``not_executed``: the write never took effect. It needs *evidence*, and
+      the action returns to ``not_dispatched`` with duplicate risk: only
+      ``approve(..., duplicate_risk=True)`` authorizes another dispatch.
+    - ``abandon``: nothing will settle the outcome. The action is closed as
+      ``unresolved``.
+
+    Each applies to an ``outcome_unknown`` action. ``adopt_observed`` and
+    ``abandon`` also apply to a ``dispatched`` action whose latest attempt
+    was acknowledged, and ``abandon`` to ``compensation_required``; anything
+    else raises ``ActionStateError``. *verifier* must verify *assertion* for
+    exactly :func:`decision_sha256` of the decision and *evidence*, return a
+    principal of the intent's tenant and still authorize it. A security stop
+    on the run refuses every decision with ``ActionNotAuthorized``.
+
+    The decision is appended as a ``decision`` record with the principal, the
+    verifier's identity, the records it rests on and *note*, kept redacted and
+    at most 500 characters; *evidence* is an ``evidence`` record of its digest
+    and summary. No attempt, approval or balance changes, so unknown exposure
+    stays. No lease is needed, and the verifier is called outside any journal
+    transaction.
+    """
+    from smythe.workflow_actions import decide, reconcile_status
+
+    identity = check_verifier(verifier)
+    _assertion(assertion)
+    _decision_inputs(decision, evidence)
+    if type(note) is not str or not note.strip():
+        raise WorkflowValidationError("note must be a non-empty string")
+    status = reconcile_status(store, _text(action_id, "action_id"))
+    action, attempts = status["action"], len(status["attempts"])
+    in_flight = action.state == "dispatched" and status["attempts"][-1]["state"] != "acknowledged"
+    if action.state not in _DECISIONS[decision][0] or in_flight:
+        raise ActionStateError(f"Action {action_id!r} is {action.state}"
+                               f"{' with an attempt in flight' if in_flight else ''}; "
+                               f"no {decision} decision applies")
+    if evidence is None and (decision == "not_executed" or decision == "adopt_observed" and not status["shown"]):
+        raise WorkflowValidationError(f"A {decision} decision needs attached evidence" + (
+            "" if decision == "not_executed" else " or a readback that showed the bound content"))
+    problem = _undeliverable(store, action.run_id, None)
+    if problem:
+        raise ActionNotAuthorized(f"Action {action_id!r} cannot be decided: {problem}")
+    digest = _decision_sha256(action, attempts, decision, evidence)
+    principal = _verified(verifier, assertion, action.intent, store._clock_ns(), digest)
+    return decide(store, action, attempts, decision, {
+        "principal": principal.to_dict(), "verifier": identity, "decision_sha256": digest,
+        "note": redact_account_identifiers(note)[:_NOTE_CHARS]}, evidence)
+
+
+def inspect_actions(store: Any, run_id: str) -> dict[str, Any]:
+    """A run's external actions and what each needs next; only reads are made.
+
+    It is the ``actions`` block of ``inspect_run()``: nanoUSD balances under
+    the ``external_actions`` scope and, for each action, its state, attempts,
+    approvals by principal, verifier, ceiling, expiry, consumption and
+    revocation, and records by kind and digest. Each action adds
+    ``duplicate_risk`` and ``next_action``: as :class:`ActionProgress` names
+    it, except that a ``not_dispatched`` action that no approval authorizes
+    needs ``approve``, or ``approve_duplicate_risk`` while it carries
+    duplicate risk. ``unresolved`` lists the actions whose effect is unknown,
+    unverified, wrong or abandoned: ``outcome_unknown``,
+    ``compensation_required`` and ``unresolved`` ones, and ``dispatched``
+    ones with no read left to confirm them. Assertions, parameters, receipts
+    and record payloads are never included. A journal without action tables
+    shows none.
+    """
+    from smythe.workflow_actions import inspect
+
+    return inspect(store, _text(run_id, "run_id"))
 
 
 def record_notice(store: Any, payload: Any) -> PreparedAction | None:
@@ -929,6 +1121,13 @@ def _payload(store: Any, action: PreparedAction) -> bytes | None:
     return data
 
 
+def _held_digest(intent: ActionIntent) -> str:
+    """The SHA-256 an object holds once *intent* took effect: its content's, or its canonical parameters'."""
+    if intent.content is not None:
+        return intent.content.sha256
+    return hashlib.sha256(canonical_bytes(intent.parameters)).hexdigest()
+
+
 def _verdict(action: PreparedAction, receipt: ConnectorReceipt, observed: Any,
              error: str | None) -> ValidationReport:
     """The readback report on one read of the object *receipt* names.
@@ -939,7 +1138,7 @@ def _verdict(action: PreparedAction, receipt: ConnectorReceipt, observed: Any,
     of the parameters for an intent without content) and, when the connector
     exposes it, carry the action's key.
     """
-    target, content = receipt.target, action.intent.content
+    target = receipt.target
     path = f"{target.tenant}/{target.collection}/{target.object_id}"
 
     def undecided(code: str, message: str, **values: Any) -> ValidationReport:
@@ -955,8 +1154,7 @@ def _verdict(action: PreparedAction, receipt: ConnectorReceipt, observed: Any,
             and observed.version < receipt.object_version):
         return undecided("stale_version", "The object read is older than the receipt's version",
                          expected=receipt.object_version, observed=observed.version)
-    digest = (content.sha256 if content is not None
-              else hashlib.sha256(canonical_bytes(action.intent.parameters)).hexdigest())
+    digest = _held_digest(action.intent)
     for code, message, expected, seen in (
             ("content_mismatch", "The object does not hold the bound content", digest,
              observed.content_ref.sha256),
@@ -1343,29 +1541,36 @@ class ActionRunner:
         from smythe.workflow_actions import reconcile_status
 
         status = reconcile_status(self.store, action_id)
-        action, attempts, finding = status["action"], status["attempts"], status["finding"]
-        profile, latest = action.profile, attempts[-1] if attempts else None
-        claimed = sum(attempt["state"] not in ("prepared", "released") for attempt in attempts)
-        # An unresolved finding stands until another attempt begins.
-        review = ("operator_review" if finding is not None and finding.get("finding") == "unresolved"
-                  and finding.get("attempts") == len(attempts) else "reconcile")
-        next_action = {"outcome_unknown": review, "compensation_required": "compensate"}.get(action.state)
-        if action.state == "not_dispatched" and claimed < profile.max_attempts:
-            next_action = "dispatch"
-        elif action.state == "dispatched":
-            next_action = ("readback" if latest["state"] == "acknowledged" and profile.lookup_by_object
-                           and status["reads"].get(latest["attempt_id"], 0) < profile.readback_reads
-                           and self._room(status, latest["attempt_id"]) >= profile.read_ceiling_nanousd
-                           else review)
-        return ActionProgress(action_id, action.state, latest, report, next_action)
+        attempts = status["attempts"]
+        return ActionProgress(action_id, status["action"].state, attempts[-1] if attempts else None, report,
+                              _next_action(status))
+
+
+def _next_action(status: dict[str, Any]) -> str | None:
+    """What an action needs next, from its ``reconcile_status``, as :class:`ActionProgress` names it."""
+    action, attempts, finding = status["action"], status["attempts"], status["finding"]
+    profile, latest = action.profile, attempts[-1] if attempts else None
+    claimed = sum(attempt["state"] not in ("prepared", "released") for attempt in attempts)
+    # An unresolved finding stands until another attempt begins.
+    review = ("operator_review" if finding is not None and finding.get("finding") == "unresolved"
+              and finding.get("attempts") == len(attempts) else "reconcile")
+    if action.state == "not_dispatched":
+        return "dispatch" if claimed < profile.max_attempts else None
+    if action.state == "dispatched":
+        return ("readback" if latest["state"] == "acknowledged" and profile.lookup_by_object
+                and status["reads"].get(latest["attempt_id"], 0) < profile.readback_reads
+                and status["ceilings"][latest["approval_id"]] - status["spent"] >= profile.read_ceiling_nanousd
+                else review)
+    return {"outcome_unknown": review, "compensation_required": "compensate"}.get(action.state)
 
 
 __all__ = [
-    "ACTION_CONTRACT_VERSION", "ACTION_STATES", "READBACK_VALIDATOR", "ActionApproval",
-    "ActionIntent", "ActionNotAuthorized", "ActionProgress", "ActionRunner", "ActionStateError",
-    "ActionTarget", "ApprovalRejected", "ApprovalVerifier", "ConnectorAmbiguous",
-    "ConnectorProfile", "ConnectorReceipt", "ConnectorRefused", "ContentRef", "ObservedObject",
-    "PreparedAction", "Principal", "WriteConnector", "action_key", "approve", "check_authority",
-    "check_connector", "check_verifier", "load_action", "prepare_action", "prepare_compensation",
-    "record_notice", "reject", "revoke", "stop_actions",
+    "ACTION_CONTRACT_VERSION", "ACTION_DECISIONS", "ACTION_STATES", "READBACK_VALIDATOR",
+    "ActionApproval", "ActionEvidence", "ActionIntent", "ActionNotAuthorized", "ActionProgress",
+    "ActionRunner", "ActionStateError", "ActionTarget", "ApprovalRejected", "ApprovalVerifier",
+    "ConnectorAmbiguous", "ConnectorProfile", "ConnectorReceipt", "ConnectorRefused", "ContentRef",
+    "ObservedObject", "PreparedAction", "Principal", "WriteConnector", "action_key", "approve",
+    "check_authority", "check_connector", "check_verifier", "decision_sha256",
+    "duplicate_risk_sha256", "inspect_actions", "load_action", "prepare_action",
+    "prepare_compensation", "record_notice", "reject", "resolve", "revoke", "stop_actions",
 ]
