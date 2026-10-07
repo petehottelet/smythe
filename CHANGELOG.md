@@ -1508,7 +1508,10 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   `attempt_record`. The committed record,
   `benchmarks/results/trigger_ablation_offline.json`, is labeled offline
   mechanics, not claimable, with zero API calls: fixtures show no measured
-  benefit and change no default. See
+  benefit and change no default. Its campaign's holdout is labeled an
+  offline stand-in, not an untouched holdout, and its `decision_status`
+  states that the engine's decision, kept as it ran, is mechanics only and
+  promotes nothing. See
   [trigger ablation](benchmarks/README.md#trigger-ablation-offline-mechanics).
 - Security stops. `RunControl.revoke(reason_code)`, on a control given to
   `Swarm(run_control=...)` or to either executor, stops runs at once and for

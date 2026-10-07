@@ -519,7 +519,11 @@ never a measured benefit, and changes no default.
   on task-indexed trials that cover every fixture task in each paired split.
   Its primary objective is supervision calls, and the accepted-outcome rate
   must not regress. Its other thresholds are placeholders, and its holdout
-  split reuses the fixture tasks.
+  split reuses the fixture tasks: the record labels it an offline stand-in,
+  not an untouched holdout. The engine's decision is kept as it ran, so it
+  reads `promoted: true` with a reason that names an untouched holdout; the
+  record's `decision_status` and `promotion` state that this decision is
+  mechanics only and promotes nothing.
 
 ```bash
 python benchmarks/run_trigger_ablation.py   # writes results/trigger_ablation_offline.json

@@ -92,7 +92,8 @@ from smythe.provider import CompletionResult, Provider, ProviderFeatures  # noqa
 from smythe.supervisor import EVIDENCE_REVIEW_PROMPT, SUPERVISOR_SYSTEM_PROMPT  # noqa: E402
 
 DEFAULT_OUT = Path(__file__).with_name("results") / "trigger_ablation_offline.json"
-RECORD_VERSION = 1
+# Version 2 labels the campaign's holdout and the status of its decision.
+RECORD_VERSION = 2
 ARMS = ("routine", "triggered", "none")
 INCUMBENT, CHALLENGER, REFERENCE = ARMS
 FAMILY = "trigger-fixtures"
@@ -141,6 +142,13 @@ SCOPE = (
     "are placeholders, no default changes, and no number here is a product, README or "
     "roadmap claim."
 )
+# The engine's decision is kept as it ran; this says what it can and cannot mean.
+DECISION_STATUS = {
+    "mechanics_only": True, "promotes": False,
+    "note": "the decision below is the Autotune engine's own, kept as it ran: its 'promoted' "
+            "and the 'untouched holdout' of its reason describe a holdout that is an offline "
+            "stand-in, so the decision shows mechanics only and promotes nothing",
+}
 
 # Step ids of the fixture plans, and the step a revision adds.
 FACTS, RISKS, DELIVER, CHECK, REVISE = "facts", "risks", "deliver", "check", "revise"
@@ -649,12 +657,15 @@ async def run_campaign(tasks: Sequence[AblationTask], policy: AcceptancePolicy, 
         "thresholds": "placeholders for offline mechanics; promotion thresholds are not decided",
         "decision_scope": "the decision of a campaign on fixtures, in a ledger the run discards: "
                           "it activates nothing and changes no default",
+        "decision_status": DECISION_STATUS,
         "evaluator_manifest": manifest.to_dict(),
         "evaluator_hash": manifest.evaluator_hash,
         "split_manifest": split_manifest(tasks),
         "task_pool": [task.task_id for task in tasks],
         "holdout": {"source": "development-stand-in", "held_out": False,
-                    "note": "the holdout split reuses the fixture tasks, so its verdict shows "
+                    "label": "offline stand-in",
+                    "note": "an offline stand-in, not an untouched holdout: the holdout split "
+                            "reuses the fixture tasks every split runs, so its verdict shows "
                             "mechanics only"},
         "decision": decision,
         "trials": trials,
@@ -678,6 +689,8 @@ def ablate(tasks: Sequence[AblationTask], *, seed: int, repetitions: int) -> dic
             "a scripted reviewer and planted anomalies establish harness mechanics, not a "
             "measured benefit",
             "promotion thresholds are not decided; the campaign's are placeholders",
+            "the campaign's decision is mechanics only: its holdout is an offline stand-in, so "
+            "its 'promoted' promotes nothing",
             "live evaluation needs an approved budget and decided thresholds",
         ]},
         arms=list(ARMS),

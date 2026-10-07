@@ -190,7 +190,7 @@ def test_the_autotune_campaign_compares_routine_triggered_and_none(offline_run):
     assert manifest.evaluator_hash == campaign["evaluator_hash"]
     assert [item.to_dict() for item in manifest.validators] == (
         record["acceptance_policy"]["final_validators"])
-    assert campaign["holdout"]["held_out"] is False
+    assert_mechanics_only(record)
     task_ids = sorted(task["task_id"] for task in record["tasks"])
     for split in ("confirmation", "holdout"):
         trials = [trial for trial in campaign["trials"] if trial["split"] == split]
@@ -202,6 +202,20 @@ def test_the_autotune_campaign_compares_routine_triggered_and_none(offline_run):
         assert all(trial["gates"].values())
         if trial["role"] == "reference":
             assert trial["arm"] == "none" and trial["split"] != "development"
+
+
+def assert_mechanics_only(record):
+    """The campaign's holdout is labeled a stand-in, and its decision promotes nothing."""
+    campaign = record["campaign"]
+    assert campaign["holdout"]["held_out"] is False
+    assert campaign["holdout"]["label"] == "offline stand-in"
+    assert "not an untouched holdout" in campaign["holdout"]["note"]
+    status = campaign["decision_status"]
+    assert status["mechanics_only"] is True and status["promotes"] is False
+    assert "untouched holdout" in status["note"] and "promotes nothing" in status["note"]
+    assert any("mechanics only" in reason and "promotes nothing" in reason
+               for reason in record["promotion"]["reasons"])
+    assert record["promotion"]["eligible"] is False and record["claimable"] is False
 
 
 def test_the_committed_record_is_labeled_and_never_cited_as_a_claim():
@@ -317,6 +331,8 @@ def test_a_campaign_without_routine_review_keeps_the_accepted_outcomes():
               *[task for task in tasks if task.anomaly in ("empty_output", "failed_step")])
     campaign = asyncio.run(run_campaign(chosen, acceptance_policy(), seed=1))
     decision = campaign["decision"]
+    assert campaign["holdout"]["label"] == "offline stand-in"
+    assert campaign["decision_status"]["promotes"] is False
     development = decision["development_scores"][0]
     assert development["viable"] is True
     assert development["secondary_non_regression"] == {"accepted_outcome_rate": True,
