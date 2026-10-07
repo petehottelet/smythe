@@ -43,6 +43,7 @@ SOURCES = {"a": {"source_id": "a", "version": "v1", "sha256": digest("a v1")},
            "b": {"source_id": "b", "version": "v1", "sha256": digest("b v1")}}
 NODES = ["read_a", "extract_a", "read_b", "extract_b", "write"]
 AGENTS = frozenset(digest("agent " + node_id) for node_id in ("extract_a", "extract_b", "write"))
+RENDERER = {"name": "markdown_renderer", "version": "1", "spec_sha256": digest("renderer")}
 
 
 def node(node_id, *, depends_on=(), kind="model", sources=(), context=True, tool=None,
@@ -82,9 +83,7 @@ def record_data(*, gate=False, **changes) -> dict:
         "access_scope": "local",
         "artifact": {
             "relative_path": "run-1/document.md", "sha256": digest("document"), "size_bytes": 120,
-            "media_type": "text/markdown; charset=utf-8",
-            "renderer": {"name": "markdown_renderer", "version": "1",
-                         "spec_sha256": digest("renderer")},
+            "media_type": "text/markdown; charset=utf-8", "renderer": dict(RENDERER),
         },
         "acceptance": {
             "operation_key": "acceptance/" + digest("inputs"), "record_sha256": digest("record"),
@@ -123,7 +122,7 @@ def state(catalog=None, **changes) -> CurrentState:
         "policy_sha256": POLICY,
         "tools": {"catalog": {"version": "1", "decoder_version": "text-utf8-v1"}},
         "components": {"brief-writer": "2", "fact-check": "1"}, "agents": AGENTS,
-        "integrity": {"run-1": "verified"},
+        "integrity": {"run-1": "verified"}, "renderer": RENDERER,
     }
     options.update(changes)
     return CurrentState(**options)
@@ -360,6 +359,30 @@ def test_an_artifact_that_cannot_be_checked_needs_review(integrity, code):
 
 def test_a_run_without_a_document_needs_no_integrity_finding():
     assert evaluate(lineage(artifact=None), state(integrity={})).action == "reuse"
+
+
+@pytest.mark.parametrize("renderer", [
+    {"name": "plain-brief", "version": "1", "spec_sha256": digest("plain brief")},
+    {**RENDERER, "version": "2"}, {**RENDERER, "spec_sha256": digest("another description")},
+    None,
+], ids=["another", "version", "description", "none"])
+def test_a_changed_renderer_regenerates_the_publication(renderer):
+    decision = evaluate(lineage(), state(renderer=renderer))
+
+    # The document is made again from the synthesis, the node nothing depends on.
+    assert (decision.action, decision.reasons) == ("regenerate", ("renderer_changed",))
+    assert actions(decision) == {**dict.fromkeys(NODES[:-1], "reuse"), "write": "regenerate"}
+    assert reasons(decision)["write"] == ("renderer_changed",)
+    assert decision.to_dict()["authority"]["sources"] == [SOURCES["a"], SOURCES["b"]]
+    # Another renderer never renders the old synthesis again, damaged document or not.
+    damaged = evaluate(lineage(), state(renderer=renderer, integrity={"run-1": "missing"}))
+    assert damaged.action == "regenerate" and "rerender" not in actions(damaged).values()
+    # A gate is never kept in an item that computes something again.
+    gated = evaluate(lineage(gate=True), state(renderer=renderer))
+    assert actions(gated)["check"] == actions(gated)["extract_b"] == "regenerate"
+    # A run that published no document has no renderer to compare.
+    assert evaluate(lineage(artifact=None), state(renderer=renderer, integrity={})).action == (
+        "reuse")
 
 
 @pytest.mark.parametrize("status", ["missing", "changed"])
@@ -746,6 +769,9 @@ def test_source_statuses_are_frozen_and_keyword_only():
     ({"gate_verifier": None}, ValueError),
     ({"gate_validators": ["contains"]}, TypeError),
     ({"gate_validators": GATE_VALIDATOR}, TypeError),
+    ({"renderer": {"name": "markdown_renderer", "version": "1"}}, ValueError),
+    ({"renderer": {**RENDERER, "spec_sha256": "renderer"}}, ValueError),
+    ({"renderer": "markdown_renderer"}, ValueError),
 ], ids=lambda value: re.sub(r"\W+", "-", str(value))[:40])
 def test_the_current_state_is_validated(changes, error):
     with pytest.raises(error):
@@ -770,6 +796,14 @@ def test_the_current_state_is_detached_and_read_only():
             dict(defaults.tasks), dict(defaults.integrity)) == ({}, {}, frozenset(), {}, {})
     # Gates are judged by TokenVerifier unless the state names a gate validator.
     assert (defaults.gate_verifier, defaults.gate_validators) == (TOKEN_VERIFIER_IDENTITY, ())
+    # No renderer unless one is named; a named one is detached and read-only.
+    assert defaults.renderer is None
+    renderer = dict(RENDERER)
+    named = state(renderer=renderer)
+    renderer["version"] = "2"
+    assert named.renderer == RENDERER
+    with pytest.raises(TypeError):
+        named.renderer["version"] = "2"
     validators = [ValidatorIdentity.for_config("b", "1"), GATE_VALIDATOR, GATE_VALIDATOR]
     assert state(gate_validators=validators).gate_validators == tuple(sorted(
         set(validators), key=lambda item: item.name))

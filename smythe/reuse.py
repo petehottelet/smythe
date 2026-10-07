@@ -34,8 +34,8 @@ from smythe.acceptance import AcceptanceDecision, DeliveryAcceptance, _calls_asy
 from smythe.context import CONTEXT_ASSEMBLY_VERSION
 from smythe.evidence import load_source_tombstones
 from smythe.lineage import (
-    ArtifactLineage, LineagePolicy, _count, _frozen, _gate_verifier, _label, _named, _plain,
-    _synthesizer, _text, _validator_set, load_lineage, validator_set_sha256,
+    _RENDERER, ArtifactLineage, LineagePolicy, _count, _frozen, _gate_verifier, _label, _named,
+    _plain, _renderer, _synthesizer, _text, _validator_set, load_lineage, validator_set_sha256,
 )
 from smythe.validation import ValidatorIdentity, _json_sha256, _require_keys, _require_sha256
 from smythe.verifier import TOKEN_VERIFIER_IDENTITY
@@ -64,7 +64,7 @@ REASONS = MappingProxyType({
     "component_changed": "regenerate", "context_assembly_changed": "regenerate",
     "agent_changed": "regenerate", "task_changed": "regenerate",
     "node_incomplete": "regenerate", "dependency_changed": "regenerate",
-    "gate_validator_changed": "regenerate",
+    "gate_validator_changed": "regenerate", "renderer_changed": "regenerate",
     "gate_pair": "regenerate", "reuse_disabled": "regenerate",
     "artifact_missing": "rerender", "artifact_changed": "rerender",
     "validator_set_changed": "recheck", "policy_changed": "recheck",
@@ -172,8 +172,10 @@ class CurrentState:
     ``gate_verifier`` names the rules a run would judge its gates by, as its
     recipe's ``verifier`` does: ``TOKEN_VERIFIER_IDENTITY`` for
     ``TokenVerifier``, or ``validator-v1`` with the identities of the gate
-    validators in ``gate_validators``, which are kept as a sorted set. Every
-    part is read-only.
+    validators in ``gate_validators``, which are kept as a sorted set.
+    ``renderer`` is the renderer a run would publish its document with, as a
+    record names it (``name``, ``version`` and ``spec_sha256``), or None for
+    none. Every part is read-only.
     """
 
     catalog: SourceCatalog
@@ -188,6 +190,7 @@ class CurrentState:
     lineage: LineagePolicy = field(default_factory=LineagePolicy)
     gate_verifier: str = TOKEN_VERIFIER_IDENTITY
     gate_validators: Iterable[ValidatorIdentity] = ()
+    renderer: Mapping[str, str] | None = None
 
     def __post_init__(self) -> None:
         describe = getattr(self.catalog, "describe", None)
@@ -214,6 +217,9 @@ class CurrentState:
             "agents": frozenset(_sha(item, "agents") for item in _items(self.agents, "agents")),
             "tasks": _mapping(self.tasks, "tasks", _sha),
             "integrity": _mapping(self.integrity, "integrity", _integrity),
+            "renderer": None if self.renderer is None else MappingProxyType(_RENDERER(
+                dict(self.renderer) if isinstance(self.renderer, Mapping) else self.renderer,
+                "renderer")),
         }
         for key in detached["tasks"]:
             _require_sha256(key, "tasks key")
@@ -361,7 +367,9 @@ def evaluate(lineage: ArtifactLineage | None, state: CurrentState) -> ItemDecisi
     Otherwise each node's sources, tool, component, context assembly, agent
     and task are compared with *state*, and each gate's verifier, which the
     nodes it judged go with, and a node that regenerates or needs review
-    takes its dependents with it. When any node is computed again, a
+    takes its dependents with it. A published document whose renderer is
+    not the state's regenerates the nodes nothing depends on, which made
+    it. When any node is computed again, a
     gate (a node of kind ``gate``) and the nodes it depends on are never
     reused. With nothing computed again, the published file's integrity,
     the acceptance decision and the validator set and policy decide. The
@@ -397,6 +405,13 @@ def evaluate(lineage: ArtifactLineage | None, state: CurrentState) -> ItemDecisi
     for node in nodes:
         for dependency in node["depends_on"]:
             children[dependency].append(node["id"])
+    renderer = None if state.renderer is None else dict(state.renderer)
+    if lineage.artifact is not None and _plain(lineage.artifact["renderer"]) != renderer:
+        # Another renderer makes the document again from what nothing else
+        # depends on: the synthesis, in a record a run writes.
+        for node_id, dependents in children.items():
+            if not dependents:
+                own[node_id].add("renderer_changed")
     reasons = _settle(own, children, policy)
     if any(_action(codes, policy) != "reuse" for codes in reasons.values()):
         for node in nodes:
@@ -584,6 +599,7 @@ def _state(recipe: Mapping[str, Any], catalog: SourceCatalog) -> CurrentState:
         lineage=LineagePolicy.from_dict(recipe["lineage"]),
         gate_verifier=verifier["name"],
         gate_validators=[ValidatorIdentity.from_dict(item) for item in verifier["validators"]],
+        renderer=None if recipe.get("renderer") is None else _renderer(recipe["renderer"]),
     )
 
 

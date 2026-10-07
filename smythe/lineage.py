@@ -228,9 +228,10 @@ def _object(fields: dict[str, _Check], optional: dict[str, _Check] | None = None
 
 _RUN = _object({"store_id": _id, "run_id": _id, "recipe_sha256": _sha,
                 "task_sha256": _nullable(_sha)})
+_RENDERER = _object({"name": _text, "version": _text, "spec_sha256": _sha})
 _ARTIFACT = _nullable(_object({
     "relative_path": _path, "sha256": _sha, "size_bytes": _count, "media_type": _text,
-    "renderer": _object({"name": _text, "version": _text, "spec_sha256": _sha})}))
+    "renderer": _RENDERER}))
 _VALIDATORS = _list(lambda value, what: ValidatorIdentity.from_dict(value))
 _ACCEPTANCE = _object({
     "operation_key": _long, "record_sha256": _sha, "policy_sha256": _sha,
@@ -529,6 +530,13 @@ def _gate_verifier(recipe: Mapping[str, Any]) -> dict[str, Any] | None:
             "validators": [item.to_dict() for item in validators]}
 
 
+def _renderer(description: Mapping[str, Any]) -> dict[str, str]:
+    """The identity a record gives the renderer its recipe *description* describes."""
+    return {"name": _label(description.get("identity", description.get("type"))),
+            "version": _label(str(description.get("version"))),
+            "spec_sha256": sha256_hex(description)}
+
+
 def _matching_digests(record: ArtifactLineage) -> set[str]:
     """The digests a run's saved record may have when its journal assembles *record* again.
 
@@ -633,13 +641,10 @@ def build_lineage(graph: ExecutionGraph, recipe: Mapping[str, Any],
                     "coverage": "declared" if component else "undeclared"})
     artifact = None
     if publication is not None:
-        renderer = publication.renderer
         artifact = {"relative_path": f"{run['run_id']}/{publication.name}",
                     "sha256": publication.sha256, "size_bytes": publication.size_bytes,
                     "media_type": publication.media_type,
-                    "renderer": {"name": _label(renderer.get("identity", renderer.get("type"))),
-                                 "version": _label(str(renderer.get("version"))),
-                                 "spec_sha256": sha256_hex(renderer)}}
+                    "renderer": _renderer(publication.renderer)}
     operation_key, record = acceptance
     validators = list(validators) if validators is not None else [
         ValidatorIdentity.from_dict(item) for item in recipe["acceptance"]["final_validators"]]

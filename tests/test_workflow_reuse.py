@@ -162,7 +162,9 @@ def decide(store, run_id, service):
         components={"brief-writer": "1"},
         agents=[node["inputs"]["agent_sha256"] for node in lineage.nodes
                 if "agent_sha256" in node["inputs"]],
-        integrity={run_id: "verified"}, lineage=LineagePolicy(access_scope=SCOPE))
+        integrity={run_id: "verified"}, lineage=LineagePolicy(access_scope=SCOPE),
+        renderer={"name": "markdown_renderer", "version": "1",
+                  "spec_sha256": sha256_hex({"type": "markdown_renderer", "version": 1})})
     return evaluate(lineage, state)
 
 

@@ -332,6 +332,7 @@ would use now. Each part is checked when it is built and kept read-only.
 | `lineage` | `LineagePolicy()` | The configured policy, whose `access_scope`, `reuse` and `undeclared_coverage` apply. |
 | `gate_verifier` | `token-v2` | The gate verifier a run would judge its gates with, as its recipe's `verifier` names it: `smythe.verifier.TOKEN_VERIFIER_IDENTITY` for `TokenVerifier`, or `validator-v1` for a gate validator. |
 | `gate_validators` | none | The gate validators' `ValidatorIdentity` values, kept as a sorted set. |
+| `renderer` | None | The renderer a run would publish its document with, as a record names it: `{"name", "version", "spec_sha256"}`, or None for none. |
 
 A price release changes none of these, so it never changes a decision.
 
@@ -394,6 +395,7 @@ most conservative of its own reasons.
 | A gate whose recorded `verifier` is not the state's gate verifier and gate validators, and each node it depends on | `regenerate` | `gate_validator_changed` |
 | A gate recorded without a `verifier`, and each node it depends on, when the state names gate validators | `undeclared_coverage` | `gate_validator_unknown` |
 | A gate, and each node it depends on, in an item where any node regenerates or needs review | `regenerate` | `gate_pair` |
+| A published document whose renderer is not the state's, for each node nothing depends on: the synthesis | `regenerate` | `renderer_changed` |
 | A published document that is missing, or holds other bytes | `rerender` | `artifact_missing`, `artifact_changed` |
 | A published document that cannot be checked safely, cannot be read, or has no `verified` finding | `review` | `artifact_unsafe`, `artifact_unreadable`, `artifact_unchecked` |
 | A recorded decision other than `accepted` | `review` | `decision_not_accepted` |
@@ -423,6 +425,12 @@ most conservative of its own reasons.
   but regenerating is the conservative route. A record written before records
   named their gates' verifier is unknown on that point, so under a gate
   validator it gets `undeclared_coverage`.
+- **Renderers.** A document is published by the renderer its record names.
+  Another renderer, another version or description of it, or none, makes
+  the document another way, so the synthesis regenerates in a successor run
+  that keeps the other nodes, as `republish`, which renders only with the
+  run's own renderer, cannot. A run that published no document has no
+  renderer to compare.
 - **Nothing computed, item rules decide.** When no node regenerates or needs
   review, the published document, the recorded decision, and the validator
   set and policy decide, and every node takes the item's action: `reuse`,
@@ -492,6 +500,7 @@ calls for, or None where the policy's `undeclared_coverage` decides.
 | `node_incomplete` | `regenerate` | The node has no result. |
 | `dependency_changed` | `regenerate` | A node this one depends on regenerates. |
 | `gate_validator_changed` | `regenerate` | Another gate verifier or gate validator would judge this gate, or the gate this node goes with. |
+| `renderer_changed` | `regenerate` | Another renderer, or none, would publish the document this node's result was rendered into. |
 | `gate_pair` | `regenerate` | A gate, or a node a gate depends on, in an item that computes something again. |
 | `reuse_disabled` | `regenerate` | The policy's `reuse` is off. |
 | `artifact_missing` | `rerender` | The published document is missing. |
@@ -541,10 +550,10 @@ with SQLiteWorkflowStore("smythe-runs.db") as store:
   what a new run of this Swarm would use: its strict policy's final
   validators and digest, its gate verifier and gate validator, its read
   profiles' names, versions and decoder versions, its synthesizer, its
-  context assembly version and the agents its registry defines. An agent
-  that a run recorded and the registry does
-  not define, such as one assigned when the run was planned, stays
-  current. Each completed run's published document is checked through
+  renderer, its context assembly version and the agents its registry
+  defines. An agent that a run recorded and the registry does not define,
+  such as one assigned when the run was planned, stays current. Each
+  completed run's published document is checked through
   `current_artifact`, the accessor resume and inspection use.
 - **Runs in progress.** A run that has not completed has no record yet. Its
   item needs `review` with `run_in_progress`, and has no status, no nodes

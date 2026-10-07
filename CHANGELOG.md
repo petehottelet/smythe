@@ -1089,8 +1089,8 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   state)` compares an `ArtifactLineage` record, or None, with a
   `CurrentState` (a developer's zero-cost `SourceCatalog`, the validator
   identities, the acceptance policy digest, the gate verifier and gate
-  validators, tool, component, context assembly and agent identities,
-  optional task changes, published-document integrity and the
+  validators, tool, component, renderer, context assembly and agent
+  identities, optional task changes, published-document integrity and the
   `LineagePolicy`) and returns an `ItemDecision`: `reuse`,
   `recheck`, `rerender`, `regenerate` or `review` for the item and each
   node, with stable reason codes and the scope, recipe, policy, validator
@@ -1100,8 +1100,10 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   review; a changed tool, decoder, component, context assembly, agent or
   task regenerates the node and everything that depends on it, while other
   branches are reused; a missing or changed document with current inputs is
-  rendered again; a changed validator set or policy calls for a recheck; a
-  changed gate verifier or gate validator regenerates the gate and the
+  rendered again, but a document whose renderer changed regenerates its
+  synthesis in a successor that keeps every other node
+  (`renderer_changed`); a changed validator set or policy calls for a
+  recheck; a changed gate verifier or gate validator regenerates the gate and the
   nodes it judged (`gate_validator_changed`), never rechecking their
   recorded verdicts, and under a gate validator a gate recorded without its
   verifier follows `undeclared_coverage` (`gate_validator_unknown`); a

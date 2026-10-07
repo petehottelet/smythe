@@ -42,7 +42,8 @@ from smythe.workflow_artifact import current_artifact
 from smythe.workflow_store import (
     WorkflowBudgetError, WorkflowConflictError, WorkflowStateError, _canonical, _sha,
 )
-from test_workflow_lineage import TEXTS, Brief, research, research_graph
+from test_workflow_lineage import NODES as LINEAGE_NODES
+from test_workflow_lineage import QUESTION, TEXTS, Brief, research, research_graph
 
 PLAN = sha256_hex("repair plan")
 REASON = "The published brief was damaged"
@@ -673,6 +674,46 @@ def test_republication_is_refused_when_the_renderer_or_synthesizer_changed(
 
     assert journal_rows(store, run_id) == before and store.load_run(run_id)["revision"] == revision
     assert Counted.checked == [result.output]
+
+
+def test_a_changed_renderer_regenerates_the_document_in_a_successor(
+        store, library, tmp_path, model_calls):
+    service = library[0]
+    _, result = completed(store, library, tmp_path)
+    run_id = result.execution_id
+    original = current_artifact(store, run_id).publication
+    document = original.path.read_bytes()
+    plain = research(store, library, tmp_path, acceptance=policy(),
+                     renderer=LocalOnly(PlainBrief, "plain-brief", "1", role="renderer"))
+    catalog = Catalog(service)
+
+    plan = plain.plan_repair(sources=catalog)
+
+    # The document would be made another way: its synthesis is regenerated, and nothing else.
+    (item,) = plan.to_dict()["items"]
+    assert (item["action"], item["status"], item["reasons"]) == (
+        "regenerate", "stale", ["renderer_changed"])
+    assert {node["id"]: node["action"] for node in item["nodes"]} == {
+        **dict.fromkeys(LINEAGE_NODES[:-1], "reuse"), "synthesis": "regenerate"}
+    assert (item["work"]["read_calls"], item["work"]["model_steps"],
+            item["work"]["publications"]) == (0, 0, 1)
+    reads, prompts = source_reads(service), list(model_calls)
+    applied = plain.repair(plan, plan_sha256=plan.plan_sha256, max_total_budget_usd=1,
+                           reason=REASON, sources=catalog)
+    (entry,) = applied.to_dict()["items"]
+    assert (entry["outcome"], entry["decision"]) == ("applied", "accepted")
+    # Every node is kept: nothing is read or called, and the new renderer publishes the brief.
+    assert entry["work"] == IDLE | {"new_runs": 1, "reused_nodes": 4, "publications": 1,
+                                    "acceptance_evaluations": 1}
+    assert source_reads(service) == reads and model_calls == prompts
+    published = current_artifact(store, entry["successor_run_id"]).publication
+    synthesis = store.load_operation(run_id, "synthesis")["result"]["output"]
+    assert published.name == "brief.txt"
+    assert published.path.read_bytes() == f"BRIEF: {QUESTION}\n{synthesis}\n".encode()
+    assert original.path.read_bytes() == document
+    # The successor replaced the run, and nothing is left to repair.
+    (after,) = plain.plan_repair(sources=catalog).to_dict()["items"]
+    assert (after["run_id"], after["action"]) == (entry["successor_run_id"], "reuse")
 
 
 def test_republication_is_refused_when_the_synthesis_digest_does_not_match_the_lineage(

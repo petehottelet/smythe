@@ -35,6 +35,9 @@ from test_workflow_lineage import QUESTION, TEXTS, research, research_graph, ser
 
 SCOPE = "research-team"
 REVISED = "In 2026, monthly billing led renewals."
+# The research publishes with MarkdownRenderer, as a record names it.
+MARKDOWN = {"name": "markdown_renderer", "version": "1",
+            "spec_sha256": sha256_hex({"type": "markdown_renderer", "version": 1})}
 ZERO = {"nodes_reused": {}, "nodes_regenerated": {}, "read_calls": 0, "model_steps": 0,
         "publications": 0, "acceptance_evaluations": 0, "new_runs": 0,
         "may_incur_charges": False, "allowance_required": False}
@@ -125,7 +128,7 @@ def expected_state(store, run_id, catalog) -> CurrentState:
         tools={"library": {"version": "1", "decoder_version": "fixture-source-v1"}},
         components={"brief-writer": "1"}, context_assembly_version=1, agents=agents,
         integrity={run_id: current_artifact(store, run_id).integrity["status"]},
-        lineage=LineagePolicy(access_scope=SCOPE))
+        lineage=LineagePolicy(access_scope=SCOPE), renderer=MARKDOWN)
 
 
 def items(plan: RepairPlan) -> dict[str, dict]:
