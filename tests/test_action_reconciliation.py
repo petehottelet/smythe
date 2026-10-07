@@ -12,24 +12,29 @@ explicitly unresolved, its exposure kept, and nothing is submitted again.
 from __future__ import annotations
 
 from dataclasses import replace
+import threading
 import time
 
 import pytest
 
-from fakes import ManualClock
+from fakes import Gate, ManualClock
 from fixture_service import FixtureService
 from smythe import SQLiteWorkflowStore, workflow_actions
 from smythe.actions import (
+    ActionEvidence,
     ActionNotAuthorized,
     ActionStateError,
     ActionTarget,
     ConnectorAmbiguous,
     ConnectorReceipt,
     check_authority,
+    decision_sha256,
+    inspect_actions,
+    resolve,
     revoke,
 )
-from smythe.workflow_store import WorkflowValidationError
-from test_action_approvals import Host
+from smythe.workflow_store import WorkflowLeaseError, WorkflowValidationError
+from test_action_approvals import FAR, Host
 from test_action_journal import SETTINGS, WRITE, balances, execute, item
 from test_action_runner import Recording, ready, records, report, runner
 from test_workflow_acceptance import replies  # noqa: F401
@@ -522,6 +527,216 @@ def test_without_lookup_or_deduplication_the_outcome_stays_unresolved_at_once(
     assert check_authority(store, action.action_id, host) == approval
     with pytest.raises(ActionStateError, match="is outcome_unknown"):
         runner(store, connector, host, clock).dispatch(action.run_id, action.action_id)
+
+
+# ---------------------------------------------------------------------------
+# A worker paused between its claim and its request
+# ---------------------------------------------------------------------------
+
+
+LEASE = 60  # each runner's lease, which a submission holds for its timeout beyond that
+CONTRADICTION = "a late receipt shows that this attempt, which was found not executed, took effect"
+
+
+class Paused(Reconciling):
+    """A connector whose submissions wait at ``gate``, after the dispatch claim and before the request leaves."""
+
+    def __init__(self, service: FixtureService, **settings) -> None:
+        super().__init__(service, **settings)
+        self.gate = Gate()
+
+    def submit(self, key, intent, payload, timeout_s):
+        self.gate.block()
+        return super().submit(key, intent, payload, timeout_s)
+
+
+def paused_past_its_lease(store, tmp_path, replies, host, clock, *, dedupe=False):  # noqa: F811
+    """An approved action whose worker claimed its dispatch and stalled, past its lease, before sending.
+
+    The service looks keys up and shows each commit at once. Worker A, in a
+    thread with its own journal connection, waits inside ``submit()``. Returns
+    the action, the service, worker B's connector and runner, and ``resume()``,
+    which lets A's request leave and returns what A's dispatch raised.
+    """
+    service = FixtureService(clock_ns=clock, dedupe=dedupe, visibility_delay_s=0)
+    connector, paused = Reconciling(service, timeout_s=10), Paused(service, timeout_s=10)
+    assert connector.profile == paused.profile and connector.profile.deduplicates is dedupe
+    assert connector.profile.lookup_by_key and connector.profile.visibility_bound_s == 0
+    action, _ = ready(store, tmp_path, replies, host, clock, connector)
+    outcome: dict = {}
+
+    def work():
+        with SQLiteWorkflowStore(store.path, clock_ns=clock) as journal:
+            try:
+                runner(journal, paused, host, clock, owner_id="worker-a", lease_ttl_s=LEASE).dispatch(
+                    action.run_id, action.action_id)
+            except BaseException as error:  # reported by the test, not lost in the thread
+                outcome["error"] = error
+
+    thread = threading.Thread(target=work)
+    thread.start()
+    assert paused.gate.entered.wait(30)
+    assert item(store, action)["attempts"][0]["state"] == "dispatched"
+    # A's lease, held for the connector's timeout beyond its duration, lapses while it waits.
+    clock.advance(LEASE + connector.profile.timeout_s + 1)
+
+    def resume():
+        paused.gate.release()
+        thread.join(30)
+        assert not thread.is_alive()
+        return outcome.get("error")
+
+    return action, service, connector, runner(store, connector, host, clock, owner_id="worker-b",
+                                              lease_ttl_s=LEASE), resume
+
+
+def found_absent(worker, action) -> None:
+    """Worker B recovers the stalled attempt and an empty lookup shows that its write was not made."""
+    progress = worker.reconcile(action.run_id, action.action_id)
+    assert (progress.state, progress.next_action) == ("not_dispatched", "dispatch")
+
+
+def second_effect(store, tmp_path, replies, host, clock, *, dedupe=False):  # noqa: F811
+    """Worker B dispatches again and observes the result; then the stalled request leaves.
+
+    Returns the action, the service and the action as inspection showed it
+    before the stalled request left.
+    """
+    action, service, _, worker, resume = paused_past_its_lease(
+        store, tmp_path, replies, host, clock, dedupe=dedupe)
+    found_absent(worker, action)
+    assert worker.dispatch(action.run_id, action.action_id).attempt["state"] == "acknowledged"
+    assert worker.readback(action.run_id, action.action_id).state == "observed"
+    before = item(store, action)
+    error = resume()
+    assert isinstance(error, WorkflowLeaseError) and "kept as a late receipt record" in str(error)
+    return action, service, before
+
+
+def test_a_late_receipt_that_contradicts_a_not_executed_finding_leaves_the_action_unresolved(
+        store, tmp_path, replies, host, clock):  # noqa: F811
+    action, service, before = second_effect(store, tmp_path, replies, host, clock)
+
+    # Without deduplication, the stalled request committed a second object.
+    assert counts(service, action) == (2, 2, 0) and len(service.snapshot()["objects"]) == 2
+    first, retry = before["attempts"]
+    (late,) = records(store, action, "late_receipt")
+    assert (late["payload"]["attempt_id"], late["payload"]["outcome"]) == (first["attempt_id"], "acknowledged")
+    absent, contradicted = findings(store, action)
+    assert (absent["attempt_id"], absent["finding"]) == (first["attempt_id"], "not_executed")
+    assert contradicted == {"attempt_id": first["attempt_id"], "finding": "contradicted_absence",
+                            "reason": CONTRADICTION, "evidence": [late["record_id"]], "attempts": 2}
+    # Only records were appended; both writes keep their exposure.
+    after = intact(store, action, before)
+    assert (after["state"], after["attempts"]) == ("observed", before["attempts"])
+    assert balances(after) == (2 * READ, 0, 2 * WRITE)
+    events = [event["data"] for event in store.inspect_run(action.run_id)["events"]
+              if event["type"] == "action_finding"]
+    assert events[-1] == {"action_id": action.action_id, "record_id": records(store, action, "finding")[-1][
+        "record_id"], "finding": "contradicted_absence", "state": "observed"}
+
+    # The action is listed unresolved, with the second effect to compensate.
+    view = inspect_actions(store, action.run_id)
+    (shown,) = view["items"]
+    assert view["unresolved"] == [action.action_id]
+    assert (shown["state"], shown["contradiction"], shown["next_action"]) == ("observed", "second_effect", "compensate")
+    with pytest.raises(ActionNotAuthorized, match="it is observed"):
+        check_authority(store, action.action_id, host)
+    assert retry["state"] == "acknowledged"
+
+
+def test_a_deduplicating_service_answers_the_stalled_request_and_nothing_is_unresolved(
+        store, tmp_path, replies, host, clock):  # noqa: F811
+    action, service, before = second_effect(store, tmp_path, replies, host, clock, dedupe=True)
+
+    # The service answered the stalled request from the commit that the second attempt made.
+    assert counts(service, action) == (2, 1, 1) and len(service.snapshot()["objects"]) == 1
+    (late,) = records(store, action, "late_receipt")
+    assert late["payload"]["receipt"]["deduplicated"] is True
+    assert [finding["finding"] for finding in findings(store, action)] == ["not_executed"]
+    after = intact(store, action, before)
+    assert after["state"] == "observed"
+    view = inspect_actions(store, action.run_id)
+    assert view["unresolved"] == []
+    assert (view["items"][0]["contradiction"], view["items"][0]["next_action"]) == (None, None)
+
+
+@pytest.mark.parametrize("begun", [False, True], ids=["not-dispatched", "an-attempt-begun"])
+def test_a_late_receipt_before_the_next_dispatch_stops_it_and_reconciliation_reads_the_write(
+        store, tmp_path, replies, host, clock, begun):  # noqa: F811
+    action, service, connector, worker, resume = paused_past_its_lease(store, tmp_path, replies, host, clock)
+    found_absent(worker, action)
+    if begun:
+        lease = store.acquire_lease(action.run_id, "worker-c", ttl_s=LEASE)
+        approval_id = item(store, action)["approvals"][0]["approval_id"]
+        attempt = workflow_actions.begin_attempt(store, lease, action.action_id, approval_id)
+    before = item(store, action)
+
+    assert isinstance(resume(), WorkflowLeaseError)
+
+    # The write that was found not made took effect: the action's outcome is open again,
+    # an attempt begun meanwhile is released unsent, and nothing dispatches another write.
+    after = item(store, action)
+    assert after["state"] == "outcome_unknown"
+    assert [entry["state"] for entry in after["attempts"]] == ["outcome_unknown"] + ["released"] * begun
+    assert after["records"][:len(before["records"])] == before["records"] and store.audit(action.run_id)["ok"]
+    assert [finding["finding"] for finding in findings(store, action)] == ["not_executed", "contradicted_absence"]
+    view = inspect_actions(store, action.run_id)
+    assert view["unresolved"] == [action.action_id]
+    assert (view["items"][0]["contradiction"], view["items"][0]["next_action"]) == (
+        "contradicted_absence", "reconcile")
+    if begun:
+        with pytest.raises(ActionStateError, match="is released"):
+            workflow_actions.claim_dispatch(store, lease, attempt["attempt_id"])
+        store.release_lease(lease)
+    with pytest.raises(ActionStateError, match="is outcome_unknown"):
+        worker.dispatch(action.run_id, action.action_id)
+    assert connector.made("submit") == 0 and counts(service, action) == (1, 1, 0)
+
+    # Reconciliation finds the stalled request's write and reads it back: one effect.
+    progress = worker.reconcile(action.run_id, action.action_id)
+
+    assert (progress.state, progress.next_action) == ("reconciled", None) and progress.report.passed
+    assert connector.made("submit") == 0 and counts(service, action) == (1, 1, 0)
+    view = inspect_actions(store, action.run_id)
+    assert view["unresolved"] == [] and view["items"][0]["contradiction"] == "contradicted_absence"
+    assert store.audit(action.run_id)["ok"]
+
+
+def test_no_lookup_or_decision_finds_an_attempt_not_executed_once_a_late_receipt_shows_its_write(
+        store, tmp_path, replies, host, clock):  # noqa: F811
+    class Blind(Reconciling):
+        """A connector whose lookups miss every commit, as a service past its declared bound would."""
+
+        def lookup(self, key, target, timeout_s):
+            self.calls.append(("lookup", key))
+            return None
+
+    action, service, connector, worker, resume = paused_past_its_lease(store, tmp_path, replies, host, clock)
+    # Worker B recovers the stalled attempt but does not reconcile it before the receipt arrives.
+    assert worker.readback(action.run_id, action.action_id).state == "outcome_unknown"
+    assert isinstance(resume(), WorkflowLeaseError)
+    assert findings(store, action) == []
+
+    progress = runner(store, Blind(service, timeout_s=10), host, clock).reconcile(action.run_id, action.action_id)
+
+    assert (progress.state, progress.next_action) == ("outcome_unknown", "operator_review")
+    (finding,) = findings(store, action)
+    assert (finding["finding"], finding["reason"]) == (
+        "unresolved", "a late receipt shows that the write took effect, so an empty lookup proves nothing")
+    (attempt,) = item(store, action)["attempts"]
+    lease = store.acquire_lease(action.run_id, "worker-c", ttl_s=LEASE)
+    with pytest.raises(ActionStateError, match="a late receipt shows that it took effect"):
+        workflow_actions.record_finding(store, lease, attempt["attempt_id"], "not_executed", "a guess")
+    store.release_lease(lease)
+    attached = ActionEvidence.for_bytes(b"audit-log export", "No write under the action's key")
+    assertion = host.issue(decision_sha256(store, action.action_id, "not_executed", attached),
+                           subject="operator-1", tenant="acme", expires_at_ns=FAR)
+    with pytest.raises(ActionStateError, match="a late receipt shows that attempt 1 took effect"):
+        resolve(store, action.action_id, "not_executed", assertion=assertion, verifier=host, evidence=attached,
+                note="Checked the audit log")
+    assert [entry["finding"] for entry in findings(store, action)] == ["unresolved"]
+    assert item(store, action)["state"] == "outcome_unknown" and counts(service, action) == (1, 1, 0)
 
 
 # ---------------------------------------------------------------------------

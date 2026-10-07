@@ -54,6 +54,7 @@ from smythe.workflow_artifact import current_artifact
 import test_action_approvals as action_approvals
 from test_action_journal import rows as action_rows
 import test_action_operator as operator_actions
+import test_action_reconciliation as reconciliation
 import test_repair_plan as repair_plans
 from test_source_evidence import CLAIM, DROPPED, KEPT, STRONG
 from test_source_evidence import SOURCES as EVIDENCE_SOURCES
@@ -1617,6 +1618,23 @@ def test_a_wrong_or_unverified_effect_exits_12_and_a_pending_readback_does_not(
     (entry,) = value["actions"]["items"]
     assert (entry["state"], entry["next_action"]) == (state, step)
     assert value["actions"]["unresolved"] == ([] if code == EXIT_OK else [action.action_id])
+    assert journal_state(path) == before
+
+
+def test_a_second_effect_that_a_late_receipt_shows_exits_12(tmp_path, capsys, scripted_replies):  # noqa: F811
+    path, action, _, _ = action_journal(tmp_path, scripted_replies, setup=reconciliation.second_effect)
+    before = journal_state(path)
+
+    exit_code, value = inspect_durable(capsys, path, action.run_id)
+
+    assert (exit_code, value["delivery"]["decision"]) == (EXIT_RUN_ACTION_UNRESOLVED, "accepted")
+    (entry,) = value["actions"]["items"]
+    assert (entry["state"], entry["contradiction"], entry["next_action"]) == ("observed", "second_effect", "compensate")
+    assert value["actions"]["unresolved"] == [action.action_id]
+    assert main(["runs", "--journal", str(path), "inspect", action.run_id]) == EXIT_RUN_ACTION_UNRESOLVED
+    assert (f"  Action publish/1 ({action.action_id}): observed; 2 attempts; {entry['confirmed_nanousd']} "
+            f"confirmed, {entry['unknown_nanousd']} unknown nanoUSD; second effect; next compensate"
+            in capsys.readouterr().out)
     assert journal_state(path) == before
 
 

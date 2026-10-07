@@ -517,6 +517,22 @@ recovered, a permit changes nothing: its receipt or error is kept as a
 write it, and `WorkflowLeaseError` or `ActionStateError` is raised. A late
 receipt carries no cost, because the attempt keeps its exposure.
 
+A late receipt can contradict a `not_executed` finding of
+[reconciliation](#reconciliation) or an
+[operator's decision](#operator-decisions): a worker that stalled after its
+claim, past its lease, sends its request after another worker found the
+write not made. When a late receipt shows a commit of such an attempt, one
+the service did not answer from an earlier commit, the journal appends a
+`contradicted_absence` finding that cites it; the earlier finding and every
+other record stay as they were. The attempt is no longer settled, so an
+action that is `not_dispatched` again becomes `outcome_unknown`, an attempt
+begun but not claimed is released unsent, and nothing dispatches it again
+until [reconciliation](#reconciliation) or an operator settles the outcome.
+[Inspection](#inspecting-actions) lists a contradicted action as unresolved
+with a `second_effect` when the receipts name two commits, and until a read
+settles it otherwise. Once a late receipt shows an attempt's commit, no
+empty lookup or operator decision finds that attempt not executed.
+
 ### Recovery
 
 `recover_actions(store, lease)` settles the attempts that a stopped worker
@@ -710,7 +726,19 @@ finding is then `not_executed`, and the action returns to `not_dispatched`
 under its unconsumed approval, so `dispatch()` can send it again while
 attempts remain; that attempt counts toward `max_attempts`. Without a
 declared bound, before the bound has passed, or once the key's window may
-have closed, empty lookups leave the outcome unknown.
+have closed, empty lookups leave the outcome unknown, as they do once a
+[late receipt](#leases-and-late-receipts) shows the attempt's commit.
+
+The proof assumes that each request leaves within `timeout_s` of its
+dispatch claim. A worker that stalls between its claim and its request for
+longer than its lease, through a host sleep, a paused virtual machine or a
+long pause in the process, can send its request after another worker has
+proved the write absent and dispatched it again. Only a service that
+deduplicates the key answers that request from the earlier commit; a
+lookup-only service commits it a second time. The stalled worker's receipt
+is then kept as a late receipt that contradicts the finding, and the action
+is listed as unresolved with a `second_effect`, for a
+[compensation](#compensation) or an operator.
 
 **The key's window** is `dedupe_window_s` from the action's first dispatch
 claim, the earliest the service can have committed the key; `None` declares
@@ -799,7 +827,7 @@ last read, or None, the `next_action`, and the `refusal` of an action that
 | `readback` | An acknowledged attempt has reads left that fit under its approval's ceiling. |
 | `reconcile` | The outcome is unknown, or the reads did not settle it. |
 | `operator_review` | Reconciliation found it can do no more: the outcome stays unknown or unverified. |
-| `compensate` | The action is `compensation_required`: a [compensation](#compensation) can undo its effect where the connector supports one. |
+| `compensate` | The action is `compensation_required`, or `observed` or `reconciled` with a `second_effect` that a [late receipt](#leases-and-late-receipts) showed: a [compensation](#compensation) can undo an effect where the connector supports one. |
 | None | The action is settled or `unresolved`, has used every attempt, or `dispatch_pending()` refused it. |
 
 Errors from the journal's checks, such as `ActionNotAuthorized`,
@@ -1016,12 +1044,19 @@ them, reading a journal opened read-only:
 |---|---|
 | `accounting_scope`, `unit` | `external_actions` and `nanoUSD` |
 | `confirmed_nanousd`, `reserved_nanousd`, `unknown_nanousd` | The run's action balances |
-| `unresolved` | The IDs of actions whose effect is unknown, unverified, wrong or abandoned: `outcome_unknown`, `compensation_required` and `unresolved` actions, and `dispatched` ones with no read left to confirm them |
-| `items` | Each action as `inspect_run()` shows it: identity, intent digest, operation, target, state, balances, attempts, approvals by principal, verifier, ceiling, expiry, consumption and revocation, and records by kind and digest, with `duplicate_risk` and `next_action` |
+| `unresolved` | The IDs of actions whose effect is unknown, unverified, wrong, abandoned or repeated: `outcome_unknown`, `compensation_required` and `unresolved` actions, `dispatched` ones with no read left to confirm them, and contradicted ones with a `second_effect` or not yet `observed` or `reconciled` |
+| `items` | Each action as `inspect_run()` shows it: identity, intent digest, operation, target, state, balances, attempts, approvals by principal, verifier, ceiling, expiry, consumption and revocation, and records by kind and digest, with `duplicate_risk`, `contradiction` and `next_action` |
 
 `next_action` is as [progress](#progress) names it, except that a
 `not_dispatched` action that no approval authorizes needs `approve`, or
-`approve_duplicate_risk` while it carries duplicate risk. Assertions,
+`approve_duplicate_risk` while it carries duplicate risk. `contradiction`
+is null until a [late receipt](#leases-and-late-receipts) shows a commit
+of an attempt found not executed: `second_effect` when the action's
+receipts name another commit as well, each a target and version the
+service did not answer from an earlier commit, and `contradicted_absence`
+otherwise. A contradicted action stays listed with a `second_effect`, as a
+`compensation_required` one does after its compensation; without one, a
+read that settles it as `observed` or `reconciled` clears the listing. Assertions,
 parameters, receipts, error text, evidence summaries, notes and record
 payloads are never shown. From the command line,
 [`smythe runs inspect`](runs.md#external-actions) prints the same block and
@@ -1068,12 +1103,20 @@ cites the test behind each:
 - Receipts and notices that arrive late and in any order, including the
   answer to a copy the service deduplicated and a forged notice, are kept
   as records and never move an action back to an earlier state.
-- Under every combination of deduplication, lookup by key, visibility bound,
-  declared or not, and key window, a lost answer, a lost request or a
-  request that reaches the service only as the connector's `timeout_s` ends
-  never leads to a second write. Another submission follows only a lookup
-  that proved the first was never made, or is a same-key retry inside the
-  declared deduplication window, which the service answers from its earlier
-  commit. Without a declared bound, no lookup proves absence.
+- Under the combinations of deduplication, lookup by key, visibility bound,
+  declared or not, and key window that the conformance sweep declares, a lost
+  answer, a lost request or a request that reaches the service only as the
+  connector's `timeout_s` ends never leads to a second write, as long as each
+  request leaves within `timeout_s` of its dispatch claim. Another submission
+  follows only a lookup that proved the first was never made, or is a
+  same-key retry inside the declared deduplication window, which the service
+  answers from its earlier commit. Without a declared bound, no lookup proves
+  absence.
+- An empty lookup proves absence only under that assumption. A worker that
+  stalls between its claim and its request past its lease can make a
+  lookup-only service commit twice; only a deduplicating service answers the
+  stalled request from the earlier commit. Its late receipt is kept, appends
+  a contradicting finding, and leaves the action listed as unresolved with a
+  `second_effect`, so `smythe runs inspect` exits with 12.
 - A worker killed while its write is in flight leaves an unknown outcome,
   which a restarted worker reconciles without writing again.

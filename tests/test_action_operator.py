@@ -590,7 +590,8 @@ def test_inspection_shows_states_approvals_records_balances_and_next_actions(
                      "notify": ("not_dispatched", False, "approve"),
                      "publish": ("outcome_unknown", False, "operator_review")}
     published = next(entry for entry in view["items"] if entry["action_id"] == action.action_id)
-    assert published == {**item(store, action), "duplicate_risk": False, "next_action": "operator_review"}
+    assert published == {**item(store, action), "duplicate_risk": False, "contradiction": None,
+                         "next_action": "operator_review"}
     (shown,) = published["approvals"]
     assert (shown["approval_id"], shown["principal"]["subject"], shown["expires_at_ns"]) == (
         approval.approval_id, "editor-1", approval.expires_at_ns)

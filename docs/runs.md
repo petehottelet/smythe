@@ -312,12 +312,16 @@ A durable run that [prepared external actions](actions.md#prepared-actions)
 reports them under `actions`, as
 [`inspect_actions()`](actions.md#inspecting-actions) returns them: the
 `external_actions` scope's nanoUSD balances; `unresolved`, the IDs of the
-actions whose effect is unknown, unverified, wrong or abandoned; and each
-action's identity, state, balances, attempts, approvals by principal,
-verifier, ceiling, expiry, consumption and revocation, records by kind and
-digest, `duplicate_risk` and `next_action`. Assertions, parameters, receipts,
-error text and record payloads are never shown. The text report prints one
-line per action, its approvals and its record kinds:
+actions whose effect is unknown, unverified, wrong, abandoned or repeated;
+and each action's identity, state, balances, attempts, approvals by
+principal, verifier, ceiling, expiry, consumption and revocation, records by
+kind and digest, `duplicate_risk`, `contradiction` and `next_action`. A
+`contradiction` of `second_effect` or `contradicted_absence` means that a
+[late receipt](actions.md#leases-and-late-receipts) showed a write that
+reconciliation or an operator had found not made. Assertions, parameters,
+receipts, error text and record payloads are never shown. The text report
+prints one line per action, with any duplicate risk or contradiction, its
+approvals and its record kinds:
 
 ```text
 External actions: 1; 0 confirmed, 0 reserved, 2000000 unknown nanoUSD; 1 unresolved
@@ -331,7 +335,8 @@ decision is `accepted` and an action is unresolved, `inspect` exits with 12.
 An [operator decision](actions.md#operator-decisions), made in Python
 because only the host can construct the approval verifier, settles an
 action: `adopt_observed` or `not_executed` leaves nothing unresolved, while
-an `abandon`ed action stays unresolved.
+an `abandon`ed action stays unresolved, as does one with a `second_effect`,
+whose next action is `compensate`.
 
 ### Next actions
 

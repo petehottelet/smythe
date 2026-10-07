@@ -295,6 +295,11 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   write ceiling as unknown exposure. Connector error text is stored
   redacted. A permit from a superseded lease session, or for an attempt
   already settled, changes nothing and is kept as a `late_receipt` record.
+  A late receipt that shows a commit of an attempt found not executed
+  appends a `contradicted_absence` finding, returns an action that was
+  `not_dispatched` again to `outcome_unknown`, releasing an unclaimed
+  attempt, and keeps any empty lookup or operator decision from finding that
+  attempt not executed again.
   `recover_actions()` releases prepared attempts and turns dispatched ones
   into `outcome_unknown` without resending or releasing exposure, and
   `reject()` releases an attempt prepared but not yet claimed. A run's
@@ -327,7 +332,10 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   causes a submission, and shows that the write was not made only once a
   declared `visibility_bound_s` plus the connector's timeout has passed since
   the dispatch while the key is still inside its window; the action is then
-  `not_dispatched` again under its unconsumed approval. A deduplicating
+  `not_dispatched` again under its unconsumed approval. That proof assumes
+  each request leaves within the timeout of its claim: only a deduplicating
+  service protects against a worker that stalls past its lease before its
+  request leaves. A deduplicating
   service without lookups gets one same-key retry within `max_attempts`,
   only while `dedupe_window_s` from the first dispatch, less the timeout, is
   open and the approval and content still hold; a refused retry leaves the
@@ -385,8 +393,11 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   is kept as a SHA-256 and a redacted summary of at most 500 characters,
   never its bytes. Decisions only append `decision` and `evidence` records:
   no attempt, approval or balance changes, so unknown exposure stays.
-  `inspect_actions(store, run_id)` adds each action's duplicate risk and next
-  action and lists the unresolved actions. `smythe runs inspect` reports them
+  `inspect_actions(store, run_id)` adds each action's duplicate risk,
+  contradiction and next action and lists the unresolved actions, including
+  one whose late receipt shows a `second_effect`, which needs compensation,
+  and one not yet settled by a read after a `contradicted_absence`.
+  `smythe runs inspect` reports them
   in an `actions` block and exits with 12 when the decision is `accepted` but
   an external action is unresolved; codes 10 and 11 take precedence.
   `smythe runs revoke-action` is the lease-free `revoke()` fail-safe, and

@@ -650,13 +650,18 @@ the runner does only what the declarations allow:
 | Declaration | With it | Without it |
 |---|---|---|
 | `lookup_by_key` | After a lost answer, looks the key up and reads a found receipt's object back | No lookup |
-| `visibility_bound_s` | An empty lookup shows the write was never made once the bound plus `timeout_s` has passed since the dispatch, while the key's window is open | An empty lookup proves nothing |
+| `visibility_bound_s` | An empty lookup shows the write was never made once the bound plus `timeout_s` has passed since the dispatch, while the key's window is open, assuming the request left within `timeout_s` of its claim | An empty lookup proves nothing |
 | `deduplicates`, `dedupe_window_s` | Without `lookup_by_key`, one same-key retry per reconciliation while the window is open, within `max_attempts`; with it, reconciliation looks the key up instead, since a lookup takes precedence | No retry |
 | `lookup_by_object` | Reads the object a receipt names and checks its bytes, key and version | No read confirms a receipt; an operator decides |
 | `compensation="new_action"` | A separately approved action can undo an effect | The action stays `compensation_required` with its exposure |
 
 The connector must be synchronous, must not retry on its own, and must
-present the profile the action was prepared with.
+present the profile the action was prepared with. An empty lookup's proof
+of absence assumes that each request leaves within `timeout_s` of its
+dispatch claim: only a deduplicating service protects against a worker that
+stalls between its claim and its request past its lease. When such a
+worker's late receipt shows a second commit, the action is listed as
+unresolved with a `second_effect`.
 
 Tests:
 
@@ -683,9 +688,14 @@ Tests:
   invalid declarations `tests/test_action_contract.py::test_profile_validation_rejects_invalid_declarations`;
   connectors `tests/test_action_runner.py::test_a_runner_refuses_a_connector_that_retries_and_async_host_code`
   and `tests/test_action_runner.py::test_a_connector_with_another_profile_is_refused`.
-- Every combination of declarations, with a visibility bound or none, after
-  a lost answer, a lost request or a request that arrives as `timeout_s` ends:
+- The swept combinations of declarations, with a visibility bound or none,
+  after a lost answer, a lost request or a request that arrives as
+  `timeout_s` ends:
   `tests/test_action_conformance.py::test_no_second_effect_without_proven_absence_or_live_deduplication`.
+- A worker stalled past its lease before its request leaves: lookup only
+  `tests/test_action_reconciliation.py::test_a_late_receipt_that_contradicts_a_not_executed_finding_leaves_the_action_unresolved`
+  and `tests/test_runs_cli.py::test_a_second_effect_that_a_late_receipt_shows_exits_12`;
+  deduplication `tests/test_action_reconciliation.py::test_a_deduplicating_service_answers_the_stalled_request_and_nothing_is_unresolved`.
 - Competing workers: `tests/test_action_conformance.py::test_two_threads_racing_to_dispatch_make_one_claim_and_one_effect`
   and `tests/test_action_conformance.py::test_a_worker_in_another_process_and_a_local_worker_race_and_one_claims`.
 - Events out of order: `tests/test_action_conformance.py::test_receipts_and_notices_in_any_order_never_move_an_action_back`,

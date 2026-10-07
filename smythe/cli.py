@@ -1062,6 +1062,8 @@ def _emit_actions(actions: dict[str, Any]) -> None:
           f"{len(actions['unresolved'])} unresolved")
     for item in actions["items"]:
         risk = "; duplicate risk" if item["duplicate_risk"] else ""
+        if item["contradiction"] is not None:
+            risk += "; " + item["contradiction"].replace("_", " ")
         print(f"  Action {_terminal_text(item['slot'])}/{item['sequence']} ({_terminal_text(item['action_id'])}): "
               f"{item['state']}; {len(item['attempts'])} attempts; {item['confirmed_nanousd']} confirmed, "
               f"{item['unknown_nanousd']} unknown {unit}{risk}; next {item['next_action'] or 'none'}")
