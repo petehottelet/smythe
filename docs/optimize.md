@@ -1010,8 +1010,11 @@ partial is visible on reopen. A writable open creates a missing file
 owner-only (`0600`), and the `-wal` and `-shm` files inherit that mode.
 Triggers refuse every `UPDATE` and `DELETE` on registry tables, from Smythe
 or any other SQLite client, and refuse inserts from a writer of another
-schema version. A writable open checks the schema version before it writes
-and refuses a missing or altered trigger. As with the ledger, this protects
+schema version. They also refuse an insert that names an existing review or
+event, which `INSERT OR REPLACE` would otherwise use to swap a row without
+firing a delete trigger, and an event that is not its target's next number.
+A writable open checks the schema version before it writes and refuses a
+missing or altered trigger. As with the ledger, this protects
 the history from accidental edits, not from an operator who can drop
 triggers or rewrite the file.
 

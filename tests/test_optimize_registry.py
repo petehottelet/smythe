@@ -293,6 +293,34 @@ def test_raw_update_and_delete_raise_through_the_triggers(tmp_path, table):
     assert _dump(path) == before
 
 
+@pytest.mark.parametrize("statement", [
+    # REPLACE deletes the conflicting row without firing DELETE triggers.
+    "INSERT OR REPLACE INTO activations VALUES "
+    "('planner.template.report', 2, 'retire', NULL, NULL, NULL, NULL, 'r', 'a', 1)",
+    "REPLACE INTO reviews VALUES ('review-1', 'c', 'd', 'reject', 'r', '{}', 1)",
+    "INSERT OR IGNORE INTO activations VALUES "
+    "('planner.template.report', 1, 'retire', NULL, NULL, NULL, NULL, 'r', 'a', 1)",
+    # An event that skips the target's next seq.
+    "INSERT INTO activations VALUES "
+    "('planner.template.report', 4, 'retire', NULL, NULL, NULL, NULL, 'r', 'a', 1)",
+    "INSERT INTO activations VALUES "
+    "('planner.template.summary', 2, 'retire', NULL, NULL, NULL, NULL, 'r', 'a', 1)",
+])
+def test_a_current_writer_cannot_replace_or_skip_an_event(tmp_path, statement):
+    path = tmp_path / "registry.sqlite3"
+    _activated(path)
+    before = _dump(path)
+    with closing(sqlite3.connect(path, isolation_level=None)) as raw:
+        raw.create_function(WRITER, 0, lambda: 1)
+        with pytest.raises(sqlite3.IntegrityError, match="append-only"):
+            raw.execute(statement)
+    assert _dump(path) == before
+    with PolicyRegistry(path) as registry:
+        assert [event.policy for event in registry.history(TARGET)] == [V1, V2]
+        with pytest.raises(sqlite3.IntegrityError, match="append-only"):
+            registry._connection.execute(statement)
+
+
 @pytest.mark.parametrize("table", sorted(TABLE_INSERTS))
 def test_a_writer_of_another_schema_version_is_refused_by_the_barrier(tmp_path, table):
     path = tmp_path / "registry.sqlite3"

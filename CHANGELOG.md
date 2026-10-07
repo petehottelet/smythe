@@ -651,9 +651,11 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   `retire()` leaves no policy in effect. Each change names the head it
   expects, and a stale `expected_seq` raises `RegistryConflictError` without
   writing, so of two writers on the same head exactly one succeeds. Triggers
-  refuse every update and delete and inserts from another schema version, a
-  writable open refuses a database holding other tables, and a read-only open
-  requires a closed, checkpointed file. The ledger schema and
+  refuse every update and delete, an insert that would replace a review or
+  event (as `INSERT OR REPLACE` does) or skip a target's next number, and
+  inserts from another schema version; a writable open refuses a database
+  holding other tables, and a read-only open requires a closed, checkpointed
+  file. The ledger schema and
   `smythe optimize inspect --json` output are unchanged. See
   [policy registry](docs/optimize.md#policy-registry).
 - `smythe.optimize.workflow_eval.workflow_trial_evaluator(runtime_factory,
