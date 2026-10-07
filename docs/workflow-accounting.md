@@ -274,11 +274,16 @@ current call for up to `drain_timeout_s` seconds:
   drain cancels the nodes in flight at once.
 
 The journal's calls record how each node's call ended; a durable checkpoint
-keeps no `control.drain` summary. A call claims its dispatch right after its
-reservation, so a drain never leaves a call reserved but unsent. A process
-lost during a drain can: resuming sends that call under its reservation, as
-[recovery boundaries](#recovery-boundaries) describe, and recovery holds each
-call the lost process sent without a saved response as unknown exposure.
+keeps no `control.drain` summary. A model call claims its dispatch right after
+its reservation, without yielding, so a cancellation never leaves one reserved
+but unsent. A read step reserves its call before it resolves its destination,
+so one cancelled meanwhile, by the deadline, a security stop or a failure
+without a policy, keeps its reservation, as does a call of a process lost
+between its reservation and its dispatch claim. Resuming the run sends that
+call under its reservation, and the run releases it once it can no longer be
+sent, as [recovery boundaries](#recovery-boundaries) describe. Recovery holds
+each call that a lost process sent without a saved response as unknown
+exposure.
 
 The recipe records the policy under `termination`, as
 `{"drain_timeout_s": ...}`, only when one is configured, so a recipe without
@@ -387,10 +392,11 @@ one exception is a [read step](#recorded-read-steps) whose profile declares it
 free and safe to send again, which is read again as a new call.
 
 A call that was reserved but never dispatched, as when a process is killed
-between the reservation and the dispatch claim, keeps its reservation while
-the run can still send it. When its node runs again at the same generation,
-resuming sends it under that reservation and its saved quote, without counting
-its input again. The run releases it once it can no longer be sent:
+between the reservation and the dispatch claim, or a read step is cancelled
+while it resolves its destination, keeps its reservation while the run can
+still send it. When its node runs again at the same generation, resuming sends
+it under that reservation and its saved quote, without counting its input
+again. The run releases it once it can no longer be sent:
 
 - when a checkpoint records a regeneration that moved its node to a later
   generation, including a regeneration that resuming applies, because a node

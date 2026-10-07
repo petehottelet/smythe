@@ -1571,9 +1571,10 @@ class WorkflowRuntime:
         self._validate_graph_policy(self.graph)
         self.registry.workflow_description()
         generations = {node.id: node_generation(node) for node in self.graph.nodes}
-        # A call claims its dispatch right after its reservation, without
-        # yielding, so a reserved call seen here was left by a killed process
-        # or a failed claim. Nodes call only at their current generation, so
+        # A model call claims its dispatch right after its reservation,
+        # without yielding, so a reserved call seen here was left by a killed
+        # process, a failed claim, or a read step cancelled while it resolved
+        # its destination. Nodes call only at their current generation, so
         # one of a superseded generation, including one that a regeneration
         # applied on resume superseded, is never sent: release it. A completed
         # run sends nothing more, so it releases every reservation left.

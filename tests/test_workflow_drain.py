@@ -13,7 +13,8 @@ during the drain leaves its sent call to recovery, which marks it unknown.
 
 The wire fake holds the sibling's generation request, or its input-token
 count, at a gate, and refuses the halting node's first request with a 401,
-a zero-cost rejection, once the sibling has reached the gate. Patching
+a zero-cost rejection, once the sibling has reached the gate. A read step is
+held the same way while it resolves its destination. Patching
 ``AsyncExecutor._drain_wait`` controls the drain's deadline: releasing the
 gate first lets the sibling answer within it, and returning at once makes it
 pass.
@@ -22,6 +23,7 @@ pass.
 from __future__ import annotations
 
 import asyncio
+import json
 from uuid import uuid4
 
 import pytest
@@ -30,10 +32,12 @@ from fakes import (
     Crash, Gate, HttpError, ManualClock, NativeTransport, crash_when, kill_and_reap,
     launch_child, wait_for_barrier,
 )
+from fixture_service import FixtureService, serve_http
 from smythe import (
-    OfflineProvider, ProviderRequestRejectedError, RunControl, SecurityStop, SimpleArchitect,
-    SQLiteWorkflowStore, Swarm, Task, TerminationPolicy,
+    OfflineProvider, ProviderRequestRejectedError, ReadProfile, RunControl, SecurityStop,
+    SimpleArchitect, SQLiteWorkflowStore, Swarm, Task, TerminationPolicy,
 )
+from smythe import workflow_tools
 from smythe.async_executor import AsyncExecutor
 from smythe.graph import ExecutionGraph, Node, Topology
 from smythe.provider_responses import OpenAIResponsesProvider
@@ -349,6 +353,105 @@ def test_a_security_stop_during_a_durable_drain_cancels_the_sibling_at_once(tmp_
     assert (sibling["state"], sibling["unknown_nanousd"]) == ("unknown", CEILING)
     assert inspected["ok"] and saved["checkpoint"]["status"] == "failed"
     assert (sent(wire, "Halt"), sent(wire, "Sibling")) == (1, 1)
+
+
+# ---------------------------------------------------------------------------
+# A read step in flight
+# ---------------------------------------------------------------------------
+
+READ_CEILING = 2_000  # nanoUSD each metered read reserves
+
+
+@pytest.fixture
+def service():
+    service = FixtureService()
+    service.add_source("brief", "Revenue grew 4% in the third quarter.")
+    with serve_http(service) as endpoint:
+        service.port = endpoint.port
+        yield service
+
+
+def reading(port: int) -> ReadProfile:
+    return ReadProfile(name="source", version="1",
+                       url=f"http://127.0.0.1:{port}/sources/{{source_id}}",
+                       input_schema={"source_id": "string"},
+                       decode=lambda body: json.loads(body)["content"],
+                       decoder_version="fixture-source-v1", allow_private_networks=True,
+                       metered=True, repeat_safe=True, ceiling_nanousd=READ_CEILING)
+
+
+def read_graph(profile: ReadProfile) -> ExecutionGraph:
+    return ExecutionGraph([Topology.FORK_JOIN], [Node(id="halt", label="Halt"),
+                                                 profile.step("fetch", {"source_id": "brief"})])
+
+
+def resolving(monkeypatch) -> Gate:
+    """Hold each read, after its reservation, while it resolves its destination."""
+    gate, lookup = Gate(), workflow_tools._addresses
+
+    def held(*args):
+        gate.block(60)
+        return lookup(*args)
+
+    monkeypatch.setattr(workflow_tools, "_addresses", held)
+    return gate
+
+
+def fetched(inspected):
+    """The read step's calls, as ``inspect_run`` summarizes them, oldest first."""
+    return [call for call in inspected["calls"]
+            if call["key"]["scope_id"] == "node/fetch" and call["key"]["phase"] == "tool"]
+
+
+def reads(service) -> int:
+    return service.snapshot()["sources"]["brief"]["reads"]
+
+
+@pytest.mark.parametrize("termination", [None, DRAIN], ids=["no-policy", "deadline"])
+def test_a_read_step_cancelled_while_resolving_its_destination_is_sent_on_resume(
+        tmp_path, monkeypatch, service, termination):
+    profile, path = reading(service.port), tmp_path / "runs.db"
+    lookup = resolving(monkeypatch)
+    Wire(lookup).install(monkeypatch)
+    waits = expiring(monkeypatch)
+
+    async def run(store):
+        try:
+            return await durable(store, termination=termination,
+                                 read_tools=[profile]).execute_async(read_graph(profile))
+        finally:
+            lookup.release()  # The lookup's thread ends before the loop closes.
+
+    with SQLiteWorkflowStore(path) as store:
+        with pytest.raises(ProviderRequestRejectedError, match="HTTP 401"):
+            asyncio.run(run(store))
+        (run_record,) = store.list_runs()
+        run_id = run_record["run_id"]
+        inspected = store.inspect_run(run_id)
+    assert waits == ([] if termination is None else [DRAIN_S])
+    # Cancelled after its reservation and before its claim, the read keeps
+    # its reservation, as a lost process leaves it; nothing was sent.
+    (orphan,) = fetched(inspected)
+    assert (orphan["state"], orphan["reserved_nanousd"], orphan["evidence_id"]) == (
+        "reserved", READ_CEILING, None)
+    assert inspected["ok"] and inspected["blocked_reason"] is None
+    assert inspected["unknown_calls"] == 0 and reads(service) == 0
+
+    Wire().install(monkeypatch)
+    with SQLiteWorkflowStore(path) as store:
+        result = durable(store, termination=termination, read_tools=[profile]).resume(run_id)
+        after = store.inspect_run(run_id)
+    # Resume sends it once, under that reservation.
+    (current,) = fetched(after)
+    history = events(after, current["call_id"])
+    assert current["call_id"] == orphan["call_id"]
+    assert (current["state"], current["result_state"]) == ("settled", "applied")
+    assert history.count("call_reserved") == history.count("dispatch_claimed") == 1
+    assert "call_released" not in history
+    assert reads(service) == 1
+    assert after["status"] == "completed" and after["ok"]
+    assert (after["reserved_nanousd"], after["unknown_nanousd"]) == (0, 0)
+    assert result.cost_is_complete
 
 
 # ---------------------------------------------------------------------------
