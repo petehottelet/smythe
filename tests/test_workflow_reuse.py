@@ -314,6 +314,27 @@ def test_reuse_operations_carry_no_calls_and_are_consumed_once(changed):
         assert node.metadata[LINEAGE_REUSE_KEY] == operation["inputs"]
 
 
+def test_each_reuse_operation_names_its_reason_codes_and_plan_digest(store, replies):
+    graph = ExecutionGraph([Topology.SERIAL], [
+        Node(id="collect", label="Collect the facts"),
+        Node(id="write", label="Write the answer", depends_on=["collect"])])
+    swarm = Swarm(model="offline", provider=OfflineProvider(), architect=SimpleArchitect(),
+                  run_store=store, max_budget_usd=1, context_sources=[], acceptance=strict(),
+                  lineage=LineagePolicy())
+    first = swarm.execute(graph).execution_id
+    plan = sha256_hex("another repair plan")
+
+    second = successor(swarm, first, {"collect": ["source_version_changed", "source_changed",
+                                                  "source_changed"]}, plan_sha256=plan)
+
+    # The codes the reuse was decided with, sorted and once each, and the plan's digest.
+    (operation,) = store.list_operations(second.execution_id, "reuse")
+    assert (operation["inputs"]["reasons"], operation["inputs"]["plan_sha256"]) == (
+        ["source_changed", "source_version_changed"], plan)
+    collect = next(node for node in second.graph.nodes if node.id == "collect")
+    assert collect.metadata[LINEAGE_REUSE_KEY] == operation["inputs"]
+
+
 def test_inspection_never_returns_reused_text(changed):
     store, second = changed.store, changed.second.execution_id
     kept = [results(changed.first.graph)[node_id] for node_id in KEPT]

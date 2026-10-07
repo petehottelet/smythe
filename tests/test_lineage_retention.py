@@ -235,6 +235,40 @@ def test_a_restricted_runs_completed_resume_never_delivers(
     assert view["next_action"]["action"] == "resolve_indeterminate"
 
 
+def decisions_and_publications(store, run_id) -> list[tuple[str, str]]:
+    return [(item["operation_key"], item["state"]) for kind in ("acceptance", "publication",
+                                                                "lineage")
+            for item in store.list_operations(run_id, kind)]
+
+
+def test_a_restricted_run_is_never_decided_or_published_again(
+        store, library, tmp_path, replies):
+    _, endpoint = library
+    swarm = research(store, endpoint, tmp_path)
+    run_id = swarm.execute(survey_only(endpoint)).execution_id
+    published = current_artifact(store, run_id).publication.path
+    restrict_source(store, "survey", reason=WITHDRAWN)
+    revision, recorded = store.load_run(run_id)["revision"], decisions_and_publications(
+        store, run_id)
+    withdrawn = "source 'survey' that the run's lineage records was withdrawn"
+
+    # Its policy would accept the saved output again: the restriction alone refuses it.
+    with pytest.raises(WorkflowStateError, match=f"cannot be re-evaluated: {withdrawn}"):
+        swarm.reevaluate(run_id)
+    # Its deleted document would otherwise be rendered and decided again.
+    published.unlink()
+    with pytest.raises(WorkflowStateError, match=f"cannot be published again: {withdrawn}"):
+        swarm.republish(run_id)
+
+    assert store.load_run(run_id)["revision"] == revision
+    assert decisions_and_publications(store, run_id) == recorded
+    assert not published.exists() and listing(published.parent) == [".smythe-run-owner.json"]
+
+
+def listing(directory) -> list[str]:
+    return sorted(item.name for item in directory.iterdir())
+
+
 def test_purge_deletes_the_derived_documents_and_keeps_each_tombstone(
         store, library, tmp_path, replies, capsys):
     service, endpoint = library
