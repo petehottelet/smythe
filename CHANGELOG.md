@@ -985,31 +985,170 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   exactly), the `reuse` switch and what `undeclared_coverage` calls for
   (`review` or `regenerate`). Without a `run_store` or a strict policy it is
   refused before any routing, planning or node call. The recipe records it
-  under `lineage` only when configured, so other recipes keep their bytes,
-  and plan, execute, resume and re-evaluation compare it exactly: a run
-  resumed under another policy, or without its own, raises
-  `WorkflowConflictError`. A new durable graph cannot carry `lineage_reuse`
-  node metadata. `ArtifactLineage` is the versioned record of a run's
-  accepted artifact, delivery decision and each node's inputs as ids,
-  versions and digests, with no source text; its reader rejects unknown
-  versions and keys, blank ids, a node that lists a source reference twice,
-  in any key order, and a node listed before a node it depends on, which also
-  rules out dependency cycles. Records hash by their digest. A run with a
-  policy writes its record once when it completes, as a `lineage` journal
-  operation that the completed checkpoint applies with its decision:
-  `smythe.lineage.load_lineage()` reads it, and `inspect_run()` and
-  `list_runs()` never return it.
-  Each read step names its read profile and the source version and digest it
-  read, each model node or gate the context snapshot and sources it was
-  given and its agent's digest, and the synthesis its synthesizer; the
-  record also binds the published bytes' digest and the decision. A node
-  whose inputs are not all known, such as a model node without a context
-  snapshot, is `undeclared` and makes the coverage `partial`. A process lost
-  before the record commits writes it on resume without a call, one lost
-  after it replays it, and resuming a completed run whose record no longer
-  matches its journal gives `indeterminate`. Lineage runs refuse, before any
-  call, node and source ids their record cannot hold: blank ids and ids with
-  DEL. See [artifact lineage](docs/lineage.md).
+  under `lineage` only when configured, so other recipes keep their bytes.
+  Plan, execute and resume compare it exactly, and re-evaluation, which
+  reuses nothing, in all but `reuse`: a run resumed under another policy, or
+  without its own, raises `WorkflowConflictError`. A new durable graph cannot
+  carry `lineage_reuse` node metadata. `ArtifactLineage` is the versioned
+  record of a run's accepted artifact, delivery decision and each node's
+  inputs as ids, versions and digests, with no source text; its reader
+  rejects unknown versions and keys, blank ids, a node that lists a source
+  reference twice, in any key order, and a node listed before a node it
+  depends on, which also rules out dependency cycles. Records hash by their
+  digest. A run with a policy writes its record once when it completes, as
+  a `lineage` journal operation that the completed checkpoint applies with
+  its decision: `smythe.lineage.load_lineage()` reads it, and `inspect_run()`
+  and `list_runs()` never return it. Each read step names its read profile
+  and the source version and digest it read, each model node or gate the
+  context snapshot and sources it was given and its agent's digest, and the
+  synthesis its synthesizer; the record also binds the published bytes'
+  digest and the decision. A node whose inputs are not all known, such as a
+  model node without a context snapshot, is `undeclared` and makes the
+  coverage `partial`. A process lost before the record commits writes it on
+  resume without a call, one lost after it replays it, and resuming a
+  completed run whose record no longer matches its journal gives
+  `indeterminate`. Lineage runs refuse, before any call, node and source ids
+  their record cannot hold: blank ids and ids with DEL. See
+  [artifact lineage](docs/lineage.md), and the
+  [support matrix](docs/support-matrix.md#lineage-and-repair) for what each
+  execution path supports.
+- Reuse decisions for artifact lineage. `smythe.reuse.evaluate(record,
+  state)` compares an `ArtifactLineage` record, or None, with a
+  `CurrentState` (a developer's zero-cost `SourceCatalog`, the validator
+  identities, the acceptance policy digest, tool, component, context
+  assembly and agent identities, optional task changes, published-document
+  integrity and the `LineagePolicy`) and returns an `ItemDecision`: `reuse`,
+  `recheck`, `rerender`, `regenerate` or `review` for the item and each
+  node, with stable reason codes and the scope, recipe, policy, validator
+  set and source versions any kept result is kept under. A source counts as
+  current only when its id, version and digest all match, so equal bytes
+  under a new version regenerate; an unavailable or withdrawn source needs
+  review; a changed tool, decoder, component, context assembly, agent or
+  task regenerates the node and everything that depends on it, while other
+  branches are reused; a missing or changed document with current inputs is
+  rendered again; a changed validator set or policy calls for a recheck; a
+  decision other than `accepted` needs review; and a missing record or
+  undeclared coverage follows `undeclared_coverage`. Gates and the nodes
+  they judge are never reused in an item that computes anything again,
+  `reuse=False` turns reuse and rendering again into regeneration, and a
+  record in another access scope is invisible before any digest is
+  compared. A catalog that declares itself metered is refused. The
+  evaluator reads no store or file and its output is deterministic JSON
+  data. See [reuse decisions](docs/lineage.md#reuse-decisions).
+- Read-only repair plans for artifact lineage.
+  `Swarm.plan_repair(execution_ids=None, *, sources)` evaluates each run in
+  the Swarm's access scope, by default the heads of the archive, against
+  what a new run would use now and returns a `RepairPlan`: each run's
+  decision, derived status and predicted work (nodes reused and regenerated
+  by kind, read calls, model steps, publications, acceptance evaluations,
+  new runs, whether charges may be incurred and whether an allowance is
+  required), the catalog's answers, and a timestamp-free `plan_sha256` that
+  a later apply must match. Planning opens the journal again read-only,
+  takes no lease, writes nothing, calls no provider, reads no source and
+  describes each source once; a run that has not completed needs `review`
+  (`run_in_progress`), and a run in another scope is not found.
+  `archive_heads(store, scope)` follows predecessor links: a completed
+  successor whose decision is accepted supersedes its predecessor, and one
+  whose decision is not supersedes nothing and is not a head.
+  `smythe.reuse.derived_status()` computes the lifecycle status `current`,
+  `stale`, `invalid`, `restricted` or `superseded`, which is never stored.
+  `smythe runs inspect` adds a `lineage` block to durable lineage runs, in
+  JSON and text: coverage, source references, predecessor and successors,
+  the published document's integrity and the derived status, with no
+  source text and no new exit code. See
+  [plan a repair](docs/lineage.md#plan-a-repair) and
+  [lineage in runs inspect](docs/runs.md#lineage).
+- In-place repair of completed lineage runs. `Swarm.republish()` on a run
+  with a lineage policy whose published document is missing or changed
+  renders the saved synthesis again, publishes it as a new file named for
+  its publication (`document-p1.md`) without replacing any file, and makes a
+  new decision on those bytes under the Swarm's policy, bound to that
+  publication, so identical bytes are decided again rather than copied. It
+  needs the saved synthesis to have the digest its lineage records and is
+  refused for an intact document, a changed renderer or synthesizer, and a
+  name already holding other bytes. Every new decision on a lineage run,
+  from republication, `Swarm.reevaluate()` or an operator, journals a
+  lineage record keyed `lineage/<sequence>` that names the decision, the
+  current publication and the deciding validators and supersedes the
+  earlier record, applied in the same checkpoint, so a later repair plan
+  finds nothing left to recheck or rerender. No node runs, nothing is read
+  or called, earlier publications, decisions and records stay in the
+  journal, and a process lost before the checkpoint is finished by the same
+  call again. `smythe runs inspect` lists superseded publications under
+  `artifact.superseded`. See
+  [repair a run in place](docs/lineage.md#repair-a-run-in-place).
+- Reuse operations for durable successor runs. A successor of a completed
+  lineage run, which applying a repair plan starts, runs the predecessor's
+  task and graph again as a new run, but each node it keeps completes first
+  from a `reuse` journal operation, keyed `reuse/<node id>`, with the
+  predecessor's text byte for byte, so one changed source runs only its
+  read, its extraction and what depends on them, and the rerun nodes get the
+  prompts a full recomputation would. Each
+  operation names the predecessor's store, run and lineage digest, the
+  node's generation and result digest, the digests of its lineage record and
+  source evidence, its reason codes and the repair plan's digest; it carries
+  no calls and no cost, and one checkpoint consumes it. Only a completed run
+  in the same store and access scope, whose lineage record has the named
+  digest, is reused from; a node whose saved result no longer has its
+  recorded digest, whose inputs are undeclared or used a removed source, a
+  gate and the nodes it judges or depends on, a node depending on one that
+  runs again, and a graph the successor's graph policy, read profiles,
+  models or agents cannot run are refused before the successor is created
+  or any call is made. A resumed successor replays its reuse operations
+  without reading the predecessor. Refreshing an unfinished successor's
+  sources, even one lost before it saved a kept node, runs its kept nodes
+  again, and a kept result naming a source removed from the successor is
+  never used. Its lineage names its `predecessor` and `repair`, each kept
+  node keeps its recorded inputs with `reused_from`, and inspection never
+  returns kept text. A new durable graph cannot carry a `repair` planning
+  record. See [reused results](docs/workflow-accounting.md#reused-results).
+- Applying a repair plan. `Swarm.repair(plan, *, plan_sha256,
+  max_total_budget_usd, reason, sources)` (and `arepair()`) makes the plan
+  again for the same runs and refuses it with `WorkflowConflictError`
+  unless it still has the approved digest. It needs a durable `run_store`
+  and a lineage policy, refuses a configured supervisor, and admits the new
+  runs only when their number times `max_budget_usd` fits
+  `max_total_budget_usd`, refusing an unbounded per-run budget when any may
+  incur charges (`WorkflowBudgetError`); every refusal comes before any run
+  is created or call made. Items are applied in plan order, each once:
+  `recheck` decides the run again and `rerender` publishes its document
+  again, both binding the plan's digest and reason, `regenerate` starts a
+  successor run that keeps the nodes the plan reuses and leaves the
+  repaired run's rows untouched, and `review` is reported. The first item
+  that raises or is not accepted stops the repair without a retry. A
+  `RepairResult` lists each item's outcome, decision, successor and work
+  (new runs, read and model calls, reused nodes, publications and
+  decisions). A successor that has not completed is a repair in progress:
+  it is no archive head, and a plan gives the run it repairs `review`
+  (`repair_in_progress`), naming it in `repairs_in_progress`, until
+  ordinary resume finishes it. Under `LineagePolicy(reuse=False)` a
+  regenerated item keeps no result and runs every node, and its document is
+  byte for byte a new run's, while a `recheck` item is still decided again.
+  See [apply a repair plan](docs/lineage.md#apply-a-repair-plan).
+- Source restriction for artifact lineage.
+  `smythe.lineage.restrict_source(store, source_id, *, version=None,
+  scope=None, reason, purge=False)` withdraws a source's text from every
+  completed lineage run whose record names it, optionally only one version
+  or one access scope, compared before any digest. Each run journals the
+  same `source_tombstone` record that `remove_source` writes (identity,
+  digest, reason and the journal clock's time, no text) under its lease,
+  and a copy of its completed checkpoint applies it. `purge=True` deletes
+  each file the run published and records its path, SHA-256, reason and
+  time as an `artifact_purge` operation (`purged_artifacts()` reads them);
+  tombstones and purge records always remain. A run restricted this way,
+  or by a source removed from a lineage run
+  (`smythe.lineage.restricted_sources()`), never delivers its output again:
+  completed resume, inspection and document eligibility give
+  `indeterminate`, external actions refuse it as unavailable, and
+  `reevaluate`, `republish` and reuse in a successor refuse it. A repair
+  plan needs `review` for it while the catalog describes the withdrawn
+  text and allows `regenerate` from another version; its derived status
+  stays `restricted`. A successor holds its predecessor's tombstones, so it
+  is refused a withdrawn text as a context source and is restricted if it
+  reads one again. `smythe runs inspect` lists a lineage run's tombstones
+  and purged files. Text copied into journal checkpoints and provider
+  responses is not scrubbed. See
+  [restrict a source](docs/lineage.md#restrict-a-source).
 - `Swarm(reserve_for_checks=True)` holds allowance for a run's verifiers and
   its `LLM_MERGE` synthesis so other nodes cannot spend it. Under
   `max_budget_usd`, before any node runs, the run holds what each pending
@@ -1087,16 +1226,16 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   and the new attempt, linked to the one it replaces, records the reason. The
   operation keeps naming its accepted attempt until a new attempt is accepted,
   even when the repair attempt is rejected; artifact rows and their `accepted`
-  flags never change, and `resume` and `reroll` recheck only each operation's
-  current accepted attempt. In Python, `JobRunner.reroll(...,
+  flags never change, and `resume` and `reroll` hash only each operation's
+  current accepted attempt again. In Python, `JobRunner.reroll(...,
   repair_integrity=True)` records the findings with
   `SQLiteRunStore.queue_integrity_repair()`; the Jobs schema stays at
   version 4. See
   [repair corrupted accepted outputs](docs/jobs.md#repair-corrupted-accepted-outputs).
 - `jobs recheck RUN_ID OPERATION... --reason TEXT` decides succeeded
   operations' accepted files again under the current checks, without a
-  provider call. Delivery eligibility now uses the latest decision made
-  under the validators an operation requires now, the call's own or a
+  provider call. Delivery eligibility uses the latest decision made under
+  the validators an operation requires now, the call's own or a
   recheck's, so a registered validator's new version or configuration, or a
   newer built-in artifact check, reports `validator_changed`: a recheck is
   required. `JobRunner.recheck()` runs this release's built-in check and the
@@ -1119,21 +1258,21 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   It opens the Jobs database read-only, takes no lease, writes nothing,
   calls no provider and exits 0. Each operation gets `reuse`, `recheck`,
   `regenerate` or `review` with sorted reason codes from the reuse
-  decisions' vocabulary, its remaining attempts, and `new_plan_required`
-  when its regeneration needs a new plan and approval: it sends an
-  attachment whose bytes changed since the plan, which the preview
-  fingerprints again, has no attempt left, or the run's budget overran. The
-  document also gives each attachment's status, the run's remaining budget
-  and a count per action; a `regenerate` without `new_plan_required` for a
-  missing or changed accepted file is what an integrity repair admits.
-  Nothing is repaired
-  automatically and no other run's artifacts are offered. Without
-  `--dry-run`, `jobs reroll` still needs operations and `--reason`; its
-  operation keys may come before, between or after its options. In
+  decisions' vocabulary, `smythe.reuse.REASONS`, whose `outcome_unknown`
+  (`review`) marks an operation whose provider call may have completed; its
+  remaining attempts; and `new_plan_required` when its regeneration needs a
+  new plan and approval: it sends an attachment whose bytes changed since
+  the plan, which the preview fingerprints again, has no attempt left, or
+  the run's budget overran. The document also gives each attachment's
+  status, the run's remaining budget and a count per action; a `regenerate`
+  without `new_plan_required` for a missing or changed accepted file is what
+  an integrity repair admits. Nothing is repaired automatically, and no
+  other run's artifacts are offered, even for the same input digest.
+  Without `--dry-run`, `jobs reroll` still needs operations and `--reason`;
+  its operation keys may come before, between or after its options. In
   Python, `JobRunner.repair_preview(run_id, operation_keys=None)` judges
-  under that runner's validators. `smythe.reuse.REASONS` gains
-  `outcome_unknown` (`review`) for an operation whose provider call may have
-  completed. See [preview repairs](docs/jobs.md#preview-repairs).
+  under that runner's validators. See
+  [preview repairs](docs/jobs.md#preview-repairs).
 - Contribution lint. `lint_contributions(graph, registry=None)` lists the
   groups of parallel siblings that could only repeat each other's work: the
   same dependency inputs, label, agent, model, required capabilities,
@@ -1160,30 +1299,6 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   lineage declares the node's inputs. Another `exchange` value is refused
   before any node call, and a generated plan cannot set the key. See
   [claim exchange](docs/architecture.md#claim-exchange).
-- Reuse decisions for artifact lineage. `smythe.reuse.evaluate(record,
-  state)` compares an `ArtifactLineage` record, or None, with a
-  `CurrentState` (a developer's zero-cost `SourceCatalog`, the validator
-  identities, the acceptance policy digest, tool, component, context
-  assembly and agent identities, optional task changes, published-document
-  integrity and the `LineagePolicy`) and returns an `ItemDecision`: `reuse`,
-  `recheck`, `rerender`, `regenerate` or `review` for the item and each
-  node, with stable reason codes and the scope, recipe, policy, validator
-  set and source versions any kept result is kept under. A source counts as
-  current only when its id, version and digest all match, so equal bytes
-  under a new version regenerate; an unavailable or withdrawn source needs
-  review; a changed tool, decoder, component, context assembly, agent or
-  task regenerates the node and everything that depends on it, while other
-  branches are reused; a missing or changed document with current inputs is
-  rendered again; a changed validator set or policy calls for a recheck; a
-  decision other than `accepted` needs review; and a missing record or
-  undeclared coverage follows `undeclared_coverage`. Gates and the nodes
-  they judge are never reused in an item that computes anything again,
-  `reuse=False` turns reuse and rendering again into regeneration, and a
-  record in another access scope is invisible before any digest is
-  compared. A catalog that declares itself metered is refused. The
-  evaluator reads no store or file and its output is deterministic JSON
-  data; `Swarm.repair()` applies the plans made from it. See
-  [reuse decisions](docs/lineage.md#reuse-decisions).
 - A supervisor revision records what it changed. Its trace span's `revision`
   record adds the completed results the run `retained`, the delivered results
   it `invalidated` because a new step now follows them, the
@@ -1271,54 +1386,6 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   mechanics, not claimable, with zero API calls: fixtures rank no arm and
   change no default. See
   [selector comparison](benchmarks/README.md#selector-comparison-offline-mechanics).
-- Read-only repair plans for artifact lineage.
-  `Swarm.plan_repair(execution_ids=None, *, sources)` evaluates each run in
-  the Swarm's access scope, by default the heads of the archive, against
-  what a new run would use now and returns a `RepairPlan`: each run's
-  decision, derived status and predicted work (nodes reused and regenerated
-  by kind, read calls, model steps, publications, acceptance evaluations,
-  new runs, whether charges may be incurred and whether an allowance is
-  required), the catalog's answers, and a timestamp-free `plan_sha256` that
-  a later apply must match. Planning opens the journal again read-only,
-  takes no lease, writes nothing, calls no provider, reads no source and
-  describes each source once; a run that has not completed needs `review`
-  (`run_in_progress`), and a run in another scope is not found.
-  `archive_heads(store, scope)` follows predecessor links: a completed
-  successor whose decision is accepted supersedes its predecessor, and one
-  whose decision is not supersedes nothing and is not a head.
-  `smythe.reuse.derived_status()` computes the lifecycle status `current`,
-  `stale`, `invalid`, `restricted` or `superseded`, which is never stored.
-  `smythe runs inspect` adds a `lineage` block to durable lineage runs, in
-  JSON and text: coverage, source references, predecessor and successors,
-  the published document's integrity and the derived status, with no
-  source text and no new exit code. See
-  [plan a repair](docs/lineage.md#plan-a-repair) and
-  [lineage in runs inspect](docs/runs.md#lineage).
-- Reuse operations for durable successor runs. A successor of a completed
-  lineage run runs the predecessor's task and graph again as a new run, but
-  each node it keeps completes first from a `reuse` journal operation, keyed
-  `reuse/<node id>`, with the predecessor's text byte for byte, so one
-  changed source runs only its read, its extraction and what depends on
-  them, and the rerun nodes get the prompts a full recomputation would. Each
-  operation names the predecessor's store, run and lineage digest, the
-  node's generation and result digest, the digests of its lineage record and
-  source evidence, its reason codes and the repair plan's digest; it carries
-  no calls and no cost, and one checkpoint consumes it. Only a completed run
-  in the same store and access scope, whose lineage record has the named
-  digest, is reused from; a node whose saved result no longer has its
-  recorded digest, whose inputs are undeclared or used a removed source, a
-  gate and the nodes it judges or depends on, a node depending on one that
-  runs again, and a graph the successor's graph policy, read profiles,
-  models or agents cannot run are refused before the successor is created
-  or any call is made. A resumed successor replays its reuse operations
-  without reading the predecessor. Refreshing an unfinished successor's
-  sources, even one lost before it saved a kept node, runs its kept nodes
-  again, and a kept result naming a source removed from the successor is
-  never used. Its lineage names its `predecessor` and `repair`, each kept
-  node keeps its recorded inputs with `reused_from`, and inspection never
-  returns kept text. A new durable graph cannot carry a `repair` planning
-  record. `Swarm.repair()` starts successors. See
-  [reused results](docs/workflow-accounting.md#reused-results).
 - `EvidenceTriggeredSupervisor(inner, triggers, on_trigger=None)` reviews only
   when a `ReviewTriggers` check fires after a completed node; otherwise it
   returns no change without any call. Triggers read the graph and the node's
@@ -1461,31 +1528,6 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   raises `WorkflowConflictError`. Unknown model-call exposure still has no
   reconciliation path; a run it blocks needs a new run. See
   [draining in-flight calls](docs/workflow-accounting.md#draining-in-flight-calls).
-- Applying a repair plan. `Swarm.repair(plan, *, plan_sha256,
-  max_total_budget_usd, reason, sources)` (and `arepair()`) makes the plan
-  again for the same runs and refuses it with `WorkflowConflictError`
-  unless it still has the approved digest. It needs a durable `run_store`
-  and a lineage policy, refuses a configured supervisor, and admits the new
-  runs only when their number times `max_budget_usd` fits
-  `max_total_budget_usd`, refusing an unbounded per-run budget when any may
-  incur charges (`WorkflowBudgetError`); every refusal comes before any run
-  is created or call made. Items are applied in plan order, each once:
-  `recheck` decides the run again and `rerender` publishes its document
-  again, both binding the plan's digest and reason, `regenerate` starts a
-  successor run that keeps the nodes the plan reuses and leaves the
-  repaired run's rows untouched, and `review` is reported. The first item
-  that raises or is not accepted stops the repair without a retry. A
-  `RepairResult` lists each item's outcome, decision, successor and work
-  (new runs, read and model calls, reused nodes, publications and
-  decisions). A successor that has not completed is a repair in progress:
-  it is no archive head, and a plan gives the run it repairs `review`
-  (`repair_in_progress`), naming it in `repairs_in_progress`, until
-  ordinary resume finishes it. Under `LineagePolicy(reuse=False)` a
-  regenerated item keeps no result and runs every node, and its document is
-  byte for byte a new run's; a `recheck` item is decided again, as
-  re-evaluation, which reuses nothing, compares a run's lineage policy in
-  all but `reuse`. See
-  [apply a repair plan](docs/lineage.md#apply-a-repair-plan).
 - [`examples/18_archive_maintenance.py`](examples/18_archive_maintenance.py)
   maintains an archive of four lineage runs offline and without keys. Two of
   its bundled sources are shared between runs. After one shared source gets
