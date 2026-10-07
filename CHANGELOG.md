@@ -982,11 +982,11 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   final validators that did not pass). Ordinary runs report null for the
   first three. See [research runs](docs/runs.md#research-runs).
 - [`examples/16_source_to_artifact.py`](examples/16_source_to_artifact.py)
-  runs a durable research workflow offline and without keys. It plans one
-  journaled read step per bundled source, reads the sources from a server it
-  starts on the loopback address, stops part way as a lost process would,
-  resumes without reading a saved source again, publishes a brief carrying
-  its source evidence, accepts it under a strict policy with
+  runs a durable research workflow offline and without keys. It plans a
+  journaled read step for each of three bundled sources, reads them from a
+  server it starts on the loopback address, stops part way as a lost process
+  would, resumes without reading a saved source again, publishes a brief
+  carrying its source evidence, accepts it under a strict policy with
   `SourceEvidenceValidator` and `TextValidator`, and prints the accepted
   document's path, the decision, the evidence and the
   `smythe runs inspect` report. `tests/test_examples_smoke.py` runs it.

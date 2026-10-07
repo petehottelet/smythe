@@ -450,6 +450,46 @@ def test_an_operator_decision_on_a_lineage_run_supersedes_its_lineage(store, lib
             plan_sha256=PLAN, reason=REASON))
 
 
+@pytest.mark.parametrize("recorded", [True, False], ids=["reuse-on", "reuse-off"])
+def test_an_operator_decision_under_the_other_reuse_setting_keeps_the_run_s_lineage(
+        store, library, tmp_path, recorded):
+    review = policy("1", Raises(), on_invalid="needs_review")
+    _, result = completed(store, library, tmp_path, acceptance=review,
+                          lineage=LineagePolicy(access_scope="research-team", reuse=recorded))
+    run_id = result.execution_id
+    config = store.load_run(run_id)["config"]
+    lineage = load_lineage(store, run_id)
+    host = HmacApprovalHost()
+    current = current_decision(store, run_id)
+    digest = operator_decision_sha256(run_id, current["sequence"], current["record"], "accepted",
+                                      EVIDENCE)
+    assertion = host.issue(digest, subject="reviewer-3", tenant="acme", expires_at_ns=2**62)
+    switched = LineagePolicy(access_scope="research-team", reuse=not recorded)
+
+    # A decision reuses nothing, so the reuse setting does not bind it.
+    decided = research(store, library, tmp_path, acceptance=review, lineage=switched).reevaluate(
+        run_id, operator=OperatorDecision("accepted", EVIDENCE, assertion=assertion,
+                                          verifier=host))
+
+    assert decided.accepted
+    superseding = load_lineage(store, run_id)
+    assert superseding.acceptance["decision"] == "accepted"
+    assert superseding.acceptance["policy_sha256"] == review.sha256
+    assert superseding.acceptance["validators"] == lineage.acceptance["validators"]
+    # Everything else is built from the run's saved recipe, not the deciding Swarm's.
+    assert superseding.run["recipe_sha256"] == store.load_run(run_id)["config_sha256"]
+    assert ({**superseding.to_dict(), "acceptance": None}
+            == {**lineage.to_dict(), "acceptance": None})
+    assert store.load_run(run_id)["config"] == config
+    assert config["lineage"]["reuse"] is recorded
+    # The run resumes under the policy it recorded, and only under it.
+    assert research(store, library, tmp_path, acceptance=review,
+                    lineage=LineagePolicy(access_scope="research-team", reuse=recorded)
+                    ).resume(run_id).accepted
+    with pytest.raises(WorkflowConflictError, match="lineage policy"):
+        research(store, library, tmp_path, acceptance=review, lineage=switched).resume(run_id)
+
+
 # ---------------------------------------------------------------------------
 # Refusals
 # ---------------------------------------------------------------------------

@@ -50,7 +50,7 @@ for _stream in (sys.stdout, sys.stderr):
     if _stream.encoding and _stream.encoding.lower() not in ("utf-8", "utf8"):
         _stream.reconfigure(encoding="utf-8")
 
-VERSIONS ={"survey-2019": "2019-spring", "renewals-2026": "2026-q2", "support-2026": "2026-09"}
+VERSIONS = {"survey-2019": "2019-spring", "renewals-2026": "2026-q2", "support-2026": "2026-09"}
 QUESTION = "Should new subscriptions default to monthly or annual billing?"
 
 # The analyst's reading of the sources: each claim and the exact passages it rests on.
