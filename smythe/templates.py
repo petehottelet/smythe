@@ -210,7 +210,7 @@ def _empty(value: Any) -> bool:
     return not value or (isinstance(value, dict) and not any(value.values()))
 
 
-@dataclass(frozen=True, kw_only=True)
+@dataclass(frozen=True, kw_only=True, eq=False)
 class TemplateRecord:
     """A versioned, serializable template: a blueprint plus optional sections.
 
@@ -223,7 +223,8 @@ class TemplateRecord:
     description, blueprint, applicability, prerequisites and expected
     outputs as canonical JSON, so evidence, tests, source runs and review
     never change it. ``record_sha256`` covers the whole record. Every part
-    is read-only; records compare by value and hash by ``record_sha256``.
+    is read-only. Records compare and hash by ``record_sha256``, so a
+    timeout of ``90`` and one of ``90.0`` make different records.
     """
 
     name: str
@@ -237,8 +238,8 @@ class TemplateRecord:
     source_runs: tuple[Mapping[str, Any], ...] = ()
     parent_version: str | None = None
     review: Mapping[str, Any] | None = None
-    template_version: str = field(init=False, compare=False)
-    record_sha256: str = field(init=False, compare=False)
+    template_version: str = field(init=False)
+    record_sha256: str = field(init=False)
 
     def __post_init__(self) -> None:
         values = {"name": _name(self.name, "template name"),
@@ -304,8 +305,13 @@ class TemplateRecord:
             raise TemplateRecordError(f"template record sections {empty} are omitted when empty")
         return record
 
+    def __eq__(self, other: object) -> bool:
+        # Equal values can differ as canonical JSON (90 and 90.0), so compare digests.
+        if not isinstance(other, TemplateRecord):
+            return NotImplemented
+        return self.record_sha256 == other.record_sha256
+
     def __hash__(self) -> int:
-        # The generated hash would hash the read-only mappings, which cannot be hashed.
         return hash(self.record_sha256)
 
     def to_template(self) -> SubGraphTemplate:

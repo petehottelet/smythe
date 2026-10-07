@@ -237,6 +237,22 @@ def test_malformed_values_are_rejected(change, match):
         TemplateRecord.from_dict(data)
 
 
+def test_records_are_equal_exactly_when_their_digests_are():
+    """90 and 90.0 are equal numbers but different canonical JSON."""
+    data = full_record().to_dict()
+    data["blueprint"][0]["timeout_s"] = 90
+    whole = TemplateRecord.from_dict(data)
+    data["blueprint"][0]["timeout_s"] = 90.0
+    decimal = TemplateRecord.from_dict(data)
+
+    assert whole.record_sha256 != decimal.record_sha256
+    assert whole.template_version != decimal.template_version
+    assert whole != decimal and not whole == decimal
+    assert len({whole, decimal}) == 2
+    assert decimal == TemplateRecord.from_dict(json.loads(canonical_bytes(decimal.to_dict())))
+    assert whole != data and whole.__eq__(data) is NotImplemented
+
+
 def test_a_record_cannot_be_its_own_parent():
     record = full_record()
     with pytest.raises(TemplateRecordError, match="its parent"):

@@ -189,7 +189,9 @@ whitespace, UTF-8):
   applicability gives a new version. Key order does not change it, and
   neither do `failure_examples`, `tests`, `source_runs`, `parent_version` or
   `review`.
-- `record_sha256` covers the whole record.
+- `record_sha256` covers the whole record. Records are equal, and hash
+  alike, exactly when their `record_sha256` is equal, so a timeout of `90`
+  and one of `90.0` make different records.
 
 `parent_version` names the template version a record was derived from.
 

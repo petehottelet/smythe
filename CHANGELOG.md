@@ -1635,8 +1635,8 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   environment, URLs, tool grants, acceptance policies, budgets, evaluator
   configuration or paths, and `from_dict()` refuses unknown keys and
   versions. `template_version` is the digest of the fields that decide what a
-  template builds and `record_sha256` that of the whole record.
-  `to_template()` builds the template `distill_template` returns, which is
+  template builds and `record_sha256` that of the whole record, by which
+  records compare and hash. `to_template()` builds the template `distill_template` returns, which is
   now built on it, and `local_only()` declares that builder for a durable run
   as `template:<name>` at the template version, so the recipe pins the exact
   template. The review lists labels that repeat the source task's goal and
