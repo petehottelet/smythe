@@ -15,6 +15,8 @@ import asyncio
 import json
 from pathlib import Path
 import subprocess
+import threading
+import time as pytime
 
 import pytest
 
@@ -23,8 +25,8 @@ from test_selector_comparison import GUARDED_RUN
 
 from benchmarks.run_policy_ablations import (
     ARMS, CONTRADICTION_ALLOWANCE, DRAIN_TIMEOUT_S, OVERHEAD_EXECUTORS, OVERHEAD_LATENCIES_MS,
-    QUOTA_IN_FLIGHT, VirtualTime, ablation_arms, correlated_errors, one_change,
-    run_capacity_arm, run_drain_ordinary_arm,
+    QUOTA_IN_FLIGHT, VirtualTime, ablation_arms, budget_holds, correlated_errors, one_change,
+    run_capacity_arm, run_drain_ordinary_arm, run_hold_arm,
 )
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -39,6 +41,8 @@ ABLATIONS = {
     "budget_holds": "reserve_for_checks",
     "contradiction_synthesis": "retain_contradictions",
 }
+# Runs of each budget-hold arm that must match exactly.
+HOLD_REPEATS = 10
 
 
 @pytest.fixture(scope="module")
@@ -322,6 +326,12 @@ def test_the_matched_graph_delivers_identical_bytes_and_reports_store_time_apart
         summary = overhead["summary"][str(latency)]
         assert summary["reference"]["median_overhead_ms"] == 0
         assert set(summary) == set(OVERHEAD_EXECUTORS)
+        # The durable runtime also counts each node's input tokens on the wire; those
+        # calls wait the declared latency too, and its overhead figures include it.
+        assert runs["durable"]["wire_calls"] == {"response": 3, "input_tokens": 3}
+        assert {executor: entry["extra_wire_latency_ms"] for executor, entry in summary.items()
+                } == {"reference": 0, "ordinary": 0, "durable": 3 * latency}
+    assert "extra_wire_latency_ms" in overhead["overhead"]
 
 
 def test_every_policy_stays_experimental_and_off_by_default(offline_run):
@@ -389,19 +399,27 @@ def test_correlated_errors_group_consequences_and_repeated_signatures():
 
 def test_virtual_time_moves_only_to_the_next_wake_time():
     time = VirtualTime()
-    woke: list[tuple[str, int]] = []
+    woke: list[tuple[str, int, int]] = []
+
+    def record(name: str) -> None:
+        # Real time passes here; on a worker thread the clock would move on meanwhile.
+        pytime.sleep(0.02)
+        woke.append((name, time.now_ms(), threading.get_ident()))
 
     async def sleeper(name: str, seconds: float) -> None:
         await time.sleep(seconds)
-        # Work handed to a thread finishes before the clock moves again.
-        await asyncio.to_thread(woke.append, (name, time.now_ms()))
+        # Work handed to a thread runs at once, on the loop's own thread, so it
+        # finishes before the clock moves again.
+        await asyncio.to_thread(record, name)
 
     async def run() -> str:
         await asyncio.gather(sleeper("late", 1.5), sleeper("early", 0.25), sleeper("tie", 1.5))
         return "done"
 
     assert time.run(run()) == "done"
-    assert woke == [("early", 250), ("late", 1500), ("tie", 1500)]
+    loop_thread = threading.get_ident()
+    assert woke == [("early", 250, loop_thread), ("late", 1500, loop_thread),
+                    ("tie", 1500, loop_thread)]
     assert time.now_ms() == 1500
 
     async def stuck() -> None:
@@ -424,3 +442,20 @@ def test_manual_clock_arms_repeat_exactly():
     first = run_capacity_arm(capacity)
     assert run_capacity_arm(capacity) == first
     assert first["rejected_429"] > 0
+
+
+def test_budget_hold_arms_repeat_exactly():
+    # Each arm admits its nodes in one order, so every run makes the same calls
+    # and spends the same, however the threads that finish each node are timed.
+    cases = {case["case"]: case for case in budget_holds()["cases"]}
+    for name, case in cases.items():
+        for arm, config in case["arms"].items():
+            runs = [case["results"][arm]] + [run_hold_arm(name, config)
+                                             for _ in range(HOLD_REPEATS - 1)]
+            assert [(run["calls"], run["spend_usd"]) for run in runs] == [
+                (runs[0]["calls"], runs[0]["spend_usd"])] * HOLD_REPEATS, (name, arm)
+            assert runs == [runs[0]] * HOLD_REPEATS, (name, arm)
+    # Under holds, the short budget pays seven workers and refuses the eighth before its call.
+    policy = cases["fan_out_short_budget"]["results"]["policy"]
+    assert policy["calls"] == [f"w{index}" for index in range(7)]
+    assert policy["spend_usd"] == 0.875 and policy["refused"]["node"] == "w7"

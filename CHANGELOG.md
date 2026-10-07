@@ -1549,15 +1549,18 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   (`TerminationPolicy` on `AsyncExecutor`, on a manual clock) and on durable
   runs (on the shared fake Responses transport), `CapacityPolicy` admission
   against a fixture provider's quota (on a manual clock, then in the
-  provider-concurrency simulator), `Swarm(reserve_for_checks=True)`, and
-  `Synthesizer(retain_contradictions=True)` under strict source-evidence
+  provider-concurrency simulator), `Swarm(reserve_for_checks=True)` (one
+  node in flight at a time, so each arm's calls and spend repeat exactly),
+  and `Synthesizer(retain_contradictions=True)` under strict source-evidence
   acceptance. Every arm keeps each failed, cancelled, refused or rejected
   call or attempt, and groups the failures that share a cause as correlated
   errors. A matched-graph scheduler overhead test runs one fixed pipeline
   under an ordinary Swarm, a durable Swarm and a minimal reference asyncio
   executor on the same fake transport, requires byte-identical outputs, and
   reports each executor's overhead with checkpoint and journal store time
-  apart. The committed record,
+  apart; the durable overhead includes the declared latency of its
+  input-token count calls, which the record lists as
+  `extra_wire_latency_ms`. The committed record,
   `benchmarks/results/policy_ablations_offline.json`, is labeled offline
   mechanics, not claimable, with zero API calls; it lists each policy as
   experimental and off by default, and its overhead times are

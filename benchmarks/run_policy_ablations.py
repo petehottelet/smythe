@@ -16,7 +16,8 @@ fixtures:
                              limit at the fixture provider's quota, on a
                              manual clock; then the provider-concurrency
                              simulator at the concurrency each arm admits
-    budget_holds             Swarm(reserve_for_checks=False) and True
+    budget_holds             Swarm(reserve_for_checks=False) and True, one
+                             node in flight at a time
     contradiction_synthesis  Synthesizer() and
                              Synthesizer(retain_contradictions=True) under
                              one strict source-evidence acceptance policy
@@ -33,8 +34,11 @@ reference asyncio executor, on the same fake transport with the same
 scripted replies and 0 ms or a declared constant of latency per wire call.
 Their outputs must be byte-identical. Overhead is each executor's elapsed
 time minus the reference's, per run and per node, with the time spent in
-checkpoint and journal stores reported apart. It is real local time on one
-machine: machine-specific, never a product claim.
+checkpoint and journal stores reported apart. The durable runtime also
+counts each node's input tokens on the wire, and those calls wait the
+declared latency too: its overhead includes that wait, which the record
+lists as extra_wire_latency_ms. It is real local time on one machine:
+machine-specific, never a product claim.
 
 Fixture runs establish mechanics, never a measured benefit: the providers
 are deterministic fixtures, manual-clock times are declared, and the record
@@ -985,8 +989,13 @@ HOLD_MEASURES = {
 def budget_holds() -> dict:
     cases = []
     for case, (fixture, _, synthesis, budget, _) in HOLD_CASES.items():
+        # One node in flight at a time, admitted in graph order once the one
+        # before it has finished, so every run makes the same calls. With
+        # several in flight, whether the nodes admitted beside a refused one
+        # reach the provider before the stop cancels them depends on thread
+        # timing.
         arms = ablation_arms(
-            {"swarm": "ordinary", "parallel": True, "max_concurrency": 4,
+            {"swarm": "ordinary", "parallel": True, "max_concurrency": 1,
              "graph": "broadcast_reduce: w0-w7" if synthesis == "llm_merge"
              else "serial: draft, judge (verifies draft, one regeneration)",
              "synthesis": synthesis, "max_budget_usd": budget, "call_price_usd": HOLD_PRICE_USD},
@@ -999,7 +1008,8 @@ def budget_holds() -> dict:
         "question": "Does holding allowance for pending verifiers and an LLM_MERGE synthesis "
                     "stop other work from spending it, so a short budget is refused before "
                     "spend that cannot deliver?",
-        "clock": "none: admission and spend only",
+        "clock": "none: admission and spend only; one node runs at a time, so each arm's "
+                 "calls and spend repeat exactly",
         "cases": cases,
     }
 
@@ -1397,6 +1407,7 @@ def scheduler_overhead(*, repetitions: int) -> dict:
     for latency_ms in OVERHEAD_LATENCIES_MS:
         own = [run for run in runs if run["latency_ms"] == latency_ms]
         reference = {run["repetition"]: run for run in own if run["executor"] == "reference"}
+        reference_calls = sum(next(iter(reference.values()))["wire_calls"].values())
         entries = {}
         for executor in OVERHEAD_EXECUTORS:
             mine = [run for run in own if run["executor"] == executor]
@@ -1417,6 +1428,11 @@ def scheduler_overhead(*, repetitions: int) -> dict:
                                       for run in mine])
                     for node in graph.nodes},
                 "wire_calls": mine[0]["wire_calls"],
+                # The declared latency of the wire calls the reference does not
+                # make, such as the durable runtime's input-token counts; every
+                # overhead figure above includes it.
+                "extra_wire_latency_ms": (sum(mine[0]["wire_calls"].values())
+                                          - reference_calls) * latency_ms,
             }
         summary[str(latency_ms)] = entries
     return {
@@ -1441,7 +1457,9 @@ def scheduler_overhead(*, repetitions: int) -> dict:
         "overhead": "each executor's elapsed time minus the reference's in the same repetition, "
                     "per run and per node; store_ms is the time spent in checkpoint and journal "
                     "store methods, reported apart and subtracted only in "
-                    "median_overhead_excluding_store_ms",
+                    "median_overhead_excluding_store_ms; extra_wire_latency_ms is the declared "
+                    "latency of the wire calls an executor makes beyond the reference's (the "
+                    "durable runtime's input-token counts), which every overhead figure includes",
         "machine": {"platform": platform.platform(), "machine": platform.machine(),
                     "processor": platform.processor() or None, "cpu_count": os.cpu_count(),
                     "python": platform.python_version()},

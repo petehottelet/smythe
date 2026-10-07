@@ -2560,7 +2560,7 @@
       "policy": "Swarm(reserve_for_checks=True)",
       "varied": "reserve_for_checks",
       "question": "Does holding allowance for pending verifiers and an LLM_MERGE synthesis stop other work from spending it, so a short budget is refused before spend that cannot deliver?",
-      "clock": "none: admission and spend only",
+      "clock": "none: admission and spend only; one node runs at a time, so each arm's calls and spend repeat exactly",
       "cases": [
         {
           "case": "fan_out_short_budget",
@@ -2572,7 +2572,7 @@
             "baseline": {
               "swarm": "ordinary",
               "parallel": true,
-              "max_concurrency": 4,
+              "max_concurrency": 1,
               "graph": "broadcast_reduce: w0-w7",
               "synthesis": "llm_merge",
               "max_budget_usd": 1.0,
@@ -2582,7 +2582,7 @@
             "policy": {
               "swarm": "ordinary",
               "parallel": true,
-              "max_concurrency": 4,
+              "max_concurrency": 1,
               "graph": "broadcast_reduce: w0-w7",
               "synthesis": "llm_merge",
               "max_budget_usd": 1.0,
@@ -2710,7 +2710,7 @@
             "baseline": {
               "swarm": "ordinary",
               "parallel": true,
-              "max_concurrency": 4,
+              "max_concurrency": 1,
               "graph": "broadcast_reduce: w0-w7",
               "synthesis": "llm_merge",
               "max_budget_usd": 1.125,
@@ -2720,7 +2720,7 @@
             "policy": {
               "swarm": "ordinary",
               "parallel": true,
-              "max_concurrency": 4,
+              "max_concurrency": 1,
               "graph": "broadcast_reduce: w0-w7",
               "synthesis": "llm_merge",
               "max_budget_usd": 1.125,
@@ -2805,7 +2805,7 @@
             "baseline": {
               "swarm": "ordinary",
               "parallel": true,
-              "max_concurrency": 4,
+              "max_concurrency": 1,
               "graph": "serial: draft, judge (verifies draft, one regeneration)",
               "synthesis": "deliverable",
               "max_budget_usd": 0.4375,
@@ -2815,7 +2815,7 @@
             "policy": {
               "swarm": "ordinary",
               "parallel": true,
-              "max_concurrency": 4,
+              "max_concurrency": 1,
               "graph": "serial: draft, judge (verifies draft, one regeneration)",
               "synthesis": "deliverable",
               "max_budget_usd": 0.4375,
@@ -3001,7 +3001,7 @@
               "attempt_allowance": 2,
               "failed_attempts": 2,
               "cost_microusd": 4098,
-              "elapsed_ms": 3.1,
+              "elapsed_ms": 4.4,
               "attempts": [
                 {
                   "attempt": 1,
@@ -3040,17 +3040,17 @@
                   "cost_microusd": 2049,
                   "cost_known": true,
                   "cost_is_estimate": false,
-                  "elapsed_ms": 1.5,
+                  "elapsed_ms": 2.2,
                   "latency_source": "swarm_timing",
                   "phases_ms": {
                     "routing": null,
                     "planning": 0.1,
                     "recovery": null,
-                    "execution": 0.3,
-                    "verification": 0.4,
+                    "execution": 0.5,
+                    "verification": 0.5,
                     "synthesis": 0.0,
                     "supervision": 0.0,
-                    "checkpoint": 0.5,
+                    "checkpoint": 0.7,
                     "waiting": 0.0
                   },
                   "graph": {
@@ -3098,17 +3098,17 @@
                   "cost_microusd": 2049,
                   "cost_known": true,
                   "cost_is_estimate": false,
-                  "elapsed_ms": 1.6,
+                  "elapsed_ms": 2.2,
                   "latency_source": "swarm_timing",
                   "phases_ms": {
                     "routing": null,
                     "planning": 0.1,
                     "recovery": null,
-                    "execution": 0.4,
-                    "verification": 0.3,
+                    "execution": 0.6,
+                    "verification": 0.5,
                     "synthesis": 0.0,
                     "supervision": 0.0,
-                    "checkpoint": 0.5,
+                    "checkpoint": 0.7,
                     "waiting": 0.0
                   },
                   "graph": {
@@ -3177,7 +3177,7 @@
               "attempt_allowance": 2,
               "failed_attempts": 0,
               "cost_microusd": 2049,
-              "elapsed_ms": 1.6,
+              "elapsed_ms": 2.0,
               "attempts": [
                 {
                   "attempt": 1,
@@ -3213,17 +3213,17 @@
                   "cost_microusd": 2049,
                   "cost_known": true,
                   "cost_is_estimate": false,
-                  "elapsed_ms": 1.6,
+                  "elapsed_ms": 2.0,
                   "latency_source": "swarm_timing",
                   "phases_ms": {
                     "routing": null,
-                    "planning": 0.0,
+                    "planning": 0.1,
                     "recovery": null,
-                    "execution": 0.3,
+                    "execution": 0.4,
                     "verification": 0.3,
                     "synthesis": 0.3,
                     "supervision": 0.0,
-                    "checkpoint": 0.4,
+                    "checkpoint": 0.5,
                     "waiting": 0.0
                   },
                   "graph": {
@@ -3296,7 +3296,7 @@
               "attempt_allowance": 2,
               "failed_attempts": 2,
               "cost_microusd": 4176,
-              "elapsed_ms": 2.9,
+              "elapsed_ms": 3.1,
               "attempts": [
                 {
                   "attempt": 1,
@@ -3340,8 +3340,8 @@
                     "routing": null,
                     "planning": 0.0,
                     "recovery": null,
-                    "execution": 0.3,
-                    "verification": 0.4,
+                    "execution": 0.4,
+                    "verification": 0.3,
                     "synthesis": 0.0,
                     "supervision": 0.0,
                     "checkpoint": 0.5,
@@ -3391,17 +3391,17 @@
                   "cost_microusd": 2088,
                   "cost_known": true,
                   "cost_is_estimate": false,
-                  "elapsed_ms": 1.4,
+                  "elapsed_ms": 1.6,
                   "latency_source": "swarm_timing",
                   "phases_ms": {
                     "routing": null,
-                    "planning": 0.0,
+                    "planning": 0.1,
                     "recovery": null,
-                    "execution": 0.3,
+                    "execution": 0.4,
                     "verification": 0.3,
                     "synthesis": 0.0,
                     "supervision": 0.0,
-                    "checkpoint": 0.4,
+                    "checkpoint": 0.5,
                     "waiting": 0.0
                   },
                   "graph": {
@@ -3470,7 +3470,7 @@
               "attempt_allowance": 2,
               "failed_attempts": 0,
               "cost_microusd": 2088,
-              "elapsed_ms": 2.4,
+              "elapsed_ms": 1.8,
               "attempts": [
                 {
                   "attempt": 1,
@@ -3506,17 +3506,17 @@
                   "cost_microusd": 2088,
                   "cost_known": true,
                   "cost_is_estimate": false,
-                  "elapsed_ms": 2.4,
+                  "elapsed_ms": 1.8,
                   "latency_source": "swarm_timing",
                   "phases_ms": {
                     "routing": null,
-                    "planning": 0.1,
+                    "planning": 0.0,
                     "recovery": null,
                     "execution": 0.4,
-                    "verification": 0.5,
-                    "synthesis": 0.4,
+                    "verification": 0.3,
+                    "synthesis": 0.3,
                     "supervision": 0.0,
-                    "checkpoint": 0.7,
+                    "checkpoint": 0.5,
                     "waiting": 0.0
                   },
                   "graph": {
@@ -3589,7 +3589,7 @@
               "attempt_allowance": 2,
               "failed_attempts": 0,
               "cost_microusd": 2181,
-              "elapsed_ms": 1.7,
+              "elapsed_ms": 1.5,
               "attempts": [
                 {
                   "attempt": 1,
@@ -3625,17 +3625,17 @@
                   "cost_microusd": 2181,
                   "cost_known": true,
                   "cost_is_estimate": false,
-                  "elapsed_ms": 1.7,
+                  "elapsed_ms": 1.5,
                   "latency_source": "swarm_timing",
                   "phases_ms": {
                     "routing": null,
                     "planning": 0.1,
                     "recovery": null,
-                    "execution": 0.4,
+                    "execution": 0.3,
                     "verification": 0.4,
                     "synthesis": 0.0,
                     "supervision": 0.0,
-                    "checkpoint": 0.6,
+                    "checkpoint": 0.5,
                     "waiting": 0.0
                   },
                   "graph": {
@@ -3660,7 +3660,7 @@
               "attempt_allowance": 2,
               "failed_attempts": 0,
               "cost_microusd": 2181,
-              "elapsed_ms": 1.7,
+              "elapsed_ms": 2.0,
               "attempts": [
                 {
                   "attempt": 1,
@@ -3696,15 +3696,15 @@
                   "cost_microusd": 2181,
                   "cost_known": true,
                   "cost_is_estimate": false,
-                  "elapsed_ms": 1.7,
+                  "elapsed_ms": 2.0,
                   "latency_source": "swarm_timing",
                   "phases_ms": {
                     "routing": null,
-                    "planning": 0.1,
+                    "planning": 0.0,
                     "recovery": null,
-                    "execution": 0.3,
-                    "verification": 0.3,
-                    "synthesis": 0.2,
+                    "execution": 0.4,
+                    "verification": 0.4,
+                    "synthesis": 0.4,
                     "supervision": 0.0,
                     "checkpoint": 0.5,
                     "waiting": 0.0
@@ -3779,7 +3779,7 @@
               "attempt_allowance": 2,
               "failed_attempts": 0,
               "cost_microusd": 1137,
-              "elapsed_ms": 1.6,
+              "elapsed_ms": 1.5,
               "attempts": [
                 {
                   "attempt": 1,
@@ -3815,17 +3815,17 @@
                   "cost_microusd": 1137,
                   "cost_known": true,
                   "cost_is_estimate": false,
-                  "elapsed_ms": 1.6,
+                  "elapsed_ms": 1.5,
                   "latency_source": "swarm_timing",
                   "phases_ms": {
                     "routing": null,
-                    "planning": 0.0,
+                    "planning": 0.1,
                     "recovery": null,
-                    "execution": 0.7,
+                    "execution": 0.5,
                     "verification": 0.2,
                     "synthesis": 0.0,
                     "supervision": 0.0,
-                    "checkpoint": 0.4,
+                    "checkpoint": 0.5,
                     "waiting": 0.0
                   },
                   "graph": {
@@ -3850,7 +3850,7 @@
               "attempt_allowance": 2,
               "failed_attempts": 0,
               "cost_microusd": 1137,
-              "elapsed_ms": 2.0,
+              "elapsed_ms": 1.5,
               "attempts": [
                 {
                   "attempt": 1,
@@ -3886,17 +3886,17 @@
                   "cost_microusd": 1137,
                   "cost_known": true,
                   "cost_is_estimate": false,
-                  "elapsed_ms": 2.0,
+                  "elapsed_ms": 1.5,
                   "latency_source": "swarm_timing",
                   "phases_ms": {
                     "routing": null,
                     "planning": 0.1,
                     "recovery": null,
-                    "execution": 0.4,
-                    "verification": 0.3,
-                    "synthesis": 0.2,
+                    "execution": 0.3,
+                    "verification": 0.2,
+                    "synthesis": 0.1,
                     "supervision": 0.0,
-                    "checkpoint": 0.7,
+                    "checkpoint": 0.4,
                     "waiting": 0.0
                   },
                   "graph": {
@@ -3969,7 +3969,7 @@
               "attempt_allowance": 2,
               "failed_attempts": 2,
               "cost_microusd": 20790,
-              "elapsed_ms": 4.4,
+              "elapsed_ms": 4.2,
               "attempts": [
                 {
                   "attempt": 1,
@@ -4008,7 +4008,7 @@
                   "cost_microusd": 10395,
                   "cost_known": true,
                   "cost_is_estimate": false,
-                  "elapsed_ms": 2.4,
+                  "elapsed_ms": 2.1,
                   "latency_source": "swarm_timing",
                   "phases_ms": {
                     "routing": null,
@@ -4018,7 +4018,7 @@
                     "verification": 0.3,
                     "synthesis": 0.0,
                     "supervision": 0.0,
-                    "checkpoint": 1.0,
+                    "checkpoint": 0.7,
                     "waiting": 0.0
                   },
                   "graph": {
@@ -4066,17 +4066,17 @@
                   "cost_microusd": 10395,
                   "cost_known": true,
                   "cost_is_estimate": false,
-                  "elapsed_ms": 2.0,
+                  "elapsed_ms": 2.1,
                   "latency_source": "swarm_timing",
                   "phases_ms": {
                     "routing": null,
                     "planning": 0.1,
                     "recovery": null,
                     "execution": 1.1,
-                    "verification": 0.3,
+                    "verification": 0.4,
                     "synthesis": 0.0,
                     "supervision": 0.0,
-                    "checkpoint": 0.8,
+                    "checkpoint": 0.7,
                     "waiting": 0.0
                   },
                   "graph": {
@@ -4145,7 +4145,7 @@
               "attempt_allowance": 2,
               "failed_attempts": 2,
               "cost_microusd": 21372,
-              "elapsed_ms": 4.2,
+              "elapsed_ms": 5.2,
               "attempts": [
                 {
                   "attempt": 1,
@@ -4184,17 +4184,17 @@
                   "cost_microusd": 10686,
                   "cost_known": true,
                   "cost_is_estimate": false,
-                  "elapsed_ms": 2.1,
+                  "elapsed_ms": 2.7,
                   "latency_source": "swarm_timing",
                   "phases_ms": {
                     "routing": null,
-                    "planning": 0.0,
+                    "planning": 0.1,
                     "recovery": null,
-                    "execution": 1.2,
-                    "verification": 0.4,
-                    "synthesis": 0.1,
+                    "execution": 1.8,
+                    "verification": 0.3,
+                    "synthesis": 0.0,
                     "supervision": 0.0,
-                    "checkpoint": 0.8,
+                    "checkpoint": 0.7,
                     "waiting": 0.0
                   },
                   "graph": {
@@ -4242,17 +4242,17 @@
                   "cost_microusd": 10686,
                   "cost_known": true,
                   "cost_is_estimate": false,
-                  "elapsed_ms": 2.1,
+                  "elapsed_ms": 2.5,
                   "latency_source": "swarm_timing",
                   "phases_ms": {
                     "routing": null,
-                    "planning": 0.1,
+                    "planning": 0.0,
                     "recovery": null,
-                    "execution": 1.1,
-                    "verification": 0.4,
-                    "synthesis": 0.0,
+                    "execution": 1.2,
+                    "verification": 0.5,
+                    "synthesis": 0.1,
                     "supervision": 0.0,
-                    "checkpoint": 0.7,
+                    "checkpoint": 1.0,
                     "waiting": 0.0
                   },
                   "graph": {
@@ -4344,8 +4344,8 @@
           "cost_per_accepted_microusd": 16191.0,
           "elapsed_ms": {
             "runs": 5,
-            "p50": 2.9,
-            "p95": 4.1,
+            "p50": 3.1,
+            "p95": 4.4,
             "label": "small sample; not a tail estimate"
           }
         },
@@ -4361,7 +4361,7 @@
           "elapsed_ms": {
             "runs": 5,
             "p50": 2.0,
-            "p95": 3.8,
+            "p95": 4.6,
             "label": "small sample; not a tail estimate"
           }
         }
@@ -4394,7 +4394,7 @@
     "order": "the executors rotate their order with each repetition",
     "outputs_identical": true,
     "output_sha256": "885b9fd3a5594a1fbbc7c800197cdd12717581c6c6cfec298bb5cd17724a44f3",
-    "overhead": "each executor's elapsed time minus the reference's in the same repetition, per run and per node; store_ms is the time spent in checkpoint and journal store methods, reported apart and subtracted only in median_overhead_excluding_store_ms",
+    "overhead": "each executor's elapsed time minus the reference's in the same repetition, per run and per node; store_ms is the time spent in checkpoint and journal store methods, reported apart and subtracted only in median_overhead_excluding_store_ms; extra_wire_latency_ms is the declared latency of the wire calls an executor makes beyond the reference's (the durable runtime's input-token counts), which every overhead figure includes",
     "machine": {
       "platform": "Windows-11-10.0.26200-SP0",
       "machine": "AMD64",
@@ -4409,7 +4409,7 @@
         "position": 0,
         "executor": "reference",
         "latency_ms": 0,
-        "elapsed_ms": 4.057,
+        "elapsed_ms": 4.148,
         "store_ms": {
           "checkpoint": 0.0,
           "journal": 0.0
@@ -4420,9 +4420,9 @@
           "input_tokens": 0
         },
         "nodes_ms": {
-          "research": 1.082,
-          "analyze": 0.956,
-          "write": 0.987
+          "research": 1.377,
+          "analyze": 0.863,
+          "write": 0.674
         },
         "output_sha256": "885b9fd3a5594a1fbbc7c800197cdd12717581c6c6cfec298bb5cd17724a44f3"
       },
@@ -4431,9 +4431,9 @@
         "position": 1,
         "executor": "ordinary",
         "latency_ms": 0,
-        "elapsed_ms": 3710.677,
+        "elapsed_ms": 5528.726,
         "store_ms": {
-          "checkpoint": 3702.178,
+          "checkpoint": 5519.21,
           "journal": 0.0
         },
         "store_calls": {
@@ -4444,9 +4444,9 @@
           "input_tokens": 0
         },
         "nodes_ms": {
-          "research": 1.8,
-          "analyze": 1.6,
-          "write": 1.6
+          "research": 2.1,
+          "analyze": 1.8,
+          "write": 1.4
         },
         "output_sha256": "885b9fd3a5594a1fbbc7c800197cdd12717581c6c6cfec298bb5cd17724a44f3"
       },
@@ -4455,223 +4455,10 @@
         "position": 2,
         "executor": "durable",
         "latency_ms": 0,
-        "elapsed_ms": 11023.382,
+        "elapsed_ms": 21039.683,
         "store_ms": {
-          "checkpoint": 1665.387,
-          "journal": 9343.51
-        },
-        "store_calls": {
-          "journal": 65,
-          "checkpoint": 6
-        },
-        "wire_calls": {
-          "response": 3,
-          "input_tokens": 3
-        },
-        "nodes_ms": {
-          "research": 1709.9,
-          "analyze": 4330.2,
-          "write": 1274.3
-        },
-        "output_sha256": "885b9fd3a5594a1fbbc7c800197cdd12717581c6c6cfec298bb5cd17724a44f3"
-      },
-      {
-        "repetition": 2,
-        "position": 0,
-        "executor": "ordinary",
-        "latency_ms": 0,
-        "elapsed_ms": 5820.43,
-        "store_ms": {
-          "checkpoint": 5803.6,
-          "journal": 0.0
-        },
-        "store_calls": {
-          "checkpoint": 5
-        },
-        "wire_calls": {
-          "response": 3,
-          "input_tokens": 0
-        },
-        "nodes_ms": {
-          "research": 10.7,
-          "analyze": 1.1,
-          "write": 1.3
-        },
-        "output_sha256": "885b9fd3a5594a1fbbc7c800197cdd12717581c6c6cfec298bb5cd17724a44f3"
-      },
-      {
-        "repetition": 2,
-        "position": 1,
-        "executor": "durable",
-        "latency_ms": 0,
-        "elapsed_ms": 12099.375,
-        "store_ms": {
-          "checkpoint": 1462.049,
-          "journal": 10622.809
-        },
-        "store_calls": {
-          "journal": 65,
-          "checkpoint": 6
-        },
-        "wire_calls": {
-          "response": 3,
-          "input_tokens": 3
-        },
-        "nodes_ms": {
-          "research": 3443.7,
-          "analyze": 4343.9,
-          "write": 1181.4
-        },
-        "output_sha256": "885b9fd3a5594a1fbbc7c800197cdd12717581c6c6cfec298bb5cd17724a44f3"
-      },
-      {
-        "repetition": 2,
-        "position": 2,
-        "executor": "reference",
-        "latency_ms": 0,
-        "elapsed_ms": 4.806,
-        "store_ms": {
-          "checkpoint": 0.0,
-          "journal": 0.0
-        },
-        "store_calls": {},
-        "wire_calls": {
-          "response": 3,
-          "input_tokens": 0
-        },
-        "nodes_ms": {
-          "research": 1.238,
-          "analyze": 1.163,
-          "write": 1.056
-        },
-        "output_sha256": "885b9fd3a5594a1fbbc7c800197cdd12717581c6c6cfec298bb5cd17724a44f3"
-      },
-      {
-        "repetition": 3,
-        "position": 0,
-        "executor": "durable",
-        "latency_ms": 0,
-        "elapsed_ms": 13431.826,
-        "store_ms": {
-          "checkpoint": 1659.992,
-          "journal": 11758.086
-        },
-        "store_calls": {
-          "journal": 65,
-          "checkpoint": 6
-        },
-        "wire_calls": {
-          "response": 3,
-          "input_tokens": 3
-        },
-        "nodes_ms": {
-          "research": 4519.3,
-          "analyze": 2915.0,
-          "write": 2497.0
-        },
-        "output_sha256": "885b9fd3a5594a1fbbc7c800197cdd12717581c6c6cfec298bb5cd17724a44f3"
-      },
-      {
-        "repetition": 3,
-        "position": 1,
-        "executor": "reference",
-        "latency_ms": 0,
-        "elapsed_ms": 4.348,
-        "store_ms": {
-          "checkpoint": 0.0,
-          "journal": 0.0
-        },
-        "store_calls": {},
-        "wire_calls": {
-          "response": 3,
-          "input_tokens": 0
-        },
-        "nodes_ms": {
-          "research": 1.165,
-          "analyze": 1.033,
-          "write": 0.927
-        },
-        "output_sha256": "885b9fd3a5594a1fbbc7c800197cdd12717581c6c6cfec298bb5cd17724a44f3"
-      },
-      {
-        "repetition": 3,
-        "position": 2,
-        "executor": "ordinary",
-        "latency_ms": 0,
-        "elapsed_ms": 1135.189,
-        "store_ms": {
-          "checkpoint": 1128.172,
-          "journal": 0.0
-        },
-        "store_calls": {
-          "checkpoint": 5
-        },
-        "wire_calls": {
-          "response": 3,
-          "input_tokens": 0
-        },
-        "nodes_ms": {
-          "research": 1.4,
-          "analyze": 1.2,
-          "write": 1.2
-        },
-        "output_sha256": "885b9fd3a5594a1fbbc7c800197cdd12717581c6c6cfec298bb5cd17724a44f3"
-      },
-      {
-        "repetition": 1,
-        "position": 0,
-        "executor": "reference",
-        "latency_ms": 20,
-        "elapsed_ms": 85.643,
-        "store_ms": {
-          "checkpoint": 0.0,
-          "journal": 0.0
-        },
-        "store_calls": {},
-        "wire_calls": {
-          "response": 3,
-          "input_tokens": 0
-        },
-        "nodes_ms": {
-          "research": 21.165,
-          "analyze": 32.006,
-          "write": 31.334
-        },
-        "output_sha256": "885b9fd3a5594a1fbbc7c800197cdd12717581c6c6cfec298bb5cd17724a44f3"
-      },
-      {
-        "repetition": 1,
-        "position": 1,
-        "executor": "ordinary",
-        "latency_ms": 20,
-        "elapsed_ms": 4523.612,
-        "store_ms": {
-          "checkpoint": 4426.955,
-          "journal": 0.0
-        },
-        "store_calls": {
-          "checkpoint": 5
-        },
-        "wire_calls": {
-          "response": 3,
-          "input_tokens": 0
-        },
-        "nodes_ms": {
-          "research": 34.5,
-          "analyze": 29.8,
-          "write": 28.5
-        },
-        "output_sha256": "885b9fd3a5594a1fbbc7c800197cdd12717581c6c6cfec298bb5cd17724a44f3"
-      },
-      {
-        "repetition": 1,
-        "position": 2,
-        "executor": "durable",
-        "latency_ms": 20,
-        "elapsed_ms": 20307.436,
-        "store_ms": {
-          "checkpoint": 3624.7,
-          "journal": 16504.701
+          "checkpoint": 5143.325,
+          "journal": 15878.494
         },
         "store_calls": {
           "journal": 66,
@@ -4682,9 +4469,9 @@
           "input_tokens": 3
         },
         "nodes_ms": {
-          "research": 5873.2,
-          "analyze": 3187.3,
-          "write": 7122.3
+          "research": 4656.2,
+          "analyze": 3778.0,
+          "write": 3482.5
         },
         "output_sha256": "885b9fd3a5594a1fbbc7c800197cdd12717581c6c6cfec298bb5cd17724a44f3"
       },
@@ -4692,10 +4479,10 @@
         "repetition": 2,
         "position": 0,
         "executor": "ordinary",
-        "latency_ms": 20,
-        "elapsed_ms": 5814.446,
+        "latency_ms": 0,
+        "elapsed_ms": 5750.469,
         "store_ms": {
-          "checkpoint": 5700.961,
+          "checkpoint": 5712.998,
           "journal": 0.0
         },
         "store_calls": {
@@ -4706,9 +4493,9 @@
           "input_tokens": 0
         },
         "nodes_ms": {
-          "research": 38.1,
-          "analyze": 37.5,
-          "write": 33.2
+          "research": 2.4,
+          "analyze": 1.5,
+          "write": 27.9
         },
         "output_sha256": "885b9fd3a5594a1fbbc7c800197cdd12717581c6c6cfec298bb5cd17724a44f3"
       },
@@ -4716,11 +4503,11 @@
         "repetition": 2,
         "position": 1,
         "executor": "durable",
-        "latency_ms": 20,
-        "elapsed_ms": 19138.741,
+        "latency_ms": 0,
+        "elapsed_ms": 20291.823,
         "store_ms": {
-          "checkpoint": 2753.252,
-          "journal": 16190.358
+          "checkpoint": 3194.385,
+          "journal": 17079.768
         },
         "store_calls": {
           "journal": 66,
@@ -4731,9 +4518,9 @@
           "input_tokens": 3
         },
         "nodes_ms": {
-          "research": 3956.6,
-          "analyze": 4502.5,
-          "write": 6373.8
+          "research": 3993.7,
+          "analyze": 4110.7,
+          "write": 5127.1
         },
         "output_sha256": "885b9fd3a5594a1fbbc7c800197cdd12717581c6c6cfec298bb5cd17724a44f3"
       },
@@ -4741,8 +4528,8 @@
         "repetition": 2,
         "position": 2,
         "executor": "reference",
-        "latency_ms": 20,
-        "elapsed_ms": 95.171,
+        "latency_ms": 0,
+        "elapsed_ms": 4.967,
         "store_ms": {
           "checkpoint": 0.0,
           "journal": 0.0
@@ -4753,9 +4540,9 @@
           "input_tokens": 0
         },
         "nodes_ms": {
-          "research": 30.508,
-          "analyze": 31.371,
-          "write": 32.021
+          "research": 1.466,
+          "analyze": 1.002,
+          "write": 0.982
         },
         "output_sha256": "885b9fd3a5594a1fbbc7c800197cdd12717581c6c6cfec298bb5cd17724a44f3"
       },
@@ -4763,14 +4550,14 @@
         "repetition": 3,
         "position": 0,
         "executor": "durable",
-        "latency_ms": 20,
-        "elapsed_ms": 13748.785,
+        "latency_ms": 0,
+        "elapsed_ms": 20248.85,
         "store_ms": {
-          "checkpoint": 2391.021,
-          "journal": 11153.997
+          "checkpoint": 2977.087,
+          "journal": 17250.701
         },
         "store_calls": {
-          "journal": 65,
+          "journal": 66,
           "checkpoint": 6
         },
         "wire_calls": {
@@ -4778,9 +4565,9 @@
           "input_tokens": 3
         },
         "nodes_ms": {
-          "research": 1688.2,
-          "analyze": 4649.1,
-          "write": 2159.3
+          "research": 5575.5,
+          "analyze": 4019.5,
+          "write": 4270.4
         },
         "output_sha256": "885b9fd3a5594a1fbbc7c800197cdd12717581c6c6cfec298bb5cd17724a44f3"
       },
@@ -4788,8 +4575,8 @@
         "repetition": 3,
         "position": 1,
         "executor": "reference",
-        "latency_ms": 20,
-        "elapsed_ms": 90.832,
+        "latency_ms": 0,
+        "elapsed_ms": 5.166,
         "store_ms": {
           "checkpoint": 0.0,
           "journal": 0.0
@@ -4800,9 +4587,9 @@
           "input_tokens": 0
         },
         "nodes_ms": {
-          "research": 27.759,
-          "analyze": 31.202,
-          "write": 30.736
+          "research": 1.357,
+          "analyze": 1.243,
+          "write": 1.042
         },
         "output_sha256": "885b9fd3a5594a1fbbc7c800197cdd12717581c6c6cfec298bb5cd17724a44f3"
       },
@@ -4810,10 +4597,10 @@
         "repetition": 3,
         "position": 2,
         "executor": "ordinary",
-        "latency_ms": 20,
-        "elapsed_ms": 1028.017,
+        "latency_ms": 0,
+        "elapsed_ms": 5960.1,
         "store_ms": {
-          "checkpoint": 944.39,
+          "checkpoint": 5949.773,
           "journal": 0.0
         },
         "store_calls": {
@@ -4824,9 +4611,222 @@
           "input_tokens": 0
         },
         "nodes_ms": {
-          "research": 24.1,
-          "analyze": 27.4,
-          "write": 28.3
+          "research": 1.9,
+          "analyze": 1.7,
+          "write": 1.7
+        },
+        "output_sha256": "885b9fd3a5594a1fbbc7c800197cdd12717581c6c6cfec298bb5cd17724a44f3"
+      },
+      {
+        "repetition": 1,
+        "position": 0,
+        "executor": "reference",
+        "latency_ms": 20,
+        "elapsed_ms": 98.44,
+        "store_ms": {
+          "checkpoint": 0.0,
+          "journal": 0.0
+        },
+        "store_calls": {},
+        "wire_calls": {
+          "response": 3,
+          "input_tokens": 0
+        },
+        "nodes_ms": {
+          "research": 35.978,
+          "analyze": 30.584,
+          "write": 30.331
+        },
+        "output_sha256": "885b9fd3a5594a1fbbc7c800197cdd12717581c6c6cfec298bb5cd17724a44f3"
+      },
+      {
+        "repetition": 1,
+        "position": 1,
+        "executor": "ordinary",
+        "latency_ms": 20,
+        "elapsed_ms": 13466.11,
+        "store_ms": {
+          "checkpoint": 13357.544,
+          "journal": 0.0
+        },
+        "store_calls": {
+          "checkpoint": 5
+        },
+        "wire_calls": {
+          "response": 3,
+          "input_tokens": 0
+        },
+        "nodes_ms": {
+          "research": 30.6,
+          "analyze": 36.9,
+          "write": 36.2
+        },
+        "output_sha256": "885b9fd3a5594a1fbbc7c800197cdd12717581c6c6cfec298bb5cd17724a44f3"
+      },
+      {
+        "repetition": 1,
+        "position": 2,
+        "executor": "durable",
+        "latency_ms": 20,
+        "elapsed_ms": 21322.015,
+        "store_ms": {
+          "checkpoint": 4329.689,
+          "journal": 16813.645
+        },
+        "store_calls": {
+          "journal": 66,
+          "checkpoint": 6
+        },
+        "wire_calls": {
+          "response": 3,
+          "input_tokens": 3
+        },
+        "nodes_ms": {
+          "research": 4096.2,
+          "analyze": 4519.6,
+          "write": 4706.7
+        },
+        "output_sha256": "885b9fd3a5594a1fbbc7c800197cdd12717581c6c6cfec298bb5cd17724a44f3"
+      },
+      {
+        "repetition": 2,
+        "position": 0,
+        "executor": "ordinary",
+        "latency_ms": 20,
+        "elapsed_ms": 9637.096,
+        "store_ms": {
+          "checkpoint": 9536.279,
+          "journal": 0.0
+        },
+        "store_calls": {
+          "checkpoint": 5
+        },
+        "wire_calls": {
+          "response": 3,
+          "input_tokens": 0
+        },
+        "nodes_ms": {
+          "research": 31.3,
+          "analyze": 29.3,
+          "write": 35.3
+        },
+        "output_sha256": "885b9fd3a5594a1fbbc7c800197cdd12717581c6c6cfec298bb5cd17724a44f3"
+      },
+      {
+        "repetition": 2,
+        "position": 1,
+        "executor": "durable",
+        "latency_ms": 20,
+        "elapsed_ms": 23378.469,
+        "store_ms": {
+          "checkpoint": 4513.834,
+          "journal": 18699.804
+        },
+        "store_calls": {
+          "journal": 66,
+          "checkpoint": 6
+        },
+        "wire_calls": {
+          "response": 3,
+          "input_tokens": 3
+        },
+        "nodes_ms": {
+          "research": 4341.9,
+          "analyze": 7542.4,
+          "write": 4178.2
+        },
+        "output_sha256": "885b9fd3a5594a1fbbc7c800197cdd12717581c6c6cfec298bb5cd17724a44f3"
+      },
+      {
+        "repetition": 2,
+        "position": 2,
+        "executor": "reference",
+        "latency_ms": 20,
+        "elapsed_ms": 91.375,
+        "store_ms": {
+          "checkpoint": 0.0,
+          "journal": 0.0
+        },
+        "store_calls": {},
+        "wire_calls": {
+          "response": 3,
+          "input_tokens": 0
+        },
+        "nodes_ms": {
+          "research": 27.796,
+          "analyze": 31.24,
+          "write": 30.963
+        },
+        "output_sha256": "885b9fd3a5594a1fbbc7c800197cdd12717581c6c6cfec298bb5cd17724a44f3"
+      },
+      {
+        "repetition": 3,
+        "position": 0,
+        "executor": "durable",
+        "latency_ms": 20,
+        "elapsed_ms": 20194.53,
+        "store_ms": {
+          "checkpoint": 915.43,
+          "journal": 19115.879
+        },
+        "store_calls": {
+          "journal": 66,
+          "checkpoint": 6
+        },
+        "wire_calls": {
+          "response": 3,
+          "input_tokens": 3
+        },
+        "nodes_ms": {
+          "research": 6463.0,
+          "analyze": 7204.1,
+          "write": 4652.8
+        },
+        "output_sha256": "885b9fd3a5594a1fbbc7c800197cdd12717581c6c6cfec298bb5cd17724a44f3"
+      },
+      {
+        "repetition": 3,
+        "position": 1,
+        "executor": "reference",
+        "latency_ms": 20,
+        "elapsed_ms": 92.524,
+        "store_ms": {
+          "checkpoint": 0.0,
+          "journal": 0.0
+        },
+        "store_calls": {},
+        "wire_calls": {
+          "response": 3,
+          "input_tokens": 0
+        },
+        "nodes_ms": {
+          "research": 27.342,
+          "analyze": 31.023,
+          "write": 32.193
+        },
+        "output_sha256": "885b9fd3a5594a1fbbc7c800197cdd12717581c6c6cfec298bb5cd17724a44f3"
+      },
+      {
+        "repetition": 3,
+        "position": 2,
+        "executor": "ordinary",
+        "latency_ms": 20,
+        "elapsed_ms": 5373.77,
+        "store_ms": {
+          "checkpoint": 5285.621,
+          "journal": 0.0
+        },
+        "store_calls": {
+          "checkpoint": 5
+        },
+        "wire_calls": {
+          "response": 3,
+          "input_tokens": 0
+        },
+        "nodes_ms": {
+          "research": 28.1,
+          "analyze": 30.2,
+          "write": 25.3
         },
         "output_sha256": "885b9fd3a5594a1fbbc7c800197cdd12717581c6c6cfec298bb5cd17724a44f3"
       }
@@ -4835,7 +4835,7 @@
       "0": {
         "reference": {
           "runs": 3,
-          "median_elapsed_ms": 4.348,
+          "median_elapsed_ms": 4.967,
           "median_overhead_ms": 0.0,
           "median_store_ms": {
             "checkpoint": 0.0,
@@ -4850,51 +4850,54 @@
           "wire_calls": {
             "response": 3,
             "input_tokens": 0
-          }
+          },
+          "extra_wire_latency_ms": 0
         },
         "ordinary": {
           "runs": 3,
-          "median_elapsed_ms": 3710.677,
-          "median_overhead_ms": 3706.62,
+          "median_elapsed_ms": 5750.469,
+          "median_overhead_ms": 5745.502,
           "median_store_ms": {
-            "checkpoint": 3702.178,
+            "checkpoint": 5712.998,
             "journal": 0.0
           },
-          "median_overhead_excluding_store_ms": 4.442,
+          "median_overhead_excluding_store_ms": 5.368,
           "median_node_overhead_ms": {
-            "research": 0.718,
-            "analyze": 0.167,
-            "write": 0.273
+            "research": 0.723,
+            "analyze": 0.498,
+            "write": 0.726
           },
           "wire_calls": {
             "response": 3,
             "input_tokens": 0
-          }
+          },
+          "extra_wire_latency_ms": 0
         },
         "durable": {
           "runs": 3,
-          "median_elapsed_ms": 12099.375,
-          "median_overhead_ms": 12094.569,
+          "median_elapsed_ms": 20291.823,
+          "median_overhead_ms": 20286.856,
           "median_store_ms": {
-            "checkpoint": 1659.992,
-            "journal": 10622.809
+            "checkpoint": 3194.385,
+            "journal": 17079.768
           },
-          "median_overhead_excluding_store_ms": 9.711,
+          "median_overhead_excluding_store_ms": 13.716,
           "median_node_overhead_ms": {
-            "research": 3442.462,
-            "analyze": 4329.244,
-            "write": 1273.313
+            "research": 4654.823,
+            "analyze": 4018.257,
+            "write": 4269.358
           },
           "wire_calls": {
             "response": 3,
             "input_tokens": 3
-          }
+          },
+          "extra_wire_latency_ms": 0
         }
       },
       "20": {
         "reference": {
           "runs": 3,
-          "median_elapsed_ms": 90.832,
+          "median_elapsed_ms": 92.524,
           "median_overhead_ms": 0.0,
           "median_store_ms": {
             "checkpoint": 0.0,
@@ -4909,45 +4912,48 @@
           "wire_calls": {
             "response": 3,
             "input_tokens": 0
-          }
+          },
+          "extra_wire_latency_ms": 0
         },
         "ordinary": {
           "runs": 3,
-          "median_elapsed_ms": 4523.612,
-          "median_overhead_ms": 4437.969,
+          "median_elapsed_ms": 9637.096,
+          "median_overhead_ms": 9545.721,
           "median_store_ms": {
-            "checkpoint": 4426.955,
+            "checkpoint": 9536.279,
             "journal": 0.0
           },
-          "median_overhead_excluding_store_ms": 11.014,
+          "median_overhead_excluding_store_ms": 9.442,
           "median_node_overhead_ms": {
-            "research": 7.592,
-            "analyze": -2.206,
-            "write": -2.436
+            "research": 0.758,
+            "analyze": -0.823,
+            "write": 4.337
           },
           "wire_calls": {
             "response": 3,
             "input_tokens": 0
-          }
+          },
+          "extra_wire_latency_ms": 0
         },
         "durable": {
           "runs": 3,
-          "median_elapsed_ms": 19138.741,
-          "median_overhead_ms": 19043.57,
+          "median_elapsed_ms": 21322.015,
+          "median_overhead_ms": 21223.575,
           "median_store_ms": {
-            "checkpoint": 2753.252,
-            "journal": 16190.358
+            "checkpoint": 4329.689,
+            "journal": 18699.804
           },
-          "median_overhead_excluding_store_ms": 99.96,
+          "median_overhead_excluding_store_ms": 73.456,
           "median_node_overhead_ms": {
-            "research": 3926.092,
-            "analyze": 4471.129,
-            "write": 6341.779
+            "research": 4314.104,
+            "analyze": 7173.077,
+            "write": 4620.607
           },
           "wire_calls": {
             "response": 3,
             "input_tokens": 3
-          }
+          },
+          "extra_wire_latency_ms": 60
         }
       }
     }
@@ -4966,9 +4972,9 @@
       "module": "smythe/__init__.py"
     },
     "source_control": {
-      "revision": "b06350be8b97dd1e16b659acef00532c76a7947e",
-      "dirty": false,
-      "untracked_files": 2
+      "revision": "fc214aeaf382e85fdf1d5defadb8d636e026ae3e",
+      "dirty": true,
+      "untracked_files": 0
     }
   }
 }

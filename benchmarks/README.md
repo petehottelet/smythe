@@ -557,16 +557,20 @@ default.
   signature repeated across nodes or attempts.
 - On the manual clock, fixture calls, retry backoff and the drain deadline
   take exactly their declared time, so each executor case repeats exactly.
-  The durable cases run in real time, with a fixture hook standing for the
-  drain deadline.
+  The budget-hold arms run one node at a time, so their calls and spend
+  repeat exactly too. The durable cases run in real time, with a fixture hook
+  standing for the drain deadline.
 - A matched-graph scheduler overhead test runs the fixed research → analyze →
   write pipeline under an ordinary `Swarm` with file checkpoints, a durable
   `Swarm` and a minimal reference asyncio executor, on the same fake
   transport with 0 ms and 20 ms of latency per wire call. The outputs must be
   byte-identical. Overhead is each executor's elapsed time minus the
   reference's, per run and per node, with checkpoint and journal store time
-  reported apart. It is real local time on the machine the record names:
-  machine-specific, never a product claim.
+  reported apart. The durable `Swarm` also counts each node's input tokens
+  with a wire call, which waits the same declared latency; its overhead
+  figures include those three waits, which the record lists as
+  `extra_wire_latency_ms`. It is real local time on the machine the record
+  names: machine-specific, never a product claim.
 
 ```bash
 python benchmarks/run_policy_ablations.py   # writes results/policy_ablations_offline.json
