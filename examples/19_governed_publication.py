@@ -282,8 +282,10 @@ def main() -> None:
             progress = runner.dispatch(run_id, action.action_id)
             print(f"  state {progress.state}; next {progress.next_action}")
             print(f"  service: {service.submissions} submission, {service.effects} post written")
-            print(f"  smythe runs inspect exits with {inspect_exit_code(journal, run_id)}: "
+            unresolved = inspect_exit_code(journal, run_id)
+            print(f"  smythe runs inspect exits with {unresolved}: "
                   "accepted output with an unresolved action\n")
+            assert unresolved == 12
 
             print("=== 5. Reconcile ===")
             progress = runner.reconcile(run_id, action.action_id)

@@ -397,10 +397,10 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   delivers a strict durable run's accepted document to an in-memory
   publishing service, offline and without keys. It prepares the action,
   approves it through a local HMAC approval host, loses the first
-  submission's answer after the service commits it, shows
-  `smythe runs inspect` exiting with 12, reconciles the action from a lookup
-  and a readback with one write on the service, and prints its inspection.
-  `tests/test_examples_smoke.py` runs it. The
+  submission's answer after the service commits it, asserts that
+  `smythe runs inspect` exits with 12, reconciles the action from a lookup
+  and a readback with one write on the service, and prints its inspection,
+  which then exits with 0. `tests/test_examples_smoke.py` runs it. The
   [external actions guide](docs/actions.md) says where actions run, what a
   connector must declare and which guarantees the tests check, and the
   [support matrix](docs/support-matrix.md#external-actions) lists external
