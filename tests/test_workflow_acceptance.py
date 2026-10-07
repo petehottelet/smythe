@@ -764,6 +764,27 @@ def test_a_durable_gate_from_a_generated_plan_does_not_accept_on_its_own(store, 
     assert store.get_checkpoint(run_id)["checkpoint"]["status"] == "planned"
 
 
+def test_resuming_a_run_stopped_before_planning_refuses_a_plan_no_gate_could_accept(
+        store, replies, monkeypatch):
+    _, calls = replies
+    swarm = planner(store, replies, acceptance=strict())
+    # plan() creates the run, then stops before its planning operation begins.
+    stop = crash_when(monkeypatch, store, "begin_operation")
+    with pytest.raises(Crash):
+        swarm.plan(Task("Write the summary"))
+    stop.restore()
+    (run,) = store.list_runs()
+    run_id = run["run_id"]
+    assert store.get_checkpoint(run_id) is None
+
+    # Resuming would plan first; the plan could never be accepted, so nothing is called.
+    with pytest.raises(ValueError, match="architect that generates its gates"):
+        swarm.resume(run_id)
+    assert calls == [] and store.inspect_run(run_id)["call_count"] == 0
+    assert store.get_checkpoint(run_id) is None
+    assert store.load_operation(run_id, "planning") is None
+
+
 @pytest.mark.parametrize(("needle", "decision"), [("unchecked", "accepted"), ("needle", "rejected")])
 def test_a_durable_generated_plan_is_decided_by_its_final_validators(store, replies, needle,
                                                                       decision):
