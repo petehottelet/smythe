@@ -1634,7 +1634,9 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   a parent version and a review. A record never carries MCP servers, models,
   environment, URLs, tool grants, acceptance policies, budgets, evaluator
   configuration or paths, and `from_dict()` refuses unknown keys and
-  versions. `template_version` is the digest of the fields that decide what a
+  versions. Text without a UTF-8 form, such as a lone surrogate, raises
+  `TemplateRecordError`, or `DistillationError` when distilling.
+  `template_version` is the digest of the fields that decide what a
   template builds and `record_sha256` that of the whole record, by which
   records compare and hash. `to_template()` builds the template `distill_template` returns, which is
   now built on it, and `local_only()` declares that builder for a durable run

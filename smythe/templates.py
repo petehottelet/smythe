@@ -89,6 +89,10 @@ _Check = Callable[[Any, str], Any]
 def _string(value: Any, what: str) -> str:
     if not isinstance(value, str):
         raise TemplateRecordError(f"{what} must be a string")
+    try:
+        value.encode("utf-8")
+    except UnicodeEncodeError:  # A lone surrogate: canonical JSON cannot hash it.
+        raise TemplateRecordError(f"{what} must be text that UTF-8 can encode") from None
     return str.__str__(value)
 
 
@@ -127,7 +131,7 @@ def _validator(value: Any, what: str) -> dict[str, str]:
         identity = value if isinstance(value, ValidatorIdentity) else ValidatorIdentity.from_dict(value)
     except ValueError as error:
         raise TemplateRecordError(f"{what}: {error}") from None
-    return identity.to_dict()
+    return {key: _string(item, f"{what} {key}") for key, item in identity.to_dict().items()}
 
 
 def _choice(*values: str) -> _Check:

@@ -253,6 +253,37 @@ def test_records_are_equal_exactly_when_their_digests_are():
     assert whole != data and whole.__eq__(data) is NotImplemented
 
 
+@pytest.mark.parametrize("change", [
+    _set(["name"], "memo \ud800"),
+    _set(["description"], "A memo \udfff"),
+    _set(["blueprint", 0, "label"], "Draft \ud800 the memo"),
+    _set(["blueprint", 0, "profile", "persona"], "You write \ud83d."),
+    _set(["blueprint", 0, "metadata", "role"], "\udc80"),
+    _set(["prerequisites", "validators", 0, "name"], "length \ud800"),
+    _set(["expected_outputs", 0, "description"], "\ud800"),
+], ids=["name", "description", "label", "persona", "role", "validator", "output"])
+def test_text_utf8_cannot_encode_is_a_record_error(change):
+    """A lone surrogate has no UTF-8 form, so no digest can be computed."""
+    data = full_record().to_dict()
+    change(data)
+    with pytest.raises(TemplateRecordError, match="UTF-8"):
+        TemplateRecord.from_dict(data)
+    with pytest.raises(TemplateRecordError, match="UTF-8"):
+        TemplateRecord(**{key: value for key, value in data.items()
+                          if key not in ("type", "version")})
+
+
+def test_distillation_refuses_text_utf8_cannot_encode():
+    graph, registry = _completed_graph()
+    graph.nodes[1].label = "Red-team \ud800 the findings"
+    for distill in (distill_record, distill_template):
+        with pytest.raises(DistillationError, match="UTF-8"):
+            distill(graph, name="t", registry=registry)
+    graph.nodes[1].label = "Red-team the findings"
+    with pytest.raises(DistillationError, match="UTF-8"):
+        distill_record(graph, name="t", registry=registry, description="About \udfff")
+
+
 def test_a_record_cannot_be_its_own_parent():
     record = full_record()
     with pytest.raises(TemplateRecordError, match="its parent"):

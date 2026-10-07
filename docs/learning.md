@@ -172,7 +172,10 @@ A record's JSON form:
 - **Consistency.** Node ids are unique; `depends_on`, `verifies`, expected
   outputs and review findings name blueprint nodes; a node neither depends on
   nor verifies itself; and a record is never its own parent. Digests are
-  64 lowercase hexadecimal characters.
+  64 lowercase hexadecimal characters. Text must have a UTF-8 form, so a
+  string holding a lone surrogate such as `"\ud800"`, which no digest could
+  cover, raises `TemplateRecordError`, and `DistillationError` when
+  distilling.
 - **Strict reading.** `TemplateRecord.from_dict()` refuses another `type`, any
   version other than 1, and any missing or unknown key at every level.
   `to_dict()` returns detached JSON data; the record's parts are read-only.
