@@ -415,7 +415,9 @@ written before 0.8.1 drops its servers. See [MCP](mcp.md).
 
 Capability hydration influences assignment; MCP tools enable execution. The
 Architect receives the effective agent/tool inventory so it can design the
-graph around capabilities that actually exist.
+graph around capabilities that actually exist. Skills come from Agent Skills
+directories, MCP tools or OpenClaw and add only capability tags; see
+[Skills](skills.md).
 
 ## Learning loop
 

@@ -490,6 +490,39 @@ Tests:
   and `tests/test_lineage_records.py::test_a_completed_lineage_run_is_re_evaluated_only_under_its_policy`.
 - No budget and ignored options: `tests/test_support_matrix.py::test_durable_run_ignores_artifact_dir_and_tool_iterations_and_allows_no_budget`.
 
+## Skill sources
+
+A skill provider lends agents capability tags that route nodes to them; see
+[Skills](skills.md). No source grants a tool, changes an acceptance policy or
+raises a budget ceiling, and no source's instructions enter a prompt. Jobs
+operations have no agents, so no skill source applies to them.
+
+| Skill source | Ordinary runs | Durable text workflows |
+|---|---|---|
+| `AgentSkillsProvider` | `MERGE`, `REPLACE` or `STATIC_ONLY` hydration from `SKILL.md` files read when the provider is built; invalid files, duplicate names and links out of a root are refused then | Through `Registry.static_snapshot()`; live hydration is rejected |
+| `MCPSkillProvider` | Hydration from allowlisted or prefetched MCP tool names | Rejected: agents with MCP servers are refused |
+| `OpenClawSkillProvider` and custom providers | Hydration; a provider that raises leaves static capabilities with a warning | Through `Registry.static_snapshot()`; live hydration is rejected |
+
+Tests:
+
+- `AgentSkillsProvider`: hydration `tests/test_agent_skills.py::test_merge_replace_and_static_only_hydration`
+  and `tests/test_agent_skills.py::test_discovery_lists_skill_refs_without_paths_or_instructions`;
+  refused `tests/test_agent_skills.py::test_invalid_skill_files_are_refused_with_a_clear_message`,
+  `tests/test_agent_skills.py::test_one_skill_name_in_two_roots_is_refused`
+  and `tests/test_agent_skills.py::test_a_skill_directory_that_resolves_outside_its_root_is_refused`;
+  authority `tests/test_agent_skills.py::test_a_skill_cannot_grant_tools_weaken_acceptance_or_raise_the_budget`
+  and `tests/test_agent_skills.py::test_instructions_never_reach_a_provider_prompt`.
+- `MCPSkillProvider`: `tests/test_mcp.py::test_skill_provider_static_allowlist_drives_assignment`
+  and `tests/test_mcp.py::test_skill_provider_prefetch_discovers_unlisted_servers`;
+  durable runs `tests/test_workflow_binding.py::test_registry_rejects_mcp_tools_before_binding`.
+- `OpenClawSkillProvider`: `tests/test_openclaw_adapter.py::test_openclaw_adapter_translates_skills`.
+- Custom providers: `tests/test_skills_registry.py::test_registry_hydrates_capabilities_merge_mode`
+  and `tests/test_skills_registry.py::test_skill_provider_failure_falls_back_to_static`.
+- Durable runs: `tests/test_agent_skills.py::test_durable_runs_take_a_static_snapshot_and_refuse_live_hydration`,
+  `tests/test_workflow_binding.py::test_registry_never_invokes_external_hydration_during_preflight`,
+  `tests/test_agent_skills.py::test_static_snapshot_pins_effective_capabilities_in_a_detached_static_registry`
+  and `tests/test_agent_skills.py::test_static_snapshot_keeps_static_capabilities_when_the_provider_fails`.
+
 ## Jobs
 
 `jobs validate`, `jobs plan` and `jobs run` check every operation against its

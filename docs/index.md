@@ -59,6 +59,7 @@ verification, trace, artifact, and recovery controls.
 - [Astra method amendment](../benchmarks/astra_method_amendment_20260913.md) — planner-only instructions, explicit field types, 48 pilot workflows and preserved diagnostic charges
 - [Astra campaign runners](../benchmarks/astra_runtime.md) — pilot, main, approved reserved-cost continuation, blind judging and offline evidence analysis
 - [MCP](mcp.md) — tool discovery, allowlists, secrets, budgets, and timeouts
+- [Skills](skills.md) — capability tags from Agent Skills directories, MCP tools and OpenClaw, what a skill can and cannot change, and static snapshots for durable runs
 - [Style](style.md) — visual language for diagrams and public assets
 
 ## Artifact workflows
