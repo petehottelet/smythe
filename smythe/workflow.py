@@ -49,7 +49,7 @@ from smythe.lineage import (
     LINEAGE_OPERATION, LINEAGE_RECORD_VERSION, LINEAGE_REUSE_KEY, ArtifactLineage, build_lineage,
     lineage_key, load_lineage, restricted_sources, snapshot_lineage_policy,
 )
-from smythe.lineage import _REPAIR, _plain
+from smythe.lineage import _REPAIR, _gate_verifier, _matching_digests, _plain
 from smythe.lineage import _id as _lineage_id
 from smythe.registry import Registry
 from smythe.provider import ProviderResponseError
@@ -1236,7 +1236,9 @@ class WorkflowRuntime:
 
         *reevaluating* tolerates a recipe whose acceptance policy and gate
         verifier differ: a re-evaluation decides under this runtime's policy
-        and reads the verdicts the run's gates recorded without judging again.
+        and reads the verdicts the run's gates recorded without judging again
+        (a lineage run's gates need their own gate verifier; see
+        :meth:`_gate_verifier_problems`).
         *reuse_switch* also tolerates a lineage policy whose ``reuse``
         differs, as a decision reuses nothing.
         """
@@ -2277,8 +2279,10 @@ class WorkflowRuntime:
         The saved recipe may differ from this runtime's only in its acceptance
         policy, its gate verifier and its lineage policy's ``reuse``, since a
         decision reuses nothing, so a repair under ``LineagePolicy(reuse=False)``
-        can recheck. Resuming the run still needs the policies its recipe
-        records, and returns the current decision.
+        can recheck. A policy's decision on a lineage run with gates reads
+        their verdicts only under the gate verifier that gave them, so there
+        the gate verifier may not differ. Resuming the run still needs the
+        policies its recipe records, and returns the current decision.
 
         *operator*, an :class:`~smythe.acceptance.OperatorDecision`, records
         that operator's decision instead, with or without a policy on this
@@ -2305,7 +2309,8 @@ class WorkflowRuntime:
         gate receipt, record or lineage that no longer matches the journal,
         so changed output or verdicts are never accepted, a lineage run that
         a source tombstone restricts
-        (:func:`~smythe.lineage.restricted_sources`), a run with a
+        (:func:`~smythe.lineage.restricted_sources`), a policy's decision on a
+        lineage run whose gates another gate verifier judged, a run with a
         renderer whose published document is missing or changed
         (:meth:`republish` publishes it again first), a current decision an
         operator cannot resolve, or an operator's acceptance of output
@@ -2349,6 +2354,9 @@ class WorkflowRuntime:
                     )
                 publication = current.publication
             if self.lineage is not None and (problems := self._lineage_problems()):
+                raise WorkflowStateError("Workflow cannot be re-evaluated: " + "; ".join(problems))
+            if operator is None and self.lineage is not None and (
+                    problems := self._gate_verifier_problems()):
                 raise WorkflowStateError("Workflow cannot be re-evaluated: " + "; ".join(problems))
             if operator is None:
                 decided = await self._decide(self._synthesis_key(), output, reevaluation=True,
@@ -2721,10 +2729,12 @@ class WorkflowRuntime:
         decision must still hold (:meth:`_decided_output`), the current file
         must be missing or changed, and the saved synthesis must have the
         digest the run's current lineage records, which must still match its
-        journal. The synthesis is then rendered again and published as the
-        next ``publication`` operation, which names the publication it
-        republishes and *repair*, under that publication's own name, so no
-        file is replaced; the new bytes, usually the earlier ones, get a new
+        journal; the run's gates must have been judged by this runtime's gate
+        verifier (:meth:`_gate_verifier_problems`). The synthesis is then
+        rendered again and published as the next ``publication`` operation,
+        which names the publication it republishes and *repair*, under that
+        publication's own name, so no file is replaced; the new bytes,
+        usually the earlier ones, get a new
         decision under this runtime's policy that binds the publication and
         *repair*; and the new decision's lineage supersedes the run's record.
         One completed checkpoint applies all three. No node runs, nothing is
@@ -2765,7 +2775,7 @@ class WorkflowRuntime:
                     "The saved synthesis no longer has the digest its lineage records, so it is not "
                     "published again; a changed synthesis is made again in a successor run"
                 )
-            problems = self._lineage_problems()
+            problems = self._lineage_problems() + self._gate_verifier_problems()
             if problems:
                 raise WorkflowStateError("Workflow cannot be published again: " + "; ".join(problems))
             self._claim_artifact_directory()
@@ -2919,7 +2929,8 @@ class WorkflowRuntime:
         completed, or the one that decision superseded it with (see
         :meth:`_supersede_lineage`), naming the run's current publication and
         the record before it. It is assembled again from the records its
-        operation names and must have the saved record's digest.
+        operation names and must have the saved record's digest; a record
+        written before records named their gates' verifier matches without it.
         """
         applied = [item for item in self.store.list_operations(self.run_id, LINEAGE_OPERATION)
                    if item["applied_revision"] is not None]
@@ -2937,10 +2948,24 @@ class WorkflowRuntime:
                                                    else publication.sequence)
                      and (not sequence or inputs["supersedes"] == ArtifactLineage.from_dict(
                          applied[-2]["result"].get("lineage")).sha256)
-                     and saved.sha256 == self._lineage(inputs).sha256)
+                     and saved.sha256 in _matching_digests(self._lineage(inputs)))
         except (TypeError, ValueError, KeyError, IndexError, WorkflowError):
             holds = False
         return [] if holds else ["the run's lineage record does not match its journal"]
+
+    def _gate_verifier_problems(self):
+        """Why this runtime cannot decide the bound lineage run again from its gates' verdicts.
+
+        A new decision reads the verdicts the run's gates recorded and never
+        judges again, so it is made only under the gate verifier that gave
+        them: the one the run's recipe records. A run without gates has
+        none. One reason, or none.
+        """
+        if (not any(node.verifies for node in self.graph.nodes)
+                or _gate_verifier(self.run["config"]) == _gate_verifier(self.recipe)):
+            return []
+        return ["its gates were judged by another gate verifier than this one, so their recorded "
+                "verdicts are not read under it; a repair plan regenerates the run"]
 
     def _unusable_evidence_validators(self):
         """Why each source evidence validator of the strict policy cannot check this run, by identity.

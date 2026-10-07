@@ -1072,7 +1072,8 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   its decision: `smythe.lineage.load_lineage()` reads it, and `inspect_run()`
   and `list_runs()` never return it. Each read step names its read profile
   and the source version and digest it read, each model node or gate the
-  context snapshot and sources it was given and its agent's digest, and the
+  context snapshot and sources it was given and its agent's digest, each
+  gate the gate verifier and gate validators that judged it, and the
   synthesis its synthesizer; the record also binds the published bytes'
   digest and the decision. A node whose inputs are not all known, such as a
   model node without a context snapshot, is `undeclared` and makes the
@@ -1087,9 +1088,10 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
 - Reuse decisions for artifact lineage. `smythe.reuse.evaluate(record,
   state)` compares an `ArtifactLineage` record, or None, with a
   `CurrentState` (a developer's zero-cost `SourceCatalog`, the validator
-  identities, the acceptance policy digest, tool, component, context
-  assembly and agent identities, optional task changes, published-document
-  integrity and the `LineagePolicy`) and returns an `ItemDecision`: `reuse`,
+  identities, the acceptance policy digest, the gate verifier and gate
+  validators, tool, component, context assembly and agent identities,
+  optional task changes, published-document integrity and the
+  `LineagePolicy`) and returns an `ItemDecision`: `reuse`,
   `recheck`, `rerender`, `regenerate` or `review` for the item and each
   node, with stable reason codes and the scope, recipe, policy, validator
   set and source versions any kept result is kept under. A source counts as
@@ -1099,6 +1101,10 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   task regenerates the node and everything that depends on it, while other
   branches are reused; a missing or changed document with current inputs is
   rendered again; a changed validator set or policy calls for a recheck; a
+  changed gate verifier or gate validator regenerates the gate and the
+  nodes it judged (`gate_validator_changed`), never rechecking their
+  recorded verdicts, and under a gate validator a gate recorded without its
+  verifier follows `undeclared_coverage` (`gate_validator_unknown`); a
   decision other than `accepted` needs review; and a missing record or
   undeclared coverage follows `undeclared_coverage`. Gates and the nodes
   they judge are never reused in an item that computes anything again,
@@ -1143,7 +1149,10 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   lineage record keyed `lineage/<sequence>` that names the decision, the
   current publication and the deciding validators and supersedes the
   earlier record, applied in the same checkpoint, so a later repair plan
-  finds nothing left to recheck or rerender. No node runs, nothing is read
+  finds nothing left to recheck or rerender. A policy's new decision on a
+  lineage run with gates reads their recorded verdicts only under the gate
+  verifier that judged them: re-evaluation and republication under another
+  raise `WorkflowStateError` and write nothing. No node runs, nothing is read
   or called, earlier publications, decisions and records stay in the
   journal, and a process lost before the checkpoint is finished by the same
   call again. `smythe runs inspect` lists superseded publications under

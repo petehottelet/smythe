@@ -581,7 +581,7 @@ or validator changes. Jobs repair an accepted output only within its own run.
 
 | Path | Lineage records | Repair |
 |---|---|---|
-| Durable text workflows | Supported with a `LineagePolicy` under a strict acceptance policy: each completed run records its published document, its decision and each node's inputs as ids, versions and digests | A read-only [repair plan](lineage.md#plan-a-repair) before anything runs; a recheck or a republication in place; successor runs that keep unaffected results, started under an explicit allowance; `reuse=False` to compute affected work again in full; and [source restriction](lineage.md#restrict-a-source) with an optional purge. Results are reused only within one store and access scope, and a configured `supervisor` is refused |
+| Durable text workflows | Supported with a `LineagePolicy` under a strict acceptance policy: each completed run records its published document, its decision, each node's inputs and each gate's verifier as ids, versions and digests | A read-only [repair plan](lineage.md#plan-a-repair) before anything runs; a recheck or a republication in place; successor runs that keep unaffected results, started under an explicit allowance; `reuse=False` to compute affected work again in full; and [source restriction](lineage.md#restrict-a-source) with an optional purge. A changed gate validator regenerates its gates and is never rechecked from their recorded verdicts. Results are reused only within one store and access scope, and a configured `supervisor` is refused |
 | Ordinary runs | Unsupported: `lineage` without a `run_store` raises `WorkflowBindingError` before any routing, planning or node call | Unsupported: `plan_repair()` and `repair()` raise `ValueError` without a `run_store` |
 | Jobs | Unsupported: Jobs write no lineage record. Each attempt's artifacts are recorded by SHA-256, and each operation's [input digest](jobs.md#operation-identity-and-input-digest) is computed from its stored plan | Within a run: an [integrity repair](jobs.md#repair-corrupted-accepted-outputs) regenerates a missing or changed accepted file, a [recheck](jobs.md#recheck-accepted-outputs) decides accepted files again under changed validators, and a read-only [preview](jobs.md#preview-repairs) shows what each operation calls for. Nothing is repaired automatically, and no run reuses another run's output, even for the same input digest |
 
@@ -597,6 +597,8 @@ Tests:
   and `tests/test_repair_plan.py::test_planning_a_read_only_store_changes_nothing_and_calls_nothing`;
   in place `tests/test_workflow_repair.py::test_a_damaged_document_is_rendered_again_and_decided_again_without_new_research`
   and `tests/test_workflow_repair.py::test_a_changed_validator_gets_a_new_decision_and_no_node_runs`;
+  gate validators `tests/test_reuse_decisions.py::test_a_changed_gate_validator_is_never_reused`
+  and `tests/test_workflow_repair.py::test_a_changed_gate_validator_is_not_rechecked_from_old_verdicts`;
   successor runs `tests/test_workflow_reuse.py::test_a_successor_runs_only_what_a_changed_source_affects`,
   `tests/test_workflow_reuse.py::test_a_successor_in_another_access_scope_is_refused`
   and `tests/test_workflow_reuse.py::test_gates_and_the_nodes_they_judge_are_never_reused`;

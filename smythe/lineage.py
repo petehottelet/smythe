@@ -231,19 +231,21 @@ _RUN = _object({"store_id": _id, "run_id": _id, "recipe_sha256": _sha,
 _ARTIFACT = _nullable(_object({
     "relative_path": _path, "sha256": _sha, "size_bytes": _count, "media_type": _text,
     "renderer": _object({"name": _text, "version": _text, "spec_sha256": _sha})}))
+_VALIDATORS = _list(lambda value, what: ValidatorIdentity.from_dict(value))
 _ACCEPTANCE = _object({
     "operation_key": _long, "record_sha256": _sha, "policy_sha256": _sha,
     "decision": _choice(*(item.value for item in AcceptanceDecision
                           if item is not AcceptanceDecision.NOT_EVALUATED)),
-    "validator_set_sha256": _sha,
-    "validators": _list(lambda value, what: ValidatorIdentity.from_dict(value))})
+    "validator_set_sha256": _sha, "validators": _VALIDATORS})
 _INPUTS = _object({"sources": _list(_object({"source_id": _id, "version": _nullable(_text),
                                              "sha256": _sha}))}, {
     "context": _object({"snapshot_key": _long,
                         "assembly_version": lambda value, what: _count(value, what, 1)}),
     "tool": _object({"name": _text, "version": _text, "decoder_version": _text}),
     "component": _object({"name": _text, "version": _text}),
-    "agent_sha256": _sha})
+    "agent_sha256": _sha,
+    # The gate verifier that judged a gate: the recipe's verifier and gate validators.
+    "verifier": _object({"name": _text, "validators": _VALIDATORS})})
 _NODE = _object({
     "id": _id, "generation": _count, "kind": _pattern(_KIND), "depends_on": _list(_id),
     "result_sha256": _nullable(_sha), "inputs": _INPUTS,
@@ -264,6 +266,8 @@ def _node_problem(node: dict[str, Any]) -> str | None:
         return "lists a source more than once"
     if node["coverage"] == "declared" and not inputs.keys() & {"context", "tool", "component"}:
         return "is declared without a recorded context, tool or component"
+    if "verifier" in inputs and node["kind"] != "gate":
+        return "names a gate verifier but is not a gate"
     if "reused_from" in node and node["result_sha256"] is None:
         return "is reused without a result"
     return None
@@ -279,8 +283,9 @@ class ArtifactLineage:
     none. ``acceptance`` binds the delivery decision, its policy and its
     validator set (:func:`validator_set_sha256`). ``nodes`` each follow the
     nodes they depend on, each with the inputs it was given; a ``declared`` node
-    names a context snapshot, read tool or component, and ``coverage`` is
-    ``complete`` only when every node is declared, else ``partial``. A run
+    names a context snapshot, read tool or component, a gate may name the gate
+    ``verifier`` that judged it, and ``coverage`` is ``complete`` only when
+    every node is declared, else ``partial``. A run
     that reused results names its ``predecessor`` in the same store, the
     ``repair`` that made it, and, on each reused node, ``reused_from``.
 
@@ -318,6 +323,11 @@ class ArtifactLineage:
         acceptance["validators"] = [item.to_dict() for item in validators]
         if acceptance["validator_set_sha256"] != validator_set_sha256(validators):
             raise ValueError("lineage acceptance validator_set_sha256 does not match its validators")
+        for node in nodes:
+            if "verifier" in node["inputs"]:
+                verifier = node["inputs"]["verifier"]
+                verifier["validators"] = [item.to_dict()
+                                          for item in _validator_set(verifier["validators"])]
         ids = [node["id"] for node in nodes]
         if not ids or len(set(ids)) != len(ids):
             raise ValueError("lineage nodes must be a non-empty list of distinct nodes")
@@ -504,6 +514,33 @@ def _synthesizer(description: Mapping[str, Any]) -> dict[str, str] | None:
     return identity if all(_fits(value) for value in identity.values()) else None
 
 
+def _gate_verifier(recipe: Mapping[str, Any]) -> dict[str, Any] | None:
+    """The gate verifier a run with *recipe* judges its gates with, as a record names it.
+
+    It is the recipe's ``verifier`` with the identities of its gate
+    ``validators``, sorted, or None for a recipe that names no verifier.
+    """
+    if "verifier" not in recipe:
+        return None
+    validators = _validator_set(
+        ValidatorIdentity(item["identity"], item["version"], item["config_sha256"])
+        for item in recipe.get("validators", ()))
+    return {"name": _label(recipe["verifier"]),
+            "validators": [item.to_dict() for item in validators]}
+
+
+def _matching_digests(record: ArtifactLineage) -> set[str]:
+    """The digests a run's saved record may have when its journal assembles *record* again.
+
+    A record written before records named their gates' verifier has the
+    digest of *record* without them.
+    """
+    data = record.to_dict()
+    for node in data["nodes"]:
+        node["inputs"].pop("verifier", None)
+    return {record.sha256, sha256_hex(data)}
+
+
 def build_lineage(graph: ExecutionGraph, recipe: Mapping[str, Any],
                   snapshots: Mapping[str, ContextSnapshot], read_calls: Mapping[str, Any],
                   publication: PublishedArtifact | None,
@@ -538,11 +575,12 @@ def build_lineage(graph: ExecutionGraph, recipe: Mapping[str, Any],
     claims, their compact claim records); a read step whose accepted read
     names its source; or a synthesis by local code or a built-in strategy
     that calls no model. Any other node is ``undeclared``, which makes the
-    coverage ``partial``.
+    coverage ``partial``. Each gate names the recipe's gate ``verifier``.
     """
     run, sources = graph.run_ref, tuple(sources)
     agents = {entry["id"]: sha256_hex({key: value for key, value in entry.items() if key != "id"})
               for entry in registry_description["agents"]}
+    verifier = _gate_verifier(recipe)
     entries: list[dict[str, Any]] = []
     results: dict[str, tuple] = {}
     for node in _dependency_order(graph.nodes):
@@ -574,6 +612,8 @@ def build_lineage(graph: ExecutionGraph, recipe: Mapping[str, Any],
                 declared = _given(snapshot, node, results)
             if node.agent_id in agents:
                 inputs["agent_sha256"] = agents[node.agent_id]
+            if kind == "gate" and verifier is not None:
+                inputs["verifier"] = _plain(verifier)
         results[node.id] = (node.status, generation, result, node.result)
         entries.append({"id": node.id, "generation": generation, "kind": kind,
                         "depends_on": list(dict.fromkeys(node.depends_on)), "result_sha256": result,

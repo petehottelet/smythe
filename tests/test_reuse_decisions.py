@@ -26,6 +26,7 @@ from smythe.executor_base import ExecutorBase
 from smythe.graph import ExecutionGraph, Node
 from smythe.lineage import validator_set_sha256
 from smythe.reuse import ACTIONS, REASONS, NodeDecision, evaluate
+from smythe.verifier import TOKEN_VERIFIER_IDENTITY
 from smythe.workflow_artifact import PublishedArtifact, artifact_integrity
 
 
@@ -477,6 +478,61 @@ def test_a_gate_pair_in_an_item_under_review_is_never_reused():
     assert actions(decision)["read_b"] == "reuse"
 
 
+GATE_VALIDATOR = ValidatorIdentity.for_config("contains", "1", {"needle": "needle"})
+
+
+def judged(verifier="validator-v1", validators=(GATE_VALIDATOR,)) -> ArtifactLineage:
+    """A record whose gate names the gate verifier that judged it."""
+    data = record_data(gate=True)
+    data["nodes"][-1]["inputs"]["verifier"] = {
+        "name": verifier, "validators": [item.to_dict() for item in validators]}
+    return ArtifactLineage.from_dict(data)
+
+
+@pytest.mark.parametrize("changes", [
+    {"gate_validators": [ValidatorIdentity.for_config("contains", "2", {"needle": "absent"})]},
+    {"gate_validators": [ValidatorIdentity.for_config("contains", "1", {"needle": "absent"})]},
+    {"gate_verifier": TOKEN_VERIFIER_IDENTITY, "gate_validators": []},
+    {"gate_validators": [GATE_VALIDATOR, ValidatorIdentity.for_config("other", "1")]},
+], ids=["version", "configuration", "token-verifier", "added"])
+def test_a_changed_gate_validator_is_never_reused(changes):
+    current = {"gate_verifier": "validator-v1", "gate_validators": [GATE_VALIDATOR]}
+    assert evaluate(judged(), state(**current)).action == "reuse"
+
+    decision = evaluate(judged(), state(**{**current, **changes}))
+
+    # The gate and the node it judged regenerate, and so does what depends on them.
+    assert decision.action == "regenerate"
+    assert actions(decision) == {"read_a": "reuse", "extract_a": "reuse", "read_b": "reuse",
+                                 "extract_b": "regenerate", "write": "regenerate",
+                                 "check": "regenerate"}
+    assert reasons(decision)["extract_b"] == ("gate_validator_changed",)
+    assert reasons(decision)["check"] == ("dependency_changed", "gate_validator_changed")
+    assert reasons(decision)["write"] == ("dependency_changed",)
+    assert decision.reasons == ("dependency_changed", "gate_validator_changed")
+    # A gate judged by TokenVerifier is compared the same way.
+    token = judged(TOKEN_VERIFIER_IDENTITY, ())
+    assert evaluate(token, state()).action == "reuse"
+    assert "gate_validator_changed" in evaluate(token, state(**current)).reasons
+
+
+@pytest.mark.parametrize("coverage", ["review", "regenerate"])
+def test_a_gate_recorded_without_its_verifier_is_unknown_under_a_gate_validator(coverage):
+    # A record written before records named their gates' verifier.
+    record, policy = lineage(gate=True), LineagePolicy(undeclared_coverage=coverage)
+    assert "verifier" not in record.nodes[-1]["inputs"]
+    assert evaluate(record, state(lineage=policy)).action == "reuse"
+
+    decision = evaluate(record, state(gate_verifier="validator-v1",
+                                      gate_validators=[GATE_VALIDATOR], lineage=policy))
+
+    assert decision.action == coverage
+    assert reasons(decision)["extract_b"] == ("gate_validator_unknown",)
+    assert "gate_validator_unknown" in reasons(decision)["check"]
+    assert actions(decision)["check"] == actions(decision)["extract_b"] == coverage
+    assert actions(decision)["read_b"] == "reuse"
+
+
 @pytest.mark.parametrize("changes,expected", [
     ({}, "reuse"), ({"policy_sha256": digest("stricter policy")}, "recheck"),
     ({"integrity": {"run-1": "missing"}}, "rerender"),
@@ -686,6 +742,10 @@ def test_source_statuses_are_frozen_and_keyword_only():
     ({"tasks": {"task": digest("task")}}, ValueError),
     ({"integrity": {"run-1": "fine"}}, ValueError),
     ({"integrity": ["verified"]}, TypeError),
+    ({"gate_verifier": ""}, ValueError),
+    ({"gate_verifier": None}, ValueError),
+    ({"gate_validators": ["contains"]}, TypeError),
+    ({"gate_validators": GATE_VALIDATOR}, TypeError),
 ], ids=lambda value: re.sub(r"\W+", "-", str(value))[:40])
 def test_the_current_state_is_validated(changes, error):
     with pytest.raises(error):
@@ -708,6 +768,11 @@ def test_the_current_state_is_detached_and_read_only():
     assert defaults.lineage == LineagePolicy()
     assert (dict(defaults.tools), dict(defaults.components), defaults.agents,
             dict(defaults.tasks), dict(defaults.integrity)) == ({}, {}, frozenset(), {}, {})
+    # Gates are judged by TokenVerifier unless the state names a gate validator.
+    assert (defaults.gate_verifier, defaults.gate_validators) == (TOKEN_VERIFIER_IDENTITY, ())
+    validators = [ValidatorIdentity.for_config("b", "1"), GATE_VALIDATOR, GATE_VALIDATOR]
+    assert state(gate_validators=validators).gate_validators == tuple(sorted(
+        set(validators), key=lambda item: item.name))
 
 
 def test_evaluate_refuses_anything_but_a_record_and_a_state():

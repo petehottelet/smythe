@@ -454,6 +454,42 @@ def test_reuse_names_the_same_store_predecessor(change):
         ArtifactLineage.from_dict(data)
 
 
+GATE_VALIDATOR = ValidatorIdentity.for_config("contains", "1", {"needle": "needle"})
+
+
+def gated_data() -> dict:
+    """A record whose gate judged the extraction under a gate validator."""
+    data = record_data()
+    data["nodes"].append(node("check", kind="gate", depends_on=["extract"],
+                              component={"name": "fact-check", "version": "1"}))
+    data["nodes"][-1]["inputs"]["verifier"] = {"name": "validator-v1",
+                                               "validators": [GATE_VALIDATOR.to_dict()]}
+    return data
+
+
+@pytest.mark.parametrize("change", [
+    pytest.param(set_at(("nodes", 3, "inputs", "verifier", "extra"), 1), id="unknown-key"),
+    pytest.param(lambda data: data["nodes"][3]["inputs"]["verifier"].pop("validators"),
+                 id="missing-validators"),
+    pytest.param(set_at(("nodes", 3, "inputs", "verifier", "name"), ""), id="empty-name"),
+    pytest.param(set_at(("nodes", 3, "inputs", "verifier", "validators"), [{"name": "x"}]),
+                 id="validator-identity"),
+    pytest.param(set_at(("nodes", 3, "inputs", "verifier"), None), id="null"),
+    pytest.param(set_at(("nodes", 3, "kind"), "model"), id="not-a-gate"),
+])
+def test_only_a_gate_names_the_verifier_that_judged_it(change):
+    other = ValidatorIdentity.for_config("another", "1")
+    data = gated_data()
+    data["nodes"][3]["inputs"]["verifier"]["validators"] = [
+        GATE_VALIDATOR.to_dict(), other.to_dict(), GATE_VALIDATOR.to_dict()]
+    # Its gate validators are kept as a sorted set, like the decision's.
+    assert ArtifactLineage.from_dict(data).nodes[3]["inputs"]["verifier"] == {
+        "name": "validator-v1", "validators": (other.to_dict(), GATE_VALIDATOR.to_dict())}
+    change(data)
+    with pytest.raises(ValueError):
+        ArtifactLineage.from_dict(data)
+
+
 def test_record_is_immutable_and_its_dict_is_detached():
     record = ArtifactLineage.from_dict(record_data())
     with pytest.raises(FrozenInstanceError):

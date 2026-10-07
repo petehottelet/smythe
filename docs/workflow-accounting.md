@@ -541,7 +541,8 @@ journals the decision:
   policy is refused. `Swarm(run_store=store).reevaluate(run_id,
   acceptance=policy)` is the explicit way to a new decision, for example
   under a fixed validator: it accepts a recipe that differs only in its
-  acceptance policy and gate verifier, runs no node and calls no provider,
+  acceptance policy and gate verifier (a lineage run's gates need the gate
+  verifier that judged them), runs no node and calls no provider,
   journals the decision as a new `acceptance` operation keyed
   `acceptance/<sequence>/<digest>`, and applies it with a new completed
   checkpoint. Calls, charges, the budget, revision and regeneration counters,

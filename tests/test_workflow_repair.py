@@ -35,6 +35,8 @@ from smythe.acceptance import OperatorDecision, operator_decision_sha256
 from smythe.cli import EXIT_OK, main
 from smythe.graph import ExecutionGraph, Node, Topology
 from smythe.lineage import load_lineage, validator_set_sha256
+from smythe.provider import CompletionResult
+from smythe.validation import hard_finding
 from smythe.workflow import current_decision, decision_history
 from smythe.workflow_artifact import current_artifact
 from smythe.workflow_store import (
@@ -488,6 +490,147 @@ def test_an_operator_decision_under_the_other_reuse_setting_keeps_the_run_s_line
                     ).resume(run_id).accepted
     with pytest.raises(WorkflowConflictError, match="lineage policy"):
         research(store, library, tmp_path, acceptance=review, lineage=switched).resume(run_id)
+
+
+class Contains:
+    """A gate validator that passes text containing its needle."""
+
+    def __init__(self, needle: str, version: str) -> None:
+        self.needle = needle
+        self.identity = ValidatorIdentity.for_config("contains", version, {"needle": needle})
+
+    def validate(self, subject):
+        if self.needle in subject.text():
+            return ValidationReport("output", (), validator=self.identity)
+        return ValidationReport("output", (hard_finding("missing", f"no {self.needle!r}"),),
+                                validator=self.identity)
+
+
+class Draft:
+    """Local synthesis that delivers the draft exactly."""
+
+    def synthesize(self, graph: ExecutionGraph) -> str:
+        return next(node.result for node in graph.nodes if node.id == "draft")
+
+
+class NoSources:
+    """A catalog for runs that name no source."""
+
+    def describe(self, source_id):
+        return None
+
+
+@pytest.fixture
+def drafts(monkeypatch) -> list[str]:
+    """Answer the judge with PASS and any other step with a draft that names the needle."""
+    labels: list[str] = []
+
+    async def complete(self, system, prompt, model):
+        step = next((line for line in prompt.splitlines() if line.startswith("Your step: ")), "")
+        labels.append(step.removeprefix("Your step: "))
+        return CompletionResult("PASS" if labels[-1] == "Judge" else "A draft with the needle.",
+                                cost_usd=0)
+
+    monkeypatch.setattr(OfflineProvider, "complete", complete)
+    return labels
+
+
+def gate_validator(needle: str, version: str) -> LocalOnly:
+    return LocalOnly(lambda: Contains(needle, version), "contains", version, role="validator")
+
+
+def judged(store, verifier) -> Swarm:
+    """A lineage run whose gate *verifier* judges the draft, which local code then delivers."""
+    return Swarm(model="offline", provider=OfflineProvider(), architect=SimpleArchitect(),
+                 run_store=store, max_budget_usd=1, verifier=verifier, acceptance=policy(),
+                 lineage=LineagePolicy(access_scope=SCOPE), context_sources=[],
+                 synthesizer=LocalOnly(Draft, "deliver-draft", "1", role="synthesizer"))
+
+
+def gated() -> ExecutionGraph:
+    graph = ExecutionGraph([Topology.SERIAL], [
+        Node(id="draft", label="Draft"),
+        Node(id="judge", label="Judge", depends_on=["draft"], verifies="draft",
+             max_regenerations=1)])
+    graph.task = Task("Write a sentence that mentions the needle")
+    return graph
+
+
+def test_a_changed_gate_validator_is_not_rechecked_from_old_verdicts(store, tmp_path, drafts):
+    first = judged(store, gate_validator("needle", "1")).execute(gated())
+    assert first.accepted
+    run_id = first.execution_id
+    # Another gate validator would reject the same draft.
+    changed = judged(store, gate_validator("absent", "2"))
+
+    plan = changed.plan_repair(sources=NoSources())
+
+    (item,) = plan.to_dict()["items"]
+    assert (item["action"], item["status"]) == ("regenerate", "stale")
+    assert {node["id"]: (node["action"], node["reasons"]) for node in item["nodes"]} == {
+        "draft": ("regenerate", ["gate_validator_changed"]),
+        "judge": ("regenerate", ["dependency_changed", "gate_validator_changed"]),
+        "synthesis": ("regenerate", ["dependency_changed"])}
+    # The record names the gate verifier that judged the gate.
+    gate = next(node for node in load_lineage(store, run_id).to_dict()["nodes"]
+                if node["id"] == "judge")
+    assert gate["inputs"]["verifier"] == {
+        "name": "validator-v1", "validators": [Contains("needle", "1").identity.to_dict()]}
+
+    # The gates' recorded verdicts never decide the run under another gate validator.
+    before, revision = journal_rows(store, run_id), store.load_run(run_id)["revision"]
+    Counted.checked = []
+    with pytest.raises(WorkflowStateError, match="another gate verifier"):
+        changed.reevaluate(run_id)
+    with pytest.raises(WorkflowStateError, match="another gate verifier"):
+        recheck(changed, run_id, plan.plan_sha256)
+    assert journal_rows(store, run_id) == before and store.load_run(run_id)["revision"] == revision
+    assert Counted.checked == [] and current_decision(store, run_id)["sequence"] == 0
+
+    # Applying the plan judges the same draft again, under the new gate validator, which rejects it.
+    labels = len(drafts)
+    result = changed.repair(plan, plan_sha256=plan.plan_sha256, max_total_budget_usd=1,
+                            reason=REASON, sources=NoSources())
+    (entry,) = result.to_dict()["items"]
+    assert (entry["action"], entry["outcome"], entry["decision"]) == (
+        "regenerate", "failed", "rejected")
+    assert drafts[labels:] == ["Draft", "Judge", "Draft", "Judge"]
+    rejected = result.decisions[entry["successor_run_id"]]
+    assert rejected.output_sha256 == first.acceptance.output_sha256
+    assert any("gate validator 'contains' rejected" in reason for reason in rejected.reasons)
+    # Under the gate validator that judged it, the run is decided again as before.
+    assert judged(store, gate_validator("needle", "1")).reevaluate(run_id).accepted
+
+
+def without_gate_verifiers(saved: dict) -> dict:
+    """A lineage operation's result as written before records named their gates' verifier."""
+    for node in saved["lineage"]["nodes"]:
+        node["inputs"].pop("verifier", None)
+    return saved
+
+
+def test_a_record_without_its_gate_verifier_still_holds_and_needs_review_under_a_gate_validator(
+        store, drafts):
+    swarm = judged(store, gate_validator("needle", "1"))
+    first = swarm.execute(gated())
+    run_id = first.execution_id
+    tamper(store, run_id, "lineage", without_gate_verifiers)
+    assert "verifier" not in load_lineage(store, run_id).nodes[1]["inputs"]
+
+    # The record still matches its journal, so the run still delivers.
+    resumed = swarm.resume(run_id)
+    assert resumed.accepted and resumed.acceptance == first.acceptance
+    # Which gate verifier judged the gate is unknown, so a plan never reuses the run.
+    (item,) = swarm.plan_repair(sources=NoSources()).to_dict()["items"]
+    assert (item["action"], item["status"]) == ("review", "stale")
+    assert "gate_validator_unknown" in item["reasons"]
+    # A plan under TokenVerifier compares nothing it cannot know.
+    token = Swarm(model="offline", provider=OfflineProvider(), architect=SimpleArchitect(),
+                  run_store=store, max_budget_usd=1, acceptance=policy(),
+                  lineage=LineagePolicy(access_scope=SCOPE), context_sources=[],
+                  synthesizer=LocalOnly(Draft, "deliver-draft", "1", role="synthesizer"))
+    (item,) = token.plan_repair(sources=NoSources()).to_dict()["items"]
+    assert (item["action"], item["reasons"]) == ("reuse", [])
 
 
 # ---------------------------------------------------------------------------

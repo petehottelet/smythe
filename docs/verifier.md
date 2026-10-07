@@ -855,6 +855,9 @@ policy, and records the decision in its journal:
   differ from the `Swarm`'s only in its acceptance policy and gate verifier,
   since no gate judges again, and in its lineage policy's `reuse`, since a
   decision reuses nothing; anything else raises `WorkflowConflictError`.
+  A lineage run with gates is decided again by a policy only under the gate
+  verifier that judged them, or `WorkflowStateError` is raised
+  ([lineage](lineage.md#repair-a-run-in-place)).
   The decision is a new `acceptance` operation keyed
   `acceptance/<sequence>/<digest>`, the digest covering the output, the
   policy and everything else the decision binds, and a new completed

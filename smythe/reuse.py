@@ -2,8 +2,9 @@
 
 :func:`evaluate` compares one :class:`~smythe.lineage.ArtifactLineage` record
 with a :class:`CurrentState`: the sources a developer's :class:`SourceCatalog`
-describes, and the validators, acceptance policy, tools, components, context
-assembly and agents a run would use now, with the published file's integrity.
+describes, and the validators, acceptance policy, gate verifier, tools,
+components, context assembly and agents a run would use now, with the
+published file's integrity.
 It returns an :class:`ItemDecision`: an action for the item and for each node,
 the stable reason codes in :data:`REASONS` behind them, and the authority any
 kept result is kept under. It is a pure function. It reads no store or file,
@@ -33,10 +34,11 @@ from smythe.acceptance import AcceptanceDecision, DeliveryAcceptance, _calls_asy
 from smythe.context import CONTEXT_ASSEMBLY_VERSION
 from smythe.evidence import load_source_tombstones
 from smythe.lineage import (
-    ArtifactLineage, LineagePolicy, _count, _frozen, _label, _named, _plain, _synthesizer, _text,
-    _validator_set, load_lineage, validator_set_sha256,
+    ArtifactLineage, LineagePolicy, _count, _frozen, _gate_verifier, _label, _named, _plain,
+    _synthesizer, _text, _validator_set, load_lineage, validator_set_sha256,
 )
 from smythe.validation import ValidatorIdentity, _json_sha256, _require_keys, _require_sha256
+from smythe.verifier import TOKEN_VERIFIER_IDENTITY
 from smythe.workflow_artifact import current_artifact
 from smythe.workflow_binding import WorkflowBindingError
 from smythe.workflow_store import WorkflowError, WorkflowNotFoundError
@@ -53,6 +55,7 @@ ACTIONS = ("reuse", "recheck", "rerender", "regenerate", "review")
 # policy's ``undeclared_coverage`` decides.
 REASONS = MappingProxyType({
     "lineage_missing": None, "coverage_partial": None, "coverage_undeclared": None,
+    "gate_validator_unknown": None,
     "source_unavailable": "review", "source_tombstoned": "review",
     "dependency_review": "review", "decision_not_accepted": "review",
     "artifact_unsafe": "review", "artifact_unreadable": "review", "artifact_unchecked": "review",
@@ -61,6 +64,7 @@ REASONS = MappingProxyType({
     "component_changed": "regenerate", "context_assembly_changed": "regenerate",
     "agent_changed": "regenerate", "task_changed": "regenerate",
     "node_incomplete": "regenerate", "dependency_changed": "regenerate",
+    "gate_validator_changed": "regenerate",
     "gate_pair": "regenerate", "reuse_disabled": "regenerate",
     "artifact_missing": "rerender", "artifact_changed": "rerender",
     "validator_set_changed": "recheck", "policy_changed": "recheck",
@@ -75,6 +79,8 @@ _INTEGRITY = {"verified": None, "missing": "artifact_missing", "changed": "artif
               "not_checked": "artifact_unchecked"}
 # The lineage node kind of a verification gate; the nodes it depends on are what it judges.
 _GATE = "gate"
+# The reasons a gate's verifier gives the gate and each node it depends on.
+_GATE_VERIFIER = frozenset({"gate_validator_changed", "gate_validator_unknown"})
 _KEPT = ("reuse", "recheck", "rerender")
 
 REPAIR_PLAN_VERSION = 1
@@ -162,8 +168,12 @@ class CurrentState:
     task's digest to the digest of the task that replaces it. ``integrity``
     maps a run id to its published file's status (``verified``, ``missing``,
     ``changed``, ``unsafe``, ``unreadable`` or ``not_checked``). ``lineage``
-    is the configured policy, which gives the access scope. Every part is
-    read-only.
+    is the configured policy, which gives the access scope.
+    ``gate_verifier`` names the rules a run would judge its gates by, as its
+    recipe's ``verifier`` does: ``TOKEN_VERIFIER_IDENTITY`` for
+    ``TokenVerifier``, or ``validator-v1`` with the identities of the gate
+    validators in ``gate_validators``, which are kept as a sorted set. Every
+    part is read-only.
     """
 
     catalog: SourceCatalog
@@ -176,6 +186,8 @@ class CurrentState:
     tasks: Mapping[str, str] = field(default_factory=dict)
     integrity: Mapping[str, str] = field(default_factory=dict)
     lineage: LineagePolicy = field(default_factory=LineagePolicy)
+    gate_verifier: str = TOKEN_VERIFIER_IDENTITY
+    gate_validators: Iterable[ValidatorIdentity] = ()
 
     def __post_init__(self) -> None:
         describe = getattr(self.catalog, "describe", None)
@@ -184,15 +196,19 @@ class CurrentState:
         if getattr(self.catalog, "metered", False) is not False:
             raise ValueError("catalog must be a zero-cost local read; a metered catalog is refused")
         validators = _items(self.validators, "validators")
-        if any(not isinstance(item, ValidatorIdentity) for item in validators):
-            raise TypeError("validators must be ValidatorIdentity values")
+        gate_validators = _items(self.gate_validators, "gate_validators")
+        for name, items in (("validators", validators), ("gate_validators", gate_validators)):
+            if any(not isinstance(item, ValidatorIdentity) for item in items):
+                raise TypeError(f"{name} must be ValidatorIdentity values")
         _require_sha256(self.policy_sha256, "policy_sha256")
+        _text(self.gate_verifier, "gate_verifier")
         if self.context_assembly_version is not None:
             _count(self.context_assembly_version, "context_assembly_version", 1)
         if type(self.lineage) is not LineagePolicy:
             raise WorkflowBindingError("lineage must be the built-in LineagePolicy")
         detached = {
             "validators": tuple(_validator_set(validators)),
+            "gate_validators": tuple(_validator_set(gate_validators)),
             "tools": _mapping(self.tools, "tools", _tool),
             "components": _mapping(self.components, "components", _text),
             "agents": frozenset(_sha(item, "agents") for item in _items(self.agents, "agents")),
@@ -306,6 +322,15 @@ def _node_reasons(node: Mapping[str, Any], statuses: Mapping[str, SourceStatus |
         reasons.add("context_assembly_changed")
     if "agent_sha256" in inputs and inputs["agent_sha256"] not in state.agents:
         reasons.add("agent_changed")
+    if node["kind"] == _GATE:
+        # A gate's verdict holds only under the gate verifier that gave it.
+        if "verifier" not in inputs:
+            if state.gate_validators:
+                reasons.add("gate_validator_unknown")
+        elif _plain(inputs["verifier"]) != {
+                "name": state.gate_verifier,
+                "validators": [item.to_dict() for item in state.gate_validators]}:
+            reasons.add("gate_validator_changed")
     return reasons
 
 
@@ -334,8 +359,9 @@ def evaluate(lineage: ArtifactLineage | None, state: CurrentState) -> ItemDecisi
     returned before any digest is compared or any source described. A
     missing record (None) calls for the policy's ``undeclared_coverage``.
     Otherwise each node's sources, tool, component, context assembly, agent
-    and task are compared with *state*, and a node that regenerates or needs
-    review takes its dependents with it. When any node is computed again, a
+    and task are compared with *state*, and each gate's verifier, which the
+    nodes it judged go with, and a node that regenerates or needs review
+    takes its dependents with it. When any node is computed again, a
     gate (a node of kind ``gate``) and the nodes it depends on are never
     reused. With nothing computed again, the published file's integrity,
     the acceptance decision and the validator set and policy decide. The
@@ -363,6 +389,10 @@ def evaluate(lineage: ArtifactLineage | None, state: CurrentState) -> ItemDecisi
     task = lineage.run["task_sha256"]
     task_changed = task is not None and state.tasks.get(task, task) != task
     own = {node["id"]: _node_reasons(node, statuses, state, task_changed) for node in nodes}
+    for node in nodes:
+        # The nodes a gate judged go with its verifier.
+        for member in node["depends_on"]:
+            own[member] |= own[node["id"]] & _GATE_VERIFIER
     children: dict[str, list[str]] = {node["id"]: [] for node in nodes}
     for node in nodes:
         for dependency in node["depends_on"]:
@@ -539,6 +569,7 @@ def _agents(entries: Iterable[Mapping[str, Any]]) -> set[str]:
 def _state(recipe: Mapping[str, Any], catalog: SourceCatalog) -> CurrentState:
     """What a run made with *recipe*, the recipe a new run would record, would use now."""
     component = _synthesizer(recipe["components"]["synthesizer"])
+    verifier = _gate_verifier(recipe) or {"name": TOKEN_VERIFIER_IDENTITY, "validators": []}
     return CurrentState(
         catalog=catalog,
         validators=[ValidatorIdentity.from_dict(item)
@@ -551,6 +582,8 @@ def _state(recipe: Mapping[str, Any], catalog: SourceCatalog) -> CurrentState:
         context_assembly_version=recipe.get("context_assembly") or None,
         agents=_agents(recipe["components"]["registry"].get("agents", ())),
         lineage=LineagePolicy.from_dict(recipe["lineage"]),
+        gate_verifier=verifier["name"],
+        gate_validators=[ValidatorIdentity.from_dict(item) for item in verifier["validators"]],
     )
 
 
@@ -640,10 +673,11 @@ def repair_plan(store: Any, recipe: Mapping[str, Any], catalog: SourceCatalog,
 
     *recipe* is the recipe a new run would record, and it must hold a
     lineage policy: its access scope chooses the runs, and its validators,
-    acceptance policy, read profiles, synthesizer, context assembly and
-    agents make the :class:`CurrentState`. An agent a run recorded that the
-    recipe's registry does not define, such as one assigned when the run
-    was planned, stays current. *catalog* describes each source once.
+    acceptance policy, gate verifier, read profiles, synthesizer, context
+    assembly and agents make the :class:`CurrentState`. An agent a run
+    recorded that the recipe's registry does not define, such as one
+    assigned when the run was planned, stays current. *catalog* describes
+    each source once.
     *run_ids* defaults to :func:`archive_heads`; named runs are planned
     once each, in the order given, and a run outside the scope raises
     :class:`~smythe.workflow_store.WorkflowNotFoundError` as an unknown one

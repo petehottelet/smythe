@@ -126,7 +126,8 @@ form:
                         "context": {"snapshot_key", "assembly_version"},
                         "tool": {"name", "version", "decoder_version"},
                         "component": {"name", "version"},
-                        "agent_sha256"},
+                        "agent_sha256",
+                        "verifier": {"name", "validators": [validator identities]}},
              "coverage": "declared" | "undeclared",
              "reused_from": {"run_id", "generation"}}],
   "coverage": "complete" | "partial",
@@ -155,11 +156,12 @@ form:
   the result: a run writes `read`, `model`, `gate` and `synthesis`. A node
   is `declared` only when its inputs name a context snapshot, a read tool or
   a component; `coverage` is `complete` when every node is declared and
-  `partial` otherwise.
+  `partial` otherwise. Only a `gate` names a `verifier`, whose `validators`
+  are kept like the decision's.
 - **Optional blocks.** `context`, `tool`, `component`, `agent_sha256`,
-  `reused_from`, `predecessor` and `repair` appear only when present, never
-  as null. `predecessor` is another run in the same store, and every
-  `reused_from` names it.
+  `verifier`, `reused_from`, `predecessor` and `repair` appear only when
+  present, never as null. `predecessor` is another run in the same store,
+  and every `reused_from` names it.
 - **Strict reading.** `ArtifactLineage.from_dict()` rejects any other
   version and any missing or unknown key at every level, rather than
   guessing. `to_dict()` returns detached JSON data; the record's parts are
@@ -207,7 +209,10 @@ print(lineage.coverage, [(node["id"], node["kind"]) for node in lineage.nodes])
     was given, by its journal key (`context/<node>/<generation>`) and
     context-assembly version, the run's sources the snapshot held, and
     `agent_sha256`, the digest of its agent's registry description without
-    the agent's id.
+    the agent's id. A gate also names the `verifier` that judged it: the
+    recipe's gate verifier, `token-v2` for `TokenVerifier` or `validator-v1`
+    for a [gate validator](verifier.md#gate-validators-in-durable-workflows),
+    with each gate validator's identity under `validators`.
   - The synthesis (`synthesis`) comes last and depends on every node. Its id
     is the synthesis operation's key, its result the digest of the
     synthesized text, and a synthesizer that calls no model is its
@@ -233,8 +238,9 @@ print(lineage.coverage, [(node["id"], node["kind"]) for node in lineage.nodes])
   record again from the records its operation names; a record that is
   missing, has another digest or is not the record of the run's current
   decision and publication makes the decision `indeterminate`, and the
-  output moves to `rejected_output`. Each later decision, by re-evaluation
-  or republication, journals a record that
+  output moves to `rejected_output`. A record written before records named
+  their gates' `verifier` still matches without it. Each later decision, by
+  re-evaluation or republication, journals a record that
   [supersedes](#repair-a-run-in-place) the one before.
 - **Summarized in inspection.** `inspect_run()`, `list_runs()` and journal
   events never return the record. `smythe runs inspect` shows a
@@ -324,6 +330,8 @@ would use now. Each part is checked when it is built and kept read-only.
 | `tasks` | `{}` | Optional task changes: a recorded task's digest mapped to the digest of the task that replaces it. |
 | `integrity` | `{}` | A run id mapped to its published document's integrity `status`: `verified`, `missing`, `changed`, `unsafe`, `unreadable` or `not_checked`, as [`smythe runs inspect`](runs.md#published-documents) reports it. |
 | `lineage` | `LineagePolicy()` | The configured policy, whose `access_scope`, `reuse` and `undeclared_coverage` apply. |
+| `gate_verifier` | `token-v2` | The gate verifier a run would judge its gates with, as its recipe's `verifier` names it: `smythe.verifier.TOKEN_VERIFIER_IDENTITY` for `TokenVerifier`, or `validator-v1` for a gate validator. |
+| `gate_validators` | none | The gate validators' `ValidatorIdentity` values, kept as a sorted set. |
 
 A price release changes none of these, so it never changes a decision.
 
@@ -383,6 +391,8 @@ most conservative of its own reasons.
 | A node whose inputs are undeclared | `undeclared_coverage` | `coverage_undeclared`, and `coverage_partial` on the item |
 | A node that depends on one that regenerates | `regenerate` | `dependency_changed` |
 | A node that depends on one under review | `review` | `dependency_review` |
+| A gate whose recorded `verifier` is not the state's gate verifier and gate validators, and each node it depends on | `regenerate` | `gate_validator_changed` |
+| A gate recorded without a `verifier`, and each node it depends on, when the state names gate validators | `undeclared_coverage` | `gate_validator_unknown` |
 | A gate, and each node it depends on, in an item where any node regenerates or needs review | `regenerate` | `gate_pair` |
 | A published document that is missing, or holds other bytes | `rerender` | `artifact_missing`, `artifact_changed` |
 | A published document that cannot be checked safely, cannot be read, or has no `verified` finding | `review` | `artifact_unsafe`, `artifact_unreadable`, `artifact_unchecked` |
@@ -405,6 +415,14 @@ most conservative of its own reasons.
   node depends on the node it judges. When an item computes anything again,
   no gate and no node a gate depends on is reused. An item that computes
   nothing keeps its gates' results.
+- **Gate verifiers.** A gate's verdict holds only under the gate verifier
+  that gave it. Another gate verifier, a gate validator of another version or
+  configuration, or a gate validator in place of `TokenVerifier` or the other
+  way round, regenerates the gate and the nodes it judged rather than
+  rechecking their recorded verdicts; a local validator could judge again,
+  but regenerating is the conservative route. A record written before records
+  named their gates' verifier is unknown on that point, so under a gate
+  validator it gets `undeclared_coverage`.
 - **Nothing computed, item rules decide.** When no node regenerates or needs
   review, the published document, the recorded decision, and the validator
   set and policy decide, and every node takes the item's action: `reuse`,
@@ -455,6 +473,7 @@ calls for, or None where the policy's `undeclared_coverage` decides.
 | `lineage_missing` | `undeclared_coverage` | The run has no lineage record. |
 | `coverage_partial` | `undeclared_coverage` | The record does not declare every node's inputs. |
 | `coverage_undeclared` | `undeclared_coverage` | This node's inputs are undeclared. |
+| `gate_validator_unknown` | `undeclared_coverage` | The record does not name the verifier that judged this gate, or the gate this node goes with, and the state names gate validators. |
 | `source_unavailable` | `review` | A source is unknown to the catalog or unavailable. |
 | `source_tombstoned` | `review` | A source was withdrawn. |
 | `dependency_review` | `review` | A node this one depends on needs review. |
@@ -472,6 +491,7 @@ calls for, or None where the policy's `undeclared_coverage` decides.
 | `task_changed` | `regenerate` | The run's task was replaced. |
 | `node_incomplete` | `regenerate` | The node has no result. |
 | `dependency_changed` | `regenerate` | A node this one depends on regenerates. |
+| `gate_validator_changed` | `regenerate` | Another gate verifier or gate validator would judge this gate, or the gate this node goes with. |
 | `gate_pair` | `regenerate` | A gate, or a node a gate depends on, in an item that computes something again. |
 | `reuse_disabled` | `regenerate` | The policy's `reuse` is off. |
 | `artifact_missing` | `rerender` | The published document is missing. |
@@ -519,9 +539,10 @@ with SQLiteWorkflowStore("smythe-runs.db") as store:
   `TypeError`.
 - **The current state.** Each run is [evaluated](#reuse-decisions) against
   what a new run of this Swarm would use: its strict policy's final
-  validators and digest, its read profiles' names, versions and decoder
-  versions, its synthesizer, its context assembly version and the agents
-  its registry defines. An agent that a run recorded and the registry does
+  validators and digest, its gate verifier and gate validator, its read
+  profiles' names, versions and decoder versions, its synthesizer, its
+  context assembly version and the agents its registry defines. An agent
+  that a run recorded and the registry does
   not define, such as one assigned when the run was planned, stays
   current. Each completed run's published document is checked through
   `current_artifact`, the accessor resume and inspection use.
@@ -643,7 +664,13 @@ decision and lineage record stays in the journal.
 - **Recheck.** A changed validator never inherits the decision made under
   the old one. `swarm.reevaluate(run_id, acceptance=policy)`
   [decides the saved document again](verifier.md#re-evaluation) under the
-  new policy, as a new decision.
+  new policy, as a new decision. A new decision reads the verdicts the run's
+  gates recorded, so a changed gate verifier or gate validator is never
+  rechecked: its plan [regenerates](#rules) the gates, and `reevaluate` and
+  `republish` of a lineage run with gates raise `WorkflowStateError`, writing
+  nothing, under any gate verifier but the one that judged them. An
+  [operator's decision](verifier.md#operator-decisions) reads no verdict, so
+  it is not refused.
 - **Rerender.** When the published document is missing or changed,
   `swarm.republish(run_id)` renders the run's saved synthesis again with
   the run's renderer, publishes the bytes as a new file named for the new
@@ -658,7 +685,8 @@ swarm.reevaluate(run_id, acceptance=policy)  # a validator's version changed
 - **Checked first.** Rerendering needs a completed run whose recipe differs
   from the `Swarm`'s only in its acceptance policy and gate verifier: a
   changed renderer or synthesizer raises `WorkflowConflictError`, because a
-  document made another way is regenerated in a successor run. The saved
+  document made another way is regenerated in a successor run. A run with
+  gates also needs the gate verifier that judged them. The saved
   decision must still hold, the saved synthesis must have the digest the
   run's lineage records, and the lineage must match its journal; otherwise
   `WorkflowStateError` is raised. A document whose file still holds its
