@@ -1609,29 +1609,6 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   a `policy_changed` item for a completed run decided under another one.
   `runs inspect` adds `unknown_cost_calls` to a durable run's `accounting`.
   See [review what needs a decision](docs/runs.md#review-what-needs-a-decision).
-- Applying a repair plan. `Swarm.repair(plan, *, plan_sha256,
-  max_total_budget_usd, reason, sources)` (and `arepair()`) makes the plan
-  again for the same runs and refuses it with `WorkflowConflictError`
-  unless it still has the approved digest. It needs a durable `run_store`
-  and a lineage policy, refuses a configured supervisor, and admits the new
-  runs only when their number times `max_budget_usd` fits
-  `max_total_budget_usd`, refusing an unbounded per-run budget when any may
-  incur charges (`WorkflowBudgetError`); every refusal comes before any run
-  is created or call made. Items are applied in plan order, each once:
-  `recheck` decides the run again and `rerender` publishes its document
-  again, both binding the plan's digest and reason, `regenerate` starts a
-  successor run that keeps the nodes the plan reuses and leaves the
-  repaired run's rows untouched, and `review` is reported. The first item
-  that raises or is not accepted stops the repair without a retry. A
-  `RepairResult` lists each item's outcome, decision, successor and work
-  (new runs, read and model calls, reused nodes, publications and
-  decisions). A successor that has not completed is a repair in progress:
-  it is no archive head, and a plan gives the run it repairs `review`
-  (`repair_in_progress`), naming it in `repairs_in_progress`, until
-  ordinary resume finishes it. Under `LineagePolicy(reuse=False)` a
-  regenerated item keeps no result and runs every node, and its document is
-  byte for byte a new run's. See
-  [apply a repair plan](docs/lineage.md#apply-a-repair-plan).
 - Versioned template records. `distill_record(graph, *, name,
   description=None, registry=None, require_success=True, source_task=None)`
   returns a `TemplateRecord`: the distilled blueprint as JSON data (type
