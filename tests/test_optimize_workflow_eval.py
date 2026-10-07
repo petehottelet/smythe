@@ -125,10 +125,13 @@ def _events(path):
 
 
 def test_offline_durable_trials_complete_at_zero_cost(tmp_path):
+    # The smallest campaign that can promote: one development trial for each
+    # policy, then the contract's minimum of three paired confirmation and
+    # three paired holdout seeds. The ledger's durability is not under test.
     contract = _contract()
     incumbent, challenger = _candidates(contract)
     with (SQLiteWorkflowStore(tmp_path / "runs.db") as store,
-          ExperimentLedger(tmp_path / "autotune.db") as ledger):
+          ExperimentLedger(tmp_path / "autotune.db", durability="normal") as ledger):
         evaluate = workflow_trial_evaluator(offline_factory(store), task_for, measure)
         runner = OptimizationRunner(contract, ledger, evaluate, evaluator_hash=EVALUATOR)
         result = asyncio.run(runner.run(incumbent, [challenger]))
