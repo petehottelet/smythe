@@ -170,19 +170,19 @@ def review_job(
     One :meth:`SQLiteRunStore.inspection_snapshot` read pages the run's
     operations; the accepted files of the page's succeeded operations are
     hashed within the 64 MiB inspection limit, and the latest detached
-    launch's receipts are read. Nothing is written, migrated or dispatched,
-    and no provider is constructed. Each item has an ``item_id``, a ``kind``
-    from :data:`REVIEW_KINDS`, what it ``blocks`` (:data:`REVIEW_BLOCKS`),
-    its ``subject``, what was ``observed``, the ``decision_needed`` and, as
-    ``resolve_with``, the ``smythe`` arguments, without ``--store``, that
-    carry the decision out, in order; ``REASON`` stands for the operator's
-    own reason. The ``item_id`` hashes the kind, run, subject and the state
-    the item depends on, so it changes only with that state. Items about
-    the whole run appear on every page, those about operations on theirs;
-    blocking kinds come first, then operation keys. Stored text is a capped
-    excerpt with account identifiers redacted and local directories
-    replaced. *validators* judge delivery eligibility as for
-    :func:`inspect_job`.
+    launch's receipts are read. The database is never written to or
+    migrated, nothing is dispatched, and no provider is constructed. Each
+    item has an ``item_id``, a ``kind`` from :data:`REVIEW_KINDS`, what it
+    ``blocks`` (:data:`REVIEW_BLOCKS`), its ``subject``, what was
+    ``observed``, the ``decision_needed`` and, as ``resolve_with``, the
+    ``smythe`` arguments, without ``--store``, that carry the decision out,
+    in order; ``REASON`` stands for the operator's own reason. The
+    ``item_id`` hashes the kind, run, subject and the state the item depends
+    on, so it changes only with that state. Items about the whole run appear
+    on every page, those about operations on theirs; blocking kinds come
+    first, then operation keys. Stored text is a capped excerpt with account
+    identifiers redacted and local directories replaced. *validators* judge
+    delivery eligibility as for :func:`inspect_job`.
     """
     # Imported here: the runner imports this module.
     from smythe.jobs.operator import _idle_reason, read_worker_state

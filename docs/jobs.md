@@ -578,8 +578,10 @@ With `--json` the command prints one compact document:
   `smythe jobs` command, in the order to try; it parses as given, without
   `--store`, and `REASON` stands for your own reason. An empty list means
   this run has no command for it. The printed output shows each item with
-  its decision and commands, and reminds you to add `--store` when you used
-  one.
+  its decision and commands, quoted for the local shell: by cmd.exe's rules
+  on Windows and POSIX shell rules elsewhere. Whenever it prints a command
+  line, the `--dry-run` hint for unhashed files included, it reminds you to
+  add `--store` if you used one.
 - **Stable identity.** `item_id` is the SHA-256 of the item's kind, run,
   subject and the recorded state it depends on. It stays the same across
   reviews until that state changes, as a reroll or a new attempt does, so a
@@ -590,18 +592,22 @@ With `--json` the command prints one compact document:
   before operations, by key. `--limit` (1–500, default 50) and `--offset`
   page the operations; items about the whole run appear on every page,
   `totals` counts each kind on this page, and `operation_counts` covers the
-  whole run.
+  whole run. The printed header names the operations the page holds by
+  position, such as `operations 51-100 of 240`.
 - **Bounded reads.** The accepted files of the page's succeeded operations
   are hashed, at most 64 MiB per review. A file past that limit is counted
   as `not_checked` in `artifact_integrity` and is not an item;
   `jobs reroll RUN_ID --dry-run` hashes every file.
 
-A review opens the database read-only, writes nothing, never migrates a
-schema-2 or schema-3 database or enables WAL, and constructs no provider. It
-also reads the latest detached launch's receipts beside the database. The
-packet holds no local paths, so it has no `manifest_root`; recorded
-acceptance flags and statuses are never changed. `review_version` versions
-the JSON, and later versions only add fields. In Python,
+A review opens the database read-only. It never writes to the database or
+migrates it, so a schema-2 or schema-3 database keeps its schema; it never
+enables WAL and constructs no provider. On a database already in WAL mode,
+SQLite may create its `-wal` and `-shm` files for the read, as it does for
+`jobs inspect` and `jobs list`. A review also reads the latest detached
+launch's receipts beside the database. The packet holds no local paths, so
+it has no `manifest_root`; recorded acceptance flags and statuses are never
+changed. `review_version` versions the JSON, and later versions only add
+fields. In Python,
 `smythe.jobs.inspection.review_job(store, run_id, limit=50, offset=0,
 validators=None)` returns the same document; `validators` judge delivery
 eligibility as for `inspect_job`.

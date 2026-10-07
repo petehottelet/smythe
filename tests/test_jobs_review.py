@@ -13,6 +13,7 @@ import pytest
 
 import smythe.provider as provider_module
 from fakes import Crash, crash_when
+import smythe.cli as cli
 from smythe.cli import (
     EXIT_INTERRUPTED, EXIT_INVALID_INPUT, EXIT_JOB_FAILED, EXIT_JOB_STATE, EXIT_OK, build_parser,
     main,
@@ -231,6 +232,24 @@ def test_a_stop_request_asks_for_a_resume(tmp_path, capsys):
     assert item["observed"]["pause_generation"] == 1
     assert item["resolve_with"] == [["jobs", "resume", "idle"]]
     commands_parse(packet, tmp_path)
+
+
+def test_an_item_id_changes_with_its_recorded_state_alone(tmp_path):
+    manifest, root = load_manifest(_manifest(tmp_path))
+    plan = preflight_job(manifest, manifest_root=root)
+    with SQLiteRunStore(tmp_path / "jobs.sqlite3") as store:
+        store.create_run(plan, make_approval(plan), manifest_root=root, run_id="idle")
+        store.request_pause("idle", reason="check the palette")
+        [first] = review_job(store, "idle")["items"]
+        assert review_job(store, "idle")["items"] == [first]
+        # A second stop request, with the same reason: the same kind of item about
+        # the same run, whose recorded pause generation has moved on.
+        store.request_pause("idle", reason="check the palette")
+        [second] = review_job(store, "idle")["items"]
+    assert (second["kind"], second["subject"]) == (first["kind"], first["subject"])
+    assert second["observed"]["status"] == first["observed"]["status"]
+    assert (first["observed"]["pause_generation"], second["observed"]["pause_generation"]) == (1, 2)
+    assert second["item_id"] != first["item_id"]
 
 
 def test_a_budget_overrun_comes_first_and_admits_no_reroll(tmp_path):
@@ -499,8 +518,6 @@ def test_an_interrupted_json_review_writes_no_partial_packet(tmp_path, capsys, m
 
 def test_an_interrupted_human_review_prints_nothing_partial(tmp_path, capsys, monkeypatch):
     job = cli_job(tmp_path, capsys, monkeypatch, rejected=True, attempts=2)
-    import smythe.cli as cli
-
     terminal_text, calls = cli._terminal_text, []
 
     def interrupted(value, **kwargs):
@@ -522,19 +539,84 @@ def test_human_review_shows_each_decision_and_command(tmp_path, capsys, monkeypa
     assert captured.err == ""
     lines = captured.out.splitlines()
     assert lines[0] == f"Run: {job.run_id}"
-    assert "Needs a decision: 1 on operation page 1 of 1 (offset 0, limit 50)" in lines
+    assert "Needs a decision: 1 (operation 1 of 1, limit 50)" in lines
     assert any(line.startswith("[completion] rejected: glyph[0] (item ") for line in lines)
     assert "  Observed: rejected" in lines
-    assert (f"  Resolve with: smythe jobs reroll {job.run_id} 'glyph[0]' --reason REASON"
-            in lines)
+    # Quoted for this host's shell; both renderings are checked below.
+    command = cli._command_line(["jobs", "reroll", job.run_id, "glyph[0]", "--reason", "REASON"])
+    assert f"  Resolve with: smythe {command}" in lines
     assert lines[-1] == ("To run a command, add the --store option used here and replace "
                          "REASON with your own reason.")
 
 
-def test_human_review_escapes_stored_terminal_controls(capsys):
-    from smythe.cli import _emit_job_review
+def human_packet(*, items=(), returned=1, total=1, offset=0, limit=50, not_checked=0):
+    """A review packet as the human output reads it."""
+    return {
+        "run_id": "safe-run", "name": "glyphs", "status": "failed",
+        "operation_counts": {"rejected": total},
+        "page": {"limit": limit, "offset": offset, "total": total, "returned": returned,
+                 "has_more": offset + returned < total},
+        "artifact_integrity": {"counts": {"not_checked": not_checked} if not_checked else {}},
+        "items": [{"item_id": "0" * 64, "kind": "rejected", "blocks": "completion",
+                   "subject": {"operation_key": "glyph[0]"},
+                   "observed": {"status": "rejected", "error_class": None, "excerpt": None},
+                   "decision_needed": "Reroll it with a reason, or leave it rejected.",
+                   "resolve_with": [argv]} for argv in items],
+    }
 
-    _emit_job_review({
+
+def emitted(capsys, value, **options):
+    cli._emit_job_review(value, **options)
+    captured = capsys.readouterr()
+    assert captured.err == ""
+    return captured.out.splitlines()
+
+
+def test_human_review_counts_the_operations_a_page_holds(capsys):
+    reroll = ["jobs", "reroll", "safe-run", "glyph[0]", "--reason", "REASON"]
+    header = [line for line in emitted(capsys, human_packet(items=[reroll]), store_given=False)
+              if line.startswith("Needs a decision")]
+    assert header == ["Needs a decision: 1 (operation 1 of 1, limit 50)"]
+    lines = emitted(capsys, human_packet(items=[reroll, reroll], returned=2, total=3, limit=2),
+                    store_given=False)
+    assert "Needs a decision: 2 (operations 1-2 of 3, limit 2)" in lines
+    assert "More operations: use --offset 2" in lines
+    lines = emitted(capsys, human_packet(returned=1, total=3, offset=2, limit=2), store_given=False)
+    assert "Needs a decision: 0 (operation 3 of 3, limit 2)" in lines
+    lines = emitted(capsys, human_packet(returned=0, total=3, offset=5), store_given=False)
+    assert "Needs a decision: 0 (none of 3 operations at offset 5, limit 50)" in lines
+
+
+def test_human_review_reminds_of_the_store_whenever_it_prints_a_command(capsys):
+    # Only the hint to hash every accepted file names a command.
+    lines = emitted(capsys, human_packet(not_checked=2), store_given=True)
+    assert lines[-2] == ("Accepted files not hashed within the 64 MiB limit: 2; "
+                         "smythe jobs reroll safe-run --dry-run hashes them all.")
+    assert lines[-1] == "To run a command, add the --store option used here."
+    # No reminder without a --store option, or without a command.
+    lines = emitted(capsys, human_packet(not_checked=2), store_given=False)
+    assert not any(line.startswith("To run a command") for line in lines)
+    lines = emitted(capsys, human_packet(), store_given=True)
+    assert lines[-1] == "Nothing on this page needs a decision."
+
+
+def test_suggested_commands_are_quoted_for_the_local_shell(capsys):
+    reroll = ["jobs", "reroll", "safe-run", "glyph[0]", "--reason", "REASON"]
+    adopt = ["jobs", "adopt", "safe-run", "--reason", "REASON", "--", "-odd key"]
+    value = human_packet(items=[reroll, adopt], returned=2, total=2)
+    # cmd.exe keeps single quotes as part of an argument, so Windows gets its own quoting.
+    lines = emitted(capsys, value, store_given=False, windows=True)
+    assert "  Resolve with: smythe jobs reroll safe-run glyph[0] --reason REASON" in lines
+    assert '  Resolve with: smythe jobs adopt safe-run --reason REASON -- "-odd key"' in lines
+    lines = emitted(capsys, value, store_given=False, windows=False)
+    assert "  Resolve with: smythe jobs reroll safe-run 'glyph[0]' --reason REASON" in lines
+    assert "  Resolve with: smythe jobs adopt safe-run --reason REASON -- '-odd key'" in lines
+    assert cli._command_line(['say "hi"', "a b"], windows=True) == r'"say \"hi\"" "a b"'
+    assert cli._command_line(['say "hi"', "a b"], windows=False) == "'say \"hi\"' 'a b'"
+
+
+def test_human_review_escapes_stored_terminal_controls(capsys):
+    cli._emit_job_review({
         "run_id": "safe-run", "name": "unsafe\x1b[2J\nname", "status": "failed",
         "operation_counts": {"rejected": 1},
         "page": {"limit": 50, "offset": 0, "total": 1, "returned": 1, "has_more": False},

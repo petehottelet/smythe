@@ -1583,8 +1583,12 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   run, subject and recorded state, so it stays the same across reviews
   until that state changes. Blocking kinds come first, then operation keys;
   operations are paged, and accepted files are hashed within the 64 MiB
-  inspection limit. The review opens the database read-only, writes and
-  migrates nothing, constructs no provider and works on schema-2 to
+  inspection limit. The printed output names the operations a page holds by
+  position, quotes each command for the local shell (cmd.exe's rules on
+  Windows) and reminds you of `--store` whenever it prints a command. The
+  review opens the database read-only, never writes to or migrates it
+  (SQLite may create the `-wal` and `-shm` files of a WAL-mode database, as
+  for `jobs inspect`), constructs no provider and works on schema-2 to
   schema-4 databases. It exits 0 whether or not anything needs a decision,
   and 130 without partial output when interrupted. The versioned JSON packet
   (`review_version: 1`) holds no local paths. In Python,

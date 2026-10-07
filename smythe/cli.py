@@ -9,6 +9,7 @@ import json
 import os
 import shlex
 import sqlite3
+import subprocess
 import sys
 import tempfile
 import unicodedata
@@ -822,10 +823,37 @@ def _emit_job_inspection(value: dict[str, Any]) -> None:
         print(f"HTML report: {_terminal_text(value['report_path'], limit=1000)}")
 
 
-def _review_lines(items: list[dict[str, Any]], label, extra) -> list[str]:
+def _command_line(argv: Sequence[str], *, windows: bool | None = None) -> str:
+    """Quote *argv* for the shell it is shown in: cmd.exe on Windows, a POSIX shell elsewhere.
+
+    ``shlex.join`` quotes with single quotes, which cmd.exe keeps as part of
+    an argument; ``subprocess.list2cmdline`` quotes as Windows programs read
+    their command line. *windows* defaults to whether this host is Windows.
+    """
+    if windows is None:
+        windows = os.name == "nt"
+    return subprocess.list2cmdline(argv) if windows else shlex.join(argv)
+
+
+def _shown_command(argv: Sequence[str], *, windows: bool | None = None) -> str:
+    """A suggested ``smythe`` command line, quoted for the shell it is shown in."""
+    return f"smythe {_terminal_text(_command_line(argv, windows=windows), limit=1000)}"
+
+
+def _operation_span(page: dict[str, Any]) -> str:
+    """Which of the run's operations a page holds, by position."""
+    first, last, total = page["offset"] + 1, page["offset"] + page["returned"], page["total"]
+    if not page["returned"]:
+        return f"none of {total} operations at offset {page['offset']}"
+    return f"operation {first} of {total}" if first == last else f"operations {first}-{last} of {total}"
+
+
+def _review_lines(items: list[dict[str, Any]], label, extra, *,
+                  windows: bool | None = None) -> list[str]:
     """Review items as printed: kind and subject, then what was observed, the decision and commands.
 
     *label* names an item's subject; *extra* gives an observation's added lines.
+    Commands are quoted as ``_command_line`` quotes them for *windows*.
     """
     lines = []
     for item in items:
@@ -839,32 +867,41 @@ def _review_lines(items: list[dict[str, Any]], label, extra) -> list[str]:
             lines.append(f"  Detail: {_terminal_text(observed['excerpt'])}")
         lines.extend(extra(observed))
         lines.append(f"  Decision: {_terminal_text(item['decision_needed'], limit=1000)}")
-        lines.extend(f"  Resolve with: smythe {_terminal_text(shlex.join(argv), limit=1000)}"
+        lines.extend(f"  Resolve with: {_shown_command(argv, windows=windows)}"
                      for argv in item["resolve_with"])
     return lines
 
 
-def _review_notes(items: list[dict[str, Any]], option: str | None) -> list[str]:
-    """The reminder after review items whose commands need the store *option* or a reason."""
+def _review_notes(items: list[dict[str, Any]], option: str | None, *,
+                  printed: bool = False) -> list[str]:
+    """The reminder after review items whose commands need the store *option* or a reason.
+
+    *printed* says another command line was shown, which also needs the option.
+    """
     commands = [argv for item in items for argv in item["resolve_with"]]
-    notes = ([f"add the {option} option used here"] if option and commands else []) + (
+    # Without it, every command line printed here would use the default store.
+    shown = bool(commands) or printed
+    notes = ([f"add the {option} option used here"] if option and shown else []) + (
         ["replace REASON with your own reason"] if any("REASON" in argv for argv in commands) else [])
     return [f"To run a command, {' and '.join(notes)}."] if notes else []
 
 
-def _emit_job_review(value: dict[str, Any], *, store_given: bool) -> None:
-    """Print a review packet at once, so an interruption leaves no partial output."""
+def _emit_job_review(value: dict[str, Any], *, store_given: bool, windows: bool | None = None) -> None:
+    """Print a review packet at once, so an interruption leaves no partial output.
+
+    Suggested commands are quoted for this host's shell, or for cmd.exe when
+    *windows* is true and a POSIX shell when it is false.
+    """
     page, items = value["page"], value["items"]
     lines = [f"Run: {_terminal_text(value['run_id'])}", f"Name: {_terminal_text(value['name'])}",
              f"Status: {_terminal_text(value['status'])}",
              f"Operations (whole run): {_terminal_text(json.dumps(value['operation_counts'], sort_keys=True))}",
-             f"Needs a decision: {len(items)} on operation page {page['returned']} of {page['total']} "
-             f"(offset {page['offset']}, limit {page['limit']})"]
+             f"Needs a decision: {len(items)} ({_operation_span(page)}, limit {page['limit']})"]
     lines += _review_lines(
         items, lambda item: (item["subject"].get("operation_key") or item["subject"].get("launch_id")
                              or value["run_id"]),
         lambda observed: [f"  Kept exposure: {_usd(observed['exposure_microusd'])}"]
-        if "exposure_microusd" in observed else [])
+        if "exposure_microusd" in observed else [], windows=windows)
     if not items:
         lines.append("Nothing on this page needs a decision.")
     if page["has_more"]:
@@ -872,8 +909,9 @@ def _emit_job_review(value: dict[str, Any], *, store_given: bool) -> None:
     unchecked = value["artifact_integrity"]["counts"].get("not_checked", 0)
     if unchecked:
         lines.append(f"Accepted files not hashed within the 64 MiB limit: {unchecked}; "
-                     f"smythe jobs reroll {_terminal_text(value['run_id'])} --dry-run hashes them all.")
-    lines += _review_notes(items, "--store" if store_given else None)
+                     f"{_shown_command(['jobs', 'reroll', value['run_id'], '--dry-run'], windows=windows)}"
+                     " hashes them all.")
+    lines += _review_notes(items, "--store" if store_given else None, printed=bool(unchecked))
     print("\n".join(lines))
 
 
