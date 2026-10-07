@@ -8,7 +8,8 @@ ids, versions and SHA-256 digests (:mod:`smythe._canonical`) and never text.
 A run with a policy writes its record once, when it completes, as a
 ``lineage`` journal operation (:func:`build_lineage`, :func:`load_lineage`).
 :func:`restrict_source` withdraws a source's text from every completed run
-whose record names it, which restricts what those runs derived.
+whose record names it, and from every successor in progress that reuses a
+result derived from it, which restricts what those runs derived.
 """
 
 from __future__ import annotations
@@ -51,6 +52,8 @@ LINEAGE_RECORD_VERSION = 1
 LINEAGE_OPERATION = "lineage"
 # Node metadata marking a result reused from an earlier run; a new graph cannot carry it.
 LINEAGE_REUSE_KEY = "lineage_reuse"
+# The journal operation kind, and key prefix, of a result a successor run reuses.
+_REUSE_OPERATION = "reuse"
 _SCOPE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:-]{0,63}")
 _KIND = re.compile(r"[a-z][a-z0-9_-]{0,31}")
 
@@ -744,9 +747,34 @@ def _purge(store: Any, lease: Any, publication: PublishedArtifact, reason: str,
     return operation
 
 
+def _reused_entries(store: Any, run_id: str) -> list[Mapping[str, Any]]:
+    """The predecessor's record entry of each result an unfinished successor reuses.
+
+    A successor's saved graph names its predecessor in its ``repair``
+    planning record, and each node it reuses in its ``lineage_reuse``
+    metadata. A committed ``reuse`` operation holds the entry it reused; a
+    node without one has its entry in the predecessor's record. Any other
+    run has none. Only reads are made; malformed records raise ValueError,
+    TypeError, KeyError or AttributeError.
+    """
+    saved = store.get_checkpoint(run_id)
+    graph = (None if saved is None else saved["checkpoint"].get("graph")) or {}
+    repair = (graph.get("planning") or {}).get("repair")
+    if repair is None:
+        return []
+    entries = {item["inputs"]["node_id"]: item["result"]["lineage"]
+               for item in store.list_operations(run_id, _REUSE_OPERATION)
+               if item["state"] != "started"}
+    planned = {node["id"] for node in graph["nodes"]
+               if LINEAGE_REUSE_KEY in (node.get("metadata") or {})} - entries.keys()
+    record = load_lineage(store, repair["predecessor"]["run_id"]) if planned else None
+    return [*entries.values(),
+            *(node for node in (record.nodes if record else ()) if node["id"] in planned)]
+
+
 def _restrict(store: Any, run_id: str, texts: Mapping[str, str | None], source_id: str,
               reason: str, stamp: str, purge: bool) -> dict[str, Any]:
-    """Tombstone *texts* (SHA-256 to version) in one completed run, and purge its files."""
+    """Tombstone *texts* (SHA-256 to version) in one run, and purge its files."""
     lease = store.acquire_lease(run_id, uuid4().hex, ttl_s=60)
     try:
         operations = [_journal_tombstone(store, lease, SourceRecord(
@@ -758,11 +786,11 @@ def _restrict(store: Any, run_id: str, texts: Mapping[str, str | None], source_i
                            if operation["state"] != "started"]
         pending = [item["operation_id"] for item in operations if item["state"] != "applied"]
         if pending:
-            # A copy of the completed checkpoint applies them; nothing else changes.
+            # A copy of the latest checkpoint applies them; nothing else changes.
             saved = store.get_checkpoint(run_id)
             store.save_checkpoint(lease, saved["revision"], saved["checkpoint"],
                                   consumed_operation_ids=sorted(pending),
-                                  transition_kind="completed")
+                                  transition_kind=saved["checkpoint"]["status"])
     finally:
         store.release_lease(lease)
     return {"run_id": run_id,
@@ -774,7 +802,7 @@ def _restrict(store: Any, run_id: str, texts: Mapping[str, str | None], source_i
 def restrict_source(store: Any, source_id: str, *, version: str | None = None,
                     scope: str | None = None, reason: str,
                     purge: bool = False) -> list[dict[str, Any]]:
-    """Withdraw a source's text from every completed lineage run whose record names it.
+    """Withdraw a source's text from every lineage run that derived from it.
 
     *version*, when given, withdraws only the references recorded with that
     version. *scope*, when given, limits the runs to that access scope,
@@ -788,7 +816,12 @@ def restrict_source(store: Any, source_id: str, *, version: str | None = None,
     source's id, version and SHA-256, *reason* (1-500 characters) and
     ``removed_at`` from the journal's clock, and none of its text. A copy of
     the run's completed checkpoint applies it, and nothing is called. The
-    run is then restricted (:func:`restricted_sources`).
+    run is then restricted (:func:`restricted_sources`). So does each
+    successor in progress whose saved graph or ``reuse`` operations name a
+    result of its predecessor whose recorded inputs name the text, with a
+    copy of its latest checkpoint: it never uses that result, and is
+    restricted once it completes. Completed runs are restricted first, so a
+    predecessor holds its tombstones before its successors are reached.
 
     With *purge*, every file the run published is deleted, never through a
     symbolic link, and an ``artifact_purge`` operation records its path
@@ -802,15 +835,15 @@ def restrict_source(store: Any, source_id: str, *, version: str | None = None,
     ``purged`` files (:func:`purged_artifacts`). A text a run already holds
     a tombstone of keeps its first one, so calling this again, for example
     after another process released a run, finishes a restriction without
-    changing what it recorded. A run that has not completed has no record
-    and is not changed.
+    changing what it recorded. Any other run that has not completed has no
+    record and is not changed.
 
     Raises ``WorkflowBindingError`` for a blank or overlong source id,
     version or reason, a scope that is not an access scope label, or a
     *purge* that is not True or False; ``WorkflowStateError``, before
-    anything is written, for a run in scope whose record cannot be read,
-    and for a store opened read-only; and ``WorkflowLeaseError`` for a run
-    another process holds.
+    anything is written, for a run in scope whose record, or a successor
+    whose reuse records, cannot be read, and for a store opened read-only;
+    and ``WorkflowLeaseError`` for a run another process holds.
     """
     try:
         _id(source_id, "source_id")
@@ -828,26 +861,31 @@ def restrict_source(store: Any, source_id: str, *, version: str | None = None,
         raise WorkflowStateError("Workflow store is read-only")
     affected = []
     for run in store.list_runs():
-        run_id = run["run_id"]
-        policy = store.load_run(run_id)["config"].get("lineage") \
-            if run["status"] == "completed" else None
+        run_id, completed = run["run_id"], run["status"] == "completed"
+        policy = store.load_run(run_id)["config"].get("lineage")
         # The scope is compared before any record or digest is read.
         if not isinstance(policy, dict) or scope not in (None, policy.get("access_scope")):
             continue
         try:
-            record = load_lineage(store, run_id)
-        except ValueError as error:
+            if completed:
+                record = load_lineage(store, run_id)
+                entries = () if record is None else record.nodes
+            else:
+                entries = _reused_entries(store, run_id)
+        except (ValueError, TypeError, KeyError, AttributeError) as error:
+            held = "an invalid lineage record" if completed else "invalid reuse records"
             raise WorkflowStateError(
-                f"Run {run_id!r} holds an invalid lineage record, so the sources it used are "
-                "unknown") from error
+                f"Run {run_id!r} holds {held}, so the sources it used are unknown") from error
         texts: dict[str, str | None] = {}
-        for node in record.nodes if record is not None else ():
+        for node in entries:
             for ref in node["inputs"]["sources"]:
                 if ref["source_id"] == source_id and version in (None, ref["version"]):
                     # One tombstone per text; it keeps a version a reference recorded.
                     texts[ref["sha256"]] = texts.get(ref["sha256"]) or ref["version"]
         if texts:
-            affected.append((run_id, texts))
+            affected.append((run_id, texts, completed))
     stamp = _stamp(store)
-    return [_restrict(store, run_id, texts, source_id, reason, stamp, purge)
-            for run_id, texts in affected]
+    # Completed runs first, so a predecessor holds its tombstones before its successors.
+    restricted = {run_id: _restrict(store, run_id, texts, source_id, reason, stamp, purge)
+                  for run_id, texts, _ in sorted(affected, key=lambda item: not item[2])}
+    return [restricted[run_id] for run_id, _, _ in affected]

@@ -49,7 +49,9 @@ from smythe.lineage import (
     LINEAGE_OPERATION, LINEAGE_RECORD_VERSION, LINEAGE_REUSE_KEY, ArtifactLineage, build_lineage,
     lineage_key, load_lineage, restricted_sources, snapshot_lineage_policy,
 )
-from smythe.lineage import _REPAIR, _gate_verifier, _matching_digests, _plain
+from smythe.lineage import (
+    _REPAIR, _REUSE_OPERATION, _gate_verifier, _matching_digests, _plain,
+)
 from smythe.lineage import _id as _lineage_id
 from smythe.registry import Registry
 from smythe.provider import ProviderResponseError
@@ -159,7 +161,7 @@ _HISTORY_KEYS = ("execution_generation", "regenerations_used", "verification_rec
                  "cost_usd_unknown", "cost_usd_is_estimate", ADVISORY_VERDICT_KEY,
                  REJECTED_GENERATIONS_KEY, CONTEXT_SNAPSHOT_KEY, LINEAGE_REUSE_KEY)
 # The journal operation kind, and key prefix, of a result a successor run reuses.
-_REUSE = "reuse"
+_REUSE = _REUSE_OPERATION
 _PROVIDER_FIELDS = frozenset({"kind", "adapter_version", "decoder_version", "endpoint_scope",
                               "price_version", "supported_models", "config"})
 
@@ -2015,7 +2017,9 @@ class WorkflowRuntime:
         no text removed from the predecessor; and a graph this runtime's
         configuration can run (:meth:`_check_successor_graph`). The successor
         holds the predecessor's source tombstones from its first checkpoint,
-        so it never derives from withdrawn text again, even one it reads anew.
+        so it never derives from withdrawn text again, even one it reads anew,
+        and takes those journaled since whenever it resumes and before it
+        decides (:meth:`_inherit_tombstones`).
         Raises ``WorkflowBindingError`` for a request that breaks these rules,
         ``WorkflowStateError`` for predecessor records that refuse it, and
         ``ValueError``, as for any graph, for a node model the provider does
@@ -2426,6 +2430,8 @@ class WorkflowRuntime:
         if state and state["status"] == "completed":
             self._check_completed()
             return self._result(state["output"], self._reverified(state["output"]))
+        # Text withdrawn from a successor's predecessor since it started is withdrawn from it.
+        self._inherit_tombstones()
         if self._context_version and self.context_revision is not None:
             # A removed source's text is never sent again, from a snapshot or the sources.
             self._refuse_removed(self.context_sources, "give the run other sources with "
@@ -2507,6 +2513,8 @@ class WorkflowRuntime:
                 # The published document is the output delivered and decided.
                 output, publication = await self._publish_output(key, output)
             await self._record_source_evidence(output)
+            # And so is text withdrawn from it while this run was in progress.
+            self._inherit_tombstones()
             acceptance = None if self.acceptance is None else await self._decide(key, output)
             if self.lineage is not None:
                 await self._record_lineage(key, publication)
@@ -2531,6 +2539,29 @@ class WorkflowRuntime:
             acceptance = self._held(acceptance, output, problems)
         return self._result(output, acceptance)
 
+    def _inherit_tombstones(self):
+        """Journal each tombstone a successor's predecessor holds now and the successor lacks.
+
+        The bound run is a successor when its graph's ``repair`` planning
+        record names a predecessor. A tombstone that a restriction made while
+        the successor was in progress journaled only in the predecessor is
+        journaled here too, keeping the predecessor's record, and the next
+        checkpoint applies it. Only the predecessor's tombstones are read.
+        Raises ``WorkflowStateError`` for a tombstone that cannot be read.
+        """
+        repair = (self.graph.planning or {}).get("repair")
+        if not isinstance(repair, dict):
+            return
+        predecessor = repair["predecessor"]["run_id"]
+        try:
+            records = load_source_tombstones(self.store, predecessor)
+        except ValueError as error:
+            raise WorkflowStateError(f"Run {predecessor!r} holds an invalid tombstone") from error
+        for record in records:
+            operation = _journal_tombstone(self.store, self.context.lease, record)
+            if operation["state"] != "applied":
+                self._pending_operations.add(operation["operation_id"])
+
     async def _seed_reuse(self):
         """Complete each node a successor reuses with its predecessor's result, before any node runs.
 
@@ -2538,9 +2569,10 @@ class WorkflowRuntime:
         inputs its ``lineage_reuse`` metadata holds and which the next
         checkpoint consumes. Only a new operation loads and checks the
         predecessor (:func:`_predecessor`, :func:`_reused`); a committed one
-        replays. Either way, the sources removed from this run are checked
-        too. Raises ``WorkflowStateError`` for a result its inputs do not
-        bind or that used a source removed from this run.
+        replays. Either way, the sources removed from this run, which holds
+        its predecessor's current tombstones (:meth:`_inherit_tombstones`),
+        are checked too. Raises ``WorkflowStateError`` for a result its
+        inputs do not bind or that used a source removed from this run.
         """
         loaded, removed = [], None
 

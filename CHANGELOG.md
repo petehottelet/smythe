@@ -1178,7 +1178,7 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   runs again, and a graph the successor's graph policy, read profiles,
   models or agents cannot run are refused before the successor is created
   or any call is made. A resumed successor replays its reuse operations
-  without reading the predecessor. Refreshing an unfinished successor's
+  without reading the predecessor's results. Refreshing an unfinished successor's
   sources, even one lost before it saved a kept node, runs its kept nodes
   again, and a kept result naming a source removed from the successor is
   never used. Its lineage names its `predecessor` and `repair`, each kept
@@ -1211,11 +1211,13 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
 - Source restriction for artifact lineage.
   `smythe.lineage.restrict_source(store, source_id, *, version=None,
   scope=None, reason, purge=False)` withdraws a source's text from every
-  completed lineage run whose record names it, optionally only one version
-  or one access scope, compared before any digest. Each run journals the
-  same `source_tombstone` record that `remove_source` writes (identity,
-  digest, reason and the journal clock's time, no text) under its lease,
-  and a copy of its completed checkpoint applies it. `purge=True` deletes
+  completed lineage run whose record names it, and from every successor in
+  progress whose saved graph or reuse operations name a result of its
+  predecessor derived from it, optionally only one version or one access
+  scope, compared before any digest. Completed runs come first. Each run
+  journals the same `source_tombstone` record that `remove_source` writes
+  (identity, digest, reason and the journal clock's time, no text) under its
+  lease, and a copy of its latest checkpoint applies it. `purge=True` deletes
   each file the run published and records its path, SHA-256, reason and
   time as an `artifact_purge` operation (`purged_artifacts()` reads them);
   tombstones and purge records always remain. A run restricted this way,
@@ -1228,7 +1230,10 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   text and allows `regenerate` from another version; its derived status
   stays `restricted`. A successor holds its predecessor's tombstones, so it
   is refused a withdrawn text as a context source, and a read step that
-  reads one again is refused it. `smythe runs inspect` lists a lineage run's
+  reads one again is refused it; it takes those journaled since when it
+  resumes and before it decides, so a restriction made while it is in
+  progress refuses a reused result the text reached on resume and leaves a
+  completed successor `indeterminate`. `smythe runs inspect` lists a lineage run's
   tombstones and purged files. Text copied into journal checkpoints and
   provider responses is not scrubbed. See
   [restrict a source](docs/lineage.md#restrict-a-source).

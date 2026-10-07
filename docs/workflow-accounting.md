@@ -713,8 +713,9 @@ for its budget.
   for byte, so the nodes that run again are given exactly what a full
   recomputation would give them.
 - **Recovery.** A process lost after a reuse operation commits replays it on
-  resume without reading the predecessor; one lost before it commits checks
-  the predecessor again first. Refreshing an unfinished successor's sources
+  resume without reading the predecessor's results, though its tombstones
+  are read again (below); one lost before it commits checks the predecessor
+  again first. Refreshing an unfinished successor's sources
   runs its kept nodes again, like every other node, even when it was lost
   before it saved any of them; their reuse operations then stay unapplied.
   A kept result is never used once a source its record or source evidence
@@ -729,18 +730,21 @@ for its budget.
 - **Withdrawn text.** The successor's first checkpoint applies a copy of each
   of the predecessor's `source_tombstone` operations, so text
   [withdrawn](lineage.md#restrict-a-source) from the predecessor is withdrawn
-  from the successor too.
+  from the successor too. A tombstone the predecessor journals later is
+  copied when the successor resumes and again before it decides, so a
+  restriction made while it is in progress reaches it before it delivers.
 
 ## Restricted runs
 
 `smythe.lineage.restrict_source` journals a `source_tombstone` operation in
-each completed lineage run whose record names the withdrawn text, and, with
-`purge=True`, an `artifact_purge` operation keyed
-`artifact-purge/<publication sequence>` for each published file it deletes. A
-copy of the run's completed checkpoint applies them under the run's lease;
-they hold no calls, no cost and no source text, and the run's calls,
-balances and earlier checkpoints are unchanged
-([restrict a source](lineage.md#restrict-a-source)).
+each completed lineage run whose record names the withdrawn text, and in
+each successor in progress whose saved graph or `reuse` operations name a
+result of its predecessor derived from it, and, with `purge=True`, an
+`artifact_purge` operation keyed `artifact-purge/<publication sequence>` for
+each published file it deletes. A copy of the run's latest checkpoint
+applies them under the run's lease; they hold no calls, no cost and no
+source text, and the run's calls, balances and earlier checkpoints are
+unchanged ([restrict a source](lineage.md#restrict-a-source)).
 
 ## Recorded read steps
 

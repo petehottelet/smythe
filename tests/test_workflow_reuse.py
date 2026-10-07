@@ -27,6 +27,7 @@ from smythe import (
 from smythe._canonical import sha256_hex
 from smythe._run_inspection import inspect_journal
 from smythe.agent import Agent, AgentProfile
+from smythe.evidence import SOURCE_TOMBSTONE_OPERATION
 from smythe.graph import ExecutionGraph, Node, Topology
 from smythe.lineage import LINEAGE_REUSE_KEY, load_lineage
 from smythe.provider import CompletionResult
@@ -500,8 +501,10 @@ def test_a_resumed_successor_replays_its_reuse_without_reading_the_predecessor(
     for name in ("get_checkpoint", "load_operation", "list_operations", "load_run"):
         original = getattr(store, name)
 
-        def guarded(target, *args, _original=original, **kwargs):
-            if target == first.execution_id:
+        def guarded(target, *args, _original=original, _name=name, **kwargs):
+            # Only the predecessor's tombstones are read again, never its results.
+            if target == first.execution_id and (
+                    _name, args) != ("list_operations", (SOURCE_TOMBSTONE_OPERATION,)):
                 pytest.fail("A resumed successor read its predecessor's records")
             return _original(target, *args, **kwargs)
 

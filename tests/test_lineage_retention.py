@@ -20,13 +20,15 @@ import pytest
 from fakes import ManualClock
 from fixture_service import FixtureService, serve_http
 from smythe import (
-    AcceptanceDecision, ContextSource, LineagePolicy, ReadToolError, SourceRecord,
-    SQLiteWorkflowStore, WorkflowBindingError,
+    AcceptanceDecision, ContextSource, LineagePolicy, OfflineProvider, ReadToolError,
+    SourceRecord, SQLiteWorkflowStore, WorkflowBindingError,
 )
 from smythe._run_inspection import inspect_journal
 from smythe.actions import ActionNotAuthorized, approve, check_authority, prepare_action
 from smythe.cli import EXIT_RUN_INDETERMINATE, main
-from smythe.evidence import SOURCE_TOMBSTONE_OPERATION, source_tombstone_key
+from smythe.evidence import (
+    SOURCE_TOMBSTONE_OPERATION, load_source_tombstones, source_tombstone_key,
+)
 from smythe.lineage import (
     PURGE_OPERATION, load_lineage, purged_artifacts, restrict_source, restricted_sources,
 )
@@ -34,7 +36,8 @@ from smythe.workflow_artifact import current_artifact
 from smythe.workflow_store import WorkflowLeaseError, WorkflowStateError
 from test_action_approvals import CEILING, PROFILE, Host, delivered, intent
 from test_workflow_reuse import (
-    CHANGED, KEPT, TEXTS, Catalog, install_replies, research, research_graph, results, successor,
+    CHANGED, KEPT, TEXTS, Catalog, install_replies, research, research_graph, results,
+    stopped_before_running, successor,
 )
 
 WITHDRAWN = "Withdrawn at its owner's request"
@@ -367,6 +370,91 @@ def test_a_successor_never_derives_again_from_text_withdrawn_from_its_predecesso
     with pytest.raises(ReadToolError, match=refused):
         swarm.resume(second)
     assert store.get_checkpoint(second)["checkpoint"]["status"] == "failed"
+
+
+@pytest.mark.parametrize("held", [False, True], ids=["free", "held-by-another-process"])
+def test_a_restriction_reaches_a_successor_in_progress(
+        store, library, tmp_path, replies, monkeypatch, clock, held):
+    service, endpoint = library
+    swarm = research(store, endpoint, tmp_path)
+    first = swarm.execute(research_graph(endpoint)).execution_id
+    clock.advance(1)
+    service.change_source("churn", CHANGED)
+    # A repair's successor, lost after it committed the reuse of the survey's read and extraction.
+    second = stopped_before_running(swarm, store, first, {node_id: [] for node_id in KEPT},
+                                    monkeypatch)
+    withdrawn = tombstone(service, "survey", at="2026-10-01T09:00:01Z")
+
+    if held:
+        # Another process holds the successor: the predecessor is restricted first.
+        lease = store.acquire_lease(second, "another-process", ttl_s=60)
+        with pytest.raises(WorkflowLeaseError):
+            restrict_source(store, "survey", reason=WITHDRAWN)
+        store.release_lease(lease)
+        assert load_source_tombstones(store, second) == ()
+    else:
+        restricted = restrict_source(store, "survey", reason=WITHDRAWN)
+        assert restricted == [{"run_id": run_id, "tombstones": [withdrawn], "purged": []}
+                              for run_id in (first, second)]
+        assert [item.to_dict() for item in load_source_tombstones(store, second)] == [withdrawn]
+        assert store.get_checkpoint(second)["checkpoint"]["status"] == "planned"
+    assert [item.to_dict() for item in restricted_sources(store, first)] == [withdrawn]
+    labels = list(replies)
+
+    # Resuming, the successor holds its predecessor's tombstone and never uses
+    # the reused result the withdrawn text reached.
+    with pytest.raises(WorkflowStateError,
+                       match="'read-survey' cannot be reused: a source it used was removed"):
+        swarm.resume(second)
+    assert [item.to_dict() for item in load_source_tombstones(store, second)] == [withdrawn]
+    assert store.inspect_run(second)["call_count"] == 0 and replies == labels
+    # The run it repairs is restricted and waits for the repair: nothing is reused.
+    (item,) = swarm.plan_repair(sources=Catalog(service)).to_dict()["items"]
+    assert (item["run_id"], item["action"], item["status"]) == (first, "review", "restricted")
+    assert {"repair_in_progress", "source_tombstoned"} <= set(item["reasons"])
+
+
+def test_a_restriction_made_while_a_successor_runs_reaches_it_before_it_delivers(
+        store, library, tmp_path, replies, monkeypatch, clock):
+    service, endpoint = library
+    swarm = research(store, endpoint, tmp_path)
+    first = swarm.execute(research_graph(endpoint)).execution_id
+    clock.advance(1)
+    service.change_source("churn", CHANGED)
+    withdrawn = tombstone(service, "survey", at="2026-10-01T09:00:01Z")
+    answer, restricted = OfflineProvider.complete, []
+
+    async def complete(self, system, prompt, model):
+        if "Your step: Extract the churn finding" in prompt and not restricted:
+            # Another process withdraws the survey while the successor runs.
+            with SQLiteWorkflowStore(store.path, clock_ns=clock) as other:
+                try:
+                    restricted.append(restrict_source(other, "survey", reason=WITHDRAWN))
+                except WorkflowLeaseError as error:
+                    restricted.append(error)
+        return await answer(self, system, prompt, model)
+
+    monkeypatch.setattr(OfflineProvider, "complete", complete)
+
+    result = successor(swarm, first, {node_id: [] for node_id in KEPT})
+
+    # The successor took its predecessor's tombstone before it decided, so
+    # it delivers nothing derived from the withdrawn text.
+    second = result.execution_id
+    assert result.acceptance.decision is AcceptanceDecision.INDETERMINATE and not result.accepted
+    assert any("'survey'" in reason and WITHDRAWN in reason
+               for reason in result.acceptance.reasons)
+    # The restriction reached the predecessor first, then waited for the successor's lease.
+    (refused,) = restricted
+    assert isinstance(refused, WorkflowLeaseError)
+    assert [item.to_dict() for item in restricted_sources(store, first)] == [withdrawn]
+    assert [item.to_dict() for item in restricted_sources(store, second)] == [withdrawn]
+    assert not current_artifact(store, second).eligible
+    assert swarm.resume(second).acceptance.decision is AcceptanceDecision.INDETERMINATE
+    # Calling the restriction again finishes it and keeps each first tombstone.
+    again = restrict_source(store, "survey", reason="Another reason")
+    assert again == [{"run_id": run_id, "tombstones": [withdrawn], "purged": []}
+                     for run_id in (first, second)]
 
 
 # ---------------------------------------------------------------------------

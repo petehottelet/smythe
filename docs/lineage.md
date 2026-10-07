@@ -745,8 +745,9 @@ Gates, the nodes they judge or depend on, and nodes that depend on a node
 that runs again are never kept. The successor holds its predecessor's source
 tombstones from its first checkpoint, so text
 [withdrawn](#restrict-a-source) from the predecessor is withdrawn from it
-too. [Applying a plan](#apply-a-repair-plan) starts one for each
-`regenerate` item.
+too, and it takes any the predecessor holds later when it resumes and again
+before it decides. [Applying a plan](#apply-a-repair-plan) starts one for
+each `regenerate` item.
 
 When the successor completes, its record shows what it kept:
 
@@ -904,18 +905,23 @@ with SQLiteWorkflowStore("smythe-runs.db") as store:
 ```
 
 - **Which runs.** Every completed run whose recipe records a lineage policy
-  and whose applied record names the source as any node's input, in journal
-  order. `version` limits it to the references recorded with that version.
-  `scope` limits it to the runs in that access scope, compared before any
-  record or digest is read, so a run in another scope is never touched
-  however exactly its digests match; without it, every scope is covered.
+  and whose applied record names the source as any node's input, and every
+  [successor](#reuse-in-a-successor-run) in progress whose saved graph or
+  `reuse` operations name a result of its predecessor whose recorded inputs
+  name the source. Completed runs are restricted first, so a predecessor
+  holds its tombstones before its successors are reached. `version` limits it
+  to the references recorded with that version. `scope` limits it to the runs
+  in that access scope, compared before any record or digest is read, so a
+  run in another scope is never touched however exactly its digests match;
+  without it, every scope is covered.
 - **What it records.** Each such run journals a tombstone of each withdrawn
   text under the run's lease: the same `SourceRecord` and
   `source_tombstone` operation that
   [removing a source](tasks.md#remove-a-source) writes, with the source's id,
   version and SHA-256, the reason (1-500 characters) and `removed_at` from
   the journal's clock (the store's `clock_ns`), and none of the text. A copy
-  of the run's completed checkpoint applies it; nothing is called. A text a
+  of the run's latest checkpoint, the completed one for a completed run,
+  applies it; nothing is called. A text a
   run already holds a tombstone of keeps its first one, so calling
   `restrict_source` again, for example after another process released a run
   whose lease it held (`WorkflowLeaseError`), finishes a restriction without
@@ -927,15 +933,15 @@ with SQLiteWorkflowStore("smythe-runs.db") as store:
   reason and the time; `smythe.lineage.purged_artifacts(store, run_id)`
   reads them. Accepted documents are deleted only by an explicit purge, and
   tombstones and purge records always remain.
-- **What it returns.** One entry per restricted run: its `run_id`, the
-  `tombstones` of the withdrawn text as JSON records, and its `purged`
-  files.
+- **What it returns.** One entry per restricted run, in journal order: its
+  `run_id`, the `tombstones` of the withdrawn text as JSON records, and its
+  `purged` files.
 - **Refusals.** A blank or overlong source id or version, a reason that is
   not 1-500 characters without control characters, a scope that is not an
   access-scope label and a `purge` that is not `True` or `False` raise
-  `WorkflowBindingError`. A run in scope whose record cannot be read raises
-  `WorkflowStateError` before anything is written, and so does a journal
-  opened read-only.
+  `WorkflowBindingError`. A run in scope whose record, or a successor whose
+  `reuse` records, cannot be read raises `WorkflowStateError` before
+  anything is written, and so does a journal opened read-only.
 
 ### A restricted run
 
@@ -950,7 +956,12 @@ decision follows it:
   `reevaluate` refuses the run, so no new decision, by a policy or an
   operator, delivers it again.
 - **No reuse.** A successor never reuses a node whose inputs name a
-  withdrawn text, nor a node that depends on one.
+  withdrawn text, nor a node that depends on one, including a successor
+  already in progress when the text is withdrawn: it is restricted with its
+  predecessor, or, while another process holds it, takes its predecessor's
+  tombstones when it resumes and before it decides. Resuming it then refuses
+  a reused result that the text reached with `WorkflowStateError`, and one
+  that already kept such a result completes `indeterminate`.
 - **No republication.** `republish` refuses the run, so a purged document is
   never published again.
 - **No external delivery.** Republication outside the journal goes through
@@ -981,9 +992,11 @@ decision follows it:
   read responses copied, including a completed run's output, is not
   scrubbed: those records are bound by their digests. Protect or delete the
   journal itself when those copies must go.
-- **Runs in progress.** Only a run that has completed with a record is
-  restricted. Call `restrict_source` again after a run in progress
-  completes.
+- **Runs in progress.** A run that has not completed has no record, so only
+  a successor that reuses a result derived from the text is restricted
+  before it completes. Another run in progress, such as one reading the
+  source itself, is not: call `restrict_source` again after it completes,
+  and after a run another process held (`WorkflowLeaseError`) is released.
 - **Files elsewhere.** Only the files a run published into its artifact
   directory are purged, never copies made elsewhere.
 
@@ -1008,8 +1021,9 @@ it comes from; nothing is looked up by its digest.
   [Reused results](workflow-accounting.md#reused-results) lists every check.
 - **Copied, never shared.** A kept result is copied byte for byte into the
   successor's journal, so once its `reuse` operation commits, resume replays
-  it without reading the predecessor. The predecessor's rows, document and
-  decisions are never changed.
+  it without reading the predecessor's results; only the predecessor's
+  tombstones are read again. The predecessor's rows, document and decisions
+  are never changed.
 - **Documents are rendered again, never copied.** A published document is
   checked against the digest its publication recorded. One that is missing
   or changed is rendered again from its own run's saved synthesis and
