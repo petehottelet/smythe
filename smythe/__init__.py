@@ -82,7 +82,8 @@ from smythe.swarm import Swarm, SwarmResult
 from smythe.synthesizer import Synthesizer, SynthesisStrategy
 from smythe.task import Task
 from smythe.templates import (
-    TemplateCatalog, TemplateRecord, TemplateRecordError, distill_record,
+    TemplateCatalog, TemplateLimits, TemplateRecord, TemplateRecordError, TemplateValidationError,
+    distill_record, validate_template_record,
 )
 from smythe.verifier import (
     CallableVerifier,
@@ -217,8 +218,10 @@ __all__ = [
     "SynthesisStrategy",
     "Task",
     "TemplateCatalog",
+    "TemplateLimits",
     "TemplateRecord",
     "TemplateRecordError",
+    "TemplateValidationError",
     "TerminationPolicy",
     "ToolCall",
     "ToolLoopLimitError",
@@ -250,5 +253,6 @@ __all__ = [
     "python_skill",
     "review_run",
     "structure_sha256",
+    "validate_template_record",
 ]
 __version__ = "0.9.1"

@@ -13,6 +13,12 @@ and the review flags text that repeats the source goal or holds a path.
 that decide what a template builds, and ``record_sha256`` covers the whole
 record. :class:`TemplateCatalog` keeps one record per version in
 append-only files named by those digests.
+
+A record's structure can come from model output, so
+:func:`validate_template_record` checks one as an untrusted candidate, and
+:meth:`TemplateCatalog.put` stores only a record that passes: no key that
+grants authority, the model-plan limits unless a developer passes others, and
+no weaker gate, output check or prerequisite than its parent's.
 """
 
 from __future__ import annotations
@@ -22,6 +28,7 @@ import json
 import math
 import os
 import re
+from collections import deque
 from collections.abc import Callable, Mapping, Sequence
 from copy import deepcopy
 from dataclasses import dataclass, field, replace
@@ -37,7 +44,14 @@ from smythe.constrained_planner import SubGraphTemplate
 from smythe.distill import (
     _STRUCTURAL_METADATA_KEYS, DistillationError, _describe, _profile_of, _specialize,
 )
-from smythe.graph import ExecutionGraph, FailurePolicy, Node, NodeStatus, _has_cycle_in
+from smythe.graph import (
+    SYNTHESIS_NODE_ID, ExecutionGraph, FailurePolicy, Node, NodeStatus, _has_cycle_in,
+)
+from smythe.loader import (
+    MODEL_NODE_ID, MODEL_PLAN_MAX_DEPTH, MODEL_PLAN_MAX_GATES, MODEL_PLAN_MAX_NODES,
+    MODEL_PLAN_MAX_REGENERATIONS, MODEL_PLAN_MAX_RETRIES, MODEL_PLAN_MIN_TIMEOUT_S,
+    _build_model_graph,
+)
 from smythe.registry import Registry
 from smythe.task import Task
 from smythe.validation import ValidatorIdentity
@@ -45,8 +59,8 @@ from smythe.workflow_binding import LocalOnly
 
 __all__ = [
     "MAX_FAILURE_EXAMPLES", "TEMPLATE_CATALOG_LAYOUT", "TEMPLATE_RECORD_TYPE",
-    "TEMPLATE_RECORD_VERSION", "TemplateCatalog", "TemplateRecord", "TemplateRecordError",
-    "distill_record",
+    "TEMPLATE_RECORD_VERSION", "TemplateCatalog", "TemplateLimits", "TemplateRecord",
+    "TemplateRecordError", "TemplateValidationError", "distill_record", "validate_template_record",
 ]
 
 TEMPLATE_RECORD_TYPE = "smythe.template_record"
@@ -69,10 +83,33 @@ _WORD = re.compile(r"[^\W_]{4,}")
 # ~user, or a home variable. A slash inside a word, a URL or ./ is not one.
 _PATH = re.compile(r"(?<![\w.~/\\:<-])(?:[A-Za-z]:[\\/]|\\\\\w|/[\w.-]|~[\w.-]*[\\/])"
                    r"|\$HOME\b|%(?i:USERPROFILE|HOMEPATH)%")
+# Keys that would let a template grant itself tools, servers, models,
+# environment, commands or network access, or decide acceptance, evaluation
+# or spend. A candidate holding one at any depth is refused, except where the
+# record format itself uses the name for something that grants nothing: the
+# tools prerequisites expect, and the acceptance decision a source run got.
+_AUTHORITY_KEYS = frozenset({"mcp_servers", "model", "env", "command", "url", "tools",
+                             "allowed_tools", "acceptance", "evaluator", "budget"})
+_RECORD_FIELDS = frozenset({("prerequisites", "tools"), ("source_runs", int, "acceptance")})
 
 
 class TemplateRecordError(ValueError):
     """A template record, or a catalog file that should hold one, is invalid."""
+
+
+class TemplateValidationError(TemplateRecordError):
+    """A template record refused as a candidate by :func:`validate_template_record`.
+
+    ``node`` is the id of the blueprint node at fault, or None when the
+    problem is not one node's. ``field`` names the field, such as
+    ``"max_retries"`` or ``"profile.mcp_servers"``, or is None for data that
+    is not a template record at all.
+    """
+
+    def __init__(self, message: str, *, node: str | None = None, field: str | None = None) -> None:
+        super().__init__(message)
+        self.node = node
+        self.field = field
 
 
 def _plain(value: Any) -> Any:
@@ -291,8 +328,8 @@ class TemplateRecord:
             raise TemplateRecordError("template review findings are omitted when empty")
         for item in review.get("path_findings", ()):
             if (item["node"] is None) != (item["field"] == "description"):
-                raise TemplateRecordError(
-                    "a template path finding names a node exactly when its field is a label or persona")
+                raise TemplateRecordError("a template path finding names a node exactly when "
+                                          "its field is a label or persona")
         named = [item["node"] for item in values["expected_outputs"] or ()]
         named += [item["node"] for findings in review.values() for item in findings
                   if item["node"] is not None]
@@ -522,6 +559,230 @@ def distill_record(
         raise DistillationError(f"cannot distill this graph: {error}") from error
 
 
+@dataclass(frozen=True, kw_only=True)
+class TemplateLimits:
+    """The limits :func:`validate_template_record` holds a record's blueprint to.
+
+    The defaults are the limits on a generated plan
+    (``smythe.loader.MODEL_PLAN_*``), because a record's structure can come
+    from model output. Pass other limits only for a record whose structure
+    you wrote or reviewed.
+    """
+
+    max_nodes: int = MODEL_PLAN_MAX_NODES
+    max_depth: int = MODEL_PLAN_MAX_DEPTH
+    max_retries: int = MODEL_PLAN_MAX_RETRIES
+    max_regenerations: int = MODEL_PLAN_MAX_REGENERATIONS
+    max_gates: int = MODEL_PLAN_MAX_GATES
+    min_timeout_s: int | float = MODEL_PLAN_MIN_TIMEOUT_S
+
+    def __post_init__(self) -> None:
+        for name in ("max_nodes", "max_depth", "max_retries", "max_regenerations", "max_gates"):
+            value, least = getattr(self, name), int(name in ("max_nodes", "max_depth"))
+            if type(value) is not int or value < least:
+                raise ValueError(f"{name} must be an integer of at least {least}, got {value!r}")
+        if type(self.min_timeout_s) not in (int, float) or not 0 <= self.min_timeout_s < math.inf:
+            raise ValueError(
+                f"min_timeout_s must be a finite number of at least 0, got {self.min_timeout_s!r}")
+
+
+def _refuse(node: str | None, field: str, problem: str) -> TemplateValidationError:
+    where = f"template node {node!r} {field}" if node is not None else f"template {field}"
+    return TemplateValidationError(f"{where} {problem}", node=node, field=field)
+
+
+def _check_authority(data: Mapping[str, Any]) -> None:
+    """Refuse a key that would grant authority, at any depth of record *data*."""
+    queue, seen = deque([((), data)]), set()
+    while queue:
+        path, value = queue.popleft()
+        if isinstance(value, (Mapping, list, tuple)):
+            if id(value) in seen:
+                continue
+            seen.add(id(value))
+        if isinstance(value, Mapping):
+            for key, item in value.items():
+                shape = (*(int if isinstance(part, int) else part for part in path), key)
+                if key in _AUTHORITY_KEYS and shape not in _RECORD_FIELDS:
+                    node, path = None, (*path, key)
+                    if path[0] == "blueprint" and isinstance(path[1], int):
+                        entry = data["blueprint"][path[1]]
+                        node = entry.get("id") if isinstance(entry, Mapping) else None
+                        node, path = (node, path[2:]) if isinstance(node, str) else (None, path)
+                    where = "".join(f"[{part}]" if isinstance(part, int) else f".{part}"
+                                    for part in path).lstrip(".")
+                    raise _refuse(node, where, "would grant authority a template never holds")
+                queue.append(((*path, key), item))
+        elif isinstance(value, (list, tuple)):
+            queue.extend(((*path, index), item) for index, item in enumerate(value))
+
+
+def _candidate(record: Any) -> TemplateRecord:
+    """*record*, or the record its JSON data holds, with no key that grants authority."""
+    if isinstance(record, TemplateRecord):
+        _check_authority(record.to_dict())
+        return record
+    if not isinstance(record, Mapping):
+        raise TypeError("a template candidate is a TemplateRecord or its JSON data")
+    _check_authority(record)
+    try:
+        return TemplateRecord.from_dict(dict(record))
+    except RecursionError:
+        raise TemplateValidationError("template record data is nested too deeply") from None
+    except TemplateRecordError as error:
+        raise TemplateValidationError(str(error)) from None
+
+
+def _check_limits(nodes: list[dict[str, Any]], limits: TemplateLimits) -> None:
+    """Refuse a blueprint that a generated plan under *limits* could not have."""
+    if len(nodes) > limits.max_nodes:
+        raise _refuse(None, "blueprint", f"has {len(nodes)} nodes, above the limit of "
+                                         f"{limits.max_nodes}")
+    gates = 0
+    for node in nodes:
+        name = node["id"]
+        if MODEL_NODE_ID.fullmatch(name) is None or name == SYNTHESIS_NODE_ID:
+            raise _refuse(name, "id", f"must be 1-64 letters, digits, '-' or '_', and not "
+                                      f"{SYNTHESIS_NODE_ID!r}")
+        if not node["label"].strip():
+            raise _refuse(name, "label", "must not be blank")
+        if node["profile"] is not None and not node["profile"]["name"].strip():
+            raise _refuse(name, "profile.name", "must not be blank")
+        for field_name in ("max_retries", "max_regenerations"):
+            cap = getattr(limits, field_name)
+            if node[field_name] > cap:
+                raise _refuse(name, field_name, f"is {node[field_name]}, above the limit of {cap}")
+        if node["timeout_s"] is not None and node["timeout_s"] < limits.min_timeout_s:
+            raise _refuse(name, "timeout_s", f"is {node['timeout_s']}, below the minimum of "
+                                             f"{limits.min_timeout_s} seconds")
+        if node["verifies"] is not None:
+            gates += 1
+            if gates > limits.max_gates:
+                raise _refuse(name, "verifies", f"adds gate {gates}, above the limit of "
+                                                f"{limits.max_gates}")
+            # A gate that could run before its target would have its verdict discarded.
+            if node["verifies"] not in node["depends_on"]:
+                raise _refuse(name, "depends_on",
+                              f"must list {node['verifies']!r}, the node it verifies")
+    plan = []
+    for node in nodes:
+        entry = {"id": node["id"], "label": node["label"], "depends_on": node["depends_on"],
+                 "required_capabilities": node["capabilities"],
+                 "failure_policy": node["failure_policy"], "max_retries": node["max_retries"],
+                 "max_regenerations": node["max_regenerations"],
+                 "attach_dep_artifacts": node["attach_dep_artifacts"]}
+        entry.update({key: node[key] for key in ("verifies", "timeout_s") if node[key] is not None})
+        entry.update({"metadata": dict(node["metadata"])} if node["metadata"] else {})
+        entry.update({"agent": node["profile"]} if node["profile"] is not None else {})
+        plan.append(entry)
+    try:
+        _build_model_graph(
+            {"nodes": plan}, max_nodes=limits.max_nodes, max_depth=limits.max_depth,
+            max_retries=limits.max_retries, max_regenerations=limits.max_regenerations,
+            max_gates=limits.max_gates, min_timeout_s=limits.min_timeout_s)
+    except ValueError as error:
+        raise TemplateValidationError(f"template blueprint breaks a model-plan rule: {error}",
+                                      field="blueprint") from None
+
+
+def _check_parent(
+    record: TemplateRecord, nodes: list[dict[str, Any]], parent: TemplateRecord,
+) -> None:
+    """Refuse a candidate that guarantees less than *parent* does."""
+    if record.parent_version not in (None, parent.template_version):
+        raise _refuse(None, "parent_version", f"names {record.parent_version}, not "
+                                              f"{parent.template_version}, the parent it is "
+                                              "compared with")
+    by_id = {node["id"]: node for node in nodes}
+    parent_by_id = {node["id"]: node for node in _plain(parent.blueprint)}
+    guarded = []
+    for gate, old in parent_by_id.items():
+        target = old["verifies"]
+        if target is None:
+            continue
+        new = by_id.get(gate) or {"verifies": None}
+        if new["verifies"] is None:
+            raise _refuse(gate, "verifies", f"no longer gates {target!r}")
+        if new["verifies"] != target:
+            raise _refuse(gate, "verifies", f"gates {new['verifies']!r} instead of {target!r}")
+        if new["max_regenerations"] < old["max_regenerations"]:
+            raise _refuse(gate, "max_regenerations", f"is {new['max_regenerations']}, below the "
+                                                     f"parent's {old['max_regenerations']}")
+        guarded += [old, parent_by_id[target]]
+    for old in guarded:
+        # A gate or target that fails is skipped under 'skip', and the run
+        # goes on without the verdict; 'halt' and 'retry' stop it.
+        policy = by_id[old["id"]]["failure_policy"]
+        if policy == FailurePolicy.SKIP.value and old["failure_policy"] != policy:
+            raise _refuse(old["id"], "failure_policy",
+                          f"relaxes the parent's {old['failure_policy']!r} to {policy!r}")
+
+    def validators(of: TemplateRecord) -> dict[str, set[bytes]]:
+        found: dict[str, set[bytes]] = {}
+        for output in of.expected_outputs:
+            found.setdefault(output["node"], set()).update(
+                canonical_bytes(_plain(item)) for item in output["validators"])
+        return found
+
+    kept = validators(record)
+    for node, required in validators(parent).items():
+        for missing in sorted(required - kept.get(node, set())):
+            raise _refuse(node, "expected_outputs.validators",
+                          f"drops the validator {json.loads(missing)['name']!r}")
+    for key, items in (parent.prerequisites or {}).items():
+        kept_items = {canonical_bytes(_plain(item))
+                      for item in (record.prerequisites or {}).get(key, ())}
+        for item in items:
+            if canonical_bytes(_plain(item)) not in kept_items:
+                label = item if isinstance(item, str) else item["name"]
+                raise _refuse(None, f"prerequisites.{key}", f"drops {label!r}, which the parent "
+                                                            "lists")
+
+
+def validate_template_record(
+    record: TemplateRecord | Mapping[str, Any],
+    *,
+    parent: TemplateRecord | None = None,
+    limits: TemplateLimits | None = None,
+) -> TemplateRecord:
+    """Check a template record, or its JSON data, as an untrusted candidate.
+
+    Returns the record. Raises :class:`TemplateValidationError`, naming the
+    node and field at fault, when the candidate:
+
+    - holds, at any depth, a key that would grant authority: ``mcp_servers``,
+      ``model``, ``env``, ``command``, ``url``, ``tools``, ``allowed_tools``,
+      ``acceptance``, ``evaluator`` or ``budget``, except the record's own
+      fields that grant nothing (the ``tools`` prerequisites expect and the
+      ``acceptance`` decision a source run got), or is data that
+      ``TemplateRecord.from_dict`` refuses;
+    - breaks *limits*, by default the limits on a generated plan
+      (:class:`TemplateLimits`): its blueprint, written as a generated plan,
+      must pass the checks ``smythe.loader.build_graph_from_model_output``
+      makes, and each gate must depend directly on the node it verifies;
+    - given a *parent*, guarantees less than the parent does: a gate is
+      dropped or verifies another node, a gate's ``max_regenerations`` is
+      lowered, a gate or its target is relaxed to ``failure_policy`` skip,
+      or an expected-output validator or a prerequisite is removed. The
+      record's ``parent_version``, if set, must be the parent's version.
+
+    Developer code is trusted, so ``distill_template`` and templates a
+    developer builds are not checked; records are.
+    """
+    if limits is None:
+        limits = TemplateLimits()
+    if not isinstance(limits, TemplateLimits):
+        raise TypeError("limits must be a TemplateLimits")
+    if parent is not None and not isinstance(parent, TemplateRecord):
+        raise TypeError("parent must be a TemplateRecord")
+    record = _candidate(record)
+    nodes = _plain(record.blueprint)
+    _check_limits(nodes, limits)
+    if parent is not None:
+        _check_parent(record, nodes, parent)
+    return record
+
+
 class TemplateCatalog:
     """Template records kept as append-only files under ``root``.
 
@@ -538,16 +799,32 @@ class TemplateCatalog:
     def __init__(self, root: str | os.PathLike[str]) -> None:
         self.root = Path(root)
 
-    def put(self, record: TemplateRecord) -> str:
-        """Store *record* and return its template version.
+    def put(
+        self,
+        record: TemplateRecord | Mapping[str, Any],
+        *,
+        parent: TemplateRecord | None = None,
+        limits: TemplateLimits | None = None,
+    ) -> str:
+        """Validate *record*, a record or its JSON data, store it, and return its version.
+
+        :func:`validate_template_record` checks it first, under *limits*
+        and against *parent*: by default the record this catalog holds for
+        the candidate's ``parent_version``, when it holds one. A refused
+        record raises :class:`TemplateValidationError` and writes nothing.
 
         Storing a record the catalog already holds writes no record or
         version file. A different record for a stored version, such as one
         with other source runs, raises :class:`TemplateRecordError` and the
         stored one is kept.
         """
-        if not isinstance(record, TemplateRecord):
-            raise TypeError("TemplateCatalog stores TemplateRecord values")
+        record = _candidate(record)
+        if parent is None and record.parent_version is not None:
+            try:
+                parent = self.get(record.parent_version)
+            except KeyError:
+                pass  # A parent this catalog does not hold is not compared.
+        record = validate_template_record(record, parent=parent, limits=limits)
         self._check_layout()
         data, digest, version = (canonical_bytes(record.to_dict()), record.record_sha256,
                                  record.template_version)
@@ -646,7 +923,8 @@ class TemplateCatalog:
         except FileNotFoundError:
             raise KeyError(name) from None
         except ValueError:
-            raise TemplateRecordError(f"template catalog file {where} is not a regular file") from None
+            raise TemplateRecordError(
+                f"template catalog file {where} is not a regular file") from None
         if len(data) > limit:
             raise TemplateRecordError(f"template catalog file {where} is too large")
         return data

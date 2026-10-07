@@ -1684,6 +1684,24 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   `PlannerMemory`, and memory objects that implement only `record()`, record
   nothing on failure. See [failed runs](docs/learning.md#failed-runs).
   results or history. See [learning from runs](docs/learning.md).
+- Template records are validated as untrusted candidates.
+  `validate_template_record(record, *, parent=None, limits=None)` checks a
+  `TemplateRecord` or its JSON data and raises `TemplateValidationError`,
+  naming the node and field, for a key that would grant authority at any
+  depth (`mcp_servers`, `model`, `env`, `command`, `url`, `tools`,
+  `allowed_tools`, `acceptance`, `evaluator` or `budget`; the record's own
+  prerequisite `tools` and source-run `acceptance` grant nothing and are
+  allowed); for a blueprint that breaks
+  the generated-plan limits, or the developer's `TemplateLimits`, including
+  a gate that does not depend on the node it verifies; and, compared with a
+  parent, for a dropped or retargeted gate, lowered `max_regenerations`, a
+  gate or target relaxed to `skip`, or a removed expected-output validator
+  or prerequisite. `TemplateCatalog.put(record, *, parent=None,
+  limits=None)` validates first, by default against the stored record of
+  the candidate's `parent_version`, writes nothing for a refused record, and
+  also accepts a record's JSON data. `distill_template` and templates built
+  in code are not validated. See
+  [validate a candidate record](docs/learning.md#validate-a-candidate-record).
 - Agent Skills directories as a skill source.
   `AgentSkillsProvider({agent_id: [root, ...]})` reads each
   `<root>/<name>/SKILL.md` when it is built and lists each skill as a

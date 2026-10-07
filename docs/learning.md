@@ -7,10 +7,10 @@ that ran into a template that `ConstrainedArchitect` can offer as a menu item,
 so a proven shape is selected instead of planned again.
 
 This page covers the evidence planner history keeps, failed runs,
-distillation, template records, their versions, and the template catalog. A
-record is data: building a template from it, storing it and pinning it in a
-durable run never changes the base planner, and nothing is promoted or
-activated automatically.
+distillation, template records, their versions, their validation as
+untrusted candidates, and the template catalog. A record is data: building a
+template from it, storing it and pinning it in a durable run never changes
+the base planner, and nothing is promoted or activated automatically.
 
 ## Evidence in planner history
 
@@ -240,6 +240,62 @@ Each list is omitted when it is empty. The review only flags text: it is
 not changed, and each build points labels at the new task as before. The
 review is not part of `template_version`.
 
+## Validate a candidate record
+
+A record's structure can come from model output, and a record read from a
+file or another process is untrusted data.
+`validate_template_record(record, *, parent=None, limits=None)` checks a
+`TemplateRecord`, or its JSON data, as such a candidate and returns the
+record. `TemplateCatalog.put` runs it before it writes anything.
+
+```python
+import json
+
+from smythe import TemplateLimits, validate_template_record
+
+record = validate_template_record(json.loads(text))  # generated-plan limits
+record = validate_template_record(data, parent=catalog.get(version))
+record = validate_template_record(data, limits=TemplateLimits(max_nodes=12, max_gates=2))
+```
+
+A refused candidate raises `TemplateValidationError`, a `TemplateRecordError`
+whose `node` and `field` attributes name the blueprint node, or `None`, and
+the field at fault, such as `"max_retries"` or `"profile.mcp_servers"`. A
+candidate is refused when:
+
+- **It would carry authority.** A key named `mcp_servers`, `model`, `env`,
+  `command`, `url`, `tools`, `allowed_tools`, `acceptance`, `evaluator` or
+  `budget` is refused at any depth: on a node, its agent profile or
+  metadata, an expected output, a validator or the record itself. The
+  record's own fields with these names grant nothing and are allowed: the
+  `tools` list in `prerequisites`, which names tools a template expects,
+  and the `acceptance` decision each source run received. Data that
+  `TemplateRecord.from_dict()` refuses is refused too, with `node` and
+  `field` set to `None`.
+- **It breaks the limits.** By default these are the limits on a generated
+  plan, `TemplateLimits()`, taken from `smythe.loader.MODEL_PLAN_*`: at
+  most 8 nodes and 5 levels, at most 3 retries and 2 regenerations per
+  node, at most 1 gate, and no timeout under 60 seconds. Node ids must be 1
+  to 64 letters, digits, `-` or `_`; labels and agent names must not be
+  blank; and each gate must list the node it verifies in `depends_on`, so
+  it cannot judge that node before it runs. The blueprint, written as a
+  generated plan, must also pass every check
+  `build_graph_from_model_output` makes. Pass `TemplateLimits(...)` with
+  other values only for a record whose structure you wrote or reviewed.
+- **It guarantees less than its parent.** Given a `parent`, each of the
+  parent's gates must still verify the same node; its `max_regenerations`
+  must not be lowered; neither a gate nor its target may be relaxed to
+  `failure_policy` `skip`, under which a failing judge or target is passed
+  over and the run continues without a verdict; and no validator of an
+  expected output and no prerequisite of the parent may be removed. A
+  prerequisite at another version counts as removed. A candidate's
+  `parent_version`, when set, must be the parent's version.
+
+Validation checks structure and authority, not instructions: a label or
+persona that tells a judge to pass everything is for a reviewer to catch.
+`distill_template`, `distill_record` and templates a developer builds in
+code are not validated, because developer code is trusted.
+
 ## The template catalog
 
 `TemplateCatalog(root)` keeps records as append-only files:
@@ -260,8 +316,13 @@ template = catalog.get(version).to_template()
 catalog.versions("diligence-review")  # every stored version of that name
 ```
 
-- `put(record)` returns the record's template version. Storing a record the
-  catalog already holds writes no record or version file. A catalog holds
+- `put(record, *, parent=None, limits=None)` [validates](#validate-a-candidate-record)
+  the record, a `TemplateRecord` or its JSON data, under `limits` and
+  against `parent` or, without one, against the record the catalog holds
+  for the candidate's `parent_version`, when it holds one. A refused record
+  raises `TemplateValidationError` and writes nothing. `put` returns the
+  record's template version. Storing a record the catalog already holds
+  writes no record or version file. A catalog holds
   one record per version: a different record for a stored version, for
   example one with other source runs, raises `TemplateRecordError` and the
   stored record is kept. Two processes that store the same record at once
@@ -312,9 +373,9 @@ saved version instead.
 
 ## Limits
 
-- Records hold structure from model output. This release checks their format
-  and consistency, not their limits: it does not yet compare a record's
-  gates, retries and regenerations with the model-plan rules or with the
-  record it came from. Build templates only from records you trust.
+- Validation compares a candidate with one parent, not with the whole
+  lineage, and a record whose parent the catalog does not hold is checked
+  against the limits only. It does not read the instructions in labels and
+  personas.
 - A catalog has no activation, review or rollback state. Choosing which
   version a planner offers is the caller's decision.
