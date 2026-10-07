@@ -191,7 +191,11 @@ from the journal's copy:
   refresh, is refused: its journal call is settled as rejected, with the
   removal as its reason, and the text is never its result. The node follows
   its failure policy, so `FailurePolicy.SKIP` lets the run continue without
-  it;
+  it. The refusal matches the exact SHA-256 of the decoded text, so a source
+  served with any byte difference, even in whitespace or line endings, is
+  not recognised as the removed one. A refused read still keeps the fetched
+  response in the journal as its response evidence, like any read response:
+  the tombstone withholds the text from use, it does not erase the record;
 - a completed run's decision, made before the removal, no longer holds:
   resuming or [inspecting](runs.md) the run gives `indeterminate` with the
   removal as its reason, until [`reevaluate`](verifier.md#re-evaluation)
@@ -216,8 +220,8 @@ from the journal's copy:
   [`restrict_source`](lineage.md#restrict-a-source) removes a source's text
   from every completed lineage run that used it at once.
 
-This is a tombstone, not an erasure: the journal's earlier records keep what
-they hold, including saved requests, read responses, snapshots and outputs,
-and so does a published document. Protect or delete the journal itself when
-those copies must go. A run without context assembly has no sources to
-remove and raises `WorkflowStateError`.
+This is a tombstone, not an erasure: the journal's records keep what they
+hold, including saved requests, read responses (a refused read's among
+them), snapshots and outputs, and so does a published document. Protect or
+delete the journal itself when those copies must go. A run without context
+assembly has no sources to remove and raises `WorkflowStateError`.

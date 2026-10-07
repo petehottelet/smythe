@@ -864,6 +864,12 @@ step reads once more; other rejections replay. A response whose text is that
 of a source [removed from the run](tasks.md#remove-a-source) is settled as
 rejected in the same way, with the removal as its reason, and a text
 accepted before the removal raises `ReadToolError` instead of replaying.
+The refusal compares the exact SHA-256 of the decoded text with the
+tombstone's, so text that differs from the removed source by any byte, even
+in whitespace or line endings, is not recognised as it. The refused response stays in the journal as the
+call's response evidence, as every read response does, and `load_evidence()`
+still returns it: a tombstone withholds text from use, it does not erase a
+record.
 
 ### Interrupted reads
 
