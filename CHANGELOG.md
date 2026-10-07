@@ -656,6 +656,16 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   requires a closed, checkpointed file. The ledger schema and
   `smythe optimize inspect --json` output are unchanged. See
   [policy registry](docs/optimize.md#policy-registry).
+- `smythe.optimize.workflow_eval.workflow_trial_evaluator(runtime_factory,
+  task_for, measure)` runs each Autotune trial as one durable text workflow.
+  The run's budget is the trial's ceiling, its id derives from the trial key
+  (`trial_run_id()`), and the trial's cost is the journal's confirmed nanoUSD
+  rounded up to whole micro-USD. A run that leaves reserved or unknown spend,
+  or an unknown call, or that fails, already exists or cannot be measured,
+  raises `WorkflowTrialError` with fixed text, so the runner records the
+  trial as unknown and stops without storing provider text. Nothing is
+  retried, and a trial's run is never run again. See
+  [durable workflow trials](docs/optimize.md#durable-workflow-trials).
 - Recorded read steps in durable text workflows. A `ReadProfile` declares one
   versioned read: an HTTP `GET` of a URL whose path or query placeholders take
   a step's checked input, a decoder and its version, whether a read can be

@@ -27,6 +27,7 @@ ambiguous after a connection failure.
 | `smythe.optimize.statistics` | Direction-normalized paired comparisons, paired Student-t promotion bounds, three-way verdicts, descriptive bootstrap intervals, and promotion policy |
 | `smythe.optimize.ledger` | Durable campaign, candidate, trial-event, cost-exposure, and decision history |
 | `smythe.optimize.engine` | Bounded development, confirmation, and holdout orchestration with conservative recovery |
+| `smythe.optimize.workflow_eval` | A trial evaluator that runs one durable text workflow per trial and reports its exact cost |
 | `smythe.optimize.inspection` and `smythe.optimize.report` | Read-only evidence collection and standalone HTML reports |
 | `smythe.optimize.registry` | Append-only history of the policy version in effect for each target, with rollback and retirement |
 
@@ -674,6 +675,71 @@ reopens a policy's used holdout. It joins the plan hash when set, like task
 pools. To test again after the pack is used up, author a new holdout pack:
 its manifest digest changes the evaluator hash and so defines a new holdout.
 
+### Durable workflow trials
+
+`workflow_trial_evaluator` runs each trial as one
+[durable text workflow](workflow-accounting.md) and reports the cost its
+journal confirmed:
+
+```python
+from smythe import Swarm, Task
+from smythe.optimize.workflow_eval import workflow_trial_evaluator
+
+
+def build(context, max_budget_usd):
+    return Swarm(model=context.candidate.policy["model"], provider=provider,
+                 run_store=store, max_budget_usd=max_budget_usd)
+
+
+def task_for(context):
+    return Task(tasks[context.split][context.task_index])
+
+
+def measure(context, result):
+    return {"quality": score(result.output)}, {"delivered": result.accepted}
+
+
+evaluate = workflow_trial_evaluator(build, task_for, measure)
+runner = OptimizationRunner(contract, ledger, evaluate,
+                            evaluator_hash=manifest.evaluator_hash)
+```
+
+For each trial the adapter:
+
+- calls `build(context, max_budget_usd)` for the candidate's `Swarm`, which
+  needs a durable `run_store` and exactly the budget it is given:
+  `ceiling_microusd` × 1,000 nanoUSD, the trial's full reservation;
+- creates the run under `trial_run_id(context.trial_key)`, a run id derived
+  from the trial key, and runs it once from `task_for(context)`;
+- calls `measure(context, result)` on the `SwarmResult` of a run that
+  completed with all of its spend confirmed, for the trial's metrics and
+  gates; and
+- reports the run's confirmed nanoUSD as micro-USD rounded up, never down.
+  A trial that confirmed 3,002,500 nanoUSD costs 3,003 micro-USD.
+
+Any other outcome raises `WorkflowTrialError`, and the runner records the
+trial as [unknown](#unknown-outcomes-stop-the-campaign) at its full ceiling
+and stops the campaign. That covers a run that leaves any reserved or
+unknown spend or any unknown call, such as a step whose response was lost; a
+run that fails, even with its spend confirmed; a configuration the adapter
+refuses before the run exists; a trial whose run id the journal already
+holds; and a failed measurement. The ledger keeps the error's text, so
+every one of these is a fixed sentence and never a provider's message; the
+original error stays chained to it in the process.
+
+Nothing retries. The runner never dispatches a trial twice, the journal
+owns each call, and the adapter refuses a trial whose run exists rather than
+resuming it. A runner killed during a trial leaves the trial dispatched,
+with its reservation, and its run in the journal; the next runner stops
+with `OptimizationNeedsAttention` before building any workflow. Inspect the
+run with [`smythe runs inspect`](runs.md) before deciding how to proceed.
+
+Measurement must be local: a judge model or anything else `measure` spends
+is not counted. The adapter is tested offline only, with `OfflineProvider`
+and simulated provider responses. Pointed at a paid provider, a campaign can
+spend up to its `max_budget_microusd`, so approve that budget explicitly
+before running one.
+
 <a id="campaign-ownership-unreleased"></a>
 
 ### Campaign ownership
@@ -960,5 +1026,7 @@ challenger to one changed field. It does not sandbox evaluator code, which
 runs in the runner's process and decides what each policy value controls.
 
 The installed concurrency campaign is intentionally offline. Custom in-process
-evaluators can use `OptimizationRunner`, but a live evaluator must supply its
-own bounded side-effect and price-ceiling implementation.
+evaluators can use `OptimizationRunner`. A live evaluator must supply its own
+bounded side-effect and price-ceiling implementation, or run each trial as a
+[durable workflow](#durable-workflow-trials), whose journal bounds and records
+every call.
