@@ -1911,3 +1911,32 @@ def test_a_repair_preview_offers_a_recheck_for_a_changed_validator(tmp_path, sto
     # A rejection of verified bytes is for a person: no repair in the run can replace them.
     assert list(_previewed(stricter, run_id).values()) == [
         ("succeeded", "review", ["decision_not_accepted"], 1, False)]
+
+
+def test_a_repair_preview_never_offers_another_runs_identical_output(tmp_path, store_factory):
+    from smythe.jobs.preflight import operation_input_digest
+
+    store = store_factory(tmp_path / "jobs.db")
+    runner = JobRunner(store)
+    results, digests = {}, set()
+    # Another attempt allowance makes another plan and approval with the same input digest.
+    for run_id, attempts in (("intact", 1), ("damaged", 2)):
+        plan = preflight_job(_manifest(count=1, attempts=attempts), manifest_root=tmp_path)
+        digests.add(operation_input_digest(plan.operations[0], plan.attachments))
+        results[run_id] = asyncio.run(runner.start(plan, make_approval(plan), manifest_root=tmp_path,
+                                                   run_id=run_id))
+    assert len(digests) == 1
+    [artifact] = results["damaged"]["artifacts"]
+    _accepted_file(tmp_path, results["damaged"], artifact).unlink()
+    intact_rows = store._call_rows("intact")
+
+    # The intact run holds an accepted output for the same input, but no run reuses
+    # another's: the damaged operation regenerates in its own run, under its approval.
+    assert list(_previewed(runner, "damaged").values()) == [
+        ("succeeded", "regenerate", ["artifact_missing"], 1, False)]
+    repaired = asyncio.run(runner.reroll("damaged", ["glyph[0]"], reason="accepted file deleted",
+                                         repair_integrity=True))
+    assert len(store._call_rows("damaged")) == 2 and store._call_rows("intact") == intact_rows
+    [_lost, new] = repaired["artifacts"]
+    assert "/attempt-0002/" in new["relative_path"]
+    assert _accepted_file(tmp_path, repaired, new).is_file()

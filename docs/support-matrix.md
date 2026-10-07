@@ -530,6 +530,57 @@ Tests:
   `tests/test_jobs_runner.py::test_registered_validator_checks_the_published_bytes_and_is_recorded`,
   `tests/test_jobs_runner.py::test_validator_errors_are_indeterminate_and_never_unknown_outcomes`.
 
+## Lineage and repair
+
+[Artifact lineage](lineage.md) records how a durable run's accepted artifact
+was made, so an archive of such runs can be kept current when a source, tool
+or validator changes. Jobs repair an accepted output only within its own run.
+
+| Path | Lineage records | Repair |
+|---|---|---|
+| Durable text workflows | Supported with a `LineagePolicy` under a strict acceptance policy: each completed run records its published document, its decision and each node's inputs as ids, versions and digests | A read-only [repair plan](lineage.md#plan-a-repair) before anything runs; a recheck or a republication in place; successor runs that keep unaffected results, started under an explicit allowance; `reuse=False` to compute affected work again in full; and [source restriction](lineage.md#restrict-a-source) with an optional purge. Results are reused only within one store and access scope, and a configured `supervisor` is refused |
+| Ordinary runs | Unsupported: `lineage` without a `run_store` raises `WorkflowBindingError` before any routing, planning or node call | Unsupported: `plan_repair()` and `repair()` raise `ValueError` without a `run_store` |
+| Jobs | Unsupported: Jobs write no lineage record. Each attempt's artifacts are recorded by SHA-256, and each operation's [input digest](jobs.md#operation-identity-and-input-digest) is computed from its stored plan | Within a run: an [integrity repair](jobs.md#repair-corrupted-accepted-outputs) regenerates a missing or changed accepted file, a [recheck](jobs.md#recheck-accepted-outputs) decides accepted files again under changed validators, and a read-only [preview](jobs.md#preview-repairs) shows what each operation calls for. Nothing is repaired automatically, and no run reuses another run's output, even for the same input digest |
+
+Tests:
+
+- Durable text workflows: recorded
+  `tests/test_workflow_lineage.py::test_lineage_lists_what_each_node_read_and_binds_the_document_and_decision`
+  and `tests/test_workflow_lineage.py::test_nodes_without_a_snapshot_are_undeclared_and_the_run_partial`;
+  decisions `tests/test_reuse_decisions.py::test_one_changed_source_regenerates_its_branch_and_reuses_the_sibling`,
+  `tests/test_reuse_decisions.py::test_same_bytes_under_a_new_version_regenerate_with_the_version_reason`
+  and `tests/test_reuse_decisions.py::test_another_scope_is_invisible_even_when_every_digest_matches`;
+  plans `tests/test_repair_plan.py::test_a_plan_over_three_runs_equals_the_evaluator_decisions`
+  and `tests/test_repair_plan.py::test_planning_a_read_only_store_changes_nothing_and_calls_nothing`;
+  in place `tests/test_workflow_repair.py::test_a_damaged_document_is_rendered_again_and_decided_again_without_new_research`
+  and `tests/test_workflow_repair.py::test_a_changed_validator_gets_a_new_decision_and_no_node_runs`;
+  successor runs `tests/test_workflow_reuse.py::test_a_successor_runs_only_what_a_changed_source_affects`,
+  `tests/test_workflow_reuse.py::test_a_successor_in_another_access_scope_is_refused`
+  and `tests/test_workflow_reuse.py::test_gates_and_the_nodes_they_judge_are_never_reused`;
+  applied `tests/test_workflow_repair.py::test_a_plan_is_applied_item_by_item_by_each_action`
+  and `tests/test_workflow_repair.py::test_with_reuse_off_a_repair_runs_every_affected_node_with_identical_bytes`;
+  refused with a supervisor
+  `tests/test_workflow_repair.py::test_a_repair_is_refused_before_anything_is_written_or_called[supervisor]`;
+  process loss `tests/test_workflow_repair_process_loss.py::test_a_killed_repair_leaves_its_predecessor_intact_and_resumes_without_repeating_work`;
+  restriction `tests/test_lineage_retention.py::test_a_restriction_marks_every_run_that_used_the_source_restricted`,
+  `tests/test_lineage_retention.py::test_purge_deletes_the_derived_documents_and_keeps_each_tombstone`
+  and `tests/test_lineage_retention.py::test_a_restriction_in_one_scope_leaves_identical_artifacts_in_another_current`;
+  selective repair against a full recomputation
+  `tests/test_archive_maintenance.py::test_selective_repair_publishes_the_bytes_and_decisions_of_a_full_recomputation`
+  and `tests/test_archive_maintenance.py::test_selective_repair_does_strictly_less_work_than_full_recomputation`.
+- Ordinary runs: `tests/test_support_matrix.py::test_lineage_is_refused_without_a_durable_store_or_strict_policy_before_any_call`,
+  `tests/test_lineage_records.py::test_swarm_lineage_needs_a_durable_store_before_any_call`,
+  `tests/test_repair_plan.py::test_planning_needs_a_durable_store_and_a_lineage_policy`
+  and `tests/test_workflow_repair.py::test_a_repair_is_refused_before_anything_is_written_or_called[ordinary]`.
+- Jobs: integrity repair `tests/test_jobs_runner.py::test_integrity_repair_regenerates_a_corrupted_accepted_png`
+  and `tests/test_jobs_cli.py::test_reroll_repair_integrity_regenerates_a_deleted_accepted_file`;
+  recheck `tests/test_jobs_runner.py::test_a_validator_version_bump_needs_a_recheck_which_records_a_new_decision`
+  and `tests/test_jobs_cli.py::test_recheck_decides_accepted_files_again_under_a_newer_built_in_check`;
+  preview `tests/test_jobs_runner.py::test_a_repair_preview_matches_integrity_repair_eligibility`
+  and `tests/test_jobs_cli.py::test_reroll_dry_run_names_the_operations_a_changed_attachment_needs_a_new_plan_for`;
+  no reuse across runs `tests/test_jobs_runner.py::test_a_repair_preview_never_offers_another_runs_identical_output`;
+  input digest `tests/test_jobs_preflight.py::test_input_digest_leaves_operation_ids_plan_hash_and_approval_token_unchanged`.
+
 ## External actions
 
 [External actions](actions.md), a preview, deliver a durable run's accepted
