@@ -6,10 +6,45 @@ recalls the outcomes of earlier runs into later planning prompts (see the
 that ran into a template that `ConstrainedArchitect` can offer as a menu item,
 so a proven shape is selected instead of planned again.
 
-This page covers distillation, template records, their versions, and the
-template catalog. A record is data: building a template from it, storing it
-and pinning it in a durable run never changes the base planner, and nothing
-is promoted or activated automatically.
+This page covers the evidence planner history keeps, distillation, template
+records, their versions, and the template catalog. A record is data: building
+a template from it, storing it and pinning it in a durable run never changes
+the base planner, and nothing is promoted or activated automatically.
+
+## Evidence in planner history
+
+A history row's `success` means only that every node completed, so a run
+whose gate ran out of regenerations, or whose output a strict policy
+rejected, still counts as a success. `PlannerMemory` therefore records the
+run's verification and acceptance evidence beside it. A run whose graph holds
+a gate's verification receipt, or whose result has a
+[delivery acceptance record](verifier.md#delivery-acceptance-records) or
+rejected output, also records:
+
+| Field | Value |
+|---|---|
+| `execution_id` | the run's execution id |
+| `structure_sha256` | the [structure digest](#structure-digests) of the run's graph |
+| `verification` | one `{gate, target, state, passed, regenerations_used}` entry per gate with a receipt |
+| `rejected_output_sha256` | the SHA-256 of the result's `rejected_output`, never its text |
+
+- `passed` is true only when the gate's receipt records a pass. An exhausted
+  gate, or one whose target did not complete, is recorded with `passed`
+  false. Gates with `max_regenerations=0` hold no receipt and have no entry.
+- `acceptance` is the decision of the result's record: a strict run that
+  rejected its output records `rejected` beside `success` true.
+- Any other run, such as one without gates or a strict policy, writes exactly
+  the keys it wrote before. Rows stay small, because recall reads the whole
+  history file.
+- Recall skips a row whose evidence fields are malformed. Rows written before
+  these fields existed recall with them `None`.
+- Planning prompts do not change: they still show each recalled run's goal,
+  topology, cost, summed node time and outcome.
+
+The execution id, structure digest and acceptance decision are what a
+template record's [`source_runs`](#template-records) name.
+[Durable runs](support-matrix.md#durable-text-workflow-components) still
+refuse `PlannerMemory`.
 
 ## Distill a template
 

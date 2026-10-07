@@ -12,11 +12,15 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from smythe.acceptance import AcceptanceDecision, DeliveryAcceptance
+from smythe.acceptance import AcceptanceDecision, DeliveryAcceptance, text_sha256
 from smythe.task import Task, snapshot_task
 
 # Delivery acceptance decisions an outcome can record.
 _ACCEPTANCE_VALUES = frozenset(decision.value for decision in AcceptanceDecision)
+# Fields a row holds only for a run that left verification or acceptance
+# evidence. Other rows leave them out and keep the keys they had before.
+_EVIDENCE_FIELDS = ("execution_id", "verification", "rejected_output_sha256", "structure_sha256")
+_SHA256 = re.compile(r"[0-9a-f]{64}")
 
 
 def _is_duration(value: Any) -> bool:
@@ -29,6 +33,45 @@ def _is_duration(value: Any) -> bool:
 
 def _flag(value: Any) -> bool | None:
     return value if type(value) is bool else None
+
+
+def _is_count(value: Any) -> bool:
+    return type(value) is int and value >= 0
+
+
+def _is_name(value: Any) -> bool:
+    return type(value) is str and bool(value.strip())
+
+
+def _is_digest(value: Any) -> bool:
+    return type(value) is str and _SHA256.fullmatch(value) is not None
+
+
+def _is_gate_entry(entry: Any) -> bool:
+    return (
+        isinstance(entry, dict)
+        and all(type(entry.get(key)) is str for key in ("gate", "target", "state"))
+        and type(entry.get("passed")) is bool and _is_count(entry.get("regenerations_used"))
+    )
+
+
+def _gate_verification(graph: Any) -> list[dict[str, Any]] | None:
+    """One entry per gate that holds a verification receipt, or None without any."""
+    entries = []
+    for node in graph.nodes:
+        receipt = node.metadata.get("verification_receipt")
+        entry = {
+            "gate": node.id,
+            "target": node.verifies,
+            "state": receipt.get("state") if isinstance(receipt, dict) else None,
+            # A gate passed only when its receipt records a pass: an exhausted
+            # gate, or one whose target was unavailable, is consumed without one.
+            "passed": isinstance(receipt, dict) and receipt.get("passed") is True,
+            "regenerations_used": node.metadata.get("regenerations_used", 0),
+        }
+        if _is_gate_entry(entry):
+            entries.append(entry)
+    return entries or None
 
 
 @dataclass
@@ -45,6 +88,17 @@ class ExecutionOutcome:
     delivery acceptance record, or ``"not_evaluated"`` when the result has
     no record; ``success`` still means every node completed. These fields
     are None when not recorded, as in history written before they existed.
+
+    A run that left verification or acceptance evidence, meaning a gate's
+    verification receipt, a delivery acceptance record or rejected output,
+    also records its ``execution_id`` and the
+    :func:`~smythe.graph.structure_sha256` of its graph. ``verification``
+    has one ``{gate, target, state, passed, regenerations_used}`` entry per
+    gate with a receipt; ``passed`` is True only when the receipt records a
+    pass, so an exhausted gate or one whose target was unavailable did not
+    pass. ``rejected_output_sha256`` is the SHA-256 of the result's
+    ``rejected_output``, never its text. These four are None, and left out
+    of the history file, when not recorded.
     """
 
     task_goal: str
@@ -64,6 +118,10 @@ class ExecutionOutcome:
     cost_is_complete: bool | None = None
     cost_contains_estimates: bool | None = None
     acceptance: str | None = None
+    execution_id: str | None = None
+    verification: list[dict[str, Any]] | None = None
+    rejected_output_sha256: str | None = None
+    structure_sha256: str | None = None
 
 
 class PlannerMemory:
@@ -90,7 +148,7 @@ class PlannerMemory:
         result: Any,
     ) -> None:
         """Append an execution outcome to the history file."""
-        from smythe.graph import NodeStatus
+        from smythe.graph import NodeStatus, structure_sha256
 
         # Capture nested context before inspecting mutable execution results.
         # Legacy duck-typed callers keep their existing goal/constraint path.
@@ -129,6 +187,17 @@ class PlannerMemory:
             record.decision.value if isinstance(record, DeliveryAcceptance)
             else AcceptanceDecision.NOT_EVALUATED.value
         )
+        verification = _gate_verification(graph)
+        rejected = getattr(result, "rejected_output", None)
+        rejected_sha256 = text_sha256(rejected) if isinstance(rejected, str) else None
+        execution_id = structure = None
+        if (verification is not None or rejected_sha256 is not None
+                or isinstance(record, DeliveryAcceptance)):
+            execution_id = getattr(result, "execution_id", None)
+            try:
+                structure = structure_sha256(graph)
+            except (TypeError, ValueError):
+                pass  # A shape that is not JSON data has no digest; record the rest.
 
         outcome = ExecutionOutcome(
             task_goal=saved_task.goal if hasattr(saved_task, "goal") else str(saved_task),
@@ -148,9 +217,17 @@ class PlannerMemory:
             cost_is_complete=_flag(getattr(result, "cost_is_complete", None)),
             cost_contains_estimates=_flag(getattr(result, "cost_contains_estimates", None)),
             acceptance=acceptance,
+            execution_id=execution_id if _is_name(execution_id) else None,
+            verification=verification,
+            rejected_output_sha256=rejected_sha256,
+            structure_sha256=structure,
         )
 
-        line = (json.dumps(asdict(outcome)) + "\n").encode("utf-8")
+        data = asdict(outcome)
+        for name in _EVIDENCE_FIELDS:
+            if data[name] is None:
+                del data[name]
+        line = (json.dumps(data) + "\n").encode("utf-8")
         with self._lock:
             # History holds task context, so a directory or file created here
             # is owner-only. Existing ones keep whatever mode they have.
@@ -224,6 +301,17 @@ class PlannerMemory:
                 if outcome.acceptance is not None and (
                     type(outcome.acceptance) is not str
                     or outcome.acceptance not in _ACCEPTANCE_VALUES
+                ):
+                    continue
+                if outcome.execution_id is not None and not _is_name(outcome.execution_id):
+                    continue
+                if any(value is not None and not _is_digest(value) for value in (
+                    outcome.rejected_output_sha256, outcome.structure_sha256,
+                )):
+                    continue
+                if outcome.verification is not None and (
+                    not isinstance(outcome.verification, list)
+                    or not all(_is_gate_entry(entry) for entry in outcome.verification)
                 ):
                     continue
             except (ValueError, TypeError, KeyError, OverflowError):

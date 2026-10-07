@@ -1645,6 +1645,18 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   graph that cannot be written as a record, such as one whose node depends on
   a node the graph does not contain. See
   [learning from runs](docs/learning.md).
+- `PlannerMemory` records verification and acceptance evidence. A run whose
+  graph holds a gate's verification receipt, or whose result has a delivery
+  acceptance record or rejected output, also records its `execution_id`, its
+  graph's `structure_sha256`, one `verification` entry per gate receipt
+  (`gate`, `target`, `state`, `passed`, `regenerations_used`) and, for
+  rejected output, `rejected_output_sha256`, a digest that never holds the
+  text. `passed` is true only when the receipt records a pass, so history
+  shows an exhausted gate, or one whose target did not complete, as not
+  passed, while `success` still means every node completed. Other runs write
+  the same keys as before, recall skips rows whose new fields are malformed,
+  and planning prompts are unchanged. See
+  [evidence in planner history](docs/learning.md#evidence-in-planner-history).
 - Agent Skills directories as a skill source.
   `AgentSkillsProvider({agent_id: [root, ...]})` reads each
   `<root>/<name>/SKILL.md` when it is built and lists each skill as a

@@ -440,6 +440,15 @@ before these fields existed recall with them `null`, meaning not recorded, and
 recall skips rows where they are malformed. Planner prompts still show only the
 summed node time.
 
+A run that left verification or acceptance evidence also records its
+`execution_id`, its graph's `structure_sha256`, a `verification` entry per
+gate receipt (`gate`, `target`, `state`, `passed`, `regenerations_used`) and,
+for rejected output, `rejected_output_sha256`, a digest that never holds the
+text. An exhausted gate, or one whose target did not complete, is recorded
+with `passed` false while `success` keeps its meaning. Other runs write the
+same keys as before, and planner prompts do not show these fields. See
+[evidence in planner history](learning.md#evidence-in-planner-history).
+
 **Added in 0.8.0:** recalled topology, success, cost, and duration fields
 are validated before ranking. Malformed records are skipped without rewriting
 the history file; valid values, legacy keys, and relevance ordering remain

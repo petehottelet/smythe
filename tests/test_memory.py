@@ -12,21 +12,35 @@ from pathlib import Path
 import pytest
 
 from fakes import Gate, ManualClock
-from smythe.acceptance import DeliveryAcceptance, text_sha256
+from smythe.acceptance import AcceptancePolicy, DeliveryAcceptance, text_sha256
 from smythe.checkpoint import FileCheckpointStore
-from smythe.graph import ExecutionGraph, Node, NodeStatus, Topology
+from smythe.constrained_planner import ConstrainedArchitect, SubGraphTemplate
+from smythe.graph import (
+    ExecutionGraph, FailurePolicy, Node, NodeStatus, Topology, structure_sha256,
+)
 from smythe.memory import ExecutionOutcome, PlannerMemory
 from smythe.planner import LLMArchitect
 from smythe.prompts import build_user_prompt
 from smythe.provider import CompletionResult, Provider
+from smythe.registry import Registry
 from smythe.swarm import Swarm, SwarmResult
 from smythe.task import Task
 from smythe.tracer import Span, Tracer
+from smythe.validation import ValidationReport, ValidatorIdentity, hard_finding
 
 _OUTCOME_FIELDS = (
     "elapsed_ms", "latency_complete", "resumed", "cost_is_complete",
     "cost_contains_estimates", "acceptance",
 )
+# The keys a history row had before verification and acceptance evidence.
+_PREVIOUS_KEYS = frozenset({
+    "task_goal", "task_constraints", "topology", "node_count", "total_cost_usd",
+    "total_duration_ms", "success", "node_outcomes", "timestamp", "task_context",
+    "task_done_when", *_OUTCOME_FIELDS,
+})
+_EVIDENCE_FIELDS = ("execution_id", "verification", "rejected_output_sha256", "structure_sha256")
+_GATE = {"gate": "judge", "target": "draft", "state": "consumed", "passed": False,
+         "regenerations_used": 1}
 
 
 def _make_memory() -> tuple[PlannerMemory, str]:
@@ -691,3 +705,286 @@ def test_record_after_a_torn_last_line_keeps_the_next_record(tmp_path):
     lines = path.read_bytes().split(b"\n")
     assert lines[1] == b'{"task_goal": "Research beta", "task_constr'
     assert len(lines) == 5 and lines[-1] == b""
+
+
+class _Steps(Provider):
+    """Answers each step from the queue of the first label prefix it starts with.
+
+    The last queued answer repeats; an exception in the queue is raised.
+    """
+
+    def __init__(self, script: dict[str, list]) -> None:
+        self._script = {prefix: list(answers) for prefix, answers in script.items()}
+
+    async def complete(self, system, prompt, model):
+        step = next(line for line in prompt.splitlines() if line.startswith("Your step: "))
+        label = step[len("Your step: "):]
+        queue = next(answers for prefix, answers in self._script.items() if label.startswith(prefix))
+        answer = queue.pop(0) if len(queue) > 1 else queue[0]
+        if isinstance(answer, BaseException):
+            raise answer
+        return CompletionResult(text=answer, prompt_tokens=1, completion_tokens=1)
+
+
+class _Forbids:
+    """A final validator that rejects delivered text containing ``marker``."""
+
+    def __init__(self, marker: str) -> None:
+        self.marker = marker
+        self.identity = ValidatorIdentity.for_config("forbids", "1", {"marker": marker})
+
+    def validate(self, subject):
+        if self.marker in subject.text():
+            return ValidationReport("output", (
+                hard_finding("forbidden_text", "output contains the forbidden marker"),
+            ), validator=self.identity)
+        return ValidationReport("output", validator=self.identity)
+
+
+class _SelectsTemplate(Provider):
+    async def complete(self, system, prompt, model):
+        return CompletionResult(text='[{"template": "memo"}]')
+
+
+def _gated(task: Task, *, max_regenerations: int = 1) -> ExecutionGraph:
+    """A draft that a judge gates."""
+    return ExecutionGraph(topology=[Topology.SERIAL], task=task, nodes=[
+        Node(id="draft", label="Draft the memo"),
+        Node(id="judge", label="Judge the memo", depends_on=["draft"], verifies="draft",
+             max_regenerations=max_regenerations),
+    ])
+
+
+def _history_rows(path: Path) -> list[dict]:
+    return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()]
+
+
+@pytest.mark.parametrize("policy", [None, AcceptancePolicy()], ids=["no-policy", "advisory"])
+@pytest.mark.parametrize("verdicts,passed,used", [
+    (["FAIL: the memo is thin"], False, 2),
+    (["FAIL: the memo is thin", "PASS"], True, 1),
+    (["PASS"], True, 0),
+], ids=["exhausted", "passed-after-regeneration", "passed"])
+def test_gate_verdict_is_recorded_beside_success(tmp_path, policy, verdicts, passed, used):
+    path = tmp_path / "history.jsonl"
+    task = Task("Research signal behind a gate")
+    swarm = Swarm(model="m", provider=_Steps({"Draft": ["A draft."], "Judge": verdicts}),
+                  memory=PlannerMemory(path), artifact_dir=None, acceptance=policy)
+
+    result = swarm.execute(_gated(task, max_regenerations=2))
+    [row] = _history_rows(path)
+    [outcome] = PlannerMemory(path).recall(task)
+
+    # An exhausted gate lets the run finish: success still means every node
+    # completed, and the gate's entry shows that its final verdict did not pass.
+    assert outcome.success is True
+    assert outcome.acceptance == "not_evaluated"
+    assert outcome.verification == [dict(_GATE, passed=passed, regenerations_used=used)]
+    assert outcome.execution_id == result.execution_id
+    assert outcome.structure_sha256 == structure_sha256(result.graph)
+    assert outcome.rejected_output_sha256 is None
+    assert set(row) == _PREVIOUS_KEYS | {"execution_id", "verification", "structure_sha256"}
+
+
+def test_gate_whose_target_was_unavailable_is_recorded_as_not_passed(tmp_path):
+    path = tmp_path / "history.jsonl"
+    task = Task("Research signal behind a gate")
+    graph = ExecutionGraph(topology=[Topology.SERIAL], task=task, nodes=[
+        Node(id="draft", label="Draft the memo", failure_policy=FailurePolicy.SKIP, max_retries=0),
+        Node(id="judge", label="Judge the memo", depends_on=["draft"], verifies="draft",
+             max_regenerations=1),
+    ])
+    provider = _Steps({"Draft": [RuntimeError("draft failed")], "Judge": ["PASS"]})
+
+    Swarm(model="m", provider=provider, memory=PlannerMemory(path), artifact_dir=None,
+          ).execute(graph)
+    [outcome] = PlannerMemory(path).recall(task)
+
+    # The judge said PASS, but about nothing: the receipt records no pass.
+    assert outcome.success is False
+    assert outcome.verification == [dict(_GATE, passed=False, regenerations_used=0)]
+
+
+@pytest.mark.parametrize("draft,decision", [
+    ("A draft with DEFECT-4c1e in its second paragraph.", "rejected"),
+    ("A clean draft.", "accepted"),
+])
+def test_strict_run_records_its_decision_and_only_a_digest_of_rejected_output(
+    tmp_path, draft, decision,
+):
+    path = tmp_path / "history.jsonl"
+    task = Task("Research signal under a strict policy")
+    policy = AcceptancePolicy(mode="strict", final_validators=[_Forbids("DEFECT")])
+    swarm = Swarm(model="m", provider=_Steps({"Draft": [draft], "Judge": ["PASS"]}),
+                  memory=PlannerMemory(path), artifact_dir=None, acceptance=policy)
+
+    result = swarm.execute(_gated(task))
+    [row] = _history_rows(path)
+    [outcome] = PlannerMemory(path).recall(task)
+
+    assert outcome.acceptance == result.acceptance.decision.value == decision
+    assert outcome.success is True
+    # The gate passed the draft; the final validator decided its delivery.
+    assert outcome.verification == [dict(_GATE, passed=True, regenerations_used=0)]
+    assert outcome.execution_id == result.execution_id
+    assert outcome.structure_sha256 == structure_sha256(result.graph)
+    if decision == "rejected":
+        assert "DEFECT-4c1e" in result.rejected_output
+        assert outcome.rejected_output_sha256 == text_sha256(result.rejected_output)
+        assert b"DEFECT-4c1e" not in path.read_bytes()
+        assert set(row) == _PREVIOUS_KEYS | set(_EVIDENCE_FIELDS)
+    else:
+        assert result.rejected_output is None and outcome.rejected_output_sha256 is None
+        assert "rejected_output_sha256" not in row
+
+
+def test_strict_exhausted_gate_records_the_rejection_and_its_failing_verdict(tmp_path):
+    path = tmp_path / "history.jsonl"
+    task = Task("Research signal under a strict policy")
+    provider = _Steps({"Draft": ["A thin draft, DEFECT-9b2d."], "Judge": ["FAIL: thin"]})
+    swarm = Swarm(model="m", provider=provider, memory=PlannerMemory(path), artifact_dir=None,
+                  acceptance=AcceptancePolicy(mode="strict"))
+
+    result = swarm.execute(_gated(task))
+    [outcome] = PlannerMemory(path).recall(task)
+
+    receipt = result.graph.nodes[1].metadata["verification_receipt"]
+    assert (receipt["outcome"], receipt["exhausted"]) == ("rejected", True)
+    assert (outcome.success, outcome.acceptance) == (True, "rejected")
+    assert outcome.verification == [dict(_GATE, passed=False, regenerations_used=1)]
+    assert outcome.rejected_output_sha256 == text_sha256(result.rejected_output)
+    assert b"DEFECT-9b2d" not in path.read_bytes()
+
+
+@pytest.mark.parametrize("policy", [None, AcceptancePolicy()], ids=["no-policy", "advisory"])
+@pytest.mark.parametrize("gate", [False, True], ids=["no-gate", "unread-gate"])
+def test_run_without_gate_receipts_or_a_strict_policy_writes_the_previous_keys(
+    tmp_path, policy, gate,
+):
+    path = tmp_path / "history.jsonl"
+    task = Task("Research signal without evidence")
+    # A gate without regenerations is never read without a strict policy.
+    graph = _gated(task, max_regenerations=0) if gate else ExecutionGraph(
+        topology=[Topology.SERIAL], task=task, nodes=[Node(id="draft", label="Draft the memo")],
+    )
+    swarm = Swarm(model="m", provider=_Steps({"Draft": ["A draft."], "Judge": ["FAIL"]}),
+                  memory=PlannerMemory(path), artifact_dir=None, acceptance=policy)
+
+    swarm.execute(graph)
+    PlannerMemory(path).record(task, graph, SwarmResult("done", graph))
+    rows = _history_rows(path)
+    outcomes = PlannerMemory(path).recall(task, k=2)
+
+    assert [set(row) for row in rows] == [_PREVIOUS_KEYS, _PREVIOUS_KEYS]
+    assert [[getattr(outcome, name) for name in _EVIDENCE_FIELDS] for outcome in outcomes] == [
+        [None] * 4, [None] * 4,
+    ]
+
+
+def test_recall_keeps_valid_evidence_fields(tmp_path):
+    path = tmp_path / "history.jsonl"
+    outcome = _make_outcome(
+        "Research signal", acceptance="rejected", execution_id="run-1",
+        verification=[_GATE, dict(_GATE, gate="second", passed=True, regenerations_used=0)],
+        rejected_output_sha256=text_sha256("rejected"), structure_sha256="0" * 64,
+    )
+    _write_outcome(path, outcome)
+
+    assert PlannerMemory(path).recall(Task("Research signal")) == [outcome]
+
+
+@pytest.mark.parametrize("field,value", [
+    ("execution_id", 1), ("execution_id", ""), ("execution_id", "  "), ("execution_id", ["run"]),
+    ("structure_sha256", "abc"), ("structure_sha256", "A" * 64), ("structure_sha256", 1),
+    ("rejected_output_sha256", "the rejected text"), ("rejected_output_sha256", "0" * 63),
+    ("rejected_output_sha256", True),
+    ("verification", {}), ("verification", "judge"), ("verification", [None]),
+    ("verification", [_GATE, "judge"]), ("verification", [dict(_GATE, gate=1)]),
+    ("verification", [dict(_GATE, target=None)]), ("verification", [dict(_GATE, state=False)]),
+    ("verification", [dict(_GATE, passed="true")]), ("verification", [dict(_GATE, passed=1)]),
+    ("verification", [dict(_GATE, regenerations_used=-1)]),
+    ("verification", [dict(_GATE, regenerations_used=True)]),
+    ("verification", [dict(_GATE, regenerations_used=1.0)]),
+    ("verification", [{key: value for key, value in _GATE.items() if key != "passed"}]),
+])
+def test_recall_skips_malformed_evidence_fields_before_ranking(tmp_path, field, value):
+    _assert_bad_row_is_skipped_without_changing_ranking(tmp_path, field, value)
+
+
+def test_legacy_rows_recall_beside_a_malformed_evidence_row(tmp_path):
+    path = tmp_path / "history.jsonl"
+    previous = asdict(_make_outcome("Research signal previous", acceptance="not_evaluated"))
+    oldest = asdict(_make_outcome("Research signal oldest"))
+    malformed = asdict(_make_outcome("Research signal malformed",
+                                     verification=[dict(_GATE, passed=None)]))
+    for name in _EVIDENCE_FIELDS:
+        del previous[name], oldest[name]
+    for name in _OUTCOME_FIELDS:
+        del oldest[name]
+    path.write_text("".join(json.dumps(row) + "\n" for row in (previous, malformed, oldest)),
+                    encoding="utf-8")
+
+    recalled = PlannerMemory(path).recall(Task("Research signal"), k=5)
+
+    assert [outcome.task_goal for outcome in recalled] == [
+        "Research signal previous", "Research signal oldest",
+    ]
+    assert all(getattr(outcome, name) is None for outcome in recalled for name in _EVIDENCE_FIELDS)
+
+
+def test_evidence_fields_leave_history_prompts_unchanged(tmp_path):
+    path, legacy_path = tmp_path / "history.jsonl", tmp_path / "legacy.jsonl"
+    task = Task("Research signal behind a gate")
+    result = Swarm(model="m", provider=_Steps({"Draft": ["A draft."], "Judge": ["FAIL: thin"]}),
+                   memory=PlannerMemory(path), artifact_dir=None).execute(_gated(task))
+    [row] = _history_rows(path)
+    previous = {key: value for key, value in row.items() if key in _PREVIOUS_KEYS}
+    legacy_path.write_text(json.dumps(previous) + "\n", encoding="utf-8")
+    before = path.read_bytes()
+
+    [outcome] = PlannerMemory(path).recall(task)
+    [legacy] = PlannerMemory(legacy_path).recall(task)
+    prompt = build_user_prompt(task, [asdict(outcome)])
+    planner_prompts = []
+    for history in (path, legacy_path):
+        provider = _HistoryPlanningProvider()
+        LLMArchitect(provider, planning_model="offline-test",
+                     memory=PlannerMemory(history)).plan(task)
+        planner_prompts.append(provider.prompts)
+
+    assert outcome.verification and outcome.structure_sha256 and outcome.execution_id
+    assert prompt == build_user_prompt(task, [asdict(legacy)])
+    for value in (result.execution_id, outcome.structure_sha256, "verification", "consumed"):
+        assert value not in prompt
+    assert planner_prompts[0] == planner_prompts[1]
+    assert len(planner_prompts[0]) == 1 and "Outcome: success" in planner_prompts[0][0]
+    assert path.read_bytes() == before
+
+
+def test_runs_of_one_template_on_different_goals_share_a_structure_digest(tmp_path):
+    path = tmp_path / "history.jsonl"
+
+    def build(task):
+        return [
+            Node(id="draft", label=f"Draft a memo: {task.goal}"),
+            Node(id="judge", label=f"Judge the memo: {task.goal}", depends_on=["draft"],
+                 verifies="draft", max_regenerations=1),
+        ], Registry()
+
+    architect = ConstrainedArchitect(
+        _SelectsTemplate(), [SubGraphTemplate("memo", "A judged memo", build)], max_retries=0,
+    )
+    results = [
+        Swarm(model="m", provider=_Steps({"Draft": ["A memo."], "Judge": ["PASS"]}),
+              architect=architect, memory=PlannerMemory(path), artifact_dir=None,
+              ).execute(Task(goal))
+        for goal in ("Summarize the quarter", "Review the annual budget")
+    ]
+    first, second = _history_rows(path)
+
+    assert first["task_goal"] != second["task_goal"]
+    assert ([node["label"] for node in first["node_outcomes"]]
+            != [node["label"] for node in second["node_outcomes"]])
+    assert first["execution_id"] == results[0].execution_id != second["execution_id"]
+    assert first["structure_sha256"] == second["structure_sha256"]
+    assert first["structure_sha256"] == structure_sha256(results[1].graph)
