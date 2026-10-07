@@ -10,6 +10,7 @@ a write transaction.
 from __future__ import annotations
 
 from contextlib import closing
+import hashlib
 import os
 import sqlite3
 import stat
@@ -27,6 +28,7 @@ from smythe.optimize import (
 )
 from smythe.optimize.contracts import Candidate, ExperimentContract, MetricObjective, MutableFieldRule
 from smythe.optimize.ledger import ExperimentLedger
+from smythe.optimize.registry import _BARRIER
 
 TARGET = "planner.template.report"
 V1 = {TARGET: "v1"}
@@ -366,6 +368,93 @@ def test_a_missing_or_altered_barrier_fails_closed_on_reopen(tmp_path):
         PolicyRegistry(path, read_only=True)
 
 
+def _as_writer(path, *statements, lift=()) -> None:
+    """Run ``(sql, parameters)`` statements as a client registered as the current writer.
+
+    The insert guards named in *lift* are dropped for the statements and then
+    recreated exactly, so the writer barrier still verifies on reopen.
+    """
+    with closing(sqlite3.connect(path, isolation_level=None)) as raw:
+        raw.create_function(WRITER, 0, lambda: 1)
+        for name in lift:
+            raw.execute(f"DROP TRIGGER {name}")
+        for sql, parameters in statements:
+            raw.execute(sql, parameters)
+        for name in lift:
+            raw.execute(_BARRIER[name])
+
+
+def _policy_hash(text: str) -> str:
+    return "sha256:" + hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+def _event(seq, action, policy_json=None, review_id=None, restores_seq=None, *, policy_hash=None):
+    if policy_json is not None and policy_hash is None:
+        policy_hash = _policy_hash(policy_json)
+    return ("INSERT INTO activations VALUES (?, ?, ?, ?, ?, ?, ?, 'stored', 'raw', 1)",
+            (TARGET, seq, action, policy_hash, policy_json, review_id, restores_seq))
+
+
+V1_JSON, V2_JSON, V3_JSON = (f'{{"{TARGET}":"{value}"}}' for value in ("v1", "v2", "v3"))
+INVALID_POLICY = f"stored policy of {TARGET!r} seq 3 is invalid"
+
+
+@pytest.mark.parametrize("statements, lift, message", [
+    # Sequence numbers are consecutive.
+    ([_event(4, "activate", V3_JSON, "review-1")], ("policy_registry_v1_activations_append",),
+     "inconsistent at seq 4"),
+    # A rollback carries exactly the policy and review of the entry it restores...
+    ([_event(3, "rollback", V2_JSON, None, 1)], (), "inconsistent at seq 3"),
+    ([_event(3, "rollback", V1_JSON, "review-1", 1)], (), "inconsistent at seq 3"),
+    # ...and restores only a baseline or activate entry.
+    ([_event(3, "rollback", V1_JSON, None, 1), _event(4, "rollback", V1_JSON, None, 3)], (),
+     "inconsistent at seq 4"),
+    # A stored policy is the canonical JSON of an object, under its own hash.
+    ([_event(3, "activate", f'{{"{TARGET}": "v3"}}', "review-1")], (), INVALID_POLICY),
+    ([_event(3, "activate", V3_JSON, "review-1", policy_hash=_policy_hash(V2_JSON))], (),
+     INVALID_POLICY),
+    ([_event(3, "activate", '["v3"]', "review-1")], (), INVALID_POLICY),
+    ([_event(3, "activate", "v3", "review-1")], (), INVALID_POLICY),
+])
+def test_reads_refuse_a_stored_history_that_is_inconsistent(tmp_path, statements, lift, message):
+    path = tmp_path / "registry.sqlite3"
+    _activated(path)
+    _as_writer(path, *statements, lift=lift)
+    before = _dump(path)
+    for read_only in (False, True):
+        with PolicyRegistry(path, read_only=read_only) as registry:
+            with pytest.raises(RegistryError, match=message):
+                registry.resolve(TARGET)
+            with pytest.raises(RegistryError, match=message):
+                registry.history(TARGET)
+            if not read_only:
+                # A change reads the history first, so it writes nothing.
+                with pytest.raises(RegistryError, match=message):
+                    registry.retire(TARGET, expected_seq=2 + len(statements), actor="operator",
+                                    reason="refused")
+    assert _dump(path) == before
+
+
+@pytest.mark.parametrize("statement, message", [
+    (("ALTER TABLE reviews ADD COLUMN extra TEXT", ()), "Invalid policy registry table reviews"),
+    (("ALTER TABLE activations RENAME COLUMN reason TO note", ()),
+     "Invalid policy registry table activations"),
+    (("ALTER TABLE registry_meta ADD COLUMN extra TEXT", ()),
+     "Invalid policy registry table registry_meta"),
+    # A client without foreign key enforcement can name a review that does not exist.
+    (_event(3, "activate", V3_JSON, "review-9"), "Policy registry has invalid references"),
+])
+def test_opens_refuse_an_altered_table_or_an_invalid_reference(tmp_path, statement, message):
+    path = tmp_path / "registry.sqlite3"
+    _activated(path)
+    _as_writer(path, statement)
+    before = _dump(path)
+    for read_only in (False, True):
+        with pytest.raises(RegistryError, match=message):
+            PolicyRegistry(path, read_only=read_only)
+    assert _dump(path) == before
+
+
 def test_a_registry_is_never_created_inside_another_database(tmp_path):
     path = tmp_path / "optimize.sqlite3"
     ExperimentLedger(path, durability="normal").close()
@@ -471,6 +560,9 @@ def held(cursor, event):
 
 PolicyRegistry._insert = staticmethod(held)
 with PolicyRegistry(path) as registry:
+    # The second child waits on the first child's write lock; leave a loaded
+    # host room to report the conflict rather than "database is locked".
+    registry._connection.execute("PRAGMA busy_timeout = 30000")
     write_barrier(folder / f"{name}-open.json", {})
     wait(f"{name}-go")
     write_barrier(folder / f"{name}-appending.json", {})
