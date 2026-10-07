@@ -1636,12 +1636,12 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   configuration or paths, and `from_dict()` refuses unknown keys and
   versions. A blueprint whose dependencies form a cycle, and text without a
   UTF-8 form, such as a lone surrogate, raise `TemplateRecordError`, or
-  `DistillationError` when distilling.
-  `template_version` is the digest of the fields that decide what a
-  template builds and `record_sha256` that of the whole record, by which
-  records compare and hash. `to_template()` builds the template `distill_template` returns, which is
-  now built on it, and `local_only()` declares that builder for a durable run
-  as `template:<name>` at the template version, so the recipe pins the exact
+  `DistillationError` when distilling. `template_version` is the digest of
+  the fields that decide what a template builds and `record_sha256` that of
+  the whole record, by which records compare and hash. `to_template()`
+  builds the template `distill_template` returns, which is now built on it,
+  and `local_only()` declares that builder for a durable run as
+  `template:<name>` at the template version, so the recipe pins the exact
   template. The review lists labels that repeat the source task's goal and
   leaves them unchanged. `TemplateCatalog(root)` keeps records in append-only,
   owner-only files, `records/<record_sha256>.json` and
@@ -1679,6 +1679,7 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   `PlannerMemory.record_failure()` writes such a row directly. The default
   `PlannerMemory`, and memory objects that implement only `record()`, record
   nothing on failure. See [failed runs](docs/learning.md#failed-runs).
+  results or history. See [learning from runs](docs/learning.md).
 - Agent Skills directories as a skill source.
   `AgentSkillsProvider({agent_id: [root, ...]})` reads each
   `<root>/<name>/SKILL.md` when it is built and lists each skill as a
@@ -1830,6 +1831,14 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   each artifact file once, decodes those bytes, and fails a file whose bytes
   no longer match the `sha256` its record carries with a `changed-artifact`
   finding.
+- `distill_template` raises `DistillationError` for a graph it cannot write
+  as a template record, which it used to accept or fail on with another
+  error: a blank template name; a blank or duplicate node id; a node that
+  depends on itself, on a blank id or on a node the graph does not contain;
+  dependencies that form a cycle; a timeout that is not a positive finite
+  number; a negative or non-integer `max_retries` or `max_regenerations`; a
+  label or metadata `role` that is not text; and text without a UTF-8 form.
+  See [distill a template](docs/learning.md#distill-a-template).
 
 ### Fixed
 

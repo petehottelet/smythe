@@ -116,9 +116,11 @@ goal, and any other label gets `Apply this step to: <goal>` appended.
 `require_success` (the default) refuses a graph with a node that did not
 complete. `DistillationError` is raised for an empty graph, a gate that
 verifies itself or a node the graph does not contain, and a graph that
-cannot be written as a [template record](#template-records), for example
-because a node depends on a node the graph does not contain or two nodes
-depend on each other.
+cannot be written as a [template record](#template-records): for example
+one with a blank or duplicate node id, a dependency on a node the graph
+does not contain, a dependency cycle, a timeout that is not a positive
+finite number, a negative or non-integer retry or regeneration count, a
+label or `role` that is not text, or text without a UTF-8 form.
 
 ## Template records
 
