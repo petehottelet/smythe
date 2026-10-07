@@ -860,10 +860,12 @@ def _run_ids(store: FileCheckpointStore | SQLiteWorkflowStore) -> list[str]:
 def list_runs(
     store: FileCheckpointStore | SQLiteWorkflowStore, *, limit: int = 50, offset: int = 0,
 ) -> dict[str, Any]:
-    """One page of saved runs with their state, decision and next action.
+    """One page of saved runs with their state, decision, next action and unresolved external actions.
 
-    A run that cannot be read is listed with its error instead of stopping
-    the listing.
+    ``unresolved_actions`` counts the run's external actions that
+    ``inspect_run()`` lists as unresolved, 0 for a run without actions. A
+    run that cannot be read is listed with its error, and null fields,
+    instead of stopping the listing.
     """
     _check_page(limit, offset)
     ids = _run_ids(store)
@@ -875,11 +877,13 @@ def list_runs(
             view = inspect_run(store, run_id, lineage=False)
         except (RunInspectionError, RunNotFoundError, ValueError) as exc:
             runs.append({"run_id": run_id, "state": None, "decision": None, "next_action": None,
-                         "error": str(exc)})
+                         "unresolved_actions": None, "error": str(exc)})
             continue
+        actions = view["actions"]
         runs.append({"run_id": run_id, "state": view["execution"]["state"],
                      "decision": view["delivery"]["decision"],
-                     "next_action": view["next_action"]["action"], "error": None})
+                     "next_action": view["next_action"]["action"],
+                     "unresolved_actions": 0 if actions is None else len(actions["unresolved"]), "error": None})
     return {"store": "journal" if isinstance(store, SQLiteWorkflowStore) else "checkpoints",
             "total": len(ids), "offset": offset, "limit": limit, "returned": len(runs),
             "has_more": offset + len(page) < len(ids), "runs": runs}

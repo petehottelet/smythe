@@ -405,6 +405,8 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   `smythe runs inspect` reports them
   in an `actions` block and exits with 12 when the decision is `accepted` but
   an external action is unresolved; codes 10 and 11 take precedence.
+  `smythe runs list` adds each run's `unresolved_actions` count and marks a
+  run that has any in its table, with unchanged exit codes.
   `smythe runs revoke-action` is the lease-free `revoke()` fail-safe, and
   never upgrades a version 1 journal. See
   [operator decisions](docs/actions.md#operator-decisions) and

@@ -400,9 +400,10 @@ def test_list_reports_entries_it_cannot_open_and_continues(tmp_path, capsys):
     assert main(["runs", "--checkpoints", str(tmp_path), "--json", "list"]) == EXIT_OK
     rows = {row["run_id"]: row for row in output(capsys)["list"]["runs"]}
     assert sorted(rows) == sorted(["deep", "folder", run_id])
-    assert (rows[run_id]["state"], rows[run_id]["error"]) == ("completed", None)
+    assert (rows[run_id]["state"], rows[run_id]["error"], rows[run_id]["unresolved_actions"]) == (
+        "completed", None, 0)
     for unreadable in ("deep", "folder"):
-        assert rows[unreadable]["state"] is None
+        assert rows[unreadable]["state"] is None and rows[unreadable]["unresolved_actions"] is None
         assert f"Checkpoint {unreadable!r} is not readable" in rows[unreadable]["error"]
     assert main(["runs", "--checkpoints", str(tmp_path), "list"]) == EXIT_OK
     text = capsys.readouterr().out
@@ -857,9 +858,12 @@ def test_list_shows_durable_decisions(strict_journal, tmp_path, capsys, monkeypa
         ("accepted", "accepted"), ("rejected", "rejected"), ("needs_review", "needs_review"),
         ("indeterminate", "indeterminate"), ("legacy", None), ("gate-validator", None))}
     assert rows == expected | {planned: ("planned", "not_evaluated", None)}
+    # Runs without external actions have none unresolved.
+    assert {row["unresolved_actions"] for row in listed["runs"]} == {0}
     assert main(["runs", "--journal", str(path), "list"]) == EXIT_OK
     text = capsys.readouterr().out
-    assert f"{results['rejected'].execution_id}  completed  acceptance rejected  next review_output" in text
+    assert f"{results['rejected'].execution_id}  completed  acceptance rejected  next review_output\n" in text
+    assert "unresolved action" not in text
     assert journal_state(path) == before
 
 
@@ -1585,9 +1589,13 @@ def test_inspection_shows_external_actions_read_only_and_exits_12_while_one_is_u
     assert "    Records: finding 1" in text
     for shown in (text, json.dumps(value)):
         assert not any(secret in shown for secret in secrets_of(path))
-    # Listing reports the run as before, with no new exit code.
+    # Listing exits as before, and counts the run's unresolved actions.
     assert main(["runs", "--journal", str(path), "--json", "list"]) == EXIT_OK
-    assert output(capsys)["list"]["runs"][0]["decision"] == "accepted"
+    (listed,) = output(capsys)["list"]["runs"]
+    assert (listed["decision"], listed["next_action"], listed["unresolved_actions"]) == ("accepted", "none", 1)
+    assert main(["runs", "--journal", str(path), "list"]) == EXIT_OK
+    assert (f"{action.run_id}  completed  acceptance accepted  next none  1 unresolved action\n"
+            in capsys.readouterr().out)
     assert journal_state(path) == before
 
 

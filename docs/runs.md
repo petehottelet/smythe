@@ -24,9 +24,12 @@ smythe runs --journal smythe-runs.db revoke-action 7c1e40aa --reason "approver l
 compact JSON document, `{"ok": true, "command": "inspect", "inspect": {...}}`,
 with structured errors in the same shape. Options may follow the subcommand.
 `list` takes `--limit` (1-500, default 50) and `--offset`, and lists each
-run's id, execution state, decision and next action; a run it cannot read,
-such as a checkpoint entry it cannot open or JSON nested too deeply to parse,
-is listed with its error and the listing continues.
+run's id, execution state, decision, next action and `unresolved_actions`,
+the number of its [external actions](#external-actions) that `inspect`
+lists as unresolved; the text table adds `N unresolved action(s)` to a run
+that has any. A run it cannot read, such as a checkpoint entry it cannot
+open or JSON nested too deeply to parse, is listed with its error and null
+fields, and the listing continues.
 
 ## Read-only
 
@@ -477,9 +480,9 @@ decisions stay in the [Python API](actions.md#operator-decisions).
 
 Codes 10, 11 and 12 follow the run's current decision, after any
 [re-evaluation](#decision-history), and 10 and 11 take precedence over 12.
-`list` and `review` return 0 whatever the runs' decisions. Codes 10 to 12
-are used only by `runs inspect`; the [Jobs codes](jobs.md#cli-exit-codes)
-are unchanged.
+`list` and `review` return 0 whatever the runs' decisions and unresolved
+actions. Codes 10 to 12 are used only by `runs inspect`; the
+[Jobs codes](jobs.md#cli-exit-codes) are unchanged.
 
 ## From Python
 

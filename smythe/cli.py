@@ -972,9 +972,10 @@ def _emit_run_list(value: dict[str, Any]) -> None:
         if run["error"] is not None:
             print(f"{_terminal_text(run['run_id'])}  unreadable: {_terminal_text(run['error'])}")
             continue
-        decision = run["decision"] or "not recorded"
+        decision, unresolved = run["decision"] or "not recorded", run["unresolved_actions"]
+        marker = f"  {unresolved} unresolved action{'' if unresolved == 1 else 's'}" if unresolved else ""
         print(f"{_terminal_text(run['run_id'])}  {run['state']}  acceptance {decision}  "
-              f"next {run['next_action']}")
+              f"next {run['next_action']}{marker}")
     if not value["runs"]:
         print("No runs matched.")
     if value["has_more"]:
