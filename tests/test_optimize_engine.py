@@ -579,6 +579,40 @@ def test_single_change_leaves_the_default_plan_hash_unchanged(tmp_path):
         assert constrained._build_plan(incumbent, (challenger,))["plan_hash"] != golden
 
 
+@pytest.mark.asyncio
+@pytest.mark.parametrize("first", [False, True], ids=["then-constrained", "then-unconstrained"])
+async def test_changing_single_change_cannot_draw_a_second_holdout(tmp_path, first):
+    contract = _contract()
+    incumbent, challenger = _candidates(contract)
+    identity = holdout_identity(contract, EVALUATOR_HASH)
+    calls: list[TrialContext] = []
+
+    async def evaluate(context: TrialContext) -> TrialOutcome:
+        calls.append(context)
+        return await _challengers_win(context)
+
+    ledger_path = tmp_path / "single-holdout.sqlite3"
+    with ExperimentLedger(ledger_path, durability="normal") as ledger:
+        used = await _runner(contract, ledger, evaluate, single_change=first).run(
+            incumbent, (challenger,)
+        )
+        assert used.holdout_assessment is not None
+        assert ledger.holdout_uses(identity) == {challenger.policy_hash: (used.campaign_id,)}
+        evaluated = len(calls)
+
+        # The other setting changes the plan hash, and so the automatic
+        # campaign ID, but not the holdout identity.
+        other = _runner(contract, ledger, evaluate, single_change=not first)
+        assert other._build_plan(incumbent, (challenger,))["campaign_id"] != used.campaign_id
+        before = _ledger_state(ledger, ledger_path)
+        with pytest.raises(HoldoutAlreadyUsedError, match=used.campaign_id) as refused:
+            await other.run(incumbent, (challenger,))
+        assert challenger.policy_hash in str(refused.value)
+        assert identity in str(refused.value)
+        assert _ledger_state(ledger, ledger_path) == before
+        assert len(calls) == evaluated
+
+
 @pytest.mark.parametrize("value", [1, "yes", None])
 def test_runner_rejects_a_non_boolean_single_change(tmp_path, value):
     with ExperimentLedger(tmp_path / "single-type.sqlite3", durability="normal") as ledger:
