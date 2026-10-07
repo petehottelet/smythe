@@ -1068,10 +1068,12 @@ cites the test behind each:
 - Receipts and notices that arrive late and in any order, including the
   answer to a copy the service deduplicated and a forged notice, are kept
   as records and never move an action back to an earlier state.
-- Under every combination of deduplication, lookup by key, visibility bound
-  and key window, a lost answer or a lost request never leads to a second
-  write. Another submission follows only a lookup that proved the first was
-  never made, or is a same-key retry inside the declared deduplication
-  window, which the service answers from its earlier commit.
+- Under every combination of deduplication, lookup by key, visibility bound,
+  declared or not, and key window, a lost answer, a lost request or a
+  request that reaches the service only as the connector's `timeout_s` ends
+  never leads to a second write. Another submission follows only a lookup
+  that proved the first was never made, or is a same-key retry inside the
+  declared deduplication window, which the service answers from its earlier
+  commit. Without a declared bound, no lookup proves absence.
 - A worker killed while its write is in flight leaves an unknown outcome,
   which a restarted worker reconciles without writing again.

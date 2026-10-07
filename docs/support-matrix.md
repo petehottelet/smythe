@@ -633,7 +633,8 @@ Tests:
   invalid declarations `tests/test_action_contract.py::test_profile_validation_rejects_invalid_declarations`;
   connectors `tests/test_action_runner.py::test_a_runner_refuses_a_connector_that_retries_and_async_host_code`
   and `tests/test_action_runner.py::test_a_connector_with_another_profile_is_refused`.
-- Every combination of declarations, after a lost answer or a lost request:
+- Every combination of declarations, with a visibility bound or none, after
+  a lost answer, a lost request or a request that arrives as `timeout_s` ends:
   `tests/test_action_conformance.py::test_no_second_effect_without_proven_absence_or_live_deduplication`.
 - Competing workers: `tests/test_action_conformance.py::test_two_threads_racing_to_dispatch_make_one_claim_and_one_effect`
   and `tests/test_action_conformance.py::test_a_worker_in_another_process_and_a_local_worker_race_and_one_claims`.

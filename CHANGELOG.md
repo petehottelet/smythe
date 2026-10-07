@@ -410,8 +410,10 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   races two workers, in threads and across processes, to one dispatch claim
   and one write; relays receipts and notices out of order without moving an
   action back; and sweeps deduplication, lookup, visibility and key-window
-  declarations to show that no second write follows without proven absence
-  or live deduplication.
+  declarations, including no visibility bound, after a lost answer, a lost
+  request or a request that reaches the service only as the connector's
+  `timeout_s` ends, to show that no second write follows without proven
+  absence or live deduplication.
 - Jobs operations have a semantic input digest.
   `smythe.jobs.operation_input_digest()` hashes the provider kind and its
   adapter version (`smythe.jobs.providers.ADAPTER_VERSIONS`), the model,

@@ -6,13 +6,17 @@ connections or from another process, make one dispatch claim and one effect
 on the service: the run's lease fences the other, which gets
 ``WorkflowLeaseError``. Receipts and notices that arrive late, in any order,
 never move an action back. Across deduplication, lookup, visibility and
-key-window declarations, no automatic step makes a second effect: another
-submission follows only a lookup that proved the first was never made, or is
-a same-key retry that the service still deduplicates.
+key-window declarations, a declared visibility bound or none, and a first
+submission whose answer is lost, whose request is lost or whose request
+reaches the service only as the connector's timeout ends, no automatic step
+makes a second effect: another submission follows only a lookup that proved
+the first was never made, or is a same-key retry that the service still
+deduplicates.
 """
 
 from __future__ import annotations
 
+from dataclasses import replace
 import itertools
 import json
 import threading
@@ -372,26 +376,52 @@ GUARANTEES = {
     "neither": {"dedupe": False, "lookup_by_key": False},
     "deduplicates-with-lookup-without-reads": {"dedupe": True, "lookup_by_key": True, "lookup_by_object": False},
 }
-VISIBILITY = (0, 3)  # seconds a commit stays invisible to lookups and reads
-FAULTS = ("answer-lost", "request-lost")
+# Seconds a commit stays invisible to lookups and reads, which the connector declares as its bound.
+# None declares no bound, for a service whose commits stay invisible for UNDECLARED_DELAY seconds:
+# longer than a step's pace inside the window.
+VISIBILITY = (0, 3, None)
+UNDECLARED_DELAY = 8
+FAULTS = ("answer-lost", "request-lost", "request-late")
 PACES = (0, 5, 20)  # seconds the clock moves before each step: before the bound, inside the window, past it
+# A late request is swept where it reaches the service after the declared bound has passed: there
+# only the timeout margin keeps an empty lookup from proving that it was never sent.
+CASES = [(visibility, fault, pace) for visibility, fault, pace in itertools.product(VISIBILITY, FAULTS, PACES)
+         if fault != "request-late" or (visibility is not None and visibility < SWEEP_SETTINGS["timeout_s"])]
 STEPS = {"dispatch": ActionRunner.dispatch, "readback": ActionRunner.readback, "reconcile": ActionRunner.reconcile}
 
 
 class Lossy(FixtureConnector):
-    """Loses the first submission: its request before it reaches the service, or the service's answer."""
+    """Loses the first submission: its request before it reaches the service, or the service's answer.
 
-    def __init__(self, service: FixtureService, fault: str, **settings) -> None:
+    A ``request-late`` fault loses the answer while the request is still on its way: it reaches the
+    service ``timeout_s`` after it was sent, the latest the profile allows, once :meth:`advance`
+    moves the clock that far.
+    """
+
+    def __init__(self, service: FixtureService, fault: str, clock: ManualClock, **settings) -> None:
         super().__init__(service, **settings)
-        self.fault, self.submitted = fault, 0
+        self.fault, self.clock, self.submitted, self.arrival_ns = fault, clock, 0, None
 
     def submit(self, key, intent, payload, timeout_s):
         self.submitted += 1
         if self.submitted == 1:
             if self.fault == "request-lost":
                 raise ConnectorAmbiguous("The connection failed; the request may have been sent")
+            if self.fault == "request-late":
+                self.service.send(key, stored_value(intent, payload), object_id=intent.target.object_id,
+                                  target=Target(intent.target.tenant, intent.target.collection))
+                self.arrival_ns = self.clock.now_ns + round(timeout_s * NS)
+                raise ConnectorAmbiguous("No answer arrived within the timeout")
             self.service.commit_then_drop_ack(key)
         return super().submit(key, intent, payload, timeout_s)
+
+    def advance(self, until_ns: int) -> None:
+        """Move the clock to *until_ns*; a late request reaches the service on the way, at its arrival."""
+        if self.arrival_ns is not None and self.arrival_ns <= until_ns:
+            self.clock.advance_past(self.arrival_ns - 1)  # to the arrival itself
+            self.service.deliver()
+            self.arrival_ns = None
+        self.clock.advance_past(until_ns - 1)
 
 
 @pytest.mark.parametrize("guarantee", GUARANTEES)
@@ -399,10 +429,13 @@ def test_no_second_effect_without_proven_absence_or_live_deduplication(tmp_path,
     clock, host = ManualClock(time.time_ns()), Host()
     with SQLiteWorkflowStore(tmp_path / "runs.db", clock_ns=clock) as store:
         run_id = completed(store, tmp_path, replies, renderer=None)
-        for number, (visibility, fault, pace) in enumerate(itertools.product(VISIBILITY, FAULTS, PACES)):
+        for number, (visibility, fault, pace) in enumerate(CASES):
             case = (guarantee, visibility, fault, pace)
-            service = FixtureService(clock_ns=clock, visibility_delay_s=visibility, **GUARANTEES[guarantee])
-            connector = Lossy(service, fault, **SWEEP_SETTINGS)
+            delay = UNDECLARED_DELAY if visibility is None else visibility
+            service = FixtureService(clock_ns=clock, visibility_delay_s=delay, **GUARANTEES[guarantee])
+            connector = Lossy(service, fault, clock, **SWEEP_SETTINGS)
+            if visibility is None:  # The connector declares no bound for its service's delay.
+                connector.profile = replace(connector.profile, visibility_bound_s=None)
             profile = connector.profile
             action = prepare_action(store, run_id, slot=f"case-{number}", intent=intent(delivered(store, run_id)),
                                     profile=profile)
@@ -417,9 +450,11 @@ def test_no_second_effect_without_proven_absence_or_live_deduplication(tmp_path,
                 step = STEPS.get(progress.next_action)
                 if step is None:
                     break
-                clock.advance(pace)
+                connector.advance(clock.now_ns + pace * NS)
                 progress = step(worker, run_id, action.action_id)
             assert progress.next_action in (None, "operator_review"), case
+            if connector.arrival_ns is not None:  # A late request still on its way arrives.
+                connector.advance(connector.arrival_ns)
 
             delivered_to = submissions(service, action)
             committed = [entry for entry in delivered_to if entry["outcome"] == "committed"]
@@ -427,8 +462,9 @@ def test_no_second_effect_without_proven_absence_or_live_deduplication(tmp_path,
             assert len(committed) <= 1, case
             absence = [finding for finding in records(store.path, action, "finding")
                        if finding["finding"] == "not_executed"]
-            # A lookup proves absence only when nothing was committed.
+            # A lookup proves absence only when nothing was committed, and only past a declared bound.
             assert not absence or fault == "request-lost", case
+            assert not absence or profile.visibility_bound_s is not None, case
             # Each later submission followed proven absence, or was a same-key retry the service
             # still deduplicated inside the declared window.
             attempts = claims(store.path, action)
@@ -448,6 +484,7 @@ def test_no_second_effect_without_proven_absence_or_live_deduplication(tmp_path,
             # A settled action holds what the service shows.
             if progress.state in ("observed", "reconciled"):
                 assert len(committed) == 1, case
-            if fault == "answer-lost":
+            # A request that reached the service made its one effect.
+            if fault != "request-lost":
                 assert len(committed) == 1, case
         assert store.audit(run_id)["ok"]
