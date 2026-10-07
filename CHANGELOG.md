@@ -1648,7 +1648,9 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   `TemplateCatalog(root)` keeps records in append-only,
   owner-only files, `records/<record_sha256>.json` and
   `versions/<template_version>`, published without replacement and never
-  deleted, and `get()` checks each file against its digest.
+  deleted, and `get()` checks each file against its digest. Its
+  `layout.json` records the file layout, version 1, and a catalog in
+  another layout is refused; one without the file is read as layout 1.
   `structure_sha256(graph)` digests a graph's shape without its labels,
   results or history. `distill_template` raises `DistillationError` for a
   graph that cannot be written as a record, such as one whose node depends on

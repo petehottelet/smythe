@@ -713,6 +713,91 @@ def test_a_missing_record_file_is_detected_and_put_publishes_it_again(tmp_path):
     assert catalog.get(record.template_version) == record
 
 
+def _race(monkeypatch, root, folder, rival):
+    """Have another put of *rival* finish first, when this put first publishes into *folder*."""
+    publish = smythe.templates.atomic_publish_bytes
+    raced, lost = [], []
+
+    def publish_after_a_rival(path, data):
+        if not raced and path.parent.name == folder:
+            raced.append(path.name)
+            TemplateCatalog(root).put(rival)
+        try:
+            publish(path, data)
+        except FileExistsError:
+            lost.append(path.name)
+            raise
+
+    monkeypatch.setattr("smythe.templates.atomic_publish_bytes", publish_after_a_rival)
+    return lost
+
+
+@pytest.mark.parametrize("folder", ["records", "versions"])
+def test_a_put_that_loses_a_race_for_the_same_record_succeeds(tmp_path, monkeypatch, folder):
+    record = full_record()
+    lost = _race(monkeypatch, tmp_path, folder, record)
+
+    assert TemplateCatalog(tmp_path).put(record) == record.template_version
+
+    assert lost == [f"{record.record_sha256}.json" if folder == "records"
+                    else record.template_version]
+    assert TemplateCatalog(tmp_path).get(record.template_version) == record
+
+
+def test_a_put_that_loses_a_race_to_another_record_of_its_version_is_refused(
+        tmp_path, monkeypatch):
+    record = full_record()
+    rival = TemplateRecord.from_dict({**record.to_dict(),
+                                      "tests": [{"name": "rival", "sha256": sha256_hex("r")}]})
+    assert rival.template_version == record.template_version
+    lost = _race(monkeypatch, tmp_path, "versions", rival)
+
+    with pytest.raises(TemplateRecordError, match="different record"):
+        TemplateCatalog(tmp_path).put(record)
+
+    assert lost == [record.template_version]
+    assert TemplateCatalog(tmp_path).get(record.template_version) == rival
+
+
+LAYOUT_1 = b'{"layout":1,"type":"smythe.template_catalog"}'
+
+
+def test_the_catalog_records_its_layout(tmp_path):
+    catalog = TemplateCatalog(tmp_path)
+    record = full_record()
+    version = catalog.put(record)
+    assert (tmp_path / "layout.json").read_bytes() == LAYOUT_1
+    assert smythe.templates.TEMPLATE_CATALOG_LAYOUT == 1
+
+    # A catalog written before the layout file existed is read as layout 1.
+    (tmp_path / "layout.json").unlink()
+    assert catalog.get(version) == record and catalog.versions("memo") == [version]
+    assert catalog.put(record) == version
+    assert (tmp_path / "layout.json").read_bytes() == LAYOUT_1
+
+
+@pytest.mark.parametrize("marker,match", [
+    (b'{"layout":2,"type":"smythe.template_catalog"}', "layout 2"),
+    (b'{"layout":1}', "layout 1"),
+    (b"\xff not json", "layout None"),
+    (b"[2]", "layout None"),
+])
+def test_a_catalog_in_another_layout_is_refused(tmp_path, marker, match):
+    catalog = TemplateCatalog(tmp_path)
+    record = full_record()
+    version = catalog.put(record)
+    (tmp_path / "layout.json").write_bytes(marker)
+    newer = TemplateRecord.from_dict({**record.to_dict(), "description": "A shorter memo"})
+    before = snapshot(tmp_path)
+
+    for read in (lambda: catalog.get(version), lambda: catalog.versions("memo"),
+                 lambda: catalog.put(record), lambda: TemplateCatalog(tmp_path).put(newer)):
+        with pytest.raises(TemplateRecordError, match=f"has {match}; this release reads layout 1"):
+            read()
+
+    assert snapshot(tmp_path) == before
+
+
 @pytest.mark.skipif(os.name == "nt", reason="POSIX permission bits")
 def test_catalog_directories_and_files_are_owner_only(tmp_path):
     root = tmp_path / "catalog"
@@ -720,7 +805,7 @@ def test_catalog_directories_and_files_are_owner_only(tmp_path):
     version = TemplateCatalog(root).put(record)
     for path, mode in ((root, 0o700), (root / "records", 0o700), (root / "versions", 0o700),
                        (root / "records" / f"{record.record_sha256}.json", 0o600),
-                       (root / "versions" / version, 0o600)):
+                       (root / "versions" / version, 0o600), (root / "layout.json", 0o600)):
         assert stat.S_IMODE(path.stat().st_mode) == mode, path
 
 
@@ -738,9 +823,10 @@ def test_records_carry_no_paths_or_execution_settings(tmp_path):
     catalog = TemplateCatalog(tmp_path / "catalog")
     version = catalog.put(record)
 
-    texts = [path.read_text(encoding="utf-8") for path in (tmp_path / "catalog").rglob("*")
-             if path.is_file()]
-    assert len(texts) == 2
+    files = sorted(path for path in (tmp_path / "catalog").rglob("*") if path.is_file())
+    assert [path.relative_to(tmp_path / "catalog").as_posix() for path in files] == [
+        "layout.json", f"records/{record.record_sha256}.json", f"versions/{version}"]
+    texts = [path.read_text(encoding="utf-8") for path in files]
     for text in (*texts, json.dumps(catalog.get(version).to_dict())):
         for path in (str(tmp_path), str(tmp_path.resolve()), home):
             assert path not in text and json.dumps(path)[1:-1] not in text

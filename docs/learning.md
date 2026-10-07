@@ -246,6 +246,7 @@ review is not part of `template_version`.
 
 ```text
 <root>/
+  layout.json                    {"layout":1,"type":"smythe.template_catalog"}
   records/<record_sha256>.json   a record's canonical JSON
   versions/<template_version>    the record_sha256 of that version's record
 ```
@@ -260,10 +261,17 @@ catalog.versions("diligence-review")  # every stored version of that name
 ```
 
 - `put(record)` returns the record's template version. Storing a record the
-  catalog already holds writes nothing. A catalog holds one record per
-  version: a different record for a stored version, for example one with
-  other source runs, raises `TemplateRecordError` and the stored record is
-  kept.
+  catalog already holds writes no record or version file. A catalog holds
+  one record per version: a different record for a stored version, for
+  example one with other source runs, raises `TemplateRecordError` and the
+  stored record is kept. Two processes that store the same record at once
+  both succeed.
+- `layout.json` records the catalog's file layout
+  (`smythe.templates.TEMPLATE_CATALOG_LAYOUT`, now 1), so a later layout
+  change is detected rather than misread. A catalog without the file was
+  written before it existed and is read as layout 1; its next `put` adds the
+  file. `put`, `get` and `versions` raise `TemplateRecordError` for a catalog
+  in another layout and write nothing.
 - `get(version)` reads the record again and checks it: the record file's
   SHA-256 must equal its name, and the record must have the version that
   names it. An edited file, including one whose JSON is merely reformatted,
@@ -273,9 +281,10 @@ catalog.versions("diligence-review")  # every stored version of that name
   in digest order, checking each.
 - Files are published whole through a flushed temporary file linked into
   place without replacing an existing file, and nothing is ever deleted. A
-  record is published before the version file that names it, so a process
-  killed during `put` leaves at most a whole record that no version names
-  yet; `get` and `versions` do not see it, and the next `put` completes it.
+  record is published before the version file that names it, and the layout
+  file last, so a process killed during `put` leaves at most a whole record
+  that no version names yet; `get` and `versions` do not see it, and the
+  next `put` completes it.
   A missing root, `records` or `versions` folder is created owner-only
   (0700), and files are owner-only (0600), where the platform supports
   permission bits. Publication needs a filesystem with hard links, such as

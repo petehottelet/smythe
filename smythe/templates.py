@@ -44,12 +44,18 @@ from smythe.validation import ValidatorIdentity
 from smythe.workflow_binding import LocalOnly
 
 __all__ = [
-    "MAX_FAILURE_EXAMPLES", "TEMPLATE_RECORD_TYPE", "TEMPLATE_RECORD_VERSION", "TemplateCatalog",
-    "TemplateRecord", "TemplateRecordError", "distill_record",
+    "MAX_FAILURE_EXAMPLES", "TEMPLATE_CATALOG_LAYOUT", "TEMPLATE_RECORD_TYPE",
+    "TEMPLATE_RECORD_VERSION", "TemplateCatalog", "TemplateRecord", "TemplateRecordError",
+    "distill_record",
 ]
 
 TEMPLATE_RECORD_TYPE = "smythe.template_record"
 TEMPLATE_RECORD_VERSION = 1
+# The catalog's file layout; layout.json records it, and a catalog without
+# that file was written in layout 1.
+TEMPLATE_CATALOG_LAYOUT = 1
+_LAYOUT_FILE = "layout.json"
+_LAYOUT = canonical_bytes({"type": "smythe.template_catalog", "layout": TEMPLATE_CATALOG_LAYOUT})
 # A record keeps failure examples as a category and an evidence digest each.
 MAX_FAILURE_EXAMPLES = 16
 # The fields that decide what a template builds; template_version hashes them.
@@ -518,9 +524,11 @@ class TemplateCatalog:
     ``records/<record_sha256>.json`` holds a record's canonical JSON, so each
     record file is named by the SHA-256 of its bytes, and
     ``versions/<template_version>`` holds the ``record_sha256`` of the one
-    record stored for that version. Files are published whole, never replace
-    an existing file and are never deleted; new directories and files are
-    owner-only where the platform supports it.
+    record stored for that version. ``layout.json`` holds the catalog's
+    layout, :data:`TEMPLATE_CATALOG_LAYOUT`; a catalog without it was written
+    in layout 1, and one in another layout is refused. Files are published
+    whole, never replace an existing file and are never deleted; new
+    directories and files are owner-only where the platform supports it.
     """
 
     def __init__(self, root: str | os.PathLike[str]) -> None:
@@ -529,12 +537,14 @@ class TemplateCatalog:
     def put(self, record: TemplateRecord) -> str:
         """Store *record* and return its template version.
 
-        Storing a record the catalog already holds writes nothing. A
-        different record for a stored version, such as one with other source
-        runs, raises :class:`TemplateRecordError` and the stored one is kept.
+        Storing a record the catalog already holds writes no record or
+        version file. A different record for a stored version, such as one
+        with other source runs, raises :class:`TemplateRecordError` and the
+        stored one is kept.
         """
         if not isinstance(record, TemplateRecord):
             raise TypeError("TemplateCatalog stores TemplateRecord values")
+        self._check_layout()
         data, digest, version = (canonical_bytes(record.to_dict()), record.record_sha256,
                                  record.template_version)
         conflict = f"the catalog holds a different record for template version {version}"
@@ -550,6 +560,8 @@ class TemplateCatalog:
         self._publish("records", f"{digest}.json", data,
                       f"template record {digest} does not match its digest")
         self._publish("versions", version, digest.encode("ascii"), conflict)
+        # Last, so a put interrupted before it leaves a layout 1 catalog.
+        self._publish("", _LAYOUT_FILE, _LAYOUT, "the template catalog layout file changed")
         return version
 
     def get(self, version: str) -> TemplateRecord:
@@ -558,8 +570,10 @@ class TemplateCatalog:
         Raises:
             KeyError: No record is stored for *version*.
             TemplateRecordError: The stored files do not hold this version's
-                record, for example because one was edited.
+                record, for example because one was edited, or the catalog
+                has another layout.
         """
+        self._check_layout()
         digest = self._digest(version)
         try:
             data = self._read("records", f"{digest}.json", MAX_ARTIFACT_BYTES)
@@ -577,6 +591,7 @@ class TemplateCatalog:
 
     def versions(self, name: str) -> list[str]:
         """The stored template versions of the records named *name*, in digest order."""
+        self._check_layout()
         try:
             with os.scandir(self.root / "versions") as entries:
                 found = sorted(entry.name for entry in entries if _HEX.fullmatch(entry.name))
@@ -597,6 +612,19 @@ class TemplateCatalog:
         if stored != content:
             raise TemplateRecordError(problem)
 
+    def _check_layout(self) -> None:
+        try:
+            stored = self._read("", _LAYOUT_FILE, 4096)
+        except KeyError:
+            return  # Written before the layout file existed: layout 1.
+        if stored != _LAYOUT:
+            try:
+                layout = json.loads(stored).get("layout")
+            except (ValueError, AttributeError):
+                layout = None
+            raise TemplateRecordError(f"the template catalog has layout {layout!r}; "
+                                      f"this release reads layout {TEMPLATE_CATALOG_LAYOUT}")
+
     def _digest(self, version: str) -> str:
         if not isinstance(version, str) or _HEX.fullmatch(version) is None:
             raise TemplateRecordError("a template version is 64 lowercase hexadecimal characters")
@@ -606,6 +634,7 @@ class TemplateCatalog:
         return digest
 
     def _read(self, folder: str, name: str, limit: int) -> bytes:
+        where = f"{folder}/{name}".lstrip("/")
         try:
             path = _regular_path(self.root / folder, name)
             with path.open("rb") as stream:
@@ -613,7 +642,7 @@ class TemplateCatalog:
         except FileNotFoundError:
             raise KeyError(name) from None
         except ValueError:
-            raise TemplateRecordError(f"template catalog file {folder}/{name} is not a regular file") from None
+            raise TemplateRecordError(f"template catalog file {where} is not a regular file") from None
         if len(data) > limit:
-            raise TemplateRecordError(f"template catalog file {folder}/{name} is too large")
+            raise TemplateRecordError(f"template catalog file {where} is too large")
         return data
