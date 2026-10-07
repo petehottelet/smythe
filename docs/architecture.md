@@ -449,6 +449,12 @@ constrained tier. The template keeps the graph's dependency edges,
 verification gates, and node failure policies, retries, and timeouts; results,
 costs, and statuses stay behind. The template is an in-memory object that you
 pass to `ConstrainedArchitect`; `PlannerMemory` does not store templates.
+`distill_record` returns the same template as a versioned `TemplateRecord`:
+JSON data with a `template_version` digest, optional applicability,
+prerequisites and evidence sections, and a review that flags labels that
+repeat the source goal. A `TemplateCatalog` keeps records in append-only,
+content-addressed files, and `record.local_only()` pins an exact version in a
+durable run's recipe. See [learning from runs](learning.md).
 
 This keeps learning reviewable: execution history informs future choices, and
 promoted graph structure becomes an explicit template rather than an invisible

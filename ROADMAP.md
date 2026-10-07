@@ -427,7 +427,10 @@ connector or paid run.
    versioned supplemental state with diffs and rollback, extending
    `PlannerMemory` and `distill_template` without mutating the base planner.
    A candidate becomes active only after it beats its predecessor and a
-   simpler alternative on held-out tasks
+   simpler alternative on held-out tasks. In progress: distilled templates
+   are [versioned records](docs/learning.md#template-records) in an
+   append-only catalog, and a durable run pins an exact template version;
+   evaluation, activation and rollback are not built yet
 8. **Native Agent Skills support** — discover the Agent Skills standard
    directly, add Python-backed executable skills, and keep the existing
    OpenClaw and MCP skill providers as inventory sources alongside it.

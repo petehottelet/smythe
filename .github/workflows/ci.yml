@@ -217,3 +217,4 @@ jobs:
           tests/test_optimize_inspection.py
           tests/test_optimize_report_cli.py
           tests/test_optimize_report.py
+          tests/test_template_records.py

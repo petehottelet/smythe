@@ -1566,6 +1566,53 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   a `policy_changed` item for a completed run decided under another one.
   `runs inspect` adds `unknown_cost_calls` to a durable run's `accounting`.
   See [review what needs a decision](docs/runs.md#review-what-needs-a-decision).
+- Applying a repair plan. `Swarm.repair(plan, *, plan_sha256,
+  max_total_budget_usd, reason, sources)` (and `arepair()`) makes the plan
+  again for the same runs and refuses it with `WorkflowConflictError`
+  unless it still has the approved digest. It needs a durable `run_store`
+  and a lineage policy, refuses a configured supervisor, and admits the new
+  runs only when their number times `max_budget_usd` fits
+  `max_total_budget_usd`, refusing an unbounded per-run budget when any may
+  incur charges (`WorkflowBudgetError`); every refusal comes before any run
+  is created or call made. Items are applied in plan order, each once:
+  `recheck` decides the run again and `rerender` publishes its document
+  again, both binding the plan's digest and reason, `regenerate` starts a
+  successor run that keeps the nodes the plan reuses and leaves the
+  repaired run's rows untouched, and `review` is reported. The first item
+  that raises or is not accepted stops the repair without a retry. A
+  `RepairResult` lists each item's outcome, decision, successor and work
+  (new runs, read and model calls, reused nodes, publications and
+  decisions). A successor that has not completed is a repair in progress:
+  it is no archive head, and a plan gives the run it repairs `review`
+  (`repair_in_progress`), naming it in `repairs_in_progress`, until
+  ordinary resume finishes it. Under `LineagePolicy(reuse=False)` a
+  regenerated item keeps no result and runs every node, and its document is
+  byte for byte a new run's. See
+  [apply a repair plan](docs/lineage.md#apply-a-repair-plan).
+- Versioned template records. `distill_record(graph, *, name,
+  description=None, registry=None, require_success=True, source_task=None)`
+  returns a `TemplateRecord`: the distilled blueprint as JSON data (type
+  `smythe.template_record`, version 1) with optional applicability,
+  prerequisites (capabilities, skills, tools and validator identities),
+  expected outputs, up to 16 failure examples by digest, tests, source runs,
+  a parent version and a review. A record never carries MCP servers, models,
+  environment, URLs, tool grants, acceptance policies, budgets, evaluator
+  configuration or paths, and `from_dict()` refuses unknown keys and
+  versions. `template_version` is the digest of the fields that decide what a
+  template builds and `record_sha256` that of the whole record.
+  `to_template()` builds the template `distill_template` returns, which is
+  now built on it, and `local_only()` declares that builder for a durable run
+  as `template:<name>` at the template version, so the recipe pins the exact
+  template. The review lists labels that repeat the source task's goal and
+  leaves them unchanged. `TemplateCatalog(root)` keeps records in append-only,
+  owner-only files, `records/<record_sha256>.json` and
+  `versions/<template_version>`, published without replacement and never
+  deleted, and `get()` checks each file against its digest.
+  `structure_sha256(graph)` digests a graph's shape without its labels,
+  results or history. `distill_template` raises `DistillationError` for a
+  graph that cannot be written as a record, such as one whose node depends on
+  a node the graph does not contain. See
+  [learning from runs](docs/learning.md).
 
 ### Changed
 

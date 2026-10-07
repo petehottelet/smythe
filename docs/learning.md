@@ -1,0 +1,207 @@
+# Learning from runs
+
+Smythe learns from finished runs in two reviewable ways. `PlannerMemory`
+recalls the outcomes of earlier runs into later planning prompts (see the
+[learning loop](architecture.md#learning-loop)). Distillation turns a graph
+that ran into a template that `ConstrainedArchitect` can offer as a menu item,
+so a proven shape is selected instead of planned again.
+
+This page covers distillation, template records, their versions, and the
+template catalog. A record is data: building a template from it, storing it
+and pinning it in a durable run never changes the base planner, and nothing
+is promoted or activated automatically.
+
+## Distill a template
+
+`distill_template(graph, *, name, description=None, registry=None,
+require_success=True)` returns a `SubGraphTemplate`:
+
+```python
+from smythe import ConstrainedArchitect, distill_template
+
+template = distill_template(result.graph, name="diligence-review", registry=swarm.registry)
+architect = ConstrainedArchitect(provider=provider, templates=[template])
+```
+
+What carries over is structure: node ids, labels, dependency edges, required
+capabilities, verification gates (`verifies` and `max_regenerations`), each
+node's failure policy, retries, timeout and `attach_dep_artifacts`, its
+metadata `role`, and, with a registry, each agent's name, persona and
+capabilities. Results, statuses, costs, models and all other metadata stay
+behind. Each build returns new pending nodes and a new registry, and points
+each label at the new task: a `{goal}` placeholder is replaced by the new
+goal, and any other label gets `Apply this step to: <goal>` appended.
+
+`require_success` (the default) refuses a graph with a node that did not
+complete. `DistillationError` is raised for an empty graph, a gate that
+verifies itself or a node the graph does not contain, and a graph that
+cannot be written as a [template record](#template-records), for example
+because a node depends on a node the graph does not contain.
+
+## Template records
+
+`distill_record(graph, *, name, description=None, registry=None,
+require_success=True, source_task=None)` takes the same arguments and
+returns a `TemplateRecord`. `record.to_template()` is the template
+`distill_template` returns, and `distill_template` is built on it.
+
+A record's JSON form:
+
+```text
+{
+  "type": "smythe.template_record",
+  "version": 1,
+  "name": "diligence-review",
+  "description": "...",
+  "blueprint": [{"id", "label", "depends_on", "capabilities",
+                 "profile": {"name", "persona", "capabilities"} or null,
+                 "verifies", "max_regenerations",
+                 "failure_policy": "halt" | "skip" | "retry",
+                 "max_retries", "timeout_s", "attach_dep_artifacts",
+                 "metadata": {"role"}}],
+  "applicability": {"task_families", "keywords", "required_context_keys",
+                    "excluded_task_families"},
+  "prerequisites": {"capabilities", "skills": [{"name", "version"}],
+                    "tools": [{"name", "version", "schema_sha256"}],
+                    "validators": [validator identities]},
+  "expected_outputs": [{"node", "description", "validators"}],
+  "failure_examples": [{"category", "evidence_sha256"}],
+  "tests": [{"name", "sha256"}],
+  "source_runs": [{"execution_id", "structure_sha256", "acceptance"}],
+  "parent_version": "<template version>",
+  "review": {"label_findings": [{"node", "contains_goal", "words"}]}
+}
+```
+
+- **Instructions and structure only.** Labels and personas are the record's
+  instructions. A record never carries MCP servers, models, environment
+  variables, URLs, tool grants, acceptance policies, budgets, evaluator
+  configuration or filesystem paths: no key holds them, and every unknown
+  key is refused. `prerequisites` names what a template expects to find,
+  such as a tool by name, version and schema digest; it grants nothing.
+  Validators appear as `ValidatorIdentity` data (name, version and
+  configuration digest), never as code or configuration.
+- **Optional sections.** Everything after `blueprint` is optional and is
+  omitted when empty, never written as null or an empty list. Lists inside
+  `applicability` and `prerequisites` are sets: they are sorted and hold each
+  item once. A record keeps at most 16 `failure_examples`, each a category
+  and the SHA-256 of its evidence, never the evidence itself. `source_runs`
+  name the runs a template was learned from by execution id, graph
+  [structure digest](#structure-digests) and acceptance decision.
+- **Consistency.** Node ids are unique; `depends_on`, `verifies`, expected
+  outputs and review findings name blueprint nodes; a node neither depends on
+  nor verifies itself; and a record is never its own parent. Digests are
+  64 lowercase hexadecimal characters.
+- **Strict reading.** `TemplateRecord.from_dict()` refuses another `type`, any
+  version other than 1, and any missing or unknown key at every level.
+  `to_dict()` returns detached JSON data; the record's parts are read-only.
+  A record written by `to_dict()` reads back to the same canonical bytes.
+
+## Versions and digests
+
+A record has two SHA-256 digests of canonical JSON (sorted keys, no
+whitespace, UTF-8):
+
+- `template_version` covers what decides what the template builds: the type,
+  version, name, description, blueprint, applicability, prerequisites and
+  expected outputs. Any change to a gate, policy, edge, label, persona or
+  applicability gives a new version. Key order does not change it, and
+  neither do `failure_examples`, `tests`, `source_runs`, `parent_version` or
+  `review`.
+- `record_sha256` covers the whole record.
+
+`parent_version` names the template version a record was derived from.
+
+### Structure digests
+
+`structure_sha256(graph)` (also in `smythe.graph`) is the SHA-256 of a
+graph's shape: each node's id, `depends_on`, `verifies`, required
+capabilities, failure policy, retries, timeout, tool-iteration cap,
+`attach_dep_artifacts`, `max_regenerations` and metadata `role`, in id order.
+Labels, agents, results, statuses and other metadata are left out, so two
+runs of one template on different goals share a structure digest.
+
+## Label review
+
+A distilled label can keep the subject of the task it was learned from,
+such as "Research the European market for solar chargers". `distill_record`
+compares each label with the source goal: `source_task`'s goal, or by
+default the goal of the graph's own `task`. A label that contains the goal,
+compared without case and with runs of whitespace collapsed, or that shares
+two or more of its words of four or more letters, is listed in
+`review["label_findings"]` with its node, whether it contains the whole
+goal, and the shared words.
+
+The review only flags labels for a reviewer. Labels are not changed, and
+each build points them at the new task as before. The review is not part of
+`template_version`.
+
+## The template catalog
+
+`TemplateCatalog(root)` keeps records as append-only files:
+
+```text
+<root>/
+  records/<record_sha256>.json   a record's canonical JSON
+  versions/<template_version>    the record_sha256 of that version's record
+```
+
+```python
+from smythe import TemplateCatalog, distill_record
+
+catalog = TemplateCatalog("templates")
+version = catalog.put(distill_record(result.graph, name="diligence-review"))
+template = catalog.get(version).to_template()
+catalog.versions("diligence-review")  # every stored version of that name
+```
+
+- `put(record)` returns the record's template version. Storing a record the
+  catalog already holds writes nothing. A catalog holds one record per
+  version: a different record for a stored version, for example one with
+  other source runs, raises `TemplateRecordError` and the stored record is
+  kept.
+- `get(version)` reads the record again and checks it: the record file's
+  SHA-256 must equal its name, and the record must have the version that
+  names it. An edited file, including one whose JSON is merely reformatted,
+  raises `TemplateRecordError`, as does a version file whose record is
+  missing; a version the catalog does not hold raises `KeyError`.
+- `versions(name)` lists the stored versions of the records with that name,
+  in digest order, checking each.
+- Files are published whole through a flushed temporary file linked into
+  place without replacing an existing file, and nothing is ever deleted. A
+  record is published before the version file that names it, so a process
+  killed during `put` leaves at most a whole record that no version names
+  yet; `get` and `versions` do not see it, and the next `put` completes it.
+  A missing root, `records` or `versions` folder is created owner-only
+  (0700), and files are owner-only (0600), where the platform supports
+  permission bits. Publication needs a filesystem with hard links, such as
+  NTFS, APFS or ext4.
+
+## Durable runs
+
+A durable run (`run_store=SQLiteWorkflowStore(...)`) accepts only template
+builders declared with `LocalOnly(role="template_builder")`.
+`record.local_only()` is that declaration, with identity `template:<name>`
+and the record's `template_version` as its version:
+
+```python
+from smythe import ConstrainedArchitect, SubGraphTemplate
+
+record = catalog.get(version)
+template = SubGraphTemplate(record.name, record.description, record.local_only())
+architect = ConstrainedArchitect(provider, [template], model="gpt-6-astra")
+```
+
+The run's recipe records the identity and version, so it pins the exact
+template. Resuming the run with a template of another version raises
+`WorkflowConflictError`; resume with the record the catalog holds for the
+saved version instead.
+
+## Limits
+
+- Records hold structure from model output. This release checks their format
+  and consistency, not their limits: it does not yet compare a record's
+  gates, retries and regenerations with the model-plan rules or with the
+  record it came from. Build templates only from records you trust.
+- A catalog has no activation, review or rollback state. Choosing which
+  version a planner offers is the caller's decision.

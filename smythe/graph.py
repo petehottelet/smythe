@@ -9,6 +9,7 @@ import re
 from typing import Any
 from uuid import uuid4
 
+from smythe._canonical import sha256_hex
 from smythe.task import Task, task_to_dict
 
 # The synthesizer's budget and trace key (smythe/synthesizer.py). A node with
@@ -622,3 +623,24 @@ class ExecutionGraph:
 
     def _has_cycle(self) -> bool:
         return _has_cycle_in({node.id: node.depends_on for node in self.nodes})
+
+
+def structure_sha256(graph: ExecutionGraph) -> str:
+    """The SHA-256 of a graph's shape as canonical JSON, in 64 lowercase hex characters.
+
+    The shape is each node's id, ``depends_on``, ``verifies``, required
+    capabilities, failure policy, retries, timeout, tool-iteration cap,
+    ``attach_dep_artifacts``, ``max_regenerations`` and metadata ``role``,
+    in id order. Labels, agents, results, statuses and other metadata are
+    left out, so two runs of one template on different goals share a digest.
+    """
+    return sha256_hex([{
+        "id": node.id, "depends_on": list(node.depends_on), "verifies": node.verifies,
+        "capabilities": list(node.required_capabilities),
+        "failure_policy": FailurePolicy(node.failure_policy).value,
+        "max_retries": node.max_retries, "timeout_s": node.timeout_s,
+        "max_tool_iterations": node.max_tool_iterations,
+        "attach_dep_artifacts": node.attach_dep_artifacts,
+        "max_regenerations": node.max_regenerations,
+        **({"role": node.metadata["role"]} if "role" in node.metadata else {}),
+    } for node in sorted(graph.nodes, key=lambda node: node.id)])
