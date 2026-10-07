@@ -23,6 +23,7 @@ from smythe._run_inspection import (
     list_runs,
     open_checkpoints,
     open_journal,
+    review_run,
 )
 from smythe.jobs.loading import load_manifest
 from smythe.jobs.models import JOB_MANIFEST_V1_JSON_SCHEMA, ManifestValidationError
@@ -380,8 +381,8 @@ def build_parser() -> argparse.ArgumentParser:
 
     runs = root_commands.add_parser(
         "runs",
-        help="inspect saved Swarm checkpoints and durable workflow runs without changing them, "
-             "and revoke external action approvals",
+        help="inspect and review saved Swarm checkpoints and durable workflow runs without "
+             "changing them, and revoke external action approvals",
     )
     _add_runs_output_options(runs, inherited=False)
     runs_commands = runs.add_subparsers(dest="runs_command", required=True)
@@ -396,6 +397,14 @@ def build_parser() -> argparse.ArgumentParser:
     run_listing.add_argument("--limit", type=int, default=50, help="page size (1-500; default: 50)")
     run_listing.add_argument("--offset", type=int, default=0, help="number of runs to skip (default: 0)")
     _add_runs_output_options(run_listing, inherited=True)
+    run_review = runs_commands.add_parser(
+        "review", help="list what in a run, or in the newest runs, needs a decision, without changing them",
+    )
+    run_review.add_argument("run_id", nargs="?", default=None,
+                            help="the run to review; without it, review a page of runs, newest first")
+    run_review.add_argument("--limit", type=int, default=50, help="runs to review (1-500; default: 50)")
+    run_review.add_argument("--offset", type=int, default=0, help="number of runs to skip (default: 0)")
+    _add_runs_output_options(run_review, inherited=True)
     revocation = runs_commands.add_parser(
         "revoke-action",
         help="revoke every approval of an external action, or one approval, without a principal or lease",
@@ -813,6 +822,36 @@ def _emit_job_inspection(value: dict[str, Any]) -> None:
         print(f"HTML report: {_terminal_text(value['report_path'], limit=1000)}")
 
 
+def _review_lines(items: list[dict[str, Any]], label, extra) -> list[str]:
+    """Review items as printed: kind and subject, then what was observed, the decision and commands.
+
+    *label* names an item's subject; *extra* gives an observation's added lines.
+    """
+    lines = []
+    for item in items:
+        observed = item["observed"]
+        lines.append(f"[{item['blocks']}] {item['kind']}: {_terminal_text(label(item))} "
+                     f"(item {item['item_id'][:12]})")
+        state = ", ".join(_terminal_text(part) for part in (observed["status"], observed["error_class"])
+                          if part)
+        lines.append(f"  Observed: {state}")
+        if observed["excerpt"]:
+            lines.append(f"  Detail: {_terminal_text(observed['excerpt'])}")
+        lines.extend(extra(observed))
+        lines.append(f"  Decision: {_terminal_text(item['decision_needed'], limit=1000)}")
+        lines.extend(f"  Resolve with: smythe {_terminal_text(shlex.join(argv), limit=1000)}"
+                     for argv in item["resolve_with"])
+    return lines
+
+
+def _review_notes(items: list[dict[str, Any]], option: str | None) -> list[str]:
+    """The reminder after review items whose commands need the store *option* or a reason."""
+    commands = [argv for item in items for argv in item["resolve_with"]]
+    notes = ([f"add the {option} option used here"] if option and commands else []) + (
+        ["replace REASON with your own reason"] if any("REASON" in argv for argv in commands) else [])
+    return [f"To run a command, {' and '.join(notes)}."] if notes else []
+
+
 def _emit_job_review(value: dict[str, Any], *, store_given: bool) -> None:
     """Print a review packet at once, so an interruption leaves no partial output."""
     page, items = value["page"], value["items"]
@@ -821,21 +860,11 @@ def _emit_job_review(value: dict[str, Any], *, store_given: bool) -> None:
              f"Operations (whole run): {_terminal_text(json.dumps(value['operation_counts'], sort_keys=True))}",
              f"Needs a decision: {len(items)} on operation page {page['returned']} of {page['total']} "
              f"(offset {page['offset']}, limit {page['limit']})"]
-    for item in items:
-        subject, observed = item["subject"], item["observed"]
-        label = subject.get("operation_key") or subject.get("launch_id") or value["run_id"]
-        lines.append(f"[{item['blocks']}] {item['kind']}: {_terminal_text(label)} "
-                     f"(item {item['item_id'][:12]})")
-        state = ", ".join(_terminal_text(part) for part in (observed["status"], observed["error_class"])
-                          if part)
-        lines.append(f"  Observed: {state}")
-        if observed["excerpt"]:
-            lines.append(f"  Detail: {_terminal_text(observed['excerpt'])}")
-        if "exposure_microusd" in observed:
-            lines.append(f"  Kept exposure: {_usd(observed['exposure_microusd'])}")
-        lines.append(f"  Decision: {_terminal_text(item['decision_needed'], limit=1000)}")
-        lines.extend(f"  Resolve with: smythe {_terminal_text(shlex.join(argv), limit=1000)}"
-                     for argv in item["resolve_with"])
+    lines += _review_lines(
+        items, lambda item: (item["subject"].get("operation_key") or item["subject"].get("launch_id")
+                             or value["run_id"]),
+        lambda observed: [f"  Kept exposure: {_usd(observed['exposure_microusd'])}"]
+        if "exposure_microusd" in observed else [])
     if not items:
         lines.append("Nothing on this page needs a decision.")
     if page["has_more"]:
@@ -844,11 +873,37 @@ def _emit_job_review(value: dict[str, Any], *, store_given: bool) -> None:
     if unchecked:
         lines.append(f"Accepted files not hashed within the 64 MiB limit: {unchecked}; "
                      f"smythe jobs reroll {_terminal_text(value['run_id'])} --dry-run hashes them all.")
-    commands = [argv for item in items for argv in item["resolve_with"]]
-    notes = (["add the --store option used here"] if store_given and commands else []) + (
-        ["replace REASON with your own reason"] if any("REASON" in argv for argv in commands) else [])
-    if notes:
-        lines.append(f"To run a command, {' and '.join(notes)}.")
+    lines += _review_notes(items, "--store" if store_given else None)
+    print("\n".join(lines))
+
+
+def _run_review_extra(observed: dict[str, Any]) -> list[str]:
+    """A runs review item's unknown exposure and validators, when it has them."""
+    lines = []
+    if observed.get("unknown_nanousd"):
+        calls = ", ".join(call["call_id"] for call in observed.get("unknown_calls") or ())
+        lines.append(f"  Unknown exposure: {observed['unknown_nanousd']} nanoUSD"
+                     + (f" on calls {_terminal_text(calls, limit=1000)}" if calls else ""))
+    lines.extend(f"  Validator {_terminal_text(result['name'])} {_terminal_text(result['version'])}: "
+                 f"{result['outcome']}" for result in observed.get("validators") or ())
+    return lines
+
+
+def _emit_run_review(value: dict[str, Any], *, journal: bool) -> None:
+    """Print a runs review packet at once, so an interruption leaves no partial output."""
+    page, items = value["page"], value["items"]
+    store = "durable workflow journal" if value["store"] == "journal" else "ordinary checkpoints"
+    lines = [f"Run: {_terminal_text(value['run_id'])} ({store})" if page is None else
+             f"Runs reviewed: {page['returned']} of {page['total']} in {store}, newest first "
+             f"(offset {page['offset']}, limit {page['limit']})", f"Needs a decision: {len(items)}"]
+    lines += _review_lines(items, lambda item: " ".join(
+        f"{key} {name}" if key != "run_id" else str(name) for key, name in item["subject"].items()),
+        _run_review_extra)
+    if not items:
+        lines.append("Nothing needs a decision.")
+    if page is not None and page["has_more"]:
+        lines.append(f"More runs: use --offset {page['offset'] + page['returned']}")
+    lines += _review_notes(items, "--journal" if journal else None)
     print("\n".join(lines))
 
 
@@ -1099,6 +1154,8 @@ def _emit(args: argparse.Namespace, command: str, value: Any) -> None:
     if args.root_command == "runs":
         if command == "list":
             _emit_run_list(value)
+        elif command == "review":
+            _emit_run_review(value, journal=args.journal is not None)
         elif command == "revoke-action":
             revoked = value["revoked"]
             print(f"Revoked {len(revoked)} approvals of {_terminal_text(value['target'])}"
@@ -1526,15 +1583,37 @@ def _revoke_action(args: argparse.Namespace) -> int:
     return EXIT_OK
 
 
+def _open_runs(args: argparse.Namespace) -> Any:
+    if args.journal is not None:
+        return open_journal(args.journal)
+    return open_checkpoints(args.checkpoints if args.checkpoints is not None else _default_checkpoints())
+
+
+def _review_runs(args: argparse.Namespace) -> int:
+    """Review saved runs; an interruption prints only its structured error, never part of the packet."""
+    try:
+        store = _open_runs(args)
+        try:
+            packet = review_run(store, args.run_id, limit=args.limit, offset=args.offset)
+        finally:
+            if args.journal is not None:
+                store.close()
+        # Each format is rendered whole before it is written.
+        _emit(args, "review", packet)
+    except KeyboardInterrupt:
+        _emit_error(args, "review", KeyboardInterrupt("review interrupted"))
+        return EXIT_INTERRUPTED
+    return EXIT_OK
+
+
 def _dispatch_runs(args: argparse.Namespace) -> int:
     if args.journal is not None and args.checkpoints is not None:
         raise ValueError("Choose --checkpoints or --journal, not both")
     if args.runs_command == "revoke-action":
         return _revoke_action(args)
-    if args.journal is not None:
-        store = open_journal(args.journal)
-    else:
-        store = open_checkpoints(args.checkpoints if args.checkpoints is not None else _default_checkpoints())
+    if args.runs_command == "review":
+        return _review_runs(args)
+    store = _open_runs(args)
     try:
         if args.runs_command == "list":
             _emit(args, "list", list_runs(store, limit=args.limit, offset=args.offset))

@@ -541,6 +541,8 @@ the stop after these checks, or `None` without one.
 4. Restores per-node costs into the budget so the resumed run keeps counting against the original cap.
 5. Executes the remaining nodes on the async executor, one at a time unless the resuming Swarm has `parallel=True` (then up to `max_concurrency`), synthesizes over the full graph, decides delivery acceptance under a strict policy, and writes the final checkpoint.
 
+Ordinary checkpoints have no lease or ownership fence: `FileCheckpointStore` keeps whichever snapshot was written last, so resume a run from one process at a time.
+
 The trace on a resumed `SwarmResult` covers only the resumed portion; spans from before the crash are not reconstructed. Its `timing` likewise measures the resuming call, with `resumed` set and `latency_complete` false, and lists the earlier calls' saved segments before its own.
 
 An invalid provider usage report stops the run and preserves its live
@@ -622,3 +624,7 @@ print(store.list_ids())
 `smythe runs list` lists the same ids from the command line with each run's
 state, delivery decision and next action, and `smythe runs inspect <id>` shows
 one checkpoint without changing it; see [Inspect saved runs](runs.md).
+`smythe runs review` lists only what in the most recently saved checkpoints
+needs a decision, such as a failed run, a withheld decision or a strict run
+stopped before its decision; see
+[Review what needs a decision](runs.md#review-what-needs-a-decision).

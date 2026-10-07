@@ -937,7 +937,13 @@ release ([journal upgrades](#journal-upgrades)). From the command line,
 the run's state, its delivery decision, its
 [published document](#published-documents) and its next action through a
 read-only open; see
-[Inspect saved runs](runs.md). Explicit `load_replay()` and
+[Inspect saved runs](runs.md). `smythe runs --journal <path> review` lists
+only what in the newest runs needs a decision, such as a blocked run with
+the calls that hold its unknown exposure, a read sent without a saved
+response, a withheld decision or an action whose outcome is open, with the
+entry point that resolves each; see
+[Review what needs a decision](runs.md#review-what-needs-a-decision).
+Explicit `load_replay()` and
 `load_evidence()` calls expose sensitive saved text and raw provider and read responses;
 protect the database and its SQLite sidecar files accordingly. Since 0.8.1, a
 new database file is created readable and writable by its owner only (mode

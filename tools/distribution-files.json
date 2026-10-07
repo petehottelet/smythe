@@ -246,6 +246,7 @@
     "tests/test_reuse_decisions.py",
     "tests/test_router.py",
     "tests/test_runs_cli.py",
+    "tests/test_runs_review.py",
     "tests/test_security_stop.py",
     "tests/test_selector_comparison.py",
     "tests/test_skills.py",

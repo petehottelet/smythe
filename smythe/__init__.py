@@ -1,6 +1,7 @@
 """Smythe: task-based personalized agent swarms with dynamic execution topology."""
 
 from smythe._failures import RunControl, SecurityStop
+from smythe._run_inspection import review_run
 from smythe.acceptance import (
     AcceptanceDecision,
     AcceptancePolicy,
@@ -230,5 +231,6 @@ __all__ = [
     "inspect_asset",
     "lint_contributions",
     "load_graph",
+    "review_run",
 ]
 __version__ = "0.9.1"

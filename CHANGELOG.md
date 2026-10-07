@@ -1544,6 +1544,28 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   (`review_version: 1`) holds no local paths. In Python,
   `smythe.jobs.inspection.review_job()` returns it. See
   [review what needs attention](docs/jobs.md#review-what-needs-attention).
+- `runs review [RUN_ID] [--limit N] [--offset N]` lists only what in a saved
+  run, or in a page of the newest runs, needs a decision: ordinary
+  checkpoints by when each was last written, or a durable journal's runs by
+  creation, opened read-only, so a version 1 journal is never upgraded.
+  Each run is read once, as `runs inspect` reads it without a lineage run's
+  successors, and its items come from that projection: a security stop; a
+  durable run blocked by a budget overrun, unknown exposure or conflicting
+  evidence, with each unknown call's id and nanoUSD; a failed run; a strict
+  run whose nodes completed without a committed decision, which resume
+  decides again; a read sent without a saved response; a source withdrawn
+  by a restriction, or removed or not held; a damaged published document; a
+  `rejected`, `needs_review` or `indeterminate` decision with its validators
+  and reasons; and external actions waiting for an approval or with an open
+  outcome. A run without an acceptance record has no decision item, and a
+  page of runs reports one it cannot read as `unreadable`. Items have the
+  Jobs review's schema and stable IDs, with the Python entry point that
+  resolves each, or the `runs revoke-action` command that stops further
+  writes; the review exits 0 whether or not anything needs a decision.
+  `smythe.review_run()` returns the packet and, given a strict policy, adds
+  a `policy_changed` item for a completed run decided under another one.
+  `runs inspect` adds `unknown_cost_calls` to a durable run's `accounting`.
+  See [review what needs a decision](docs/runs.md#review-what-needs-a-decision).
 
 ### Changed
 

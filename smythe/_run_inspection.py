@@ -11,8 +11,10 @@ evidence its output carried, the issues left open, a lineage run's summary
 and its external actions, never source text, read bodies, output, approval
 assertions or record payloads.
 :meth:`smythe.swarm.SwarmResult.to_dict` builds its execution, delivery,
-unknown-exposure and next-action blocks with the same functions. Nothing here
-constructs a provider, migrates a journal or writes a file.
+unknown-exposure and next-action blocks with the same functions, and
+:func:`review_run` derives from the same projection only what in a run, or
+in a page of runs, needs a decision. Nothing here constructs a provider,
+migrates a journal or writes a file.
 """
 
 from __future__ import annotations
@@ -27,6 +29,8 @@ from smythe._redact import redact_account_identifiers
 from smythe.acceptance import (
     _OUTPUT_CHANGED,
     AcceptanceDecision,
+    AcceptanceMode,
+    AcceptancePolicy,
     DeliveryAcceptance,
     _delivery_problems,
     task_sha256,
@@ -321,6 +325,7 @@ def _checkpoint_accounting(state: dict[str, Any], graph: ExecutionGraph) -> dict
         "cost_contains_estimates": sentinel.cost_contains_estimates,
         "cost_contains_token_estimates": sentinel.cost_contains_token_estimates,
         "unknown_cost_nodes": unknown,
+        "unknown_cost_calls": None,
         "workflow_accounting": None,
         "unknown_exposure": None,
         "unresolved": unresolved,
@@ -539,7 +544,8 @@ def evidence_view(store: SQLiteWorkflowStore, run_id: str) -> dict[str, Any] | N
 
 
 def lineage_view(store: SQLiteWorkflowStore, run_id: str, recipe: dict[str, Any], completed: bool,
-                 artifact: CurrentArtifact | None, delivery: dict[str, Any]) -> dict | None:
+                 artifact: CurrentArtifact | None, delivery: dict[str, Any], *,
+                 successors: bool = True) -> dict | None:
     """A lineage run's record summarized, with its links and derived status; None without lineage.
 
     It names the record's digest, coverage, nodes by kind and undeclared
@@ -554,21 +560,23 @@ def lineage_view(store: SQLiteWorkflowStore, run_id: str, recipe: dict[str, Any]
     source catalog: supersession, sources withdrawn from the run, the
     document's integrity and the current decision; it is never ``current``
     or ``stale``, which only a repair plan can tell. No text is read out.
+    Finding successors reads every run in the scope: with *successors*
+    false, ``successors`` is None and the status is never ``superseded``.
     """
     policy = recipe.get("lineage")
     if not isinstance(policy, dict):
         return None
     record = load_lineage(store, run_id)
-    _, links = _archive(store, policy["access_scope"])
+    links = _archive(store, policy["access_scope"])[1] if successors else {}
     # A successor that has not completed has no record to name the run yet.
-    successors = [{"run_id": successor, "supersedes": accepted}
-                  for successor, (predecessor, accepted) in links.items()
-                  if predecessor == run_id and accepted is not None]
+    found = [{"run_id": successor, "supersedes": accepted}
+             for successor, (predecessor, accepted) in links.items()
+             if predecessor == run_id and accepted is not None]
     view: dict[str, Any] = {
         "access_scope": policy["access_scope"], "recorded": record is not None,
         "lineage_sha256": None, "coverage": None, "nodes": {}, "undeclared": [], "sources": [],
-        "artifact": None, "predecessor": None, "successors": successors, "tombstones": [],
-        "purged": purged_artifacts(store, run_id)}
+        "artifact": None, "predecessor": None, "successors": found if successors else None,
+        "tombstones": [], "purged": purged_artifacts(store, run_id)}
     reasons = set() if completed else {"run_in_progress"}
     if record is not None:
         references = {(ref["source_id"], ref["version"] or "", ref["sha256"]): dict(ref)
@@ -597,7 +605,7 @@ def lineage_view(store: SQLiteWorkflowStore, run_id: str, recipe: dict[str, Any]
                     sources=[references[key] for key in sorted(references)],
                     predecessor=None if record.predecessor is None else dict(record.predecessor))
     reasons.discard(None)
-    superseded = any(item["supersedes"] for item in successors)
+    superseded = any(item["supersedes"] for item in found)
     return view | {"status": derived_status(reasons, superseded=superseded, sources_checked=False),
                    "reasons": sorted(reasons)}
 
@@ -646,7 +654,8 @@ def issues_view(delivery: dict[str, Any], evidence: dict[str, Any] | None,
     return issues
 
 
-def _journal_view(store: SQLiteWorkflowStore, run_id: str, *, lineage: bool = True) -> dict[str, Any]:
+def _journal_view(store: SQLiteWorkflowStore, run_id: str, *, lineage: bool = True,
+                  successors: bool = True) -> dict[str, Any]:
     from smythe.workflow import _checkpoint_version, revision_log
 
     inspected = store.inspect_run(run_id)
@@ -697,6 +706,10 @@ def _journal_view(store: SQLiteWorkflowStore, run_id: str, *, lineage: bool = Tr
         "cost_contains_estimates": False,
         "cost_contains_token_estimates": False,
         "unknown_cost_nodes": None,
+        "unknown_cost_calls": [
+            {"call_id": call["call_id"], "phase": call["key"]["phase"],
+             "scope_id": call["key"]["scope_id"], "unknown_nanousd": call["unknown_nanousd"]}
+            for call in inspected["calls"] if call["billing_state"] == "unknown"],
         "workflow_accounting": workflow_accounting,
         "unknown_exposure": unknown_exposure(workflow_accounting),
         "unresolved": [f"admission is closed by {blocked}"] if blocked else [],
@@ -726,7 +739,7 @@ def _journal_view(store: SQLiteWorkflowStore, run_id: str, *, lineage: bool = Tr
         "revision_log": revision_log(store, run_id),
         "artifact": None if artifact is None else artifact.to_dict(),
         "lineage": lineage_view(store, run_id, run["config"], state == "completed", artifact,
-                                delivery) if lineage else None,
+                                delivery, successors=successors) if lineage else None,
         "context": context_view(store, run_id, run["config"], checkpoint, graph),
         "tool_calls": tool_calls,
         "evidence": evidence,
@@ -743,14 +756,15 @@ def _journal_view(store: SQLiteWorkflowStore, run_id: str, *, lineage: bool = Tr
 
 
 def inspect_journal(store: SQLiteWorkflowStore, run_id: str, *,
-                    lineage: bool = True) -> dict[str, Any]:
+                    lineage: bool = True, successors: bool = True) -> dict[str, Any]:
     """Project one durable run from a journal opened read-only.
 
     The ``lineage`` block reads every run in the run's access scope to find
-    its successors; ``lineage=False`` leaves it null.
+    its successors; ``lineage=False`` leaves it null, and
+    ``successors=False`` leaves out only the successors.
     """
     try:
-        return _journal_view(store, run_id, lineage=lineage)
+        return _journal_view(store, run_id, lineage=lineage, successors=successors)
     except WorkflowNotFoundError as exc:
         raise RunNotFoundError(f"No durable run {run_id!r} in this journal") from exc
     except (WorkflowError, ValueError, TypeError, KeyError, AttributeError, RecursionError) as exc:
@@ -758,11 +772,31 @@ def inspect_journal(store: SQLiteWorkflowStore, run_id: str, *,
 
 
 def inspect_run(store: FileCheckpointStore | SQLiteWorkflowStore, run_id: str, *,
-                lineage: bool = True) -> dict[str, Any]:
-    """Project one run from either kind of store; *lineage* as for :func:`inspect_journal`."""
+                lineage: bool = True, successors: bool = True) -> dict[str, Any]:
+    """Project one run from either kind of store.
+
+    *lineage* and *successors* apply to a journal, as for :func:`inspect_journal`.
+    """
     if isinstance(store, SQLiteWorkflowStore):
-        return inspect_journal(store, run_id, lineage=lineage)
+        return inspect_journal(store, run_id, lineage=lineage, successors=successors)
     return inspect_checkpoint(store, run_id)
+
+
+def _check_page(limit: Any, offset: Any) -> None:
+    if type(limit) is not int or not 1 <= limit <= MAX_LIST_RUNS:
+        raise ValueError(f"limit must be an integer from 1 to {MAX_LIST_RUNS}")
+    if type(offset) is not int or offset < 0:
+        raise ValueError("offset must be a non-negative integer")
+
+
+def _run_ids(store: FileCheckpointStore | SQLiteWorkflowStore) -> list[str]:
+    """Every run id the store lists: checkpoints by id, journal runs as created."""
+    if not isinstance(store, SQLiteWorkflowStore):
+        return store.list_ids()
+    try:
+        return [run["run_id"] for run in store.list_runs()]
+    except WorkflowError as exc:
+        raise RunInspectionError(f"Cannot list the workflow journal: {exc}") from exc
 
 
 def list_runs(
@@ -773,17 +807,8 @@ def list_runs(
     A run that cannot be read is listed with its error instead of stopping
     the listing.
     """
-    if type(limit) is not int or not 1 <= limit <= MAX_LIST_RUNS:
-        raise ValueError(f"limit must be an integer from 1 to {MAX_LIST_RUNS}")
-    if type(offset) is not int or offset < 0:
-        raise ValueError("offset must be a non-negative integer")
-    if isinstance(store, SQLiteWorkflowStore):
-        try:
-            ids = [run["run_id"] for run in store.list_runs()]
-        except WorkflowError as exc:
-            raise RunInspectionError(f"Cannot list the workflow journal: {exc}") from exc
-    else:
-        ids = store.list_ids()
+    _check_page(limit, offset)
+    ids = _run_ids(store)
     page = ids[offset:offset + limit]
     runs = []
     for run_id in page:
@@ -800,3 +825,300 @@ def list_runs(
     return {"store": "journal" if isinstance(store, SQLiteWorkflowStore) else "checkpoints",
             "total": len(ids), "offset": offset, "limit": limit, "returned": len(runs),
             "has_more": offset + len(page) < len(ids), "runs": runs}
+
+
+# What each kind of runs review item holds back, in the order a review's totals list them.
+_RUN_REVIEW = {
+    **dict.fromkeys(("security_stop", "budget_overrun", "unknown_exposure", "evidence_conflict"),
+                    "admission"),
+    **dict.fromkeys(("unreadable", "run_failed", "decision_uncommitted", "read_unanswered"),
+                    "completion"),
+    **dict.fromkeys(("source_restricted", "source_unavailable", "artifact_integrity", "rejected",
+                     "needs_review", "indeterminate", "policy_changed", "action_approval",
+                     "action_duplicate_risk", "action_outcome_unknown", "action_compensation"),
+                    "delivery"),
+}
+RUN_REVIEW_KINDS = tuple(_RUN_REVIEW)
+# The review item of an external action, by the step it needs next.
+_ACTION_KINDS = {"approve": "action_approval", "approve_duplicate_risk": "action_duplicate_risk",
+                 "reconcile": "action_outcome_unknown", "operator_review": "action_outcome_unknown",
+                 "compensate": "action_compensation"}
+_REEVALUATE = "Swarm.reevaluate(run_id, acceptance=policy)"
+# What each kind of item, a read by its profile, or an action by its next step, asks to decide.
+_RUN_DECIDE = {
+    "security_stop": "A security stop ended the run: nothing resumes, re-evaluates or republishes "
+                     "it, and none of its external actions is dispatched or decided. Once its "
+                     "cause is resolved, run the task again as a new run.",
+    "budget_overrun": "Spending passed the run's budget, so it admits no more calls. Run the task "
+                      "again as a new run.",
+    "unknown_exposure": "Calls were sent without a saved response, so their charges are unknown "
+                        "and the run admits no more calls. Check their charges with the provider "
+                        "or source; the journal cannot reconcile unknown exposure, so once the "
+                        "cause is resolved, run the task again as a new run.",
+    "evidence_conflict": "A call holds two different saved responses, so the run admits no more "
+                         "calls. Investigate the provider's records of the call, then run the task "
+                         "again as a new run.",
+    "unreadable": "The run's saved state cannot be read: it is damaged or foreign, was written by "
+                  "a newer release, or is a checkpoint that resume would refuse. Nothing about it "
+                  "can be decided until it is restored or read by the release that wrote it.",
+    "decision_uncommitted": "Every node completed, but no delivery decision was committed: the run "
+                            "stopped, or is still finishing, between synthesis and its decision. "
+                            "Resuming it finishes synthesis from what was saved and decides on the "
+                            "output again; it never accepts output unchecked. ",
+    "read_again": "A read was sent and no response was saved. Its profile is free and safe to "
+                  "repeat, so once no worker holds the run, resuming it reads again as a new call.",
+    "read_unknown": "A read was sent and no response was saved. Its profile is metered or not safe "
+                    "to repeat, so resuming the run never sends it again: its ceiling becomes "
+                    "unknown exposure and the run is blocked. Check the read with its source first.",
+    "source_restricted": "A source text the run's lineage names was withdrawn, so nothing the run "
+                         "derived is delivered, re-evaluated, reused or published again. Run the "
+                         "task again as a new run, or plan a successor with Swarm.plan_repair once "
+                         "the source catalog describes another text.",
+    "source_unavailable": "The run does not hold this source's text, and nothing rebuilds it from a "
+                          f"copy. Decide the saved output again with {_REEVALUATE}, or run the task "
+                          "again with the source restored; an unfinished run resumes only with "
+                          "other sources.",
+    "artifact_integrity": "The published document no longer holds the decided bytes, so it is not "
+                          "eligible for delivery. Publish it again with "
+                          "Swarm(run_store=...).republish(run_id), which never replaces a file.",
+    "rejected": f"The decision withholds the output. Review it, then decide it again with "
+                f"{_REEVALUATE} under a fixed policy, which runs no node and calls no provider, "
+                "or run the task again.",
+    "needs_review": "The policy left the output, which is withheld, for a person. Record an "
+                    "authorized operator's decision with Swarm.reevaluate(run_id, "
+                    f"operator=OperatorDecision(...)), or decide it again with {_REEVALUATE}.",
+    "indeterminate": f"No valid decision covers the output, which is withheld. Decide it again with "
+                     f"{_REEVALUATE}, or record an authorized operator's decision with "
+                     "operator=OperatorDecision(...). Re-evaluation refuses output, a task or "
+                     "source generations that no longer match the record; only a new run "
+                     "replaces those.",
+    "policy_changed": "The current decision was made under another acceptance policy than the one "
+                      "given, and resume never decides a completed run again. Decide it under the "
+                      f"given policy with {_REEVALUATE}, which runs no node and calls no provider.",
+    "approve": "The action waits for an approval, and is never dispatched without one. Your host's "
+               "verifier authorizes it in Python with smythe.actions.approve(store, action_id, "
+               "assertion, verifier, ...).",
+    "approve_duplicate_risk": "An operator found the last attempt not executed on evidence that "
+                              "cannot prove it, so another dispatch may repeat its effect. Only a "
+                              "new approval that accepts the risk dispatches it: "
+                              "smythe.actions.approve(..., duplicate_risk=True) for "
+                              "duplicate_risk_sha256(store, action_id).",
+    "reconcile": "The action's write may or may not have taken effect, and it keeps its exposure. "
+                 "Reconcile it in Python with ActionRunner(store, connector, verifier).reconcile("
+                 "run_id, action_id), which may send it again with the same key to a service that "
+                 "deduplicates it.",
+    "revoke": " To allow no further write, revoke its approvals first.",
+    "operator_review": "Reconciliation cannot settle the action's outcome. A person checks the "
+                       "service and records adopt_observed, not_executed or abandon, as its state "
+                       "allows, with smythe.actions.resolve(store, action_id, decision, ...).",
+    "compensate": "A read showed that the target does not hold the intended result. Undo it with a "
+                  "separately approved compensation (smythe.actions.prepare_compensation), or "
+                  "record abandon with smythe.actions.resolve.",
+}
+
+
+def _saved_ns(store: FileCheckpointStore, run_id: str) -> int:
+    """When *run_id*'s checkpoint file was last written; 0 when that cannot be read."""
+    try:
+        return store._path(run_id).stat().st_mtime_ns
+    except (OSError, ValueError):
+        return 0
+
+
+def _run_items(view: dict[str, Any], acceptance: AcceptancePolicy | None, observe) -> list[tuple]:
+    """What one inspected run needs decided; see :func:`review_run`.
+
+    Each item is ``(kind, subject, state, observed, decision, commands, reasons)``.
+    """
+    execution, delivery, accounting = view["execution"], view["delivery"], view["accounting"]
+    state, blocked, nodes = execution["state"], execution["blocked_reason"], execution["nodes"]
+    record, detail, decision = delivery["record"], view["next_action"]["detail"], delivery["decision"]
+    found: list[tuple] = []
+
+    def add(kind, subject, recorded, observed, needed=None, commands=(), reasons=()):
+        found.append((kind, subject, recorded, observed, needed or _RUN_DECIDE[kind], commands,
+                      reasons))
+
+    if blocked == "security_stop":
+        # Nothing reopens the run, so nothing else about it can be decided.
+        add(blocked, {}, {"state": state}, observe(state))
+        return found
+    if _RUN_REVIEW.get(blocked) == "admission":
+        calls = accounting["unknown_cost_calls"] or []
+        add(blocked, {}, {"calls": [call["call_id"] for call in calls]},
+            observe(state, unknown_nanousd=accounting["unknown_exposure"]["amount"],
+                    unknown_calls=calls))
+    elif state == "failed":
+        add("run_failed", {}, {"nodes": nodes, "unresolved": accounting["unresolved"]},
+            observe(state, nodes=nodes, unresolved=accounting["unresolved"]),
+            "The run stopped before it completed. " + detail)
+    if (record is not None and record["decision"] == AcceptanceDecision.NOT_EVALUATED.value
+            and state == "running" and nodes and set(nodes) <= {"completed", "skipped"}):
+        add("decision_uncommitted", {}, {"policy_sha256": record["policy_sha256"], "nodes": nodes},
+            observe(state, nodes=nodes), _RUN_DECIDE["decision_uncommitted"] + detail)
+    for call in view["tool_calls"] or ():
+        if call["state"] == "dispatched":
+            again = call["metered"] is False and call["repeat_safe"] is True
+            add("read_unanswered",
+                {key: call[key] for key in ("node_id", "generation", "attempt", "invocation")},
+                {"state": call["state"]},
+                observe(call["state"], profile=call["profile"], metered=call["metered"],
+                        repeat_safe=call["repeat_safe"]),
+                _RUN_DECIDE["read_again" if again else "read_unknown"])
+    lineage = view["lineage"]
+    withdrawn = lineage["tombstones"] if lineage is not None else []
+    if withdrawn:
+        sources = [{key: item[key] for key in ("source_id", "version", "sha256")}
+                   for item in withdrawn]
+        purged = [item["relative_path"] for item in lineage["purged"]]
+        add("source_restricted", {}, {"sources": sources, "purged": purged},
+            observe(state, "; ".join(dict.fromkeys(item["reason"] for item in withdrawn)),
+                    sources=sources, purged=purged),
+            reasons=["source_tombstoned"])
+    else:
+        missing = {item["source_id"]: "removed from the run: " + item["tombstone"]
+                   for item in (view["context"] or {}).get("tombstones", ())}
+        for issue in view["issues"]:
+            if issue["kind"] == "source_unavailable":
+                missing.setdefault(issue["subject"], issue["detail"])
+        for source_id, why in sorted(missing.items()):
+            add("source_unavailable", {"source_id": source_id}, {"detail": why},
+                observe(state, why), reasons=["source_unavailable"])
+    artifact = view["artifact"]
+    damaged = (not withdrawn and artifact is not None and state == "completed"
+               and artifact["integrity"]["status"] != "verified")
+    if damaged:
+        status, publication = artifact["integrity"]["status"], artifact["publication"]
+        add("artifact_integrity", {"publication": publication["sequence"]},
+            {"status": status, "sha256": publication["sha256"]},
+            observe(state, name=publication["name"], integrity=status),
+            reasons=[f"artifact_{status}"])
+    # A decision is reviewed only while the run's sources and published document stand.
+    decided = record is not None and not withdrawn and not damaged
+    if decided and (decision in NOT_ACCEPTED or decision == AcceptanceDecision.INDETERMINATE.value):
+        validators = [{**result["validator"], "outcome": result["outcome"]}
+                      for result in record["validators"]]
+        add(decision, {}, {"sequence": view["decisions"]["current"],
+                           "output_sha256": record["output_sha256"], "reasons": delivery["reasons"]},
+            observe(state, "; ".join(delivery["reasons"]) or None, decision=decision,
+                    integrity=delivery["integrity"], validators=validators),
+            reasons=["decision_not_accepted"])
+    if (decided and acceptance is not None and state == "completed"
+            and delivery["integrity"] == "verified" and record["policy_sha256"] != acceptance.sha256):
+        recorded = sorted(json.dumps(result["validator"], sort_keys=True)
+                          for result in record["validators"])
+        given = sorted(json.dumps(identity.to_dict(), sort_keys=True)
+                       for identity in acceptance.validator_identities)
+        add("policy_changed", {}, {"policy_sha256": record["policy_sha256"],
+                                   "given_sha256": acceptance.sha256,
+                                   "sequence": view["decisions"]["current"]},
+            observe(state, decision=decision, policy_sha256=record["policy_sha256"]),
+            reasons=["validator_set_changed" if recorded != given else "policy_changed"])
+    for entry in (view["actions"] or {}).get("items", ()):
+        step = entry["next_action"]
+        kind = _ACTION_KINDS.get(step)
+        # Content withdrawn from the run takes no new approval.
+        if kind is None or withdrawn and kind in ("action_approval", "action_duplicate_risk"):
+            continue
+        # While an approval is not revoked, reconciliation may write again under it.
+        unrevoked = sum(approval["revoked_at_ns"] is None for approval in entry["approvals"])
+        revoke = step == "reconcile" and unrevoked > 0
+        add(kind, {"action_id": entry["action_id"]},
+            {"state": entry["state"], "attempts": len(entry["attempts"]),
+             "approvals": len(entry["approvals"]), "unrevoked": unrevoked, "next_action": step},
+            observe(entry["state"], slot=entry["slot"], sequence=entry["sequence"],
+                    next_action=step, unknown_nanousd=entry["unknown_nanousd"]),
+            _RUN_DECIDE[step] + (_RUN_DECIDE["revoke"] if revoke else ""),
+            [["runs", "revoke-action", entry["action_id"], "--reason", "REASON"]] if revoke else [])
+    return found
+
+
+def review_run(
+    store: FileCheckpointStore | SQLiteWorkflowStore, run_id: str | None = None, *,
+    limit: int = 50, offset: int = 0, acceptance: AcceptancePolicy | None = None,
+) -> dict[str, Any]:
+    """List only what needs a decision in one saved run, or in a page of runs, changing nothing.
+
+    Each run is read once with :func:`inspect_run`, leaving out the
+    successors that would read every run of a lineage scope, and its items
+    come from that projection: a security stop; a durable run whose budget
+    overran, whose calls hold unknown exposure (each call by id and nanoUSD)
+    or whose responses conflict; a failed run; a strict run whose nodes all
+    completed without a committed decision; a read sent without a saved
+    response; a source withdrawn by a restriction, or removed or not held;
+    a published document that no longer holds the decided bytes; a decision
+    that is ``rejected``, ``needs_review`` or ``indeterminate``, with its
+    validators and reasons; and external actions waiting for an approval or
+    with an outcome left open. A run without a delivery acceptance record
+    has no acceptance item. *acceptance*, a strict policy, adds a
+    ``policy_changed`` item for a completed run whose current decision
+    another policy made. An ordinary run holds no lease, so no item claims
+    who owns it.
+
+    Without *run_id*, the store's runs are reviewed newest first, journal
+    runs by creation and checkpoints by their last save: *limit* (1-500)
+    runs from *offset*, under ``page``, and a run that cannot be read is an
+    ``unreadable`` item. A named run that cannot be read raises as
+    :func:`inspect_run` does. Items have the Jobs review's schema
+    (:data:`smythe.jobs.inspection.REVIEW_VERSION`), with ``run_id`` in
+    every subject, and kinds from :data:`RUN_REVIEW_KINDS`; ``resolve_with``
+    holds ``smythe runs revoke-action`` arguments, without ``--journal``,
+    where a command carries a decision out, and is empty where only the
+    Python entry point that ``decision_needed`` names can. They are ordered
+    by what they hold back, then by run, kind and ``item_id``. Stored text
+    is a capped excerpt with account identifiers redacted and local
+    directories replaced. Nothing is written, migrated or called.
+    """
+    # Imported here: the item schema is the one Jobs reviews use.
+    from smythe.jobs.inspection import (
+        REVIEW_BLOCKS, REVIEW_VERSION, _excerpt, _home, _local_paths, _review_item,
+    )
+
+    _check_page(limit, offset)
+    if acceptance is not None and (not isinstance(acceptance, AcceptancePolicy)
+                                   or acceptance.mode is not AcceptanceMode.STRICT):
+        raise ValueError("acceptance must be a strict AcceptancePolicy")
+    journal = isinstance(store, SQLiteWorkflowStore)
+    paths = _local_paths(((store.path.parent if journal else store._dir, "<store directory>"),
+                          (_home(), "~")))
+
+    def observe(status, text=None, error_class=None, **extra):
+        return {"status": status, "error_class": error_class, "excerpt": _excerpt(text, paths),
+                **extra}
+
+    page = None
+    if run_id is None:
+        ids = _run_ids(store)
+        if journal:
+            ids.reverse()
+        else:
+            ids.sort(key=lambda name: -_saved_ns(store, name))
+        page = {"limit": limit, "offset": offset, "total": len(ids)}
+        ids = ids[offset:offset + limit]
+        page.update(returned=len(ids), has_more=offset + len(ids) < page["total"])
+    else:
+        ids = [run_id]
+    items = []
+    for name in ids:
+        try:
+            view = inspect_run(store, name, successors=False)
+        except (RunInspectionError, RunNotFoundError, ValueError) as exc:
+            if run_id is not None:
+                raise
+            observed = observe(None, str(exc), type(exc).__name__)
+            found = [("unreadable", {}, {"error": observed["excerpt"]}, observed,
+                      _RUN_DECIDE["unreadable"], (), ())]
+        else:
+            found = _run_items(view, acceptance, observe)
+        items += [_review_item(kind, _RUN_REVIEW[kind], name, {"run_id": name, **subject}, state,
+                               observed, decision, commands, reasons)
+                  for kind, subject, state, observed, decision, commands, reasons in found]
+    order = {name: index for index, name in enumerate(ids)}
+    items.sort(key=lambda item: (REVIEW_BLOCKS.index(item["blocks"]),
+                                 order[item["subject"]["run_id"]],
+                                 RUN_REVIEW_KINDS.index(item["kind"]), item["item_id"]))
+    totals = dict.fromkeys(RUN_REVIEW_KINDS, 0)
+    for item in items:
+        totals[item["kind"]] += 1
+    return {"review_version": REVIEW_VERSION, "store": "journal" if journal else "checkpoints",
+            "run_id": run_id, "page": page, "totals": totals, "items": items}

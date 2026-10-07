@@ -211,12 +211,8 @@ def review_job(
                 **extra}
 
     def add(kind, blocks, subject, state, observed, decision, commands=(), reasons=()):
-        items.append({
-            "item_id": sha256_hex({"kind": kind, "run_id": run_id, "subject": subject,
-                                   "state": state}),
-            "kind": kind, "blocks": blocks, "subject": subject, "observed": observed,
-            "reasons": list(reasons), "decision_needed": decision, "resolve_with": list(commands),
-        })
+        items.append(_review_item(kind, blocks, run_id, subject, state, observed, decision,
+                                  commands, reasons))
 
     def command(name, keys=(), *options):
         # Manifest keys start with a letter; a damaged ledger's key still parses after "--".
@@ -339,6 +335,19 @@ def review_job(
         "reviewed_at_ns": snapshot["observed_at_ns"], "operation_counts": snapshot["counts"],
         "cost": snapshot["cost"], "page": snapshot["pagination"], "totals": totals, "items": items,
         "artifact_integrity": summary | {"hash_byte_limit": MAX_INSPECTION_HASH_BYTES},
+    }
+
+
+def _review_item(kind, blocks, run_id, subject, state, observed, decision, commands=(),
+                 reasons=()) -> dict[str, Any]:
+    """One review item; its ``item_id`` hashes the kind, run, subject and the state it depends on.
+
+    Jobs and runs reviews share this item schema (:data:`REVIEW_VERSION`).
+    """
+    return {
+        "item_id": sha256_hex({"kind": kind, "run_id": run_id, "subject": subject, "state": state}),
+        "kind": kind, "blocks": blocks, "subject": subject, "observed": observed,
+        "reasons": list(reasons), "decision_needed": decision, "resolve_with": list(commands),
     }
 
 
