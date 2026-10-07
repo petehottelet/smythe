@@ -632,6 +632,14 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   holdout accounting, but a stored campaign that declares such a field no
   longer runs or resumes. See
   [experiment contracts and budgets](docs/optimize.md#experiment-contracts-and-budgets).
+- `OptimizationRunner(single_change=True)` requires every challenger to
+  differ from the incumbent in exactly one policy path and refuses a plan
+  with a challenger that changes more before the campaign is created.
+  References are not limited. The setting joins the plan hash only when set,
+  so default plan hashes and automatic campaign IDs are unchanged, and an
+  explicit campaign ID created with the other setting is refused as campaign
+  binding drift. See
+  [experiment contracts and budgets](docs/optimize.md#experiment-contracts-and-budgets).
 - Recorded read steps in durable text workflows. A `ReadProfile` declares one
   versioned read: an HTTP `GET` of a URL whose path or query placeholders take
   a step's checked input, a decoder and its version, whether a read can be

@@ -102,6 +102,17 @@ reads field names only; the evaluator decides what each policy value controls,
 so it must not apply a differently named field to acceptance, spend, tools, or
 held-out data.
 
+`OptimizationRunner(..., single_change=True)` holds each challenger to one
+targeted change: it must differ from the incumbent in exactly one policy path,
+counting a path that only one of the two sets. A plan with a challenger that
+changes more is refused with `OptimizationError`, naming the challenger and
+its changed paths, before the campaign is created.
+[References](#reference-arms) are not limited, since they are never promoted.
+The setting joins the plan hash only when it is true, so plans without it keep
+their hashes and automatic campaign IDs, and reopening an explicit campaign ID
+with the other setting is refused as campaign binding drift. It is not part of
+the holdout identity.
+
 Independent implementation ceilings bound otherwise-valid contracts to 1,024
 candidates, 256 parallel candidate series, 10,000 repetitions per split, and
 100,000 trials. Descriptive bootstrap work is capped at 1,000,000 resamples
@@ -389,8 +400,9 @@ promote the candidate. Rejection never emits a patch to apply.
 The optimization plan hash binds the contract, incumbent, ordered challenger
 set, policy hashes, evaluator hash, runner version, promotion method,
 descriptive bootstrap configuration, ledger durability, and required trial
-count, plus any declared [task pools and holdout draw cap](#finite-task-pools)
-and [reference arms](#reference-arms).
+count, plus any declared [task pools and holdout draw cap](#finite-task-pools),
+[reference arms](#reference-arms), and
+[single-change constraint](#experiment-contracts-and-budgets).
 When `--campaign-id` is omitted, the durable campaign identity is
 derived from that full plan. Repeating the same command reuses completed
 trials; changing a candidate, contract, evaluator, bootstrap, or durability
@@ -851,9 +863,9 @@ The following pieces remain future work:
 
 The runner bounds what a campaign may vary:
 [reserved fields](#experiment-contracts-and-budgets) such as acceptance,
-spend, and tool settings cannot be mutable. It does not sandbox evaluator
-code, which runs in the runner's process and decides what each policy value
-controls.
+spend, and tool settings cannot be mutable, and `single_change` limits each
+challenger to one changed field. It does not sandbox evaluator code, which
+runs in the runner's process and decides what each policy value controls.
 
 The installed concurrency campaign is intentionally offline. Custom in-process
 evaluators can use `OptimizationRunner`, but a live evaluator must supply its

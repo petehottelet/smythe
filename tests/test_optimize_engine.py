@@ -373,6 +373,170 @@ async def test_a_stored_campaign_with_a_reserved_path_loads_but_does_not_resume(
         assert len(calls) == evaluated
 
 
+# Two challengers, each with one development trial, and two paired splits of
+# three seeds; a reference adds five more.
+_TWO_FIELD_LIMITS = {"max_candidates": 3, "max_trials": 20, "max_budget_microusd": 200}
+
+
+def _two_field_contract() -> ExperimentContract:
+    return replace(
+        _contract(**_TWO_FIELD_LIMITS),
+        mutable_fields=("strength", "style"),
+        mutable_field_rules={
+            "strength": MutableFieldRule("integer", minimum=1, maximum=8),
+            "style": MutableFieldRule("string", choices=("plain", "bold")),
+        },
+    )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("incumbent_policy", "changed_policy"),
+    [
+        ({"strength": 1, "style": "plain"}, {"strength": 2, "style": "bold"}),
+        ({"strength": 1}, {"style": "bold"}),
+    ],
+    ids=["two-values", "different-path"],
+)
+async def test_single_change_refuses_a_challenger_that_changes_two_paths(
+    tmp_path, incumbent_policy, changed_policy
+):
+    contract = _two_field_contract()
+    incumbent = Candidate(contract=contract, policy=incumbent_policy, hypothesis="incumbent")
+    one = Candidate(
+        contract=contract,
+        policy={**incumbent_policy, "strength": 3},
+        hypothesis="one change",
+        parent=incumbent,
+    )
+    two = Candidate(
+        contract=contract, policy=changed_policy, hypothesis="two changes", parent=incumbent
+    )
+    ledger_path = tmp_path / "single.sqlite3"
+
+    with ExperimentLedger(ledger_path, durability="normal") as ledger:
+        before = _ledger_state(ledger, ledger_path)
+        with pytest.raises(OptimizationError, match="exactly one policy path") as refused:
+            await _runner(contract, ledger, _never_called, single_change=True).run(
+                incumbent, (one, two)
+            )
+        message = str(refused.value)
+        assert two.candidate_id in message
+        assert one.candidate_id not in message
+        assert "strength, style" in message
+        assert _ledger_state(ledger, ledger_path) == before
+
+        # The constraint is opt-in, and a reference is never promoted, so it
+        # may differ in more than one path.
+        assert _runner(contract, ledger, _never_called)._build_plan(incumbent, (one, two))
+        assert _runner(contract, ledger, _never_called, single_change=True)._build_plan(
+            incumbent, (one,), (two,)
+        )
+
+
+@pytest.mark.asyncio
+async def test_single_change_runs_one_path_challengers_and_binds_the_plan(tmp_path):
+    contract = _two_field_contract()
+    incumbent = Candidate(
+        contract=contract, policy={"strength": 1, "style": "plain"}, hypothesis="incumbent"
+    )
+    stronger = Candidate(
+        contract=contract,
+        policy={"strength": 2, "style": "plain"},
+        hypothesis="stronger",
+        parent=incumbent,
+    )
+    # Dropping a path the incumbent sets is also one change.
+    unstyled = Candidate(
+        contract=contract, policy={"strength": 1}, hypothesis="no style", parent=incumbent
+    )
+    challengers = (stronger, unstyled)
+    calls: list[TrialContext] = []
+
+    async def evaluate(context: TrialContext) -> TrialOutcome:
+        calls.append(context)
+        return await _challengers_win(context)
+
+    payload = {
+        "runner_version": 4,
+        "statistics": {"method": PROMOTION_METHOD, "descriptive_bootstrap_resamples": 100},
+        "contract_hash": contract.contract_hash,
+        "incumbent_candidate_id": incumbent.candidate_id,
+        "ordered_candidate_ids": [stronger.candidate_id, unstyled.candidate_id],
+        "ordered_policy_hashes": [stronger.policy_hash, unstyled.policy_hash],
+        "evaluator_hash": EVALUATOR_HASH,
+        "ledger_durability": "normal",
+        "required_trials": 15,
+    }
+
+    with ExperimentLedger(tmp_path / "single.sqlite3", durability="normal") as ledger:
+
+        def plan(**options: object) -> dict:
+            return _runner(contract, ledger, evaluate, **options)._build_plan(
+                incumbent, challengers
+            )
+
+        assert plan()["plan_hash"] == sha256_prefixed(payload)
+        assert plan(single_change=True)["plan_hash"] == sha256_prefixed(
+            {**payload, "single_change": True}
+        )
+        assert plan(single_change=True)["campaign_id"] != plan()["campaign_id"]
+
+        # A campaign sealed without the constraint does not reopen with it.
+        unconstrained = plan(campaign_id="unconstrained")
+        ledger.create_campaign(
+            contract,
+            incumbent.candidate_id,
+            unconstrained["all_candidates"],
+            plan_hash=unconstrained["plan_hash"],
+            campaign_id="unconstrained",
+        )
+        with pytest.raises(OptimizationError, match="campaign binding drift"):
+            await _runner(
+                contract, ledger, evaluate, campaign_id="unconstrained", single_change=True
+            ).run(incumbent, challengers)
+
+        runner = _runner(contract, ledger, evaluate, campaign_id="single", single_change=True)
+        result = await runner.run(incumbent, challengers)
+        assert result.promoted is True
+        assert result.selected_candidate_id == stronger.candidate_id
+        assert result.optimization_plan_hash == plan(single_change=True)["plan_hash"]
+        evaluated = len(calls)
+
+        # Nor does a constrained campaign reopen without it; it still replays.
+        with pytest.raises(OptimizationError, match="campaign binding drift"):
+            await _runner(contract, ledger, evaluate, campaign_id="single").run(
+                incumbent, challengers
+            )
+        replay = await runner.run(incumbent, challengers)
+        assert replay.decision_id == result.decision_id
+        assert len(calls) == evaluated
+
+
+def test_single_change_leaves_the_default_plan_hash_unchanged(tmp_path):
+    contract = _contract()
+    incumbent, challenger = _candidates(contract)
+    # Fixed bytes: a plan without the constraint keeps its earlier identity.
+    golden = "sha256:37830969bc68da4e8b6a5cd8df722bef53c5c03cec600e4f63bb8a99b1c34fbc"
+
+    with ExperimentLedger(tmp_path / "golden.sqlite3", durability="normal") as ledger:
+        for options in ({}, {"single_change": False}):
+            plan = _runner(contract, ledger, _challengers_win, **options)._build_plan(
+                incumbent, (challenger,)
+            )
+            assert plan["plan_hash"] == golden
+            assert plan["campaign_id"] == "optimization_v4_" + golden.removeprefix("sha256:")
+        constrained = _runner(contract, ledger, _challengers_win, single_change=True)
+        assert constrained._build_plan(incumbent, (challenger,))["plan_hash"] != golden
+
+
+@pytest.mark.parametrize("value", [1, "yes", None])
+def test_runner_rejects_a_non_boolean_single_change(tmp_path, value):
+    with ExperimentLedger(tmp_path / "single-type.sqlite3", durability="normal") as ledger:
+        with pytest.raises(TypeError, match="single_change must be a boolean"):
+            _runner(_contract(), ledger, _challengers_win, single_change=value)
+
+
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     "gates",
