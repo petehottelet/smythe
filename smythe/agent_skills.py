@@ -32,6 +32,7 @@ MAX_SKILL_BYTES = 64 * 1024
 MAX_NAME_CHARS = 64
 MAX_DESCRIPTION_CHARS = 1024
 MAX_COMPATIBILITY_CHARS = 500
+_MAX_DETAIL_CHARS = 500
 _NAME = re.compile(r"[a-z0-9]+(?:-[a-z0-9]+)*")
 _FRONTMATTER = re.compile(r"---[ \t]*\n(.*?)^---[ \t]*(?:\n|\Z)", re.DOTALL | re.MULTILINE)
 _KNOWN_FIELDS = frozenset({
@@ -112,6 +113,19 @@ def _shown(value: Any) -> str:
     return type(value).__name__
 
 
+def _clipped(error: Exception) -> str:
+    """A loader's message, cut short: it can quote a tag or alias the whole file long."""
+    detail = str(error)
+    return detail if len(detail) <= _MAX_DETAIL_CHARS else detail[:_MAX_DETAIL_CHARS] + " ..."
+
+
+def _recorded(value: Any, where: str, what: str) -> str:
+    try:
+        return str(value)
+    except ValueError:  # an integer with more digits than Python writes out as text
+        raise AgentSkillError(f"{where}: {what} is a number too long to record") from None
+
+
 def _text(fields: dict[Any, Any], key: str, where: str, limit: int | None = None) -> str | None:
     value = fields.get(key)
     if value is None:
@@ -132,15 +146,20 @@ def parse_skill_md(data: bytes, *, skill_id: str | None = None) -> AgentSkill:
     skill's directory name, which defaults to the name. ``description`` is
     required, at most 1024 characters. ``license`` and ``compatibility`` are
     text, ``metadata`` maps text to text, ``allowed-tools`` is space-separated
-    text or a list, and ``version`` is recorded as text. Any problem raises
-    :class:`AgentSkillError` naming the field.
+    text or a list, and ``version`` is recorded as text. Any problem, frontmatter
+    that YAML cannot load included, raises :class:`AgentSkillError` naming the
+    field, with a message kept short.
     """
     where = "SKILL.md" if skill_id is None else f"Skill {skill_id!r}"
     normalized, frontmatter, body = _split(data, where)
     try:
         fields = yaml.safe_load(frontmatter)
     except yaml.YAMLError as error:
-        raise AgentSkillError(f"{where}: frontmatter is not valid YAML: {error}") from None
+        raise AgentSkillError(f"{where}: frontmatter is not valid YAML: {_clipped(error)}") from None
+    except RecursionError:
+        raise AgentSkillError(f"{where}: frontmatter nests too deeply to load") from None
+    except ValueError as error:  # a date that does not exist, or too many digits
+        raise AgentSkillError(f"{where}: frontmatter holds a value YAML cannot load: {_clipped(error)}") from None
     if not isinstance(fields, dict):
         raise AgentSkillError(f"{where}: frontmatter must be a YAML mapping, not {type(fields).__name__}")
     name = fields.get("name")
@@ -173,11 +192,12 @@ def parse_skill_md(data: bytes, *, skill_id: str | None = None) -> AgentSkill:
     return AgentSkill(
         name=name, description=description, version="sha256:" + _sha256(normalized),
         body_sha256=_sha256(body.encode("utf-8")), skill_id=name if skill_id is None else skill_id,
-        declared_version=None if version is None else str(version),
+        declared_version=None if version is None else _recorded(version, where, "version"),
         declared_allowed_tools=tuple(tools), license=_text(fields, "license", where),
         compatibility=_text(fields, "compatibility", where, MAX_COMPATIBILITY_CHARS),
         metadata=metadata,
-        ignored_fields=tuple(sorted(str(key) for key in fields if key not in _KNOWN_FIELDS)),
+        ignored_fields=tuple(sorted(_recorded(key, where, "a frontmatter key")
+                                    for key in fields if key not in _KNOWN_FIELDS)),
     )
 
 

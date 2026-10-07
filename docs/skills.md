@@ -51,9 +51,11 @@ Collect merged changes and group them by area.
 ```
 
 Only the frontmatter is read as YAML, with `yaml.safe_load`, and it must be a
-mapping. The file may hold at most 64 KiB. These rules raise
-`AgentSkillError`, a `ValueError` that names the skill directory and the
-field and quotes a refused value only when it is short text:
+mapping that loads: invalid YAML, nesting deeper than Python can follow and a
+value such as a date that does not exist are refused. The file may hold at
+most 64 KiB. These rules raise `AgentSkillError`, a `ValueError` that names
+the skill directory and the field and quotes a refused value only when it is
+short text:
 
 - `name` is 1 to 64 lowercase letters, digits and single hyphens, neither
   starting nor ending with a hyphen, and equals its directory name.

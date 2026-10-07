@@ -105,6 +105,16 @@ INVALID = {
     "long-description": (skill_text(description="x" * 1025), "description is longer than 1024 characters"),
     "no-frontmatter": ("# Release notes\n", "must start with YAML frontmatter"),
     "invalid-yaml": ("---\nname: release-notes\ndescription: [x\n---\n", "frontmatter is not valid YAML"),
+    "long-tag": (skill_text(extra=f"released: !{'x' * 50_000} 1\n"),
+                 "frontmatter is not valid YAML: could not determine a constructor for the tag '!xxx"),
+    "deep-nesting": (skill_text(extra=f"nested: {'[' * 20_000}{']' * 20_000}\n"),
+                     "frontmatter nests too deeply to load"),
+    "impossible-date": (skill_text(extra="released: 2024-02-30\n"),
+                        "frontmatter holds a value YAML cannot load: day is out of range"),
+    "long-decimal": (skill_text(extra=f"version: {'9' * 5_000}\n"), "frontmatter holds a value YAML cannot load"),
+    "long-hex-version": (skill_text(extra=f"version: 0x{'f' * 4_000}\n"), "version is a number too long to record"),
+    "long-hex-key": (skill_text(extra=f"? 0x{'f' * 4_000}\n: unknown\n"),
+                     "a frontmatter key is a number too long to record"),
     "metadata-number": (skill_text(extra="metadata:\n  level: 3\n"), "metadata must map text keys to text"),
     "tools-mapping": (skill_text(extra="allowed-tools: {Bash: yes}\n"), "allowed-tools must be text or a list"),
     "license-list": (skill_text(extra="license: [MIT]\n"), "license must be text"),
@@ -118,6 +128,7 @@ def test_invalid_skill_files_are_refused_with_a_clear_message(text, message):
     with pytest.raises(AgentSkillError, match=message) as raised:
         parse_skill_md(text.encode(), skill_id="release-notes")
     assert str(raised.value).startswith("Skill 'release-notes': ")
+    assert len(str(raised.value)) < 1_000
 
 
 def test_a_non_utf8_file_is_refused():

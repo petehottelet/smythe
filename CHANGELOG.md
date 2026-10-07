@@ -1638,17 +1638,17 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   `allowed-tools` and version, never a path or the instructions. Only the
   frontmatter is parsed, with `yaml.safe_load`; `parse_skill_md()` refuses an
   invalid name, a name that differs from its directory, a missing or overlong
-  description, frontmatter that is not a mapping and files over 64 KiB, and
-  the provider refuses one name in two directories and a `SKILL.md` that
-  resolves outside its root, each with an `AgentSkillError` whose message
-  stays short however large the refused value. A skill adds only a
-  capability tag: declared tools are never granted, and its instructions,
-  which `instructions(name)` returns after checking the digest, never enter a
-  prompt. `refresh()` discovers again and returns the changed names. Scripts
-  are never run or imported. `Registry.static_snapshot()` returns a
-  `STATIC_ONLY` registry of each agent's current effective capabilities,
-  which durable runs accept in place of live hydration. See
-  [Skills](docs/skills.md).
+  description, frontmatter that YAML cannot load or that is not a mapping,
+  and files over 64 KiB; the provider refuses one name in two directories
+  and a `SKILL.md` that resolves outside its root. Each refusal is an
+  `AgentSkillError` whose message stays short however large the refused
+  value. A skill adds only a capability tag: declared tools are never
+  granted, and its instructions, which `instructions(name)` returns after
+  checking the digest, never enter a prompt. `refresh()` discovers again and
+  returns the changed names. Scripts are never run or imported.
+  `Registry.static_snapshot()` returns a `STATIC_ONLY` registry of each
+  agent's current effective capabilities, which durable runs accept in place
+  of live hydration. See [Skills](docs/skills.md).
 
 ### Changed
 
