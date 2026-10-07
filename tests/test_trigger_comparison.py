@@ -224,8 +224,14 @@ def test_the_committed_record_is_labeled_and_never_cited_as_a_claim():
     assert record["evidence_status"] == "offline-mechanics" and record["claimable"] is False
     assert record["api_calls"] == 0 and record["default_change"] is False
     assert record["comparison"]["routine_and_triggered_accept_the_same_tasks"] is True
+    assert_mechanics_only(record)
+    # The record was generated from a committed revision with no local changes.
+    assert record["environment"]["source_control"]["dirty"] is False
     for name in ("README.md", "ROADMAP.md"):
         assert "trigger_ablation" not in (ROOT / name).read_text(encoding="utf-8")
+    readme = (ROOT / "benchmarks" / "README.md").read_text(encoding="utf-8")
+    section = readme.split("## Trigger ablation (offline mechanics)", 1)[1].split("\n## ", 1)[0]
+    assert "offline stand-in" in section and "promotes nothing" in section
 
 
 def _review(graph, node, *, evidence: bool) -> dict:
