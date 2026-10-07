@@ -1126,7 +1126,8 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   a later apply must match. Planning opens the journal again read-only,
   takes no lease, writes nothing, calls no provider, reads no source and
   describes each source once; a run that has not completed needs `review`
-  (`run_in_progress`), and a run in another scope is not found.
+  (`run_in_progress`, or `run_failed` for a run that failed or is blocked),
+  and a run in another scope is not found.
   `archive_heads(store, scope)` follows predecessor links: a completed
   successor whose decision is accepted supersedes its predecessor, and one
   whose decision is not supersedes nothing and is not a head.

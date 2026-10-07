@@ -21,8 +21,9 @@ import pytest
 import test_workflow_reuse as successors
 from fixture_service import FixtureService, serve_http
 from smythe import (
-    AcceptancePolicy, ContextSource, CurrentState, LineagePolicy, OfflineProvider, RepairPlan,
-    SimpleArchitect, SourceStatus, SQLiteWorkflowStore, Swarm, Task, TextValidator, archive_heads,
+    AcceptancePolicy, ContextSource, CurrentState, LineagePolicy, OfflineProvider, ReadToolError,
+    RepairPlan, SimpleArchitect, SourceStatus, SQLiteWorkflowStore, Swarm, Task, TextValidator,
+    archive_heads,
 )
 from smythe._canonical import sha256_hex
 from smythe._run_inspection import inspect_journal
@@ -31,7 +32,9 @@ from smythe.lineage import load_lineage
 from smythe.reuse import STATUSES, derived_status, evaluate
 from smythe.workflow_artifact import current_artifact
 from smythe.workflow_store import WorkflowNotFoundError, _canonical, _sha
-from test_workflow_lineage import QUESTION, TEXTS, research, research_graph, serial, strict
+from test_workflow_lineage import (
+    QUESTION, TEXTS, profile, research, research_graph, serial, strict,
+)
 
 SCOPE = "research-team"
 REVISED = "In 2026, monthly billing led renewals."
@@ -318,6 +321,34 @@ def test_a_run_in_progress_needs_review_and_its_lease_is_left_alone(built, tmp_p
     item = listed[run_id]
     assert (item["action"], item["reasons"], item["status"]) == ("review", ["run_in_progress"], None)
     assert (item["lineage_sha256"], item["nodes"], item["work"]) == (None, [], ZERO)
+
+
+def test_a_failed_or_blocked_run_needs_review_and_is_not_called_in_progress(built, tmp_path):
+    with SQLiteWorkflowStore(built.copy(tmp_path)) as store:
+        swarm = built.swarm(store)
+        # A read of a source the service does not have fails the run.
+        graph = research_graph(built.library)
+        graph.nodes = [profile(built.library[2]).step("read-missing", {"source_id": "missing"})]
+        with pytest.raises(ReadToolError):
+            swarm.execute(graph)
+        (failed,) = [run["run_id"] for run in store.list_runs()
+                     if run["run_id"] not in built.runs.values()]
+        assert store.get_checkpoint(failed)["checkpoint"]["status"] == "failed"
+        blocked = swarm.plan(Task(QUESTION)).run_ref["run_id"]
+        store.security_stop(blocked, "credential-leak")
+        waiting = swarm.plan(Task(QUESTION)).run_ref["run_id"]
+        plan = swarm.plan_repair(sources=ServiceCatalog(built.service))
+        inspected = {run_id: inspect_journal(store, run_id)["lineage"]
+                     for run_id in (failed, blocked, waiting)}
+    listed = items(plan)
+    for run_id, code in ((failed, "run_failed"), (blocked, "run_failed"),
+                         (waiting, "run_in_progress")):
+        item = listed[run_id]
+        # Each needs review and has no record, status, nodes or work.
+        assert (item["action"], item["reasons"], item["status"]) == ("review", [code], None)
+        assert (item["lineage_sha256"], item["nodes"], item["work"]) == (None, [], ZERO)
+        assert (inspected[run_id]["reasons"], inspected[run_id]["status"]) == ([code], None)
+    assert derived_status(["run_failed"]) is None
 
 
 # ---------------------------------------------------------------------------

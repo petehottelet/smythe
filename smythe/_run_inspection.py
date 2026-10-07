@@ -61,7 +61,7 @@ from smythe.context import (
 from smythe.evidence import load_source_evidence, load_source_tombstones
 from smythe.graph import ExecutionGraph
 from smythe.lineage import load_lineage, purged_artifacts, restricted_sources
-from smythe.reuse import _INTEGRITY, _archive, _kinds, derived_status
+from smythe.reuse import _INTEGRITY, _archive, _kinds, _unfinished, derived_status
 from smythe.validation import _json_sha256
 from smythe.workflow_artifact import CurrentArtifact, artifact_problems, current_artifact
 from smythe.workflow_store import (
@@ -627,7 +627,7 @@ def lineage_view(store: SQLiteWorkflowStore, run_id: str, recipe: dict[str, Any]
         "lineage_sha256": None, "coverage": None, "nodes": {}, "undeclared": [], "sources": [],
         "artifact": None, "predecessor": None, "successors": found if successors else None,
         "tombstones": [], "purged": purged_artifacts(store, run_id)}
-    reasons = set() if completed else {"run_in_progress"}
+    reasons = set() if completed else {_unfinished(store, run_id)}
     if record is not None:
         references = {(ref["source_id"], ref["version"] or "", ref["sha256"]): dict(ref)
                       for node in record.nodes for ref in node["inputs"]["sources"]}

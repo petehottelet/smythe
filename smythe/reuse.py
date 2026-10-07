@@ -68,7 +68,7 @@ REASONS = MappingProxyType({
     "gate_pair": "regenerate", "reuse_disabled": "regenerate",
     "artifact_missing": "rerender", "artifact_changed": "rerender",
     "validator_set_changed": "recheck", "policy_changed": "recheck",
-    "run_in_progress": "review", "repair_in_progress": "review",
+    "run_in_progress": "review", "run_failed": "review", "repair_in_progress": "review",
     # Only the Jobs repair preview gives it: a provider call may have completed.
     "outcome_unknown": "review",
 })
@@ -468,7 +468,7 @@ def derived_status(reasons: Iterable[str], *, superseded: bool = False,
     reasons = set(reasons)
     if superseded:
         return "superseded"
-    if "run_in_progress" in reasons:
+    if reasons & {"run_in_progress", "run_failed"}:
         return None
     if "source_tombstoned" in reasons:
         return "restricted"
@@ -533,6 +533,16 @@ def archive_heads(store: Any, scope: str) -> list[str]:
     Only reads are made, so a store opened read-only will do.
     """
     return _heads(*_archive(store, scope))
+
+
+def _unfinished(store: Any, run_id: str) -> str:
+    """The reason a run that has not completed gives: ``run_failed`` for one that
+    failed or is blocked, such as by a security stop, else ``run_in_progress``."""
+    if store.load_run(run_id)["status"] == "blocked":
+        return "run_failed"
+    saved = store.get_checkpoint(run_id)
+    failed = saved is not None and saved["checkpoint"].get("status") == "failed"
+    return "run_failed" if failed else "run_in_progress"
 
 
 def _heads(runs: Mapping[str, str], links: Mapping[str, tuple[str, bool | None]]) -> list[str]:
@@ -698,7 +708,8 @@ def repair_plan(store: Any, recipe: Mapping[str, Any], catalog: SourceCatalog,
     once each, in the order given, and a run outside the scope raises
     :class:`~smythe.workflow_store.WorkflowNotFoundError` as an unknown one
     does. A run that has not completed needs ``review``
-    (``run_in_progress``), and so does a run that a successor which has not
+    (``run_in_progress``, or ``run_failed`` for one that failed or is
+    blocked), and so does a run that a successor which has not
     completed repairs (``repair_in_progress``): its item keeps its status and
     names the successor in ``repairs_in_progress``, since that repair
     resumes rather than starting again. Each completed run's published
@@ -730,7 +741,8 @@ def repair_plan(store: Any, recipe: Mapping[str, Any], catalog: SourceCatalog,
                 f"No durable run {run_id!r} in access scope {state.access_scope!r}")
         record, restricted = None, False
         if runs[run_id] != "completed":
-            decision = replace(evaluate(None, state), action="review", reasons=("run_in_progress",))
+            decision = replace(evaluate(None, state), action="review",
+                               reasons=(_unfinished(store, run_id),))
         else:
             record = load_lineage(store, run_id)
             recorded = store.get_checkpoint(run_id)["checkpoint"]["registry"]["agents"]

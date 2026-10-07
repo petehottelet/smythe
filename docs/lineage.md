@@ -507,7 +507,8 @@ calls for, or None where the policy's `undeclared_coverage` decides.
 | `artifact_changed` | `rerender` | The published document holds other bytes. |
 | `validator_set_changed` | `recheck` | The validator set differs. |
 | `policy_changed` | `recheck` | The acceptance policy differs. |
-| `run_in_progress` | `review` | The run has not completed, so it has no record yet; only a [repair plan](#plan-a-repair) gives it. |
+| `run_in_progress` | `review` | The run has not completed, so it has no record yet; a [repair plan](#plan-a-repair) and `smythe runs inspect` give it, never `evaluate`. |
+| `run_failed` | `review` | The run failed or is blocked, such as by a security stop, so it has no record; a [repair plan](#plan-a-repair) and `smythe runs inspect` give it, never `evaluate`. |
 | `repair_in_progress` | `review` | A successor that has not completed is repairing the run; only a [repair plan](#plan-a-repair) gives it. |
 | `outcome_unknown` | `review` | A Jobs provider call's outcome is unknown: it may have completed and been charged. Only the [Jobs repair preview](jobs.md#preview-repairs) gives it. |
 
@@ -556,8 +557,10 @@ with SQLiteWorkflowStore("smythe-runs.db") as store:
   completed run's published document is checked through
   `current_artifact`, the accessor resume and inspection use.
 - **Runs in progress.** A run that has not completed has no record yet. Its
-  item needs `review` with `run_in_progress`, and has no status, no nodes
-  and no work.
+  item needs `review` with `run_in_progress`, or `run_failed` when its last
+  checkpoint failed or it is blocked, such as by a security stop, and has no
+  status, no nodes and no work. [`smythe runs inspect`](runs.md#lineage)
+  gives a lineage run that has not completed the same code.
 - **Repairs in progress.** A run that a successor which has not completed
   is repairing, such as one a lost process left, needs `review` with
   `repair_in_progress` added to its decision's reasons, so the plan never
