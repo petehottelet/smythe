@@ -210,6 +210,7 @@ jobs:
           tests/test_workflow_process_loss.py
           tests/test_workflow_drain.py
           tests/test_action_process_loss.py
+          tests/test_action_conformance.py
           tests/test_workflow_repair_process_loss.py
           tests/test_optimize_lease.py
           tests/test_memory.py

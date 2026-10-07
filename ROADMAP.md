@@ -371,7 +371,18 @@ connector or paid run.
    checked again before dispatch. One connector gets a stable action identity
    across retries, a receipt per action and independent readback: a write
    whose acknowledgment is lost is reconciled or reported as unresolved, never
-   blindly repeated
+   blindly repeated. In progress: a completed durable run whose strict
+   delivery acceptance is `accepted` can [deliver that output](docs/actions.md)
+   through a host connector. An approval binds a principal your host verifies
+   to the exact intent, with a ceiling and an expiry; it is checked again
+   before every dispatch, and rejection, revocation and a run's action stop
+   are kept in the journal across restarts. Each action sends one key on
+   every attempt and records each receipt, and only a read of the target
+   settles its result. A write whose answer is lost is reconciled from
+   lookups or a deduplicated retry where the connector declares them, or left
+   for an operator's verified decision. The offline
+   [governed-publication example](examples/19_governed_publication.py) runs
+   the path end to end. Approval gates inside a run's graph are not covered
 3. **Evidence-triggered control** — replace routine model supervision calls
    with deterministic stage and anomaly triggers; reserve LLM review for a
    result that supplies evidence the pending plan should change. A replan

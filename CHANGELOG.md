@@ -393,6 +393,25 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   never upgrades a version 1 journal. See
   [operator decisions](docs/actions.md#operator-decisions) and
   [external actions in runs inspect](docs/runs.md#external-actions).
+- [`examples/19_governed_publication.py`](examples/19_governed_publication.py)
+  delivers a strict durable run's accepted document to an in-memory
+  publishing service, offline and without keys. It prepares the action,
+  approves it through a local HMAC approval host, loses the first
+  submission's answer after the service commits it, shows
+  `smythe runs inspect` exiting with 12, reconciles the action from a lookup
+  and a readback with one write on the service, and prints its inspection.
+  `tests/test_examples_smoke.py` runs it. The
+  [external actions guide](docs/actions.md) says where actions run, what a
+  connector must declare and which guarantees the tests check, and the
+  [support matrix](docs/support-matrix.md#external-actions) lists external
+  actions as supported only on completed durable text workflows whose strict
+  delivery acceptance is `accepted`, and unsupported on ordinary runs and
+  Jobs, with the test behind each row. `tests/test_action_conformance.py`
+  races two workers, in threads and across processes, to one dispatch claim
+  and one write; relays receipts and notices out of order without moving an
+  action back; and sweeps deduplication, lookup, visibility and key-window
+  declarations to show that no second write follows without proven absence
+  or live deduplication.
 - Jobs operations have a semantic input digest.
   `smythe.jobs.operation_input_digest()` hashes the provider kind and its
   adapter version (`smythe.jobs.providers.ADAPTER_VERSIONS`), the model,

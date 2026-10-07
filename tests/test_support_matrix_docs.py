@@ -30,6 +30,17 @@ def test_page_cites_tests_for_every_execution_path():
         assert any(node.startswith(f"tests/{module}::") for node in cited), module
 
 
+def test_the_external_actions_section_cites_each_path_and_the_conformance_tests():
+    text = PAGE.read_text(encoding="utf-8")
+    section = text.split("\n## External actions\n", 1)[1].split("\n## ", 1)[0]
+    cited = set(NODE_ID.findall(section))
+    for module in ("test_action_approvals.py", "test_action_conformance.py", "test_action_reconciliation.py",
+                   "test_action_runner.py", "test_action_process_loss.py", "test_support_matrix.py"):
+        assert any(node.startswith(f"tests/{module}::") for node in cited), module
+    for path in ("Durable text workflows", "Ordinary runs", "Jobs"):
+        assert f"| {path} |" in section, path
+
+
 def test_every_cited_test_exists():
     cited = cited_node_ids()
     collected = collected_node_ids(sorted({node.split("::")[0] for node in cited}))

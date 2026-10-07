@@ -325,7 +325,12 @@ accepts today, with the test behind each cell. The
 [source-to-artifact example](examples/16_source_to_artifact.py) runs a
 durable research workflow offline and without keys, from bundled sources
 through an interruption and resume to an accepted document whose evidence
-`smythe runs inspect` reports.
+`smythe runs inspect` reports. In preview,
+[external actions](docs/actions.md) deliver a strict durable run's accepted
+output to another service under an approval your host verifies; the
+offline [governed-publication example](examples/19_governed_publication.py)
+loses a write's answer and reconciles it from the service's records without
+writing again.
 
 The [Noumenon screensaver](https://github.com/petehottelet/noumenon) renders
 Smythe's glyph catalog, with a web explorer and native Windows, macOS and Linux

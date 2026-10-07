@@ -1,6 +1,6 @@
 # Smythe examples
 
-Examples 01–05, 08–18, and the acquisition-diligence example run offline
+Examples 01–05, 08–19 and the acquisition-diligence example run offline
 out of the box. A built-in `DemoProvider` returns deterministic responses so
 you can inspect planning, fan-out, budgets, recovery, and synthesis without an
 API key. Examples 06 and 07 are live MCP integration tours. These examples
@@ -12,10 +12,11 @@ pip install -e .            # from the repo root
 python examples/14_durable_text_workflow.py
 ```
 
-Examples 14, 15, 16, 17 and 18 explicitly select fixture responses even when API keys are set.
+Examples 14, 15, 16, 17, 18 and 19 explicitly select fixture responses even when API keys are set.
 Example 14 demonstrates planning, execution and recovery with zero provider calls.
 Examples 16 and 18 read their bundled sources from a server they start on the
-loopback address and make no other network request.
+loopback address and make no other network request. Example 19 publishes to an
+in-memory service it defines and makes no network request.
 The [0.9.1 release guide](../docs/release-0.9.1.md) covers upgrading from 0.9.0,
 the [0.9.0 guide](../docs/release-0.9.0.md) upgrading from 0.8.2, the
 [0.8.2 guide](../docs/release-0.8.2.md) upgrading from 0.8.1, the
@@ -107,4 +108,5 @@ Use a new output filename for each export.
 | [16_source_to_artifact.py](16_source_to_artifact.py) | A durable research run from [bundled sources](source_to_artifact/sources/) to an accepted document: plan the reads, fetch each source with a [journaled read step](../docs/workflow-accounting.md#recorded-read-steps), stop the run part way as a lost process would, resume without reading a saved source again, publish the brief with its [source evidence](../docs/source-evidence.md), accept it under a strict policy, and [inspect](../docs/runs.md#research-runs) the document, reads, evidence and open questions. |
 | [17_contribution_templates.py](17_contribution_templates.py) | `SubGraphTemplate` values whose parallel workers each contribute something distinct: one extractor per source, one review by specialists with their own personas and capabilities, and documents that can each be checked alone. A `WhiteRabbit` routes the task to a `ConstrainedArchitect` that composes them, and the [contribution lint](../docs/architecture.md#contribution-lint) flags nothing in that plan. The lint records a repeated fan-out of identical workers under `graph.planning["coordination"]` and leaves the plan unchanged. |
 | [18_archive_maintenance.py](18_archive_maintenance.py) | Maintain an archive of four accepted briefs with [artifact lineage](../docs/lineage.md). One shared source gets a new version, one published brief is damaged and one final validator's version is bumped. A [repair plan](../docs/lineage.md#plan-a-repair) shows before anything runs that the two briefs reading the revised source regenerate only its read, its extraction and the brief, that the damaged brief is published again and that the untouched one is decided again. [Applying it](../docs/lineage.md#apply-a-repair-plan) does that under an explicit allowance. A full recomputation in a second journal publishes the same bytes with the same decisions, and a table compares the reads, model steps, local steps, publications, acceptance evaluations and new runs each took. |
+| [19_governed_publication.py](19_governed_publication.py) | An accepted document delivered to another service as a governed [external action](../docs/actions.md): a strict durable run publishes a release announcement, the journal prepares an action bound to its exact bytes, an approval verified by a local approval host authorizes it, and the first submission commits but loses its answer. `smythe runs inspect` exits with 12 until [reconciliation](../docs/actions.md#reconciliation) finds the key, reads the post back and reconciles the action with one write on the service. |
 | [acquisition_diligence/](acquisition_diligence/) | **Complete acquisition-diligence example.** Task intake → generated `fork-join → adversarial → serial` topology → parallel specialists → red-team review → final memo, with committed expected artifacts (graph, trace, memo). |

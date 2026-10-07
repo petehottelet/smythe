@@ -530,5 +530,66 @@ Tests:
   `tests/test_jobs_runner.py::test_registered_validator_checks_the_published_bytes_and_is_recorded`,
   `tests/test_jobs_runner.py::test_validator_errors_are_indeterminate_and_never_unknown_outcomes`.
 
+## External actions
+
+[External actions](actions.md), a preview, deliver a durable run's accepted
+output to another service through your connector once the run has
+completed. They are journal records outside every run's graph.
+
+| Path | External actions |
+|---|---|
+| Durable text workflows | Supported once the run has completed under a strict acceptance policy whose current decision is `accepted`, an operator's acceptance included. `ActionNotAuthorized` refuses an advisory run, a `rejected`, `needs_review` or `indeterminate` decision, an unfinished run, content other than the accepted output, and every action of a run that a security stop holds |
+| Ordinary runs | Unsupported: no journal holds the run, so `prepare_action()` raises `WorkflowNotFoundError` |
+| Jobs | Unsupported: manifest profiles take only the `offline`, `openai_image` and `gemini_image` providers, none of which writes to another service |
+
+A connector declares what its service guarantees in its `ConnectorProfile`
+(see [what a connector declares](actions.md#what-a-connector-declares)), and
+the runner does only what the declarations allow:
+
+| Declaration | With it | Without it |
+|---|---|---|
+| `lookup_by_key` | After a lost answer, looks the key up and reads a found receipt's object back | No lookup |
+| `visibility_bound_s` | An empty lookup shows the write was never made once the bound plus `timeout_s` has passed since the dispatch, while the key's window is open | An empty lookup proves nothing |
+| `deduplicates`, `dedupe_window_s` | One same-key retry per reconciliation while the window is open, within `max_attempts` | No retry |
+| `lookup_by_object` | Reads the object a receipt names and checks its bytes, key and version | No read confirms a receipt; an operator decides |
+| `compensation="new_action"` | A separately approved action can undo an effect | The action stays `compensation_required` with its exposure |
+
+The connector must be synchronous, must not retry on its own, and must
+present the profile the action was prepared with.
+
+Tests:
+
+- Paths: accepted `tests/test_action_approvals.py::test_an_accepted_run_prepares_an_action_bound_to_its_published_document`,
+  `tests/test_action_approvals.py::test_a_run_without_a_renderer_binds_its_output`
+  and `tests/test_action_approvals.py::test_actions_can_be_prepared_only_after_an_operator_acceptance`;
+  refused `tests/test_action_approvals.py::test_only_an_accepted_run_can_prepare_actions`,
+  `tests/test_action_approvals.py::test_an_unfinished_run_cannot_prepare_actions`,
+  `tests/test_action_approvals.py::test_content_other_than_the_accepted_output_is_refused`
+  and `tests/test_action_runner.py::test_a_security_stop_refuses_the_dispatch`;
+  ordinary runs `tests/test_action_conformance.py::test_an_ordinary_run_has_no_journal_record_an_action_could_bind`;
+  Jobs `tests/test_support_matrix.py::test_jobs_manifest_accepts_only_image_provider_kinds`.
+- Declarations: lookup `tests/test_action_reconciliation.py::test_a_lost_acknowledgement_is_reconciled_from_a_lookup_and_a_read`;
+  visibility `tests/test_action_reconciliation.py::test_empty_lookups_before_a_visibility_bound_never_resubmit`
+  and `tests/test_action_reconciliation.py::test_past_the_visibility_bound_a_lookup_settles_the_outcome`;
+  key window `tests/test_action_reconciliation.py::test_an_expired_key_window_never_counts_an_empty_lookup_as_absence`
+  and `tests/test_action_reconciliation.py::test_no_retry_once_the_key_window_may_have_closed`;
+  deduplication `tests/test_action_reconciliation.py::test_a_deduplicating_service_gets_one_same_key_retry`;
+  neither lookup nor deduplication `tests/test_action_reconciliation.py::test_without_lookup_or_deduplication_the_outcome_stays_unresolved_at_once`;
+  reads `tests/test_action_runner.py::test_one_submission_then_an_independent_read_observes_the_intended_state`
+  and `tests/test_action_runner.py::test_a_connector_without_reads_leaves_the_result_to_reconciliation`;
+  compensation `tests/test_action_compensation.py::test_a_compensation_needs_its_own_approval_and_gets_its_own_attempt_and_receipt`
+  and `tests/test_action_compensation.py::test_a_connector_without_compensation_leaves_the_action_compensation_required_with_its_exposure`;
+  invalid declarations `tests/test_action_contract.py::test_profile_validation_rejects_invalid_declarations`;
+  connectors `tests/test_action_runner.py::test_a_runner_refuses_a_connector_that_retries_and_async_host_code`
+  and `tests/test_action_runner.py::test_a_connector_with_another_profile_is_refused`.
+- Every combination of declarations, after a lost answer or a lost request:
+  `tests/test_action_conformance.py::test_no_second_effect_without_proven_absence_or_live_deduplication`.
+- Competing workers: `tests/test_action_conformance.py::test_two_threads_racing_to_dispatch_make_one_claim_and_one_effect`
+  and `tests/test_action_conformance.py::test_a_worker_in_another_process_and_a_local_worker_race_and_one_claims`.
+- Events out of order: `tests/test_action_conformance.py::test_receipts_and_notices_in_any_order_never_move_an_action_back`,
+  `tests/test_action_runner.py::test_a_late_receipt_after_a_newer_attempt_is_kept_and_the_state_does_not_regress`
+  and `tests/test_action_runner.py::test_forged_notices_never_complete_an_action`.
+- Process loss: `tests/test_action_process_loss.py::test_a_restarted_worker_reconciles_a_killed_dispatch_without_a_second_write`.
+
 [Documentation map](index.md) · [Architecture](architecture.md) ·
 [Roadmap](../ROADMAP.md)

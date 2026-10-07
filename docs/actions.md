@@ -16,7 +16,10 @@ service's [notices](#notices) as untrusted records.
 that reconciliation left open, and [inspection](#inspecting-actions) shows
 what each action needs next. These types and functions may
 change before they leave preview. `import smythe` loads neither module;
-import them explicitly.
+import them explicitly. Actions run only after a
+[strict durable run](#where-actions-run) has accepted its output, and the
+[offline walkthrough](#an-offline-walkthrough) runs the whole path without
+keys.
 
 An external action has three parts that this page describes:
 
@@ -28,6 +31,27 @@ An external action has three parts that this page describes:
 
 A retry is another attempt of the same logical action, under the same intent
 and key. A changed intent is a different action, never a retry.
+
+## Where actions run
+
+An action delivers the accepted output of a completed
+[durable text workflow](workflow-accounting.md). It belongs to the run's
+journal, not to its graph: no node, generated plan, supervisor revision,
+source text or model output can create, approve or dispatch one, and the
+run's strict acceptance policy has decided on the exact content before
+anything is prepared.
+
+| Path | External actions |
+|---|---|
+| Durable text workflows with a strict acceptance policy | Supported once the run has completed and its current delivery decision is `accepted`, made by the policy, a re-evaluation or an operator |
+| Other durable text workflows | Refused: an advisory run has no decision, and a `rejected`, `needs_review` or `indeterminate` decision delivers nothing |
+| Ordinary runs | Unsupported: they keep no journal, so an action has no run record to bind |
+| Jobs | Unsupported: a manifest's profiles only generate artifacts, and none writes to another service |
+
+Smythe ships the contract, the journal and the runner, but no connector and
+no approval verifier: both are your host's code. The
+[support matrix](support-matrix.md#external-actions) names the test behind
+each row and each guarantee below.
 
 ## Intent identity
 
@@ -129,6 +153,32 @@ Seconds must be finite and non-negative, and positive for `timeout_s` and
 `dedupe_window_s`. Ceilings and counts are non-negative integers, and
 `max_attempts` is at least 1. `to_dict()` omits settings at their defaults, and
 `ConnectorProfile.from_dict()` refuses unknown keys.
+
+### What a connector declares
+
+The runner relies on each declaration and cannot check it against the
+service, so declare only what the service guarantees for an action's key
+within the target's tenant:
+
+- `deduplicates` only when the service answers a repeated key from its
+  earlier commit instead of writing again, and `dedupe_window_s` as the
+  shortest time it remembers a key.
+- `lookup_by_key` only when `lookup()` finds a committed key for that long,
+  or without expiry for a service that does not deduplicate.
+- `visibility_bound_s` only when the service bounds how long a commit can
+  stay invisible to lookups and reads.
+- `lookup_by_object` only when `read()` returns the object's exact current
+  bytes, with its version and the key that wrote it where the service
+  exposes them.
+- `timeout_s` as the longest one call can take to reach the service; a
+  request that arrives later is outside the contract.
+- `compensation="new_action"` only when a separate write can undo an effect.
+
+Declaring less is always safe: without lookup or deduplication, an unknown
+outcome waits for an [operator](#operator-decisions) and nothing is sent
+again. Declaring more than the service guarantees is not: it can make an
+empty lookup a false proof that a write was never made, or a retry a second
+effect.
 
 ## Connectors and approval verifiers
 
@@ -980,3 +1030,48 @@ exits with 12 while accepted output has an unresolved action, and
 fail-safe [`revoke()`](#approvals). Decisions and approvals stay in the
 Python API, because only your host can construct the verifier and the
 connector.
+
+## An offline walkthrough
+
+[`examples/19_governed_publication.py`](../examples/19_governed_publication.py)
+runs the whole path without keys or network access:
+
+1. A strict durable run publishes a release announcement, and a final
+   validator accepts the document's exact bytes.
+2. `prepare_action()` binds those bytes to a publishing service's
+   connector profile, and inspection names `approve` as the next action.
+3. An assertion from a local HMAC approval host for another intent is
+   refused; one for the action's intent digest approves it, up to its
+   ceiling, for one hour.
+4. The first submission commits on the service, but its answer is lost: the
+   action is `outcome_unknown`, and `smythe runs inspect` exits with 12.
+5. `reconcile()` finds the key with a lookup, reads the post back and
+   reconciles the action. The service holds one post from one submission,
+   and the receipt the lookup found confirms the write's cost, so no unknown
+   exposure remains.
+6. Inspection shows the attempt, the approval and the lookup and readback
+   records, never the assertion or the document.
+
+Its in-memory service, connector and approval host are short examples of
+the protocols on this page, not code that Smythe ships.
+
+## Guarantees under test
+
+These hold for every connector that declares only what its service
+guarantees, and the [support matrix](support-matrix.md#external-actions)
+cites the test behind each:
+
+- Two workers that race to dispatch one action, in one process with their
+  own journal connections or in two processes, make one dispatch claim and
+  one write. The run's lease fences the other, which raises
+  `WorkflowLeaseError` before it reads the payload.
+- Receipts and notices that arrive late and in any order, including the
+  answer to a copy the service deduplicated and a forged notice, are kept
+  as records and never move an action back to an earlier state.
+- Under every combination of deduplication, lookup by key, visibility bound
+  and key window, a lost answer or a lost request never leads to a second
+  write. Another submission follows only a lookup that proved the first was
+  never made, or is a same-key retry inside the declared deduplication
+  window, which the service answers from its earlier commit.
+- A worker killed while its write is in flight leaves an unknown outcome,
+  which a restarted worker reconciles without writing again.
