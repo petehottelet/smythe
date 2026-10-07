@@ -478,6 +478,72 @@ def test_label_review_names_labels_that_contain_the_source_goal():
     assert unreviewed.template_version == record.template_version
 
 
+def test_review_names_labels_personas_and_descriptions_holding_a_path():
+    graph, registry = _completed_graph()
+    research, review = graph.nodes
+    research.label = r"Summarize D:\exports\q3.csv"
+    registry.get(review.agent_id).profile.persona = "Read ~/notes before you start."
+
+    record = distill_record(graph, name="t", registry=registry,
+                            description="Reports kept under /srv/reports")
+
+    assert record.to_dict()["review"] == {"path_findings": [
+        {"node": None, "field": "description"},
+        {"node": "research", "field": "label"},
+        {"node": "review", "field": "persona"},
+    ]}
+    # Flagged, not changed, and kept out of the template version.
+    assert record.blueprint[0]["label"] == r"Summarize D:\exports\q3.csv"
+    unreviewed = TemplateRecord.from_dict(
+        {key: value for key, value in record.to_dict().items() if key != "review"})
+    assert unreviewed.template_version == record.template_version
+    # Summarized from the labels, the default description shows the path too.
+    described = distill_record(graph, name="t", registry=registry)
+    assert {"node": None, "field": "description"} in described.review["path_findings"]
+    graph.task = Task(r"Summarize D:\exports\q3.csv")
+    both = distill_record(graph, name="t", registry=registry, description="Quarterly")
+    assert both.to_dict()["review"] == {
+        "label_findings": [{"node": "research", "contains_goal": True,
+                            "words": ["exports", "summarize"]}],
+        "path_findings": [{"node": "research", "field": "label"},
+                          {"node": "review", "field": "persona"}]}
+
+
+@pytest.mark.parametrize("text,flagged", [
+    (r"Read E:\exports\q3.csv", True), ("Load D:/data/x.csv", True),
+    ("Open /srv/notes", True), ("/etc/hosts first", True), ("(see /tmp/x)", True),
+    ("Read ~/notes", True), (r"Read ~\notes", True), ("Read ~pat/notes", True),
+    (r"Copy \\server\share\q3.csv", True), ("Use $HOME/notes", True),
+    (r"Use %UserProfile%\notes", True),
+    ("Answer PASS/FAIL", False), ("Agree and/or object", False), ("Keep 1/2 of it", False),
+    ("Cite https://example.com/a/b", False), ("Edit ./src/app.py", False),
+    ("Edit ../up.txt", False), ("Wait ~5 minutes", False), ("Option C: none", False),
+    ("Write w/o sources over TCP/IP", False), ("Close </b> tags", False),
+    ("Grade the $HOMEWORK", False),
+])
+def test_path_review_finds_rooted_and_home_paths_only(text, flagged):
+    graph, registry = _completed_graph()
+    graph.nodes[0].label = text
+    record = distill_record(graph, name="t", registry=registry, description="A review")
+    findings = (record.review or {}).get("path_findings", ())
+    assert ({"node": "research", "field": "label"} in findings) is flagged
+
+
+@pytest.mark.parametrize("review,match", [
+    ({"label_findings": [], "path_findings": [{"node": "draft", "field": "label"}]},
+     "omitted when empty"),
+    ({"path_findings": [{"node": None, "field": "label"}]}, "names a node"),
+    ({"path_findings": [{"node": "draft", "field": "description"}]}, "names a node"),
+    ({"path_findings": [{"node": "ghost", "field": "label"}]}, "unknown nodes"),
+    ({"path_findings": [{"node": "draft", "field": "name"}]}, "must be one of"),
+])
+def test_malformed_path_findings_are_rejected(review, match):
+    data = full_record().to_dict()
+    data["review"] = review
+    with pytest.raises(TemplateRecordError, match=match):
+        TemplateRecord.from_dict(data)
+
+
 def test_distillation_refuses_a_graph_that_is_not_a_valid_record():
     graph, registry = _completed_graph()
     graph.nodes[1].depends_on = ["ghost"]

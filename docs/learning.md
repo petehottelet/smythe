@@ -153,7 +153,8 @@ A record's JSON form:
   "tests": [{"name", "sha256"}],
   "source_runs": [{"execution_id", "structure_sha256", "acceptance"}],
   "parent_version": "<template version>",
-  "review": {"label_findings": [{"node", "contains_goal", "words"}]}
+  "review": {"label_findings": [{"node", "contains_goal", "words"}],
+             "path_findings": [{"node", "field"}]}
 }
 ```
 
@@ -161,7 +162,9 @@ A record's JSON form:
   instructions. A record never carries MCP servers, models, environment
   variables, URLs, tool grants, acceptance policies, budgets, evaluator
   configuration or filesystem paths: no key holds them, and every unknown
-  key is refused. `prerequisites` names what a template expects to find,
+  key is refused. Free text, the description, labels and personas, is copied
+  verbatim from the graph and its agents, so it can still hold a path or the
+  source task's subject; the [review](#review) flags both. `prerequisites` names what a template expects to find,
   such as a tool by name, version and schema digest; it grants nothing.
   Validators appear as `ValidatorIdentity` data (name, version and
   configuration digest), never as code or configuration.
@@ -175,11 +178,10 @@ A record's JSON form:
 - **Consistency.** Node ids are unique; `depends_on`, `verifies`, expected
   outputs and review findings name blueprint nodes; a node neither depends on
   nor verifies itself, and `depends_on` edges form no cycle; and a record is
-  never its own parent. Digests are
-  64 lowercase hexadecimal characters. Text must have a UTF-8 form, so a
-  string holding a lone surrogate such as `"\ud800"`, which no digest could
-  cover, raises `TemplateRecordError`, and `DistillationError` when
-  distilling.
+  never its own parent. Digests are 64 lowercase hexadecimal characters.
+  Text must have a UTF-8 form, so a string holding a lone surrogate such as
+  `"\ud800"`, which no digest could cover, raises `TemplateRecordError`, and
+  `DistillationError` when distilling.
 - **Strict reading.** `TemplateRecord.from_dict()` refuses another `type`, any
   version other than 1, and any missing or unknown key at every level.
   `to_dict()` returns detached JSON data; the record's parts are read-only.
@@ -211,20 +213,32 @@ capabilities, failure policy, retries, timeout, tool-iteration cap,
 Labels, agents, results, statuses and other metadata are left out, so two
 runs of one template on different goals share a structure digest.
 
-## Label review
+## Review
 
-A distilled label can keep the subject of the task it was learned from,
-such as "Research the European market for solar chargers". `distill_record`
-compares each label with the source goal: `source_task`'s goal, or by
-default the goal of the graph's own `task`. A label that contains the goal,
-compared without case and with runs of whitespace collapsed, or that shares
-two or more of its words of four or more letters, is listed in
-`review["label_findings"]` with its node, whether it contains the whole
-goal, and the shared words.
+`distill_record` copies the description, labels and personas verbatim, so
+they can keep what the source run was about. Its review lists that text for
+a reviewer:
 
-The review only flags labels for a reviewer. Labels are not changed, and
-each build points them at the new task as before. The review is not part of
-`template_version`.
+- **Labels that repeat the source goal.** A distilled label can keep the
+  subject of the task it was learned from, such as "Research the European
+  market for solar chargers". `distill_record` compares each label with the
+  source goal: `source_task`'s goal, or by default the goal of the graph's
+  own `task`. A label that contains the goal, compared without case and with
+  runs of whitespace collapsed, or that shares two or more of its words of
+  four or more letters, is listed in `review["label_findings"]` with its
+  node, whether it contains the whole goal, and the shared words.
+- **Rooted or home paths.** The description, each label and each persona
+  that holds a path starting at a drive letter (`C:\`), a UNC share
+  (`\\server`), a leading slash (`/srv/...`), `~` or `~user`, `$HOME` or
+  `%USERPROFILE%` is listed in `review["path_findings"]` by its node (`null`
+  for the description) and field (`description`, `label` or `persona`). A
+  finding says where a path is, never what it is. A slash inside a word or a
+  URL, as in `PASS/FAIL` or `https://...`, and a relative path such as
+  `./src` are not flagged.
+
+Each list is omitted when it is empty. The review only flags text: it is
+not changed, and each build points labels at the new task as before. The
+review is not part of `template_version`.
 
 ## The template catalog
 

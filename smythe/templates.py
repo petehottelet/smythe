@@ -3,10 +3,11 @@
 :func:`distill_record` turns a graph that ran into a :class:`TemplateRecord`:
 the blueprint that :func:`smythe.distill.distill_template` builds from, as
 JSON data, with optional applicability, prerequisites, expected outputs,
-failure examples, tests, source runs, a parent version and a label review.
-A record holds instructions and structure only. It never carries MCP servers,
+failure examples, tests, source runs, a parent version and a review.
+A record holds instructions and structure only. No key carries MCP servers,
 models, environment, URLs, tool grants, acceptance policies, budgets,
-evaluator configuration or filesystem paths.
+evaluator configuration or filesystem paths; free text is copied verbatim,
+and the review flags text that repeats the source goal or holds a path.
 
 ``template_version`` is the SHA-256 (:mod:`smythe._canonical`) of the fields
 that decide what a template builds, and ``record_sha256`` covers the whole
@@ -58,6 +59,10 @@ _LIST_SECTIONS = frozenset({"expected_outputs", "failure_examples", "tests", "so
 _HEX = re.compile(r"[0-9a-f]{64}")
 # Words a label review compares: four or more letters or digits.
 _WORD = re.compile(r"[^\W_]{4,}")
+# A rooted or home path: a drive letter, a UNC share, a leading slash, ~ or
+# ~user, or a home variable. A slash inside a word, a URL or ./ is not one.
+_PATH = re.compile(r"(?<![\w.~/\\:<-])(?:[A-Za-z]:[\\/]|\\\\\w|/[\w.-]|~[\w.-]*[\\/])"
+                   r"|\$HOME\b|%(?i:USERPROFILE|HOMEPATH)%")
 
 
 class TemplateRecordError(ValueError):
@@ -205,8 +210,11 @@ _SECTIONS: dict[str, _Check] = {
         "execution_id": _name, "structure_sha256": _hex,
         "acceptance": _choice(*(decision.value for decision in AcceptanceDecision))})),
     "parent_version": _hex,
-    "review": _object({"label_findings": _list(_object({
-        "node": _name, "contains_goal": _flag, "words": _list(_string)}))}),
+    "review": _object({}, {
+        "label_findings": _list(_object({
+            "node": _name, "contains_goal": _flag, "words": _list(_string)})),
+        "path_findings": _list(_object({
+            "node": _nullable(_name), "field": _choice("description", "label", "persona")}))}),
 }
 
 
@@ -268,8 +276,16 @@ class TemplateRecord:
                     f"template node {node['id']!r} names unknown nodes {sorted(unknown)}")
         if _has_cycle_in({node["id"]: node["depends_on"] for node in nodes}):
             raise TemplateRecordError("template blueprint has a dependency cycle")
-        named =[item["node"] for item in values["expected_outputs"] or ()]
-        named += [item["node"] for item in (values["review"] or {}).get("label_findings", ())]
+        review = values["review"] or {}
+        if not all(review.values()):
+            raise TemplateRecordError("template review findings are omitted when empty")
+        for item in review.get("path_findings", ()):
+            if (item["node"] is None) != (item["field"] == "description"):
+                raise TemplateRecordError(
+                    "a template path finding names a node exactly when its field is a label or persona")
+        named = [item["node"] for item in values["expected_outputs"] or ()]
+        named += [item["node"] for findings in review.values() for item in findings
+                  if item["node"] is not None]
         if set(named) - ids:
             raise TemplateRecordError(
                 f"template expected outputs or review name unknown nodes {sorted(set(named) - ids)}")
@@ -399,6 +415,16 @@ def _label_findings(blueprint: list[dict[str, Any]], goal: Any) -> list[dict[str
     return findings
 
 
+def _path_findings(blueprint: list[dict[str, Any]], description: str) -> list[dict[str, Any]]:
+    """The description, labels and personas that hold a rooted or home path."""
+    texts = [(None, "description", description)]
+    for node in blueprint:
+        texts += [(node["id"], "label", node["label"]),
+                  (node["id"], "persona", (node["profile"] or {}).get("persona"))]
+    return [{"node": node, "field": field} for node, field, text in texts
+            if isinstance(text, str) and _PATH.search(text)]
+
+
 def distill_record(
     graph: ExecutionGraph,
     *,
@@ -414,8 +440,11 @@ def distill_record(
     ``record.to_template()`` is the template it returns. ``source_task`` is
     the task the graph ran for, by default the graph's ``task``. Labels that
     contain its goal, or two or more of its words of four or more letters,
-    are listed in ``review["label_findings"]`` for a reviewer. They are not
-    changed: each build still points a label at the new task.
+    are listed in ``review["label_findings"]`` for a reviewer, and the
+    description, labels and personas that hold a rooted or home path, such
+    as ``D:\\data\\...``, ``/srv/...`` or ``~/...``, in
+    ``review["path_findings"]``. Text is copied verbatim, never changed: each
+    build still points a label at the new task.
 
     Raises:
         DistillationError: For the reasons ``distill_template`` gives, or when
@@ -471,13 +500,14 @@ def distill_record(
             )
     task = graph.task if source_task is None else source_task
     try:
-        record = TemplateRecord(
-            name=name, description=description or "", blueprint=blueprint,
-            review={"label_findings": _label_findings(blueprint, getattr(task, "goal", None))},
-        )
+        record = TemplateRecord(name=name, description=description or "", blueprint=blueprint)
         # Summarized only once the record's checks pass: a graph with a
         # cycle or a label that is not text has no summary.
-        return record if description else replace(record, description=_describe(graph))
+        description = description or _describe(graph)
+        review = {"label_findings": _label_findings(blueprint, getattr(task, "goal", None)),
+                  "path_findings": _path_findings(blueprint, description)}
+        return replace(record, description=description,
+                       review={key: value for key, value in review.items() if value})
     except TemplateRecordError as error:
         raise DistillationError(f"cannot distill this graph: {error}") from error
 

@@ -1642,8 +1642,10 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   builds the template `distill_template` returns, which is now built on it,
   and `local_only()` declares that builder for a durable run as
   `template:<name>` at the template version, so the recipe pins the exact
-  template. The review lists labels that repeat the source task's goal and
-  leaves them unchanged. `TemplateCatalog(root)` keeps records in append-only,
+  template. Labels, personas and the description are copied verbatim; the
+  review lists labels that repeat the source task's goal, and the text that
+  holds a rooted or home path, by node and field, and leaves them unchanged.
+  `TemplateCatalog(root)` keeps records in append-only,
   owner-only files, `records/<record_sha256>.json` and
   `versions/<template_version>`, published without replacement and never
   deleted, and `get()` checks each file against its digest.
