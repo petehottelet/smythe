@@ -807,7 +807,11 @@ added to the journal: the new runs it started, and the read calls, model
 calls, `reuse` operations, publications and acceptance decisions of the run
 it repaired in place or the successor it started. Offline runs cost nothing,
 so these counts, not money, compare a selective repair with computing again
-in full.
+in full. The [archive-maintenance example](../examples/18_archive_maintenance.py)
+makes that comparison offline: it revises a source two of four runs share,
+damages one published brief and bumps a validator's version, applies the
+plan, computes the four runs again in full in a second journal and compares
+their documents, decisions and work.
 
 ### A repair in progress
 

@@ -1,0 +1,5 @@
+Checkout funnel notes, June 2026
+
+The checkout page asked for a payment card before the trial started.
+Abandoned checkouts fell by a fifth after the card step moved to the end of the trial.
+The notes do not say how long the trial was.

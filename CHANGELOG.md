@@ -1459,6 +1459,19 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   re-evaluation, which reuses nothing, compares a run's lineage policy in
   all but `reuse`. See
   [apply a repair plan](docs/lineage.md#apply-a-repair-plan).
+- [`examples/18_archive_maintenance.py`](examples/18_archive_maintenance.py)
+  maintains an archive of four lineage runs offline and without keys. Two of
+  its bundled sources are shared between runs. After one shared source gets
+  a new version, one published brief is damaged and one final validator's
+  version is bumped, it prints the repair plan and applies it: the runs that
+  read the revised source regenerate only what depends on it, the damaged
+  brief is published again and the untouched run is decided again. It then
+  computes the four runs again in full in a second journal and prints the
+  reads, model steps, local steps, publications, acceptance evaluations and
+  new runs each took, with byte and decision equality per run. Example 16
+  now reads its sources through the shared `examples/_source_library.py`,
+  which also serves later versions of a bundled source.
+  `tests/test_examples_smoke.py` runs the example.
 
 ### Changed
 
