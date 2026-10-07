@@ -15,7 +15,8 @@ is prepared, quoted at the profile's declared ceiling, reserved, and claimed
 for dispatch once. The raw response is saved before it is settled and
 decoded, so a saved response is reused on resume without reading again. A
 read never retries on its own; the node's failure policy decides whether a
-failed read is read again, as a new journaled call.
+failed read is read again, as a new journaled call. A read whose text is
+that of a source removed from the run is refused, never delivered.
 """
 
 from __future__ import annotations
@@ -37,6 +38,8 @@ from typing import TYPE_CHECKING, Any, Callable, NamedTuple
 from urllib.parse import quote, urljoin, urlsplit
 
 from smythe._redact import redact_account_identifiers
+from smythe.context import text_sha256
+from smythe.evidence import load_source_tombstones
 from smythe.provider import CompletionResult
 from smythe.workflow_binding import WorkflowBindingError
 from smythe.workflow_store import READ_PRICE_VERSION, WorkflowStateError, _canonical
@@ -75,11 +78,12 @@ class ReadToolError(RuntimeError):
     """A read step ended without usable text, and the journal settled its charge.
 
     The response was refused by a limit, was not a 200, was lost before it
-    was saved, or could not be decoded. The run stays open: the node's
-    failure policy decides what happens next, and ``RETRY`` makes a new
-    journaled read. The message names the status or failure, never the
-    response body; a decoder's own error message is shortened and has
-    account identifiers redacted.
+    was saved, could not be decoded, or decoded to the text of a source
+    removed from the run. The run stays open: the node's failure policy
+    decides what happens next, and ``RETRY`` makes a new journaled read. The
+    message names the status or failure, never the response body; a
+    decoder's own error message is shortened and has account identifiers
+    redacted.
     """
 
 
@@ -591,6 +595,26 @@ def _reason_text(value: str, limit: int) -> str:
     return text if len(text) <= limit else text[:limit - 3] + "..."
 
 
+def _removed_text(store: Any, run_id: str, text: str) -> str | None:
+    """Why run *run_id* may not use *text*, a source's text it removed; None for other text.
+
+    A source tombstone the run holds (see
+    :func:`~smythe.evidence.load_source_tombstones`) keeps the SHA-256 of
+    the text it removed, and *text* is that text when it has that digest.
+    """
+    digest = text_sha256(text)
+    try:
+        removed = [record for record in load_source_tombstones(store, run_id)
+                   if record.sha256 == digest]
+    except ValueError as error:
+        raise WorkflowStateError("Workflow journal holds an invalid source tombstone") from error
+    if not removed:
+        return None
+    record = min(removed, key=lambda item: item.source_id)
+    return (f"the response is the text of source {record.source_id!r}, which was removed from "
+            f"this run ({record.tombstone})")
+
+
 class JournaledReadTool:
     """One read step bound to one immutable journal call key.
 
@@ -600,6 +624,12 @@ class JournaledReadTool:
     once. A rejection replays as ``ReadToolError``. A call that was
     dispatched but holds no response or no known charge raises
     ``WorkflowStateError``: it is never sent again.
+
+    Text that has the SHA-256 of a source removed from the run
+    (:meth:`~smythe.workflow.WorkflowRuntime.remove_source`) is never
+    delivered: a new read with it is settled as rejected with that reason,
+    never accepted, and a result accepted before the removal keeps its
+    record but raises ``ReadToolError`` instead of replaying.
     """
 
     def __init__(self, context: WorkflowProviderContext, profile: ReadProfile, key: CallKey,
@@ -639,6 +669,10 @@ class JournaledReadTool:
             text = (record["decoded_result"] or {}).get("text")
             if type(text) is not str:
                 raise WorkflowStateError("Saved read result has no text")
+            removed = _removed_text(store, record["run_id"], text)
+            if removed is not None:
+                # Accepted before the source was removed: the record stays as it is.
+                raise self._fail(_reason_text(removed, 500))
             return self._result(record, text, replayed=True)
         if record["result_state"] == "rejected":
             raise self._fail(record["error"] or "rejected")
@@ -731,10 +765,14 @@ class JournaledReadTool:
             reason = f"decoder {version} raised {type(error).__name__}" + (f": {detail}" if detail else "")
         else:
             if type(text) is str:
-                store.accept_result(context.lease, call_id, {"text": text}, decoder_version=version)
-                return self._result(record, text, replayed=replayed)
-            if inspect.iscoroutine(text):
-                text.close()
-            reason = f"decoder {version} returned {type(text).__name__}, not text"
+                # The text of a source removed from the run is settled as a refusal.
+                reason = _removed_text(store, record["run_id"], text)
+                if reason is None:
+                    store.accept_result(context.lease, call_id, {"text": text}, decoder_version=version)
+                    return self._result(record, text, replayed=replayed)
+            else:
+                if inspect.iscoroutine(text):
+                    text.close()
+                reason = f"decoder {version} returned {type(text).__name__}, not text"
         store.reject_result(context.lease, call_id, _reason_text(reason, 500))
         raise self._fail(_reason_text(reason, 500))

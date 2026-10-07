@@ -14,23 +14,25 @@ import json
 import pytest
 
 from fakes import Crash, crash_when
+from fixture_service import FixtureService, serve_http
 from smythe import (
     AcceptanceDecision, AcceptancePolicy, ClaimPassage, ClaimRecord, ContextSource,
-    DeliveryAcceptance, MarkdownRenderer, OfflineProvider, SimpleArchitect, SourceEvidence,
-    SourceEvidenceValidator, SourceRecord, SQLiteWorkflowStore, Swarm, Task,
+    DeliveryAcceptance, FailurePolicy, LocalOnly, MarkdownRenderer, OfflineProvider, ReadProfile,
+    SimpleArchitect, SourceEvidence, SourceEvidenceValidator, SourceRecord, SQLiteWorkflowStore,
+    Swarm, Task, TextValidator,
 )
 from smythe.cli import EXIT_OK, main
 from smythe.context import SourceRemovedError, load_context_snapshot, load_context_sources
 from smythe.evidence import (
     SOURCE_TOMBSTONE_OPERATION, load_source_evidence, load_source_tombstones, source_tombstone_key,
 )
-from smythe.graph import ExecutionGraph, Node, Topology
+from smythe.graph import ExecutionGraph, Node, NodeStatus, Topology
 from smythe.provider import CompletionResult
 from smythe.validation import ValidationOutcome
 from smythe.workflow import current_decision
 from smythe.workflow_artifact import current_artifact
 from smythe.workflow_binding import WorkflowBindingError
-from smythe.workflow_store import WorkflowStateError
+from smythe.workflow_store import CallKey, WorkflowStateError
 from test_acceptance_operator_decision import RecordingHost, durable_operator
 from test_source_evidence import CLAIM, KEPT, MISLEADING, SOURCES, STRONG, artifact
 
@@ -384,6 +386,115 @@ def test_an_unfinished_run_resumes_only_with_other_sources(store, calls):
     assert result.output == "Write done"
     ((label, prompt),) = calls
     assert label == "Write" and STRONG.text not in prompt and replacement.text in prompt
+
+
+# ---------------------------------------------------------------------------
+# Read steps, and policies without a source evidence validator
+# ---------------------------------------------------------------------------
+
+# A strict policy that checks only the text, with no source evidence validator.
+TEXT_ONLY = AcceptancePolicy(mode="strict", final_validators=[TextValidator()])
+
+
+class Quotes:
+    """A local synthesizer: every text the run's read steps returned, as it was read."""
+
+    def synthesize(self, graph: ExecutionGraph) -> str:
+        return "\n\n".join(["# Sources", *(node.result for node in graph.nodes
+                                           if "read_step" in node.metadata
+                                           and node.status is NodeStatus.COMPLETED)])
+
+
+@pytest.fixture
+def library():
+    """A source library on loopback that serves each source's text, and a profile that reads it."""
+    service = FixtureService()
+    for source in SOURCES:
+        service.add_source(source.source_id, source.text)
+    with serve_http(service) as endpoint:
+        yield service, ReadProfile(
+            name="library", version="1",
+            url=f"http://127.0.0.1:{endpoint.port}/sources/{{source_id}}",
+            input_schema={"source_id": "string"}, metered=False, repeat_safe=True,
+            decode=lambda body: json.loads(body)["content"], decoder_version="fixture-source-v1",
+            allow_private_networks=True)
+
+
+def reading(store, profile, tmp_path) -> Swarm:
+    """A durable research run that reads its sources and publishes what it read."""
+    return durable(store, acceptance=TEXT_ONLY, read_tools=[profile],
+                   synthesizer=LocalOnly(Quotes, "quotes", "1", role="synthesizer"),
+                   renderer=MarkdownRenderer(), artifact_dir=tmp_path / "artifacts")
+
+
+def test_a_read_step_cannot_bring_back_a_removed_source_after_a_refresh(store, library, tmp_path,
+                                                                       monkeypatch):
+    service, profile = library
+    graph = ExecutionGraph([Topology.SERIAL], [
+        profile.step("read-renewals", {"source_id": STRONG.source_id},
+                     failure_policy=FailurePolicy.SKIP),
+        profile.step("read-survey", {"source_id": MISLEADING.source_id}, depends_on=["read-renewals"],
+                     failure_policy=FailurePolicy.SKIP),
+    ])
+    # The run stops as it checkpoints its first read, before its second.
+    stop = crash_when(monkeypatch, store, "save_checkpoint", lambda lease, revision, state, **_: any(
+        node["id"] == "read-renewals" and node["status"] == "completed"
+        for node in state["graph"]["nodes"]))
+    with pytest.raises(Crash):
+        reading(store, profile, tmp_path).execute(graph)
+    stop.restore()
+    (run,) = store.list_runs()
+    run_id = run["run_id"]
+    assert service.snapshot()["sources"][MISLEADING.source_id]["reads"] == 0
+
+    reading(store, profile, tmp_path).remove_source(run_id, MISLEADING.source_id, REASON,
+                                                    removed_at=REMOVED_AT)
+    assert reading(store, profile, tmp_path).refresh_context(run_id, (STRONG,)) == 1
+    result = reading(store, profile, tmp_path).resume(run_id)
+
+    # The library still serves the removed text, but the read step never delivers it.
+    assert service.snapshot()["sources"][MISLEADING.source_id]["reads"] == 1
+    calls = {call["key"]["scope_id"]: call for call in store.inspect_run(run_id)["calls"]
+             if call["key"]["phase"] == "tool" and call["key"]["generation"] == 1}
+    refused = store.lookup_call(run_id, CallKey(**calls["node/read-survey"]["key"]))
+    assert (refused["billing_state"], refused["result_state"], refused["decoded_result"]) == (
+        "known", "rejected", None)
+    assert ("the response is the text of source 'survey-2019', which was removed from this run "
+            f"({REASON})") in refused["error"]
+    assert MISLEADING.text not in refused["error"]
+    survey = next(node for node in result.graph.nodes if node.id == "read-survey")
+    assert survey.status is NodeStatus.SKIPPED and MISLEADING.text not in survey.result
+    # Neither the delivered output nor its published document holds the removed text.
+    assert result.accepted and STRONG.text in result.output
+    assert MISLEADING.text not in result.output
+    document = current_artifact(store, run_id).publication
+    assert MISLEADING.text not in document.path.read_text(encoding="utf-8")
+
+
+def test_reevaluation_after_a_removal_needs_a_validator_that_holds_the_tombstone(store, replies):
+    replies["Write"] = artifact("# Billing\n\nA 2019 poll favoured annual billing.\n\n", POLL_ONLY)
+    result = durable(store, acceptance=TEXT_ONLY).execute(single())
+    run_id = result.execution_id
+    assert result.accepted
+    remove(store, run_id, acceptance=TEXT_ONLY)
+
+    # A policy without a source evidence validator cannot tell whether the
+    # output rests on the removed text, so it never accepts it again.
+    again = durable(store, acceptance=TEXT_ONLY).reevaluate(run_id)
+    assert again.acceptance.decision is AcceptanceDecision.INDETERMINATE and not again.accepted
+    assert (again.output, again.rejected_output) == ("", result.output)
+    assert again.acceptance.reasons == (
+        f"source 'renewals-2026' that the run delivered from was removed ({REASON}); only a "
+        "source evidence validator that holds its tombstone can decide the run",)
+    assert [item.outcome for item in again.acceptance.validators] == [ValidationOutcome.PASSED]
+    assert durable(store, acceptance=TEXT_ONLY).resume(run_id).acceptance == again.acceptance
+
+    # With a source evidence validator that holds the tombstone, the policy's checks decide.
+    held = AcceptancePolicy(mode="strict", final_validators=[
+        TextValidator(), SourceEvidenceValidator((MISLEADING, tombstone_of(STRONG)))])
+    decided = durable(store).reevaluate(run_id, acceptance=held)
+    assert decided.accepted and decided.output == result.output
+    assert durable(store, acceptance=TEXT_ONLY).resume(run_id).acceptance == decided.acceptance
 
 
 # ---------------------------------------------------------------------------

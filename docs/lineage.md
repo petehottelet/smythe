@@ -917,8 +917,9 @@ decision follows it:
   new version, the run can `regenerate`; its status stays `restricted`.
 - **Successors.** A successor holds its predecessor's tombstones from its
   first checkpoint. One given such a text as a context source is refused
-  before it is created, and one that reads such a text again is restricted
-  when it completes.
+  before it is created, and a read step that reads such a text again is
+  [refused it](tasks.md#remove-a-source): the read is settled as rejected
+  and its node follows its failure policy.
 
 ### Limits
 

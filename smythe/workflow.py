@@ -6,6 +6,7 @@ import asyncio
 from collections.abc import Mapping
 from contextlib import asynccontextmanager
 from contextvars import ContextVar
+from dataclasses import replace
 from datetime import datetime, timezone
 import hashlib
 import json
@@ -2118,10 +2119,14 @@ class WorkflowRuntime:
           ``load_source_evidence`` marks it ``removed`` and never returns it;
         - an unfinished run does not resume until :meth:`refresh_context`
           gives it other sources, which may not include the removed text;
+        - a read step whose response is the removed text is refused
+          (:class:`~smythe.workflow_tools.JournaledReadTool`), and its node
+          follows its failure policy;
         - a completed run's decision, made before the removal, no longer
           holds: resuming or inspecting the run gives ``indeterminate``, and
-          :meth:`reevaluate` decides again, under a source evidence
-          validator that holds the tombstone rather than the text;
+          :meth:`reevaluate` decides again. Only a policy with a source
+          evidence validator that holds the tombstone rather than the text
+          can decide it; any other policy's decision is ``indeterminate``;
         - a lineage run whose record names the source is restricted instead
           (:func:`~smythe.lineage.restricted_sources`): no decision delivers
           its output again.
@@ -2196,7 +2201,9 @@ class WorkflowRuntime:
         (:func:`decision_history`). A re-evaluation stopped before that
         checkpoint is finished by the next one under the same policy, unless
         a source was removed from the run after it decided: the next one then
-        decides again, since a decision binds the run's tombstones.
+        decides again, since a decision binds the run's tombstones. Output
+        delivered from a removed source is decided ``indeterminate`` unless
+        the policy has a source evidence validator that holds its tombstone.
 
         The saved recipe may differ from this runtime's only in its acceptance
         policy, its gate verifier and its lineage policy's ``reuse``, since a
@@ -2924,6 +2931,29 @@ class WorkflowRuntime:
             return latest
         return latest + 1
 
+    def _unheld_removals(self):
+        """Why this runtime's policy cannot decide output delivered from a removed source.
+
+        The run delivers from its current source set. When a source in it
+        was removed (:meth:`remove_source`), only a source evidence validator
+        whose sources hold that source's tombstone, rather than its text, can
+        tell whether the output rests on the removed text; a policy without
+        one decides ``indeterminate``. One reason for each such source; empty
+        when there is none.
+        """
+        if not self._context_version:
+            return []
+        delivered = {(source.source_id, source.sha256) for source in self.context_sources}
+        held = {(record.source_id, record.sha256)
+                for validator in self.acceptance.final_validators
+                if isinstance(validator, SourceEvidenceValidator)
+                for record in validator.sources if record.tombstone is not None}
+        return [f"source {record.source_id!r} that the run delivered from was removed "
+                f"({record.tombstone}); only a source evidence validator that holds its "
+                "tombstone can decide the run"
+                for record, _ in _tombstone_operations(self.store, self.run_id)
+                if (record.source_id, record.sha256) in delivered - held]
+
     async def _decide(self, synthesis_key, output, *, reevaluation=False, publication=None,
                       repair=None):
         """Decide delivery acceptance for exactly *output* as a journal operation.
@@ -2934,6 +2964,9 @@ class WorkflowRuntime:
         read back and never made again. A *reevaluation* decides under the
         next decision sequence (see :meth:`reevaluate`), binding the
         republished *publication* and the *repair* it was made for, if any.
+        A decision on output delivered from a removed source is
+        ``indeterminate`` unless the policy can decide it
+        (:meth:`_unheld_removals`); the validators' outcomes are kept.
         """
         from smythe.swarm import _delivery_sources, _synthesis_strategy
 
@@ -2957,6 +2990,10 @@ class WorkflowRuntime:
                 used_fallback=used_fallback, task=self.graph.task,
                 unusable=self._unusable_evidence_validators(),
             )
+            removals = self._unheld_removals()
+            if removals:
+                record = replace(record, decision=AcceptanceDecision.INDETERMINATE,
+                                 reasons=(*(() if record.accepted else record.reasons), *removals))
             return {"delivery_acceptance": record.to_dict()}
 
         self.decision_key = _decision_key(inputs)

@@ -858,7 +858,10 @@ at their known cost as a rejected result, and the step raises `ReadToolError`
 with the status or failure name, never the response body. The node's failure policy decides what happens next:
 `RETRY` reads again as a new journaled call. Resuming re-enters the last
 rejected call of a free, `repeat_safe` read as a new invocation, so a halted
-step reads once more; other rejections replay.
+step reads once more; other rejections replay. A response whose text is that
+of a source [removed from the run](tasks.md#remove-a-source) is settled as
+rejected in the same way, with the removal as its reason, and a text
+accepted before the removal raises `ReadToolError` instead of replaying.
 
 ### Interrupted reads
 

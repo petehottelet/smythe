@@ -186,13 +186,21 @@ from the journal's copy:
   source `removed` and never returns its text;
 - an unfinished run does not resume until `refresh_context` gives it other
   sources, and a refresh that includes the removed text is refused;
+- a [read step](workflow-accounting.md#recorded-read-steps) whose response
+  is the removed text, such as a step that reads the source again after a
+  refresh, is refused: its journal call is settled as rejected, with the
+  removal as its reason, and the text is never its result. The node follows
+  its failure policy, so `FailurePolicy.SKIP` lets the run continue without
+  it;
 - a completed run's decision, made before the removal, no longer holds:
   resuming or [inspecting](runs.md) the run gives `indeterminate` with the
   removal as its reason, until [`reevaluate`](verifier.md#re-evaluation)
   decides again under a source evidence validator that holds the tombstone.
   Passages quoted from the removed source then cannot be checked, so the run
-  is accepted only when its evidence does not rest on them. Resuming,
-  inspecting and a published document's
+  is accepted only when its evidence does not rest on them. A policy without
+  such a validator cannot tell whether the output rests on the removed text,
+  so its decision is `indeterminate`, naming the removed source, whatever its
+  other validators report. Resuming, inspecting and a published document's
   [eligibility](workflow-accounting.md#published-documents) then follow the
   new decision. A decision binds the keys of the tombstones the run held
   when it was made, so one made before the removal never counts after it: a

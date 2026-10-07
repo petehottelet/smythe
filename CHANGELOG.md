@@ -909,13 +909,17 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   `smythe.context.SourceRemovedError` for a record that holds it,
   `load_source_evidence` marks the source `removed` and returns no text for
   it, an unfinished run resumes only after `refresh_context` gives it other
-  sources, and a completed run's earlier decision becomes `indeterminate`
-  until `reevaluate` decides again under a source evidence validator that
-  holds the tombstone. A decision binds the keys of the tombstones the run
-  held when it was made, so a re-evaluation stopped before a removal is
-  decided again rather than finished. `smythe.evidence.load_source_tombstones`
-  reads a run's tombstones. Earlier journal records and published documents
-  keep what they hold. See [remove a source](docs/tasks.md#remove-a-source).
+  sources, a read step whose response is the removed text is settled as a
+  rejected read with the removal as its reason and never delivers it, and a
+  completed run's earlier decision becomes `indeterminate` until
+  `reevaluate` decides again under a source evidence validator that holds
+  the tombstone; any other policy's decision on output delivered from the
+  removed source is `indeterminate`. A decision binds the keys of the
+  tombstones the run held when it was made, so a re-evaluation stopped before
+  a removal is decided again rather than finished.
+  `smythe.evidence.load_source_tombstones` reads a run's tombstones. Earlier
+  journal records and published documents keep what they hold. See
+  [remove a source](docs/tasks.md#remove-a-source).
 - `smythe runs inspect` reports what a durable research run was given, read
   and claimed, without source text, read bodies, quotes or output: a
   `context` block (the context-assembly and snapshot versions, the current
@@ -1430,10 +1434,10 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   plan needs `review` for it while the catalog describes the withdrawn
   text and allows `regenerate` from another version; its derived status
   stays `restricted`. A successor holds its predecessor's tombstones, so it
-  is refused a withdrawn text as a context source and is restricted if it
-  reads one again. `smythe runs inspect` lists a lineage run's tombstones
-  and purged files. Text copied into journal checkpoints and provider
-  responses is not scrubbed. See
+  is refused a withdrawn text as a context source, and a read step that
+  reads one again is refused it. `smythe runs inspect` lists a lineage run's
+  tombstones and purged files. Text copied into journal checkpoints and
+  provider responses is not scrubbed. See
   [restrict a source](docs/lineage.md#restrict-a-source).
 - Durable runs drain their in-flight calls under
   `Swarm(run_store=store, termination=TerminationPolicy(drain_timeout_s=...))`.

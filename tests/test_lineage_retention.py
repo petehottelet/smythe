@@ -20,8 +20,8 @@ import pytest
 from fakes import ManualClock
 from fixture_service import FixtureService, serve_http
 from smythe import (
-    AcceptanceDecision, ContextSource, LineagePolicy, SourceRecord, SQLiteWorkflowStore,
-    WorkflowBindingError,
+    AcceptanceDecision, ContextSource, LineagePolicy, ReadToolError, SourceRecord,
+    SQLiteWorkflowStore, WorkflowBindingError,
 )
 from smythe._run_inspection import inspect_journal
 from smythe.actions import ActionNotAuthorized, approve, check_authority, prepare_action
@@ -350,16 +350,23 @@ def test_a_successor_never_derives_again_from_text_withdrawn_from_its_predecesso
         successor(given, first, {node_id: [] for node_id in KEPT})
     assert run_ids(store) == [first]
 
-    # The service still serves the withdrawn text, which the successor reads again.
-    second = successor(swarm, first, {node_id: [] for node_id in KEPT})
-    assert results(second.graph)["read-churn"] == TEXTS["churn"]
-    inherited = store.load_operation(second.execution_id,
-                                     source_tombstone_key("churn", withdrawn["sha256"]))
+    # The service still serves the withdrawn text; the successor's read step is refused it.
+    refused = "the response is the text of source 'churn', which was removed from this run"
+    with pytest.raises(ReadToolError, match=refused):
+        successor(swarm, first, {node_id: [] for node_id in KEPT})
+    (second,) = [run_id for run_id in run_ids(store) if run_id != first]
+    inherited = store.load_operation(second, source_tombstone_key("churn", withdrawn["sha256"]))
     assert inherited["state"] == "applied" and inherited["result"] == {"tombstone": withdrawn}
-    assert second.acceptance.decision is AcceptanceDecision.INDETERMINATE
-    assert not second.accepted and second.output == ""
-    assert swarm.resume(second.execution_id).acceptance.decision \
-        is AcceptanceDecision.INDETERMINATE
+    (read,) = [call for call in store.inspect_run(second)["calls"]
+               if call["key"]["scope_id"] == "node/read-churn"]
+    assert read["result_state"] == "rejected"
+    saved = store.get_checkpoint(second)["checkpoint"]
+    churn = next(node for node in saved["graph"]["nodes"] if node["id"] == "read-churn")
+    assert saved["status"] == "failed" and TEXTS["churn"] not in (churn["result"] or "")
+    # Resuming reads it again and is refused it again: nothing derives from it.
+    with pytest.raises(ReadToolError, match=refused):
+        swarm.resume(second)
+    assert store.get_checkpoint(second)["checkpoint"]["status"] == "failed"
 
 
 # ---------------------------------------------------------------------------
