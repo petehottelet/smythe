@@ -32,7 +32,7 @@ from uuid import uuid4
 from smythe._money import NANOUSD
 from smythe._redact import redact_account_identifiers
 from smythe.actions import (
-    _CLOSED, _DECISIONS, _FINISHED, _SECURITY_STOP, _SHOWN, ACTION_STATES, ActionIntent, ActionNotAuthorized,
+    _CLOSED, _DECISIONS, _FINISHED, _NOTICES, _SECURITY_STOP, _SHOWN, ACTION_STATES, ActionIntent, ActionNotAuthorized,
     ActionStateError, ApprovalRejected, ConnectorProfile, ConnectorReceipt, PreparedAction, Principal,
     _held_digest, _next_action, _receipt_of, _undeliverable, _window_open, action_key,
 )
@@ -846,19 +846,30 @@ def keep_notice(store, key, payload):
     """Keep *payload* as an untrusted ``notice`` record of the action keyed *key*; return that action.
 
     A notice that names no action of the journal is not kept, and None is
-    returned. Keeping a notice changes no state.
+    returned. A notice with the payload digest of one the action keeps is not
+    kept again. An action keeps at most ``_NOTICES`` notices; for each further
+    one an ``action_notice_dropped`` event records its digest, not its body.
+    Keeping a notice changes no state.
     """
     payload_json = _canonical(payload)
     if store.store_version < 2:
         return None
+    digest = _sha(payload_json)
     with store._transaction() as db:
         row = db.execute("SELECT * FROM workflow_actions WHERE action_key=?", (key,)).fetchone()
         if row is None:
             return None
+        where = "FROM workflow_action_records WHERE action_id=? AND kind='notice'"
+        if db.execute(f"SELECT 1 {where} AND payload_sha=?", (row["action_id"], digest)).fetchone() is not None:
+            return _prepared(row)
+        if db.execute(f"SELECT count(*) {where}", (row["action_id"],)).fetchone()[0] >= _NOTICES:
+            store._event(db, row["run_id"], "action_notice_dropped",
+                         payload={"action_id": row["action_id"], "payload_sha256": digest})
+            return _prepared(row)
         record_id = uuid4().hex
         db.execute("""INSERT INTO workflow_action_records(record_id,action_id,kind,payload_json,payload_sha,
           trusted,created) VALUES (?,?,'notice',?,?,0,?)""",
-                   (record_id, row["action_id"], payload_json, _sha(payload_json), store._clock_ns()))
+                   (record_id, row["action_id"], payload_json, digest, store._clock_ns()))
         store._event(db, row["run_id"], "action_notice",
                      payload={"action_id": row["action_id"], "record_id": record_id})
         return _prepared(row)

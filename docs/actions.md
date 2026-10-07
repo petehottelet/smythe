@@ -825,9 +825,14 @@ The payload is a JSON object of at most 64 KiB as canonical JSON, which names
 the action key it reports as `key` and the action's target as `target`;
 other fields are kept as they are. A notice whose key names an action of the
 journal is kept with that action as an untrusted `notice` record, with an
-`action_notice` event; a notice under any other key is not kept. It returns
-the action only when the action is `dispatched` and the notice names its
-tenant and collection, and None otherwise. A notice never changes an action's
+`action_notice` event; a notice under any other key is not kept. Because
+anyone who can reach your callback endpoint can send notices, each action
+keeps a notice once, by the SHA-256 of its canonical JSON, and at most 64 of
+them: a notice identical to one it keeps is not kept again, and for each
+notice beyond 64 an `action_notice_dropped` event records its digest, never
+its body. Kept or not, the notice is still answered: `record_notice()`
+returns the action only when the action is `dispatched` and the notice names
+its tenant and collection, and None otherwise. A notice never changes an action's
 state: anyone can send one, so it can only prompt a readback, which reads the
 object the receipt names and decides by itself. A notice for another tenant,
 for an action not yet dispatched or for one already settled prompts nothing.

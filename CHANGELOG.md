@@ -326,7 +326,9 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   `observed`; a contradiction makes it `compensation_required`, and reads
   that decide nothing leave it dispatched with `reconcile` next. Nothing is
   resubmitted. `record_notice()` keeps a relayed service callback as an
-  untrusted record that can only prompt a readback. A connector whose profile
+  untrusted record that can only prompt a readback, once per payload digest
+  and at most 64 per action; each further notice is only counted, by its
+  digest, in an `action_notice_dropped` event. A connector whose profile
   differs from the action's, or that retries on its own, is refused. See
   [the action runner](docs/actions.md#action-runner).
 - `ActionRunner.reconcile()` settles an external action whose outcome a

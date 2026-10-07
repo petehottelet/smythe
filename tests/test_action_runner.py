@@ -670,11 +670,12 @@ def test_forged_notices_never_complete_an_action(store, tmp_path, replies, host,
 
     # The commit is not visible yet, so no notice made it observed.
     assert (progress.state, progress.next_action) == ("dispatched", "reconcile")
+    # The forged notice relayed again is the same notice, kept once.
     kept = records(store, action, "notice")
-    assert len(kept) == 5 and {(row["trusted"], row["cost"]) for row in kept} == {(0, None)}
+    assert len(kept) == 4 and {(row["trusted"], row["cost"]) for row in kept} == {(0, None)}
     assert [row["payload"] for row in kept][:1] == [forged]
     shown = item(store, action)["records"]
-    assert [record["kind"] for record in shown].count("notice") == 5
+    assert [record["kind"] for record in shown].count("notice") == 4
     assert all(not record["trusted"] for record in shown if record["kind"] == "notice")
     events = [event["data"] for event in store.inspect_run(action.run_id)["events"]
               if event["type"] == "action_notice"]
@@ -697,6 +698,38 @@ def test_a_notice_after_the_result_is_observed_changes_nothing(
 
     assert item(store, action)["state"] == "observed"
     assert len(records(store, action, "notice")) == 1
+
+
+def test_notices_are_kept_once_per_payload_and_at_most_64_per_action(
+        store, tmp_path, replies, host, clock, connector):  # noqa: F811
+    action, _ = ready(store, tmp_path, replies, host, clock, connector)
+    acme = {"tenant": "acme", "collection": "posts"}
+    first = {"key": action.action_key, "target": acme, "notice": {"sequence": 0}}
+
+    # A notice identical to one the action keeps is not kept again, however its keys are ordered.
+    record_notice(store, first)
+    record_notice(store, {"notice": {"sequence": 0}, "target": dict(acme), "key": action.action_key})
+    assert len(records(store, action, "notice")) == 1
+
+    # The action keeps 64 notices; each one beyond is only counted, by its digest.
+    relayed = [{**first, "notice": {"sequence": number, "padding": "x" * 1000}} for number in range(1, 70)]
+    for notice in relayed:
+        record_notice(store, notice)
+    record_notice(store, relayed[-1])
+
+    kept = records(store, action, "notice")
+    assert [row["payload"] for row in kept] == [first, *relayed[:63]]
+    events = store.inspect_run(action.run_id)["events"]
+    assert [event["data"]["record_id"] for event in events if event["type"] == "action_notice"] == [
+        row["record_id"] for row in kept]
+    dropped = [event["data"] for event in events if event["type"] == "action_notice_dropped"]
+    assert dropped == [{"action_id": action.action_id, "payload_sha256": _sha(_canonical(notice))}
+                       for notice in relayed[63:] + relayed[-1:]]
+    assert "padding" not in json.dumps(dropped)
+    # Notices change nothing else, and the audit holds.
+    current = item(store, action)
+    assert (current["state"], balances(current)) == ("not_dispatched", (0, 0, 0))
+    assert store.audit(action.run_id)["ok"]
 
 
 @pytest.mark.parametrize("payload,message", [

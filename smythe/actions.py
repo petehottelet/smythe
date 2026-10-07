@@ -83,6 +83,8 @@ _COMPENSATION = ("new_action", "unsupported")
 READBACK_VALIDATOR = ValidatorIdentity.for_config("smythe.action-readback", "1")
 # The largest notice, as canonical JSON, that record_notice keeps.
 _NOTICE_BYTES = 65_536
+# The most notices one action keeps; record_notice counts any further ones by digest only.
+_NOTICES = 64
 
 
 class ConnectorRefused(Exception):
@@ -1106,7 +1108,10 @@ def record_notice(store: Any, payload: Any) -> PreparedAction | None:
     the action key it reports as ``key`` and the action's target as
     ``target``, an object with ``tenant`` and ``collection``; other fields are
     kept as they are. A notice whose key names an action of the journal is
-    kept with that action, marked untrusted; any other is not kept. The action
+    kept with that action, marked untrusted; any other is not kept. A notice
+    whose canonical JSON has the SHA-256 of one the action keeps is not kept
+    again, and an action keeps at most 64 notices: an ``action_notice_dropped``
+    event records the digest of each further one, never its body. The action
     is returned, so that the host can call :meth:`ActionRunner.readback`, only
     when it is ``dispatched`` and the notice names its tenant and collection;
     otherwise None is. A notice never changes an action: only a read the
