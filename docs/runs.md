@@ -54,6 +54,7 @@ its runs and its recorded version do not change.
 | `delivery` | The current delivery acceptance decision; see below |
 | `decisions` | The [decision history](#decision-history): the current decision's sequence and the decisions before it |
 | `revision_log` | The run's latest [supervisor decisions](#revision-log), applied or refused; empty without any |
+| `routing` | The [routing decision](#routing-decisions) that chose the tier that planned the run; null for a run that no router planned |
 | `artifact` | A durable run's [published document](#published-documents); null for a run that publishes none and for ordinary runs |
 | `lineage` | A summary of a durable run's [lineage](#lineage): coverage, source references, predecessor and successors, document integrity and derived status; null without a lineage policy and for ordinary runs |
 | `context` | A durable run's [context assembly](#research-runs): versions, current sources, snapshots and tombstones; null without context assembly and for ordinary runs |
@@ -153,6 +154,31 @@ Revision after draft: applied (+1); added check; 1 revisions left, 1 added nodes
 Revision after final: refused (-1); dropped draft; 1 revisions left, 1 added nodes in the graph
   Reason: the draft is done
   Detail: cannot drop node 'draft' with status completed; only pending work may be revised
+```
+
+### Routing decisions
+
+A run that a `WhiteRabbit` router planned reports its
+[routing decision](architecture.md#routing-decisions) under `routing`, read
+from the planned graph its checkpoint saved; for a durable run planned before
+its first checkpoint, from its planning operation:
+
+| Field | Meaning |
+|---|---|
+| `readable` | False for a decision this build cannot read, whose other fields are then null; inspection goes on |
+| `tier` | The tier that planned the run: `single`, `deterministic:<key>`, `constrained` or `autonomous` |
+| `method` | `rule`, `classifier`, `fallback_no_classifier` or `fallback_unmatched` |
+| `rule` | The name of the [routing rule](architecture.md#routing-rules) that chose the tier; null for any other method |
+| `reasons`, `alternatives`, `policy_version`, `matched_token` | As the decision records them |
+| `classifier` | The classifier call's `usage`, which an ordinary run records, and the journal `call_ids` that hold a durable run's charge; null when no classifier was called |
+
+The decision holds no task text, prompt or classifier reply, so none is
+shown. The text report gives it one line:
+
+```text
+Routing: tier single, chosen by rule stable-transform
+Routing: tier constrained, chosen by the classifier; classifier call: 120 prompt and 2 completion tokens, $0.000124
+Routing: tier autonomous, chosen by fallback unmatched; classifier charge in 1 journal call
 ```
 
 ### Published documents

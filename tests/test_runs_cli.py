@@ -28,6 +28,7 @@ from smythe import (
     LocalOnly,
     OfflineProvider,
     ReadProfile,
+    RoutingRule,
     SimpleArchitect,
     SourceEvidenceValidator,
     SQLiteWorkflowStore,
@@ -35,6 +36,7 @@ from smythe import (
     Task,
     ValidationReport,
     ValidatorIdentity,
+    WhiteRabbit,
 )
 import smythe.cli as cli
 from smythe.acceptance import text_sha256
@@ -1007,6 +1009,130 @@ def test_ordinary_runs_have_no_durable_research_blocks(tmp_path, capsys):
     assert value["lineage"] is None
     assert value["issues"] == [{"kind": "validator_rejected", "subject": "fixed-reject",
                                 "detail": value["delivery"]["reasons"][0]}]
+
+
+# ---------------------------------------------------------------------------
+# Routing decisions
+# ---------------------------------------------------------------------------
+
+
+ROUTED_GOAL = "Translate the confidential merger memo"
+TRANSLATE = RoutingRule("stable-transform", "single", "a stable transformation needs one worker",
+                        goal_any=("translate",))
+TIERS = ["single", "autonomous"]
+
+
+def routed_swarm(store, *rules) -> Swarm:
+    """A Swarm whose router applies *rules* before its offline classifier."""
+    router = WhiteRabbit(classifier_provider=OfflineProvider(), classifier_model="offline",
+                         autonomous=SimpleArchitect(), single=SimpleArchitect(), rules=rules)
+    if isinstance(store, SQLiteWorkflowStore):
+        return Swarm(model="offline", provider=OfflineProvider(), router=router, run_store=store,
+                     max_budget_usd=1)
+    return Swarm(model="offline", provider=OfflineProvider(), router=router, artifact_dir=None,
+                 checkpoint_store=store)
+
+
+def routed_run(tmp_path, kind: str, *rules) -> tuple[list[str], str, dict]:
+    """Run a routed task; the inspect arguments for its store, and the decision it saved."""
+    if kind == "checkpoints":
+        result = routed_swarm(FileCheckpointStore(tmp_path), *rules).execute(Task(ROUTED_GOAL))
+        return (["--checkpoints", str(tmp_path)],
+                result.execution_id, result.graph.planning["routing"])
+    path = tmp_path / "routed.db"
+    with SQLiteWorkflowStore(path) as store:
+        result = routed_swarm(store, *rules).execute(Task(ROUTED_GOAL))
+    return ["--journal", str(path)], result.execution_id, result.graph.planning["routing"]
+
+
+@pytest.mark.parametrize("kind", ["checkpoints", "journal"])
+def test_inspection_shows_the_rule_that_routed_a_run_and_never_its_task(
+        tmp_path, capsys, monkeypatch, kind):
+    store, run_id, saved = routed_run(tmp_path, kind, TRANSLATE)
+    no_side_effects(monkeypatch)
+
+    assert main(["runs", *store, "--json", "inspect", run_id]) == EXIT_OK
+    value = output(capsys)["inspect"]
+
+    assert value["routing"] == {
+        "readable": True, "tier": "single", "method": "rule", "rule": "stable-transform",
+        "reasons": ["the rule 'stable-transform' chose single",
+                    "a stable transformation needs one worker"],
+        "alternatives": TIERS, "policy_version": 2, "matched_token": None, "classifier": None,
+    }
+    assert value["routing"]["reasons"] == saved["reasons"]
+    assert main(["runs", *store, "inspect", run_id]) == EXIT_OK
+    text = capsys.readouterr().out
+    assert "Routing: tier single, chosen by rule stable-transform" in text
+    assert "merger memo" not in text and "merger memo" not in json.dumps(value)
+
+
+@pytest.mark.parametrize("kind", ["checkpoints", "journal"])
+def test_inspection_shows_the_classifier_s_routing_charge(tmp_path, capsys, kind):
+    store, run_id, saved = routed_run(tmp_path, kind)
+
+    assert main(["runs", *store, "--json", "inspect", run_id]) == EXIT_OK
+    routing = output(capsys)["inspect"]["routing"]
+
+    assert (routing["tier"], routing["method"], routing["rule"]) == (
+        saved["tier"], saved["method"], None)
+    assert routing["method"] in ("classifier", "fallback_unmatched")
+    assert routing["classifier"] == {"usage": saved["usage"], "call_ids": saved["call_ids"]}
+    main(["runs", *store, "inspect", run_id])
+    [line] = [line for line in capsys.readouterr().out.splitlines()
+              if line.startswith("Routing:")]
+    if kind == "checkpoints":
+        # An ordinary run records what the classifier call used.
+        usage = saved["usage"]
+        assert saved["call_ids"] == [] and usage is not None
+        assert (f"classifier call: {usage['prompt_tokens']} prompt and "
+                f"{usage['completion_tokens']} completion tokens") in line
+    else:
+        # A durable run's journal holds the charge, in the calls the decision names.
+        assert saved["usage"] is None and len(saved["call_ids"]) == 1
+        assert line.endswith("; classifier charge in 1 journal call")
+
+
+def test_a_durable_run_lost_before_its_first_checkpoint_shows_its_planned_routing(
+        tmp_path, capsys, monkeypatch):
+    from test_workflow_runtime import Crash, crash_checkpoints
+
+    path = tmp_path / "routed.db"
+    with SQLiteWorkflowStore(path) as store:
+        crash_checkpoints(monkeypatch, store, lambda state, _: state["status"] == "planned")
+        with pytest.raises(Crash):
+            routed_swarm(store, TRANSLATE).plan(Task(ROUTED_GOAL))
+        (run,) = store.list_runs()
+        # Only the planning operation holds the decision.
+        assert store.get_checkpoint(run["run_id"]) is None
+        assert store.load_operation(run["run_id"], "planning")["result"]["routing"]
+
+    main(["runs", "--journal", str(path), "--json", "inspect", run["run_id"]])
+    routing = output(capsys)["inspect"]["routing"]
+
+    assert (routing["tier"], routing["method"], routing["rule"]) == (
+        "single", "rule", "stable-transform")
+
+
+def test_a_run_without_a_router_shows_no_routing(tmp_path, capsys):
+    result = run(tmp_path)
+    code, value = inspect(capsys, tmp_path, result.execution_id)
+    assert code == EXIT_OK and value["routing"] is None
+    main(["runs", "--checkpoints", str(tmp_path), "inspect", result.execution_id])
+    assert "Routing" not in capsys.readouterr().out
+
+
+def test_a_routing_record_this_build_cannot_read_does_not_stop_inspection(tmp_path, capsys):
+    store, run_id, _ = routed_run(tmp_path, "checkpoints", TRANSLATE)
+    edit_checkpoint(tmp_path, run_id,
+                    lambda state: state["graph"]["planning"]["routing"].update(version=99))
+
+    code, value = inspect(capsys, tmp_path, run_id)
+
+    assert code == EXIT_OK and value["routing"]["readable"] is False
+    assert value["routing"]["tier"] is None
+    main(["runs", *store, "inspect", run_id])
+    assert "Routing: a decision this build cannot read" in capsys.readouterr().out
 
 
 # ---------------------------------------------------------------------------

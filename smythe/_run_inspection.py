@@ -4,12 +4,12 @@
 :class:`~smythe.checkpoint.FileCheckpointStore`, or a durable run from a
 :class:`~smythe.workflow_store.SQLiteWorkflowStore` opened read-only, and
 reports execution, delivery acceptance and its decision history, the
-supervisor's revision log, a durable run's published artifact, cost, timing
-and the next action as separate JSON blocks. For a durable run it also
-reports its context sources and snapshots, its journaled reads, the source
-evidence its output carried, the issues left open, a lineage run's summary
-and its external actions, never source text, read bodies, output, approval
-assertions or record payloads.
+supervisor's revision log, the router's decision, a durable run's published
+artifact, cost, timing and the next action as separate JSON blocks. For a
+durable run it also reports its context sources and snapshots, its journaled
+reads, the source evidence its output carried, the issues left open, a
+lineage run's summary and its external actions, never source text, read
+bodies, output, approval assertions or record payloads.
 :meth:`smythe.swarm.SwarmResult.to_dict` builds its execution, delivery,
 unknown-exposure and next-action blocks with the same functions, and
 :func:`review_run` derives from the same projection only what in a run, or
@@ -19,6 +19,7 @@ migrates a journal or writes a file.
 
 from __future__ import annotations
 
+import ast
 import json
 import math
 from pathlib import Path
@@ -197,6 +198,54 @@ def next_action(
                            "decision was recorded.")
 
 
+_ROUTING_FIELDS = ("tier", "method", "rule", "reasons", "alternatives", "policy_version",
+                   "matched_token", "classifier")
+
+
+def _rule_name(decision: Any) -> str | None:
+    """The name of the rule that chose *decision*'s tier, read from its first reason."""
+    first = decision.reasons[0] if decision.method == "rule" and decision.reasons else ""
+    suffix = f" chose {decision.tier}"
+    if not (first.startswith("the rule ") and first.endswith(suffix)):
+        return None
+    try:
+        name = ast.literal_eval(first[len("the rule "):-len(suffix)])
+    except (ValueError, TypeError, SyntaxError, MemoryError, RecursionError):
+        return None
+    return name if isinstance(name, str) else None
+
+
+def routing_view(planning: Any) -> dict[str, Any] | None:
+    """The routing decision a run's planning records hold; None without one.
+
+    ``tier`` is the tier that planned the run, ``method`` how it was chosen
+    and ``rule`` the name of the rule that chose it, if one did. ``reasons``,
+    ``alternatives``, ``policy_version`` and ``matched_token`` are the
+    decision's own, and ``classifier`` holds the classifier call's ``usage``
+    and the journal ``call_ids`` that hold a durable run's charge, or is
+    null when no classifier was called. A record this build cannot read has
+    ``readable`` false and null fields. The decision holds no task text,
+    prompt or classifier reply, so none is read out.
+    """
+    from smythe.router import RoutingDecision
+
+    record = planning.get("routing") if isinstance(planning, dict) else None
+    if record is None:
+        return None
+    try:
+        decision = RoutingDecision.from_dict(record)
+    except (ValueError, TypeError):
+        return {"readable": False, **dict.fromkeys(_ROUTING_FIELDS)}
+    saved = decision.to_dict()
+    classifier = None
+    if saved["usage"] is not None or saved["call_ids"]:
+        classifier = {"usage": saved["usage"], "call_ids": saved["call_ids"]}
+    return {"readable": True, "tier": saved["tier"], "method": saved["method"],
+            "rule": _rule_name(decision), "reasons": saved["reasons"],
+            "alternatives": saved["alternatives"], "policy_version": saved["policy_version"],
+            "matched_token": saved["matched_token"], "classifier": classifier}
+
+
 def result_view(result: Any) -> dict[str, Any]:
     """The execution, delivery, unknown-exposure and next-action blocks of a finished SwarmResult."""
     record = result.acceptance
@@ -367,6 +416,7 @@ def _checkpoint_view(execution_id: str, state: Any) -> dict[str, Any]:
         "delivery": delivery,
         "decisions": decisions,
         "revision_log": revision_log_from_state(state),
+        "routing": routing_view(graph.planning),
         # Only durable runs publish a rendered document, journal reads and
         # record context snapshots, source evidence and lineage.
         "artifact": None,
@@ -726,6 +776,13 @@ def _journal_view(store: SQLiteWorkflowStore, run_id: str, *, lineage: bool = Tr
         actions = inspect_actions(store, run_id)
     # A restricted run's document is never published again, so its decision says why.
     published = None if artifact is None or restricted_sources(store, run_id) else artifact.to_dict()
+    # The planned graph carries the routing decision; before its first
+    # checkpoint, the planning operation's result holds it.
+    planning = graph.planning if graph is not None else None
+    if planning is None:
+        operation = store.load_operation(run_id, "planning")
+        result = operation.get("result") if operation is not None else None
+        planning = result if isinstance(result, dict) else None
     return {
         "run_id": run_id,
         "store": "journal",
@@ -737,6 +794,7 @@ def _journal_view(store: SQLiteWorkflowStore, run_id: str, *, lineage: bool = Tr
         "delivery": delivery,
         "decisions": decisions,
         "revision_log": revision_log(store, run_id),
+        "routing": routing_view(planning),
         "artifact": None if artifact is None else artifact.to_dict(),
         "lineage": lineage_view(store, run_id, run["config"], state == "completed", artifact,
                                 delivery, successors=successors) if lineage else None,

@@ -203,6 +203,8 @@ and it never enters node metadata. The record holds no elapsed time:
 charging it to the run's budget, whose scope stays execution and synthesis.
 Checkpoints keep the record, and resume restores it
 ([graph planning records](checkpoint-format.md#graph-planning-records)).
+`smythe runs inspect` shows it as its
+[`routing` block](runs.md#routing-decisions), for ordinary and durable runs.
 
 In a durable run, the `planning` operation's result carries the decision under
 `routing` as well as in its saved graph. Resuming restores the whole

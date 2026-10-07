@@ -1097,6 +1097,31 @@ def _emit_revisions(log: list[dict[str, Any]]) -> None:
                 print(f"  {label}: {_terminal_text(entry[key])}")
 
 
+def _emit_routing(routing: dict[str, Any] | None) -> None:
+    """One line for the tier the router chose, how, and what its classifier call used."""
+    if routing is None:
+        return
+    if not routing["readable"]:
+        print("Routing: a decision this build cannot read")
+        return
+    method = routing["method"]
+    how = (f"rule {_terminal_text(routing['rule'] or 'unnamed')}" if method == "rule"
+           else "the classifier" if method == "classifier" else method.replace("_", " "))
+    line = f"Routing: tier {_terminal_text(routing['tier'])}, chosen by {how}"
+    classifier = routing["classifier"]
+    usage = None if classifier is None else classifier["usage"]
+    if usage is not None:
+        cost = ("cost unknown" if usage["cost_usd_unknown"] or usage["cost_usd"] is None
+                else f"${usage['cost_usd']:.6f}" + (" estimated" if usage["cost_usd_is_estimate"]
+                                                   else ""))
+        line += (f"; classifier call: {usage['prompt_tokens']} prompt and "
+                 f"{usage['completion_tokens']} completion tokens, {cost}")
+    elif classifier is not None:
+        calls = len(classifier["call_ids"])
+        line += f"; classifier charge in {calls} journal call{'' if calls == 1 else 's'}"
+    print(line)
+
+
 def _emit_run_inspection(value: dict[str, Any]) -> None:
     print(f"Run: {_terminal_text(value['run_id'])}")
     saved = value["format"]
@@ -1108,6 +1133,7 @@ def _emit_run_inspection(value: dict[str, Any]) -> None:
     execution = value["execution"]
     blocked = f" ({_terminal_text(execution['blocked_reason'])})" if execution["blocked_reason"] else ""
     print(f"Execution: {execution['state']}{blocked}; nodes: {json.dumps(execution['nodes'], sort_keys=True)}")
+    _emit_routing(value.get("routing"))
     delivery = value["delivery"]
     record = delivery["record"]
     if record is None:

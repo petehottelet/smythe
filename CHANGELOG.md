@@ -1027,7 +1027,12 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   their amounts, and its `planning` operation result carries the decision
   under `routing`; resume restores `graph.planning` from the saved plan
   without classifying again. The classifier prompt and durable recipes are
-  unchanged. See [routing decisions](docs/architecture.md#routing-decisions).
+  unchanged. `smythe runs inspect` reports the decision as a `routing` block,
+  with the name of the rule that chose the tier and the classifier's usage or
+  journal calls, and as a `Routing:` line, for ordinary and durable runs and
+  never with task text. See
+  [routing decisions](docs/architecture.md#routing-decisions) and
+  [routing in runs inspect](docs/runs.md#routing-decisions).
 - Declarative routing rules and a single-worker tier.
   `WhiteRabbit(single=..., rules=[...])` takes a single-worker architect, such
   as `SimpleArchitect`, which the classifier is offered as `single`, and
