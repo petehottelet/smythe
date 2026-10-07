@@ -23,7 +23,7 @@ import os
 import re
 from collections.abc import Callable, Mapping, Sequence
 from copy import deepcopy
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from types import MappingProxyType
 from typing import Any
@@ -36,7 +36,7 @@ from smythe.constrained_planner import SubGraphTemplate
 from smythe.distill import (
     _STRUCTURAL_METADATA_KEYS, DistillationError, _describe, _profile_of, _specialize,
 )
-from smythe.graph import ExecutionGraph, FailurePolicy, Node, NodeStatus
+from smythe.graph import ExecutionGraph, FailurePolicy, Node, NodeStatus, _has_cycle_in
 from smythe.registry import Registry
 from smythe.task import Task
 from smythe.validation import ValidatorIdentity
@@ -266,7 +266,9 @@ class TemplateRecord:
             if unknown:
                 raise TemplateRecordError(
                     f"template node {node['id']!r} names unknown nodes {sorted(unknown)}")
-        named = [item["node"] for item in values["expected_outputs"] or ()]
+        if _has_cycle_in({node["id"]: node["depends_on"] for node in nodes}):
+            raise TemplateRecordError("template blueprint has a dependency cycle")
+        named =[item["node"] for item in values["expected_outputs"] or ()]
         named += [item["node"] for item in (values["review"] or {}).get("label_findings", ())]
         if set(named) - ids:
             raise TemplateRecordError(
@@ -469,10 +471,13 @@ def distill_record(
             )
     task = graph.task if source_task is None else source_task
     try:
-        return TemplateRecord(
-            name=name, description=description or _describe(graph), blueprint=blueprint,
+        record = TemplateRecord(
+            name=name, description=description or "", blueprint=blueprint,
             review={"label_findings": _label_findings(blueprint, getattr(task, "goal", None))},
         )
+        # Summarized only once the record's checks pass: a graph with a
+        # cycle or a label that is not text has no summary.
+        return record if description else replace(record, description=_describe(graph))
     except TemplateRecordError as error:
         raise DistillationError(f"cannot distill this graph: {error}") from error
 

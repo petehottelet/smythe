@@ -117,7 +117,8 @@ goal, and any other label gets `Apply this step to: <goal>` appended.
 complete. `DistillationError` is raised for an empty graph, a gate that
 verifies itself or a node the graph does not contain, and a graph that
 cannot be written as a [template record](#template-records), for example
-because a node depends on a node the graph does not contain.
+because a node depends on a node the graph does not contain or two nodes
+depend on each other.
 
 ## Template records
 
@@ -171,7 +172,8 @@ A record's JSON form:
   [structure digest](#structure-digests) and acceptance decision.
 - **Consistency.** Node ids are unique; `depends_on`, `verifies`, expected
   outputs and review findings name blueprint nodes; a node neither depends on
-  nor verifies itself; and a record is never its own parent. Digests are
+  nor verifies itself, and `depends_on` edges form no cycle; and a record is
+  never its own parent. Digests are
   64 lowercase hexadecimal characters. Text must have a UTF-8 form, so a
   string holding a lone surrogate such as `"\ud800"`, which no digest could
   cover, raises `TemplateRecordError`, and `DistillationError` when

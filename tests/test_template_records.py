@@ -212,6 +212,7 @@ def test_present_but_empty_sections_are_rejected(key, value):
     (_set(["blueprint", 1, "verifies"], "check"), "verifies itself"),
     (_set(["blueprint", 1, "depends_on"], ["ghost"]), "unknown nodes"),
     (_set(["blueprint", 0, "depends_on"], ["draft"]), "depends on"),
+    (_set(["blueprint", 0, "depends_on"], ["check"]), "dependency cycle"),
     (_set(["blueprint", 1, "id"], "draft"), "each id once"),
     (_set(["blueprint"], []), "at least one node"),
     (_set(["blueprint", 0, "failure_policy"], "ignore"), "failure_policy must be one of"),
@@ -483,6 +484,30 @@ def test_distillation_refuses_a_graph_that_is_not_a_valid_record():
     for distill in (distill_record, distill_template):
         with pytest.raises(DistillationError, match="'review' names unknown nodes"):
             distill(graph, name="t", registry=registry)
+
+
+@pytest.mark.parametrize("change", [
+    _node_change("depends_on", ["ghost"]), _node_change("depends_on", [" "]),
+    _node_change("depends_on", ["review"]), _node_change("depends_on", ["review"], index=0),
+    _node_change("id", "research"), _node_change("id", " "), _node_change("timeout_s", 0.0),
+    _node_change("timeout_s", float("nan")), _node_change("max_retries", -1),
+    _node_change("max_retries", 2.0), _node_change("max_regenerations", -1),
+    _node_change("metadata", {"role": 7}), _node_change("label", None),
+    _node_change("label", "Red-team \ud800"),
+], ids=["dangling-edge", "blank-edge", "self-edge", "cycle", "duplicate-id", "blank-id",
+        "zero-timeout", "nan-timeout", "negative-retries", "float-retries",
+        "negative-regenerations", "non-text-role", "non-text-label", "no-utf8-form"])
+def test_distill_template_refuses_a_graph_it_cannot_write_as_a_record(change):
+    """Without a description too, which is summarized from the graph's shape."""
+    for description in (None, "A review"):
+        graph, registry = _completed_graph()
+        change(graph)
+        for distill in (distill_record, distill_template):
+            with pytest.raises(DistillationError, match="cannot distill this graph"):
+                distill(graph, name="t", registry=registry, description=description)
+    graph, registry = _completed_graph()
+    with pytest.raises(DistillationError, match="must not be blank"):
+        distill_template(graph, name=" ", registry=registry)
 
 
 def test_local_only_pins_the_record_version_in_a_durable_recipe(tmp_path, monkeypatch):
