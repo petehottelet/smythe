@@ -34,6 +34,7 @@ from smythe.optimize.engine import (
     _task_indices,
 )
 from smythe.optimize.ledger import (
+    _ENGINE_HOLDOUT_CAPABILITY,
     CampaignLeaseConflict,
     ExperimentLedger,
     HoldoutAlreadyUsedError,
@@ -337,40 +338,88 @@ async def test_a_path_that_only_starts_like_a_reserved_name_stays_mutable(tmp_pa
 
 
 @pytest.mark.asyncio
-async def test_a_stored_campaign_with_a_reserved_path_loads_but_does_not_resume(
-    tmp_path, monkeypatch
-):
-    from smythe.optimize import engine
-
+async def test_a_stored_campaign_with_a_reserved_path_loads_but_does_not_resume(tmp_path):
     contract = _policy_contract("strength", "budget.max_usd")
     incumbent, challenger = _candidates(contract)
     identity = holdout_identity(contract, EVALUATOR_HASH)
-    calls: list[TrialContext] = []
-
-    async def evaluate(context: TrialContext) -> TrialOutcome:
-        calls.append(context)
-        return await _challengers_win(context)
+    # The plan an earlier release, which let any field be mutable, sealed for
+    # this campaign under its automatic campaign ID.
+    plan_hash = sha256_prefixed(
+        {
+            "runner_version": 4,
+            "statistics": {"method": PROMOTION_METHOD, "descriptive_bootstrap_resamples": 100},
+            "contract_hash": contract.contract_hash,
+            "incumbent_candidate_id": incumbent.candidate_id,
+            "ordered_candidate_ids": [challenger.candidate_id],
+            "ordered_policy_hashes": [challenger.policy_hash],
+            "evaluator_hash": EVALUATOR_HASH,
+            "ledger_durability": "normal",
+            "required_trials": 14,
+        }
+    )
+    campaign_id = "optimization_v4_" + plan_hash.removeprefix("sha256:")
 
     ledger_path = tmp_path / "stored.sqlite3"
     with ExperimentLedger(ledger_path, durability="normal") as ledger:
-        with monkeypatch.context() as earlier_release:
-            earlier_release.setattr(engine, "_RESERVED_PATH_ROOTS", frozenset())
-            first = await _runner(contract, ledger, evaluate).run(incumbent, (challenger,))
-        assert first.holdout_assessment is not None
-        evaluated = len(calls)
+        # That release wrote the campaign through the ledger, and its
+        # challenger's first sealed holdout trial claimed the policy's holdout.
+        ledger.create_campaign(
+            contract,
+            incumbent.candidate_id,
+            (incumbent, challenger),
+            plan_hash=plan_hash,
+            campaign_id=campaign_id,
+        )
+        material, _ = ledger._get_holdout_seed_binding(
+            campaign_id,
+            plan_hash=plan_hash,
+            candidates=(incumbent, challenger),
+            capability=_ENGINE_HOLDOUT_CAPABILITY,
+        )
+        lease = ledger.acquire_campaign_lease(campaign_id, "earlier-release")
+        trial_key = ledger.prepare_trial(
+            campaign_id,
+            challenger.candidate_id,
+            "holdout",
+            _bound_phase("challenger", plan_hash),
+            _split_seeds(contract, holdout_seed_material=material)[2][0],
+            lease=lease,
+            evaluator_hash=EVALUATOR_HASH,
+            ceiling_microusd=contract.per_trial_reservation_microusd,
+        )
+        ledger.mark_trial_dispatched(trial_key, lease=lease)
+        ledger.complete_trial(
+            trial_key,
+            lease=lease,
+            metrics={"quality": 10.0, "risk": 1.0},
+            gates={"safe": True},
+            actual_cost_microusd=1,
+            duration_ms=1.0,
+        )
+        ledger.release_campaign_lease(lease)
+        # This runner would resume exactly that campaign.
+        resumed = _runner(contract, ledger, _never_called)
+        assert resumed._build_plan(incumbent, (challenger,))["campaign_id"] == campaign_id
 
-        # The ledger still reads the stored contract back for inspection and
-        # for holdout accounting.
-        stored = ledger.snapshot(first.campaign_id)["campaign"]["contract"]
+        # The ledger still reads the stored contract back for inspection, and
+        # its holdout use still counts against a contract without the field.
+        stored = ledger.snapshot(campaign_id)["campaign"]["contract"]
         assert ExperimentContract.from_dict(stored) == contract
-        assert ledger.holdout_uses(identity) == {challenger.policy_hash: (first.campaign_id,)}
-        assert len(ledger.validate_decision_inventory(first.campaign_id)) == 1
-
+        assert ledger.holdout_uses(identity) == {challenger.policy_hash: (campaign_id,)}
+        allowed = _contract()
+        allowed_incumbent, allowed_challenger = _candidates(allowed)
+        assert holdout_identity(allowed, EVALUATOR_HASH) == identity
+        assert allowed_challenger.policy_hash == challenger.policy_hash
         before = _ledger_state(ledger, ledger_path)
+        with pytest.raises(HoldoutAlreadyUsedError, match=campaign_id):
+            await _runner(allowed, ledger, _never_called).run(
+                allowed_incumbent, (allowed_challenger,)
+            )
+
+        # Resuming is refused before the runner reads or writes the ledger.
         with pytest.raises(OptimizationError, match="budget.max_usd"):
-            await _runner(contract, ledger, evaluate).run(incumbent, (challenger,))
+            await resumed.run(incumbent, (challenger,))
         assert _ledger_state(ledger, ledger_path) == before
-        assert len(calls) == evaluated
 
 
 # Two challengers, each with one development trial, and two paired splits of
