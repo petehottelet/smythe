@@ -651,6 +651,13 @@ On a durable run, `smythe.workflow.current_decision(store, run_id)` gives the
   stands: `reevaluate` raises `ValueError` (`WorkflowStateError` on a durable
   run) before the assertion is checked. As with re-evaluation, the run must
   be completed and everything its record binds must still hold.
+- On a durable run that delivered from a
+  [removed source](tasks.md#remove-a-source), an operator can reject the
+  output but accepts it only through a `Swarm` whose own policy has a
+  `SourceEvidenceValidator` that holds the source's tombstone, as a policy's
+  decision needs. Otherwise `reevaluate` raises `WorkflowStateError`, naming
+  the removed source, before the assertion is checked, and nothing is
+  written.
 - The verifier must accept the assertion for exactly that digest. A forged,
   expired or revoked assertion, or one issued for another run, decision,
   sequence, record or evidence, makes it raise `ApprovalRejected`, which

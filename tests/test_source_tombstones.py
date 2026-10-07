@@ -10,6 +10,7 @@ the journal's copy.
 from __future__ import annotations
 
 import json
+import re
 
 import pytest
 
@@ -229,12 +230,14 @@ def test_an_operator_decision_made_after_a_removal_holds_on_resume(store, replie
     left = durable(store).reevaluate(run_id, acceptance=policy(MISLEADING, tombstone_of(STRONG)))
     assert left.acceptance.decision is AcceptanceDecision.INDETERMINATE
 
-    decided = durable(store).reevaluate(
+    # An operator accepts it under a policy that holds the tombstone, as a policy decides.
+    decided = durable(store, acceptance=policy(MISLEADING, tombstone_of(STRONG))).reevaluate(
         run_id, operator=durable_operator(RecordingHost(), store, run_id))
     assert decided.accepted
     # The operator decided under the removal, so resuming keeps the decision.
     resumed = durable(store).resume(run_id)
     assert resumed.accepted and resumed.acceptance == decided.acceptance
+
 
 def test_a_published_document_is_delivered_under_a_decision_that_holds_the_tombstone(
     tmp_path, replies, capsys,
@@ -495,6 +498,39 @@ def test_reevaluation_after_a_removal_needs_a_validator_that_holds_the_tombstone
     decided = durable(store).reevaluate(run_id, acceptance=held)
     assert decided.accepted and decided.output == result.output
     assert durable(store, acceptance=TEXT_ONLY).resume(run_id).acceptance == decided.acceptance
+
+
+def test_an_operator_cannot_accept_output_delivered_from_a_removed_source(store, replies):
+    replies["Write"] = artifact("# Billing\n\nA 2019 poll favoured annual billing.\n\n", POLL_ONLY)
+    run_id = durable(store, acceptance=TEXT_ONLY).execute(single()).execution_id
+    remove(store, run_id, acceptance=TEXT_ONLY)
+    left = durable(store, acceptance=TEXT_ONLY).reevaluate(run_id)
+    assert left.acceptance.decision is AcceptanceDecision.INDETERMINATE
+    host, revision = RecordingHost(), store.get_checkpoint(run_id)["revision"]
+    decisions = store.list_operations(run_id, "acceptance")
+
+    # Without a policy, or under one whose source evidence validator holds the
+    # removed text rather than its tombstone, nothing can tell whether the
+    # output rests on the removed text, so an operator cannot accept it.
+    refused = re.escape(
+        "An operator cannot accept output delivered from a removed source: source "
+        f"'renewals-2026' that the run delivered from was removed ({REASON})")
+    for acceptance in (None, TEXT_ONLY, policy()):
+        with pytest.raises(WorkflowStateError, match=refused):
+            durable(store, acceptance=acceptance).reevaluate(
+                run_id, operator=durable_operator(host, store, run_id))
+    # Refused before the assertion is checked, with nothing written.
+    assert host.verified == []
+    assert store.get_checkpoint(run_id)["revision"] == revision
+    assert store.list_operations(run_id, "acceptance") == decisions
+    assert current_decision(store, run_id)["record"] == left.acceptance
+
+    # An operator can still reject it, and the rejection holds on resume.
+    rejected = durable(store, acceptance=None).reevaluate(
+        run_id, operator=durable_operator(host, store, run_id, "rejected"))
+    assert rejected.acceptance.decision is AcceptanceDecision.REJECTED and not rejected.accepted
+    assert (rejected.output, rejected.rejected_output) == ("", left.rejected_output)
+    assert durable(store, acceptance=TEXT_ONLY).resume(run_id).acceptance == rejected.acceptance
 
 
 # ---------------------------------------------------------------------------

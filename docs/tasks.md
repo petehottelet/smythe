@@ -200,11 +200,16 @@ from the journal's copy:
   is accepted only when its evidence does not rest on them. A policy without
   such a validator cannot tell whether the output rests on the removed text,
   so its decision is `indeterminate`, naming the removed source, whatever its
-  other validators report. Resuming, inspecting and a published document's
-  [eligibility](workflow-accounting.md#published-documents) then follow the
-  new decision. A decision binds the keys of the tombstones the run held
-  when it was made, so one made before the removal never counts after it: a
-  re-evaluation stopped before the removal is decided again, not finished;
+  other validators report. An [operator](verifier.md#operator-decisions) can
+  reject such output, but accepts it only through a `Swarm` whose own policy
+  has a validator that holds the tombstone; otherwise `reevaluate` raises
+  `WorkflowStateError`, naming the removed source, before the assertion is
+  checked, and nothing is written. Resuming, inspecting and a published
+  document's [eligibility](workflow-accounting.md#published-documents) then
+  follow the new decision. A decision binds the keys of the tombstones the
+  run held when it was made, so one made before the removal never counts
+  after it: a re-evaluation stopped before the removal is decided again, not
+  finished;
 - a [lineage](lineage.md) run whose record names the removed text is
   [restricted](lineage.md#a-restricted-run) instead: no later decision
   delivers its output, and `reevaluate` refuses it.

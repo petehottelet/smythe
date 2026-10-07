@@ -963,12 +963,14 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   completed run's earlier decision becomes `indeterminate` until
   `reevaluate` decides again under a source evidence validator that holds
   the tombstone; any other policy's decision on output delivered from the
-  removed source is `indeterminate`. A decision binds the keys of the
-  tombstones the run held when it was made, so a re-evaluation stopped before
-  a removal is decided again rather than finished.
-  `smythe.evidence.load_source_tombstones` reads a run's tombstones. Earlier
-  journal records and published documents keep what they hold. See
-  [remove a source](docs/tasks.md#remove-a-source).
+  removed source is `indeterminate`, and an operator can reject that output
+  but accepts it only through a `Swarm` whose policy holds the tombstone,
+  or `reevaluate` raises `WorkflowStateError` and writes nothing. A decision
+  binds the keys of the tombstones the run held when it was made, so a
+  re-evaluation stopped before a removal is decided again rather than
+  finished. `smythe.evidence.load_source_tombstones` reads a run's
+  tombstones. Earlier journal records and published documents keep what they
+  hold. See [remove a source](docs/tasks.md#remove-a-source).
 - `smythe runs inspect` reports what a durable research run was given, read
   and claimed, without source text, read bodies, quotes or output: a
   `context` block (the context-assembly and snapshot versions, the current

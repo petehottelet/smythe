@@ -2179,7 +2179,9 @@ class WorkflowRuntime:
           holds: resuming or inspecting the run gives ``indeterminate``, and
           :meth:`reevaluate` decides again. Only a policy with a source
           evidence validator that holds the tombstone rather than the text
-          can decide it; any other policy's decision is ``indeterminate``;
+          can decide it; any other policy's decision is ``indeterminate``,
+          and an operator can reject the output but accepts it only under
+          such a policy;
         - a lineage run whose record names the source is restricted instead
           (:func:`~smythe.lineage.restricted_sources`): no decision delivers
           its output again.
@@ -2269,7 +2271,11 @@ class WorkflowRuntime:
         runtime: a version 2 record that keeps what the current decision binds
         and names the operator, in a new ``acceptance`` operation whose inputs
         also bind the decision and operator. Only a current ``needs_review``
-        or ``indeterminate`` decision can be resolved; any other stands.
+        or ``indeterminate`` decision can be resolved; any other stands. An
+        operator can reject output delivered from a removed source, but
+        accepts it only on a runtime whose policy has a source evidence
+        validator that holds the source's tombstone, as a policy's decision
+        needs.
 
         On a run with a lineage policy, whose lineage must still match its
         journal, the new decision's lineage supersedes the run's record in the
@@ -2287,8 +2293,9 @@ class WorkflowRuntime:
         a source tombstone restricts
         (:func:`~smythe.lineage.restricted_sources`), a run with a
         renderer whose published document is missing or changed
-        (:meth:`republish` publishes it again first), or a current decision an
-        operator cannot resolve;
+        (:meth:`republish` publishes it again first), a current decision an
+        operator cannot resolve, or an operator's acceptance of output
+        delivered from a removed source that no such validator holds;
         ``WorkflowConflictError`` for a recipe that differs in anything else;
         and whatever the operator's verifier raises, such as
         ``ApprovalRejected``, before anything is journaled.
@@ -2988,28 +2995,35 @@ class WorkflowRuntime:
             return latest
         return latest + 1
 
-    def _unheld_removals(self):
-        """Why this runtime's policy cannot decide output delivered from a removed source.
+    def _unheld_tombstones(self):
+        """The tombstones of sources the run delivered from that this runtime's policy lacks.
 
         The run delivers from its current source set. When a source in it
         was removed (:meth:`remove_source`), only a source evidence validator
         whose sources hold that source's tombstone, rather than its text, can
-        tell whether the output rests on the removed text; a policy without
-        one decides ``indeterminate``. One reason for each such source; empty
-        when there is none.
+        tell whether the output rests on the removed text. A runtime without
+        a policy holds none.
         """
         if not self._context_version:
             return []
         delivered = {(source.source_id, source.sha256) for source in self.context_sources}
         held = {(record.source_id, record.sha256)
-                for validator in self.acceptance.final_validators
+                for validator in (self.acceptance.final_validators if self.acceptance else ())
                 if isinstance(validator, SourceEvidenceValidator)
                 for record in validator.sources if record.tombstone is not None}
+        return [record for record, _ in _tombstone_operations(self.store, self.run_id)
+                if (record.source_id, record.sha256) in delivered - held]
+
+    def _unheld_removals(self):
+        """Why this runtime's policy cannot decide output delivered from a removed source.
+
+        A policy without a source evidence validator that holds the source's
+        tombstone (:meth:`_unheld_tombstones`) decides ``indeterminate``. One
+        reason for each such source; empty when there is none.
+        """
         return [f"source {record.source_id!r} that the run delivered from was removed "
                 f"({record.tombstone}); only a source evidence validator that holds its "
-                "tombstone can decide the run"
-                for record, _ in _tombstone_operations(self.store, self.run_id)
-                if (record.source_id, record.sha256) in delivered - held]
+                "tombstone can decide the run" for record in self._unheld_tombstones()]
 
     async def _decide(self, synthesis_key, output, *, reevaluation=False, publication=None,
                       repair=None):
@@ -3078,8 +3092,22 @@ class WorkflowRuntime:
 
         The assertion is verified first, so nothing is journaled for one the
         verifier refuses. An operator decision stopped before its checkpoint
-        is finished by the same decision again.
+        is finished by the same decision again. An operator may reject output
+        delivered from a removed source, but accepts it only under a policy
+        that could decide it (:meth:`_unheld_tombstones`); otherwise
+        ``WorkflowStateError`` is raised before the assertion is verified.
         """
+        if (operator.decision is AcceptanceDecision.ACCEPTED
+                and record.decision in (AcceptanceDecision.NEEDS_REVIEW,
+                                        AcceptanceDecision.INDETERMINATE)
+                and (unheld := self._unheld_tombstones())):
+            raise WorkflowStateError(
+                "An operator cannot accept output delivered from a removed source: " + "; ".join(
+                    f"source {item.source_id!r} that the run delivered from was removed "
+                    f"({item.tombstone})" for item in unheld)
+                + "; reject it, or accept it under a policy whose source evidence validator "
+                "holds the tombstone"
+            )
         sequence = current_decision(self.store, self.run_id)["sequence"]
         decided = _operator_record(operator, self.run_id, sequence, record, WorkflowStateError)
         # Like a policy's decision, it binds the removals it was made under.
