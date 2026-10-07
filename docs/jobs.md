@@ -689,8 +689,10 @@ smythe jobs reroll RUN_ID "tile[3]" \
   --acknowledge-unknown
 ```
 
-`--dry-run` [previews](#preview-repairs) what each operation calls for
-without changing anything.
+Operation keys may come before, between or after the options; every plain
+argument after the run ID is an operation key. `--dry-run`
+[previews](#preview-repairs) what each operation calls for without changing
+anything.
 
 Rerolls consume the same original approval and attempt allowance. The selected
 operation receives a new immutable attempt linked to its predecessor that

@@ -592,3 +592,49 @@ def test_reroll_dry_run_names_the_operations_a_changed_attachment_needs_a_new_pl
         main(["jobs", "reroll", "--help"])
     help_text = " ".join(capsys.readouterr().out.split())
     assert "--dry-run" in help_text and "changes nothing" in help_text
+
+
+def test_reroll_reads_operation_keys_before_between_and_after_its_options(tmp_path, capsys):
+    manifest = _manifest(tmp_path, attempts=2)
+    data = json.loads(manifest.read_text(encoding="utf-8"))
+    data["operations"][0]["count"] = 2
+    manifest.write_text(json.dumps(data), encoding="utf-8")
+    store, run = _completed_run(tmp_path, capsys, manifest)
+    reroll = ["jobs", "reroll", run["run_id"]]
+
+    def previewed(*arguments):
+        assert main([*reroll, *arguments]) == EXIT_OK
+        return [item["operation_key"] for item in _json_output(capsys)["reroll"]["operations"]]
+
+    assert previewed("--dry-run", "glyph[1]", "--store", str(store), "--json") == ["glyph[1]"]
+    assert previewed("--store", str(store), "--json", "--dry-run", "glyph[1]") == ["glyph[1]"]
+    assert previewed("glyph[1]", "--dry-run", "glyph[0]", "--store", str(store),
+                     "--json") == ["glyph[1]", "glyph[0]"]
+    assert previewed("--dry-run", "--store", str(store), "--json", "--", "glyph[1]") == ["glyph[1]"]
+
+    # Every order reaches the run, which refuses a succeeded operation.
+    for arguments in (["--reason", "r", "glyph[1]", "--store", str(store)],
+                      ["--store", str(store), "glyph[1]", "--reason", "r"],
+                      ["--acknowledge-unknown", "glyph[1]", "--reason", "r", "--store", str(store)],
+                      ["--reason", "r", "--store", str(store), "--", "glyph[1]"]):
+        assert main([*reroll, "--json", *arguments]) == EXIT_JOB_STATE
+        refused = _json_output(capsys)
+        assert refused["command"] == "reroll"
+        assert "glyph[1] in state succeeded cannot be rerolled" in refused["error"]["message"]
+
+    [operation] = [item for item in run["operations"] if item["operation_key"] == "glyph[1]"]
+    [artifact] = [item for item in run["artifacts"] if item["operation_id"] == operation["operation_id"]]
+    (tmp_path / "outputs" / run["artifact_directory"] / artifact["relative_path"]).unlink()
+    assert main([*reroll, "--store", str(store), "--repair-integrity", "glyph[1]", "--reason",
+                 "accepted file deleted", "--json"]) == EXIT_OK
+    repaired = _json_output(capsys)["reroll"]
+    assert repaired["status"] == "completed" and repaired["counts"] == {"succeeded": 2}
+    assert [attempt["reason"] for attempt in repaired["attempts"]
+            if attempt["operation_id"] == operation["operation_id"]] == [None, "accepted file deleted"]
+
+    # A leftover option is still refused, whatever surrounds it.
+    for arguments in (["--dry-run", "glyph[1]", "--bogus"], ["--bogus", "glyph[1]", "--reason", "r"]):
+        with pytest.raises(SystemExit) as refused:
+            main([*reroll, *arguments, "--store", str(store)])
+        assert refused.value.code == EXIT_INVALID_INPUT
+        assert "unrecognized arguments: --bogus\n" in capsys.readouterr().err

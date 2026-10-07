@@ -1076,7 +1076,8 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   missing or changed accepted file is what an integrity repair admits.
   Nothing is repaired
   automatically and no other run's artifacts are offered. Without
-  `--dry-run`, `jobs reroll` still needs operations and `--reason`. In
+  `--dry-run`, `jobs reroll` still needs operations and `--reason`; its
+  operation keys may come before, between or after its options. In
   Python, `JobRunner.repair_preview(run_id, operation_keys=None)` judges
   under that runner's validators. `smythe.reuse.REASONS` gains
   `outcome_unknown` (`review`) for an operation whose provider call may have

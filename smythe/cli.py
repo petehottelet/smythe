@@ -253,7 +253,8 @@ def build_parser() -> argparse.ArgumentParser:
 
     reroll = commands.add_parser("reroll", help="rerun selected rejected operations")
     reroll.add_argument("run_id")
-    # Required unless --dry-run; main() checks them.
+    # Required unless --dry-run; _parse_arguments() checks them and collects
+    # the operation keys that follow an option.
     reroll.add_argument("operation_keys", nargs="*")
     reroll.add_argument("--reason", default=None)
     reroll.add_argument(
@@ -1432,16 +1433,39 @@ def _dispatch(args: argparse.Namespace) -> int:
     raise AssertionError(args.root_command)  # pragma: no cover
 
 
+def _parse_arguments(parser: argparse.ArgumentParser, argv: list[str] | None) -> argparse.Namespace:
+    """Parse ``argv`` like ``parse_args``, with every operation key of ``jobs reroll``.
+
+    A reroll's operation keys are optional, so that ``--dry-run`` can preview a
+    whole run. Python 3.11 matches them as empty once an option follows the run
+    ID and leaves the keys after that option unrecognized, so a reroll's
+    leftover plain arguments are its operation keys on every Python version.
+    """
+    args, extras = parser.parse_known_args(argv)
+    if args.root_command == "jobs" and args.jobs_command == "reroll":
+        keys, unrecognized, separated = list(args.operation_keys or ()), [], False
+        for token in extras:
+            if token == "--" and not separated:
+                separated = True
+            elif separated or not token.startswith("-"):
+                keys.append(token)
+            else:
+                unrecognized.append(token)
+        args.operation_keys, extras = keys, unrecognized
+        missing = [name for name, absent in (("operation_keys", not keys),
+                                             ("--reason", args.reason is None)) if absent]
+        if missing and not args.dry_run:
+            parser.error("the following arguments are required: " + ", ".join(missing))
+    if extras:
+        parser.error(f"unrecognized arguments: {' '.join(extras)}")
+    return args
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """Run the Smythe CLI and return a stable process exit code."""
     parser = build_parser()
-    args = parser.parse_args(list(argv) if argv is not None else None)
+    args = _parse_arguments(parser, list(argv) if argv is not None else None)
     command = getattr(args, f"{args.root_command}_command", args.root_command)
-    if command == "reroll" and args.root_command == "jobs" and not args.dry_run:
-        missing = [name for name, absent in (("operation_keys", not args.operation_keys),
-                                             ("--reason", args.reason is None)) if absent]
-        if missing:
-            parser.error("the following arguments are required: " + ", ".join(missing))
     try:
         return _dispatch(args)
     except KeyboardInterrupt as exc:
