@@ -31,6 +31,7 @@ publishing benchmark updates.
 | [Control ablation](control_ablation.md) | Mechanism scope | Objective gates remain valuable; routine LLM supervision and judged-prose gating are not default quality paths |
 | [Selector comparison](#selector-comparison-offline-mechanics) | Offline mechanics; not claimable | Four selection arms and an Autotune campaign with reference arms on fixtures for both task families; ranks no arm and changes no default |
 | [Trigger ablation](#trigger-ablation-offline-mechanics) | Offline mechanics; not claimable | Routine, evidence-triggered and no supervision on fixtures with planted anomalies, and an Autotune campaign with a reference arm; shows no measured benefit and changes no default |
+| [Policy ablations](#policy-ablations-offline-mechanics) | Offline mechanics; not claimable | Drain, durable drain, capacity admission, budget holds and contradiction synthesis, each against its own baseline on fixtures, and a matched-graph scheduler overhead test; shows no measured benefit and changes no default |
 | [Jobs at 5,000 operations](jobs_scale_5000_20260907_results.md) | **Claimable correctness observation** | One offline schema-v3 campaign: 5,000 accepted identical fixtures after a hard kill, safe resume, and eight explicit rerolls; zero accepted work reissued and zero calls on completed resume. No comparative timing or model-quality claim. |
 | [Astra/Sol amended study](results/astra_20260913_main/README.md) | **Human review complete; claimable within recorded descriptive scope** | All 200 workflows retained, 191 automatically accepted; all eight flagged answers accepted by human review at 4/4. Anonymous judging, graph/phase breakdowns and task-clustered comparisons. One failed call retains its full $0.169645 reserve. Reused synthetic tasks; all earlier diagnostics and charges remain separate. |
 
@@ -526,6 +527,53 @@ python benchmarks/run_trigger_ablation.py   # writes results/trigger_ablation_of
 
 Live evaluation, with a model reviewer and anomalies nobody planted, needs an
 approved budget and decided thresholds.
+
+## Policy ablations (offline mechanics)
+
+Does each opt-in scheduling and synthesis policy change what it should
+against its own baseline, one change at a time?
+[run_policy_ablations.py](run_policy_ablations.py) is the harness for those
+ablations, run offline on fixtures with planted failures, so the
+[record](results/policy_ablations_offline.json) establishes mechanics, never
+a measured benefit, and changes no default. It lists every policy it covers,
+and the selector and trigger policies above, as experimental and off by
+default.
+
+| Ablation | Baseline arm | Policy arm | Fixtures |
+|---|---|---|---|
+| `drain_ordinary` | `AsyncExecutor` without a termination policy | [`TerminationPolicy(drain_timeout_s=30)`](../docs/execution.md#draining-in-flight-work) | A planted failure while a sibling is in flight that answers within the drain or straggles past its deadline, and a `SecurityStop`, on a manual clock |
+| `drain_durable` | A durable `Swarm` without a termination policy | The [same policy](../docs/workflow-accounting.md#draining-in-flight-calls) | A zero-cost HTTP 401 rejection while the sibling's request is held, which answers within the drain or misses its deadline, on the shared fake Responses transport |
+| `capacity_admission` | `AsyncExecutor` without a capacity policy | A [`CapacityPolicy`](../docs/execution.md#provider-capacity) limit at the provider's quota | Eight ready nodes against a provider that serves two calls at once and refuses the rest with HTTP 429, with four retries or one, on a manual clock; then the provider-concurrency simulator at the concurrency each arm admits |
+| `budget_holds` | `Swarm(reserve_for_checks=False)` | [`Swarm(reserve_for_checks=True)`](../docs/budgets.md#held-allowance-for-checks) | An `LLM_MERGE` fan-out under a budget its workers can spend and under one that covers it, and a regeneration whose rerun competes with its judge |
+| `contradiction_synthesis` | `Synthesizer()` | [`Synthesizer(retain_contradictions=True)`](../docs/source-evidence.md#keep-contradictions-through-synthesis) | Supplied-source artifacts that leave out both, one or none of two contradictions, an uncontested one, and an `LLM_MERGE` that drops both, under one strict source-evidence policy |
+
+- Each case's arms come from one configuration and differ only in the policy
+  under test. The record lists the keys they differ in, and the harness
+  refuses a case whose arms differ in more.
+- Every arm keeps each call or attempt, failed, cancelled, refused and
+  rejected ones included, with its error and failure class. Failures that
+  share one cause are grouped as correlated errors: a sibling cancelled, or
+  left with unknown exposure, by another node's failure, or one failure
+  signature repeated across nodes or attempts.
+- On the manual clock, fixture calls, retry backoff and the drain deadline
+  take exactly their declared time, so each executor case repeats exactly.
+  The durable cases run in real time, with a fixture hook standing for the
+  drain deadline.
+- A matched-graph scheduler overhead test runs the fixed research → analyze →
+  write pipeline under an ordinary `Swarm` with file checkpoints, a durable
+  `Swarm` and a minimal reference asyncio executor, on the same fake
+  transport with 0 ms and 20 ms of latency per wire call. The outputs must be
+  byte-identical. Overhead is each executor's elapsed time minus the
+  reference's, per run and per node, with checkpoint and journal store time
+  reported apart. It is real local time on the machine the record names:
+  machine-specific, never a product claim.
+
+```bash
+python benchmarks/run_policy_ablations.py   # writes results/policy_ablations_offline.json
+```
+
+Promoting any of these policies needs decided held-out criteria, and live
+evaluation needs an approved budget.
 
 ## Coming soon
 
