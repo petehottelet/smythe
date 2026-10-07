@@ -431,10 +431,17 @@ connector or paid run.
    are [versioned records](docs/learning.md#template-records) in an
    append-only catalog, and a durable run pins an exact template version;
    evaluation, activation and rollback are not built yet
-8. **Native Agent Skills support** — discover the Agent Skills standard
-   directly, add Python-backed executable skills, and keep the existing
-   OpenClaw and MCP skill providers as inventory sources alongside it.
-   Skills never grant tools or change acceptance criteria
+8. **Native Agent Skills support** — built for the next release.
+   [Agent Skills directories](docs/skills.md#agent-skills-directories) are
+   discovered directly, beside the OpenClaw and MCP skill providers, and lend
+   agents capability tags only: declared `allowed-tools` are recorded and
+   never granted, instructions never enter a prompt, and durable runs pin a
+   static snapshot of the tags.
+   [Python-backed skills](docs/skills.md#python-backed-skills) are developer
+   tools that a local tool runtime offers only to the agent ids you list, on
+   ordinary runs. Skills never grant tools or change acceptance criteria.
+   Running a skill's bundled scripts, putting its instructions into prompts
+   and tools in durable text workflows are not covered
 9. **Autotune generalization** — add calibrated sample-size and
    repeated-comparison guidance, cross-campaign reports, process-
    supervised evaluator isolation, and conservative live-evaluator adapters

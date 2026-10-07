@@ -1665,6 +1665,25 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   `Registry.static_snapshot()` returns a `STATIC_ONLY` registry of each
   agent's current effective capabilities, which durable runs accept in place
   of live hydration. See [Skills](docs/skills.md).
+- Python-backed skills and local tools. `LocalTool(spec, handler, version,
+  timeout_s=None)` runs a Python handler for a model's tool call, and
+  `LocalToolRuntime(tools, agents={agent_id: [tool_name, ...]})` offers each
+  tool only to the agent ids listed, never by name or capability tag, so an
+  agent a generated plan creates under the same name is offered none.
+  `python_skill(skill, handler, input_schema=..., version=...)` makes a tool
+  named `skill.<name>` described by an Agent Skill's description, without
+  reading the skill's directory. A synchronous handler runs in a thread of its
+  own and an `async` one on the event loop. Each call runs once: an
+  exception, a result that is not text or an expired `timeout_s` returns to
+  the model as an error result, while `BudgetValidationError`,
+  `ProviderResponseError`, `WorkflowError` and `SecurityStop` stop the node.
+  Result text is cut to 65,536 characters by default, and `describe()` lists
+  each tool's name, version and input-schema digest in the form template
+  records use. `CompositeToolRuntime(*runtimes)` merges local and MCP tool
+  sessions and refuses a tool name that two of them offer. Local tools serve
+  ordinary runs; durable text workflows still refuse every `tool_runtime`.
+  See [Python-backed skills](docs/skills.md#python-backed-skills) and
+  [`examples/20_agent_skills.py`](examples/20_agent_skills.py).
 
 ### Changed
 

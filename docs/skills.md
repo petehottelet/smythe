@@ -4,7 +4,8 @@ A skill is a capability tag that an agent's inventory lends it. The registry
 asks a skill provider which skills each agent has, maps their names to tags,
 and matches a node's `required_capabilities` against them. The planner sees
 the same tags in its agent inventory. A skill routes work to an agent; it
-never changes what that agent may do.
+never changes what that agent may do. A [Python-backed skill](#python-backed-skills)
+is a tool you write and register for the agents you name.
 
 ## Sources
 
@@ -111,10 +112,96 @@ A skill cannot:
   ceiling;
 - put its instructions or description into a prompt. Node prompts are
   byte-identical with and without skills, and the planner's prompt differs
-  only by the tags it lists.
+  only by the tags it lists. Only a Python-backed skill that you register
+  sends its description to the model, as its tool's description, and only to
+  the agents you list.
 
 A tag can still route a node to an agent that already holds tools, so give
 tool-bearing agents only the skills you would trust with those tools.
+
+## Python-backed skills
+
+A skill's instructions tell a model what to do; a Python-backed skill does it
+in your code. `python_skill()` makes a `LocalTool` of a discovered skill and a
+handler you write, and a `LocalToolRuntime` offers that tool only to the
+agent ids you list:
+
+```python
+from smythe import LocalToolRuntime, Swarm, python_skill
+
+def collect_changes(arguments: dict) -> str:
+    return changes_since(arguments["since"])  # your code
+
+notes = python_skill(
+    provider.skill("release-notes"), collect_changes, version="1",
+    input_schema={"type": "object", "properties": {"since": {"type": "string"}},
+                  "required": ["since"]},
+)
+runtime = LocalToolRuntime([notes], agents={"writer": [notes.name]})
+swarm = Swarm(registry=registry, tool_runtime=runtime, ...)
+```
+
+The tool is named `skill.<name>`, so its skill's name may have at most 57
+characters, and is described by the skill's `description`; `input_schema`,
+`version` and an optional `timeout_s` are yours. `python_skill()` reads
+nothing from the skill's directory: it never runs `scripts/` or imports from
+the directory, and the skill's declared `allowed-tools` grant nothing.
+`LocalTool(spec, handler, version, timeout_s=None)` makes a tool of any
+`ToolSpec` the same way. [Example 20](../examples/20_agent_skills.py) runs
+one offline.
+
+Who is offered a tool:
+
+- `agents` maps agent ids to tool names, and a node is offered a tool only
+  when its agent's id is listed for it. Names never count: a generated plan
+  names its agents freely, and an agent it creates under one of your agents'
+  names gets a new id and no tools. A node without an agent gets none.
+- Capability tags route work and grant nothing. A skill's tag can route a
+  node to an agent that holds tools, but an agent not listed in `agents` is
+  offered no tool, whatever tags or skills it has.
+- The planner's agent inventory lists MCP allowlists, not local tools; route
+  work to a tool-bearing agent with its capability tags or with `agent_id` in
+  graphs you write.
+
+How a call runs:
+
+- The handler gets a copy of the arguments the model sent, which are
+  untrusted input, and returns the result text. A synchronous handler runs
+  in a thread of its own, so it never blocks the event loop; an `async`
+  handler runs on the loop.
+- An exception becomes an error result for the model, and so does a result
+  that is not text. `BudgetValidationError`, `ProviderResponseError`,
+  `WorkflowError` and `SecurityStop` stop the node instead, as they do from
+  any tool runtime.
+- With `timeout_s`, a call that has not returned in time becomes an error
+  result. An `async` handler is cancelled. A thread cannot be: a synchronous
+  handler keeps running until it returns, though the run does not wait for
+  it, and stops wherever it is if the process exits first.
+- A result's text and an error's message are cut to `max_result_chars`
+  characters (65,536 by default), with a note of how many more there were.
+- The model's tool loop is the only retry owner: each call runs its handler
+  once, and the model decides what to do with an error. Calls are not
+  journaled, so a retried node or a resumed run may call a handler again
+  ([side effects are at-least-once](mcp.md#side-effects-are-at-least-once)).
+- What a tool returns reaches the model as untrusted data, like any tool
+  result ([threat model](mcp.md#threat-model)).
+
+`CompositeToolRuntime(runtime, MCPToolRuntime())` offers a node the tools of
+every runtime it merges, each call going to the runtime that offered the
+tool. A tool name may come from one runtime only: local runtimes that define
+the same name are refused when composed, and sessions that offer the same
+name raise `ValueError` when the node's session opens, before its first
+provider call.
+
+`runtime.describe()` lists each tool's `name`, `version` and `schema_sha256`,
+the SHA-256 of its input schema as canonical JSON, in the form a
+[template record](learning.md#template-records) lists the tools it needs. A
+changed schema changes the digest; change `version` when the handler's
+behavior changes.
+
+Local tools serve ordinary runs. Durable text workflows refuse every
+`tool_runtime` before any call, and Jobs have no tools
+([support matrix](support-matrix.md#skill-sources)).
 
 ## Durable runs
 

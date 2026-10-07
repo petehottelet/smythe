@@ -26,6 +26,7 @@ from smythe.evidence import ClaimPassage, ClaimRecord, SourceEvidence, SourceRec
 from smythe.graph import FailurePolicy, Revision, RevisionError, structure_sha256
 from smythe.lineage import ArtifactLineage, LineagePolicy
 from smythe.loader import load_graph
+from smythe.local_tools import CompositeToolRuntime, LocalTool, LocalToolRuntime, python_skill
 from smythe.mcp import MCPConfigError, MCPServerSpec, MCPSkillProvider, MCPToolRuntime
 from smythe.memory import PlannerMemory
 from smythe.planner import (
@@ -132,6 +133,7 @@ __all__ = [
     "ClaimPassage",
     "ClaimRecord",
     "CompletionResult",
+    "CompositeToolRuntime",
     "ConstrainedArchitect",
     "ContextSnapshot",
     "ContextSource",
@@ -151,6 +153,8 @@ __all__ = [
     "LineagePolicy",
     "LLMArchitect",
     "LLMSupervisor",
+    "LocalTool",
+    "LocalToolRuntime",
     "MCPConfigError",
     "MCPServerSpec",
     "MCPSkillProvider",
@@ -243,6 +247,7 @@ __all__ = [
     "lint_contributions",
     "load_graph",
     "parse_skill_md",
+    "python_skill",
     "review_run",
     "structure_sha256",
 ]

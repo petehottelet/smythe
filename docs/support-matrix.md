@@ -409,6 +409,7 @@ Tests:
   `tests/test_support_matrix.py::test_durable_run_rejects_component_before_any_call[token-verifier-subclass]`,
   `tests/test_support_matrix.py::test_durable_run_rejects_component_before_any_call[memory]`,
   `tests/test_support_matrix.py::test_durable_run_rejects_component_before_any_call[tool-runtime]`,
+  `tests/test_support_matrix.py::test_durable_run_rejects_component_before_any_call[local-tool-runtime]`,
   `tests/test_support_matrix.py::test_durable_run_rejects_component_before_any_call[checkpoint-store]`,
   `tests/test_workflow_acceptance.py::test_durable_runs_refuse_unregistered_verifier_code_before_any_call`,
   `tests/test_workflow_retry_policy.py::test_a_provider_whose_sdk_may_retry_is_refused_before_any_call`,
@@ -495,13 +496,16 @@ Tests:
 A skill provider lends agents capability tags that route nodes to them; see
 [Skills](skills.md). No source grants a tool, changes an acceptance policy or
 raises a budget ceiling, and no source's instructions enter a prompt. Jobs
-operations have no agents, so no skill source applies to them.
+operations have no agents, so no skill source applies to them. A
+[Python-backed skill](skills.md#python-backed-skills) is a tool you register
+for the agent ids you list, on ordinary runs only.
 
 | Skill source | Ordinary runs | Durable text workflows |
 |---|---|---|
 | `AgentSkillsProvider` | `MERGE`, `REPLACE` or `STATIC_ONLY` hydration from `SKILL.md` files read when the provider is built; invalid files, duplicate names and links out of a root are refused then | Through `Registry.static_snapshot()`; live hydration is rejected |
 | `MCPSkillProvider` | Hydration from allowlisted or prefetched MCP tool names | Rejected: agents with MCP servers are refused |
 | `OpenClawSkillProvider` and custom providers | Hydration; a provider that raises leaves static capabilities with a warning | Through `Registry.static_snapshot()`; live hydration is rejected |
+| Python-backed skills (`python_skill`, `LocalToolRuntime`) | Tools offered only to the agent ids listed, never by name or tag | Rejected with every `tool_runtime` |
 
 Tests:
 
@@ -519,6 +523,11 @@ Tests:
 - `OpenClawSkillProvider`: `tests/test_openclaw_adapter.py::test_openclaw_adapter_translates_skills`.
 - Custom providers: `tests/test_skills_registry.py::test_registry_hydrates_capabilities_merge_mode`
   and `tests/test_skills_registry.py::test_skill_provider_failure_falls_back_to_static`.
+- Python-backed skills: `tests/test_local_tools.py::test_a_run_offers_tools_only_to_nodes_of_the_listed_agents`,
+  `tests/test_local_tools.py::test_a_generated_plan_agent_named_like_a_tool_bearing_agent_gets_no_tools[Developer]`,
+  `tests/test_local_tools.py::test_a_hydrated_tag_routes_a_node_to_a_tool_bearing_agent_but_never_adds_a_tool`
+  and `tests/test_local_tools.py::test_declared_allowed_tools_never_add_a_tool`; durable runs
+  `tests/test_support_matrix.py::test_durable_run_rejects_component_before_any_call[local-tool-runtime]`.
 - Durable runs: `tests/test_agent_skills.py::test_durable_runs_take_a_static_snapshot_and_refuse_live_hydration`,
   `tests/test_workflow_binding.py::test_registry_never_invokes_external_hydration_during_preflight`,
   `tests/test_agent_skills.py::test_static_snapshot_pins_effective_capabilities_in_a_detached_static_registry`
