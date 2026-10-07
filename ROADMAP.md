@@ -399,7 +399,24 @@ connector or paid run.
    retry owner and a shared deadline per operation; an opt-in drain policy
    that stops new paid work while in-flight results settle; and admission that
    respects provider rate limits and reserves allowance for verification and
-   synthesis. Security events and revoked authority stop work immediately
+   synthesis. Security events and revoked authority stop work immediately.
+   In progress, each experimental and off by default: an opt-in
+   [retry policy](docs/execution.md#retry-policy) classifies failures, with
+   one retry owner, a shared deadline and attempt caps that resume cannot
+   refill; [capacity limits](docs/execution.md#provider-capacity) admit work
+   per provider type and model; a
+   [drain policy](docs/execution.md#draining-in-flight-work) lets in-flight
+   calls settle after a failure; a
+   [held allowance](docs/budgets.md#held-allowance-for-checks) keeps budget for
+   verification and synthesis; a
+   [security stop](docs/execution.md#security-stops) ends a run at once and for
+   good; and [model profiles](docs/execution.md#model-profiles) route nodes to
+   approved models and [fall back](docs/execution.md#profile-fallback) on a
+   retry. [Evidence-triggered supervision](docs/supervisor.md#evidence-triggered-review),
+   [claim exchange](docs/architecture.md#claim-exchange) and
+   [routing rules](docs/architecture.md#routing-rules) are opt-in as well, and
+   the [contribution lint](docs/architecture.md#contribution-lint) only
+   records. No default changes without a held-out evaluation
 5. **Artifact lineage and selective repair** — accepted artifacts record the
    sources, validators and tools they depend on. A changed source or validator
    invalidates its dependents, and a repair plan shows what will be reused,
