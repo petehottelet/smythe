@@ -693,6 +693,44 @@ async def test_a_profiled_node_takes_the_limit_of_its_profile_s_provider_and_mod
     # The profile's provider hints one call at a time for its model.
     assert routed.peak["p"] == 1
 
+
+@pytest.mark.asyncio
+async def test_a_profiled_node_whose_model_is_full_is_passed_over_for_other_work():
+    """Admission reads p1's profile: with p0 holding its model's only slot, m0 starts instead.
+
+    Admitting p1 under the run's provider would spend the second concurrency
+    slot on a node that can only wait for p0, and hold m0 back behind it.
+    """
+    gate = Gate()
+
+    class Routed(Overlapping):
+        async def complete(self, system, prompt, model):
+            if label_of(system, prompt) == "p0":
+                await gate.wait()
+            return await super().complete(system, prompt, model)
+
+    run_provider, routed = Overlapping(), Routed(hint={"max_in_flight": 1})
+    executor = async_executor(run_provider, max_concurrency=2, capacity_policy=CapacityPolicy(),
+                              profiles=[ModelProfile("fast", routed, "p", 0.01)])
+    profiled = [Node(id=f"p{i}", label=f"p{i}", metadata={"profile": "fast"}) for i in range(2)]
+    run = asyncio.create_task(executor.run(graph(*profiled, node("m0"))))
+    try:
+        assert await gate.reached()
+        for _ in range(1000):
+            if run_provider.calls:
+                break
+            await asyncio.sleep(0)
+        # m0 ran on the run's model while p0 held the profile model's only slot.
+        assert run_provider.calls == ["m0"] and routed.calls == []
+        assert executor._capacity.bucket(routed, "p").in_flight == 1
+    finally:
+        gate.release()
+        await asyncio.wait_for(run, 10)
+
+    assert all(item.status is NodeStatus.COMPLETED for item in profiled)
+    assert sorted(routed.calls) == ["p0", "p1"] and routed.peak["p"] == 1
+
+
 def test_a_swarm_refuses_a_bad_hint_before_planning():
     provider = Overlapping(hint={"max_in_flight": -1})
     swarm = Swarm(model="m", provider=provider, capacity_policy=CapacityPolicy())
