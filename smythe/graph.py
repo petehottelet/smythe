@@ -274,8 +274,10 @@ class ExecutionGraph:
             by namespace, each written by one component: a ``Swarm`` with a
             ``WhiteRabbit`` router sets ``routing`` to its
             ``RoutingDecision.to_dict()``, and ``coordination`` to the groups
-            ``smythe.lint_contributions`` finds, if any. None when nothing
-            recorded any.
+            ``smythe.lint_contributions`` finds, if any; a
+            ``ConstrainedArchitect`` sets ``templates`` to the name, index and
+            version of each composed template that came from a record. None
+            when nothing recorded any.
     """
 
     topology: list[Topology]

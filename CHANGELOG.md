@@ -1750,7 +1750,6 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   `PlannerMemory.record_failure()` writes such a row directly. The default
   `PlannerMemory`, and memory objects that implement only `record()`, record
   nothing on failure. See [failed runs](docs/learning.md#failed-runs).
-  results or history. See [learning from runs](docs/learning.md).
 - Template records are validated as untrusted candidates.
   `validate_template_record(record, *, parent=None, limits=None)` checks a
   `TemplateRecord` or its JSON data and raises `TemplateValidationError`,
@@ -1944,8 +1943,11 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   depends on itself, on a blank id or on a node the graph does not contain;
   dependencies that form a cycle; a timeout that is not a positive finite
   number; a negative or non-integer `max_retries` or `max_regenerations`; a
-  label or metadata `role` that is not text; and text without a UTF-8 form.
-  See [distill a template](docs/learning.md#distill-a-template).
+  label or metadata `role` that is not text; text without a UTF-8 form; and
+  an integer timeout too large to be a float. A plan a `ConstrainedArchitect`
+  composes from its templates records them under `graph.planning["templates"]`,
+  so such checkpoints gain that key. See
+  [distill a template](docs/learning.md#distill-a-template).
 
 ### Fixed
 

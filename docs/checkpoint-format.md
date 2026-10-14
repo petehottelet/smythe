@@ -194,6 +194,13 @@ writes `coordination` beside `routing`, one list of node ids per group:
 `{"version": 1, "duplicate_siblings": [["research-0", "research-1"]]}`. A plan
 it does not flag has no `coordination` key.
 
+When a `ConstrainedArchitect` composes a plan from one or more
+[template records](learning.md#template-records), including templates built
+by `distill_template`, it writes `templates`, one entry per composed
+template that came from a record: `[{"name": "report", "index": 0,
+"version": "<template_version>"}]`. A plan composed only from templates
+written in code has no `templates` key.
+
 ## Revision log
 
 Once a [supervisor](supervisor.md#revision-log) has made a decision, applied
