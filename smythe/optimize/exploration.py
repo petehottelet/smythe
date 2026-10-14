@@ -47,10 +47,18 @@ from smythe.optimize.registry import PolicyRegistry
 PROTOCOL = "smythe.exploration.v1"
 _MAX_REPLY_BYTES = 1 << 20
 _REAP_SECONDS = 5.0
-# Inherited variables a proposer never receives: provider keys and other credentials.
-_CREDENTIAL_SUFFIXES = ("_API_KEY", "_ACCESS_KEY", "_ACCESS_KEY_ID", "_SECRET", "_SECRET_KEY",
-                        "_TOKEN", "_PASSWORD", "_CREDENTIALS")
-_CREDENTIAL_NAMES = frozenset({"SMYTHE_MCP_URL"})
+# The only variables a proposer inherits, whichever are set, besides the
+# locale's LC_* ones: what a process needs to start on Windows, macOS and
+# Linux, and what a Python interpreter reads to find itself and its modules.
+# Credentials, whatever their names, reach it only when the caller passes them.
+_INHERITED = frozenset({
+    "PATH", "TEMP", "TMP", "TMPDIR", "HOME", "USER", "LOGNAME", "LANG", "LANGUAGE", "TZ",
+    "LD_LIBRARY_PATH", "DYLD_LIBRARY_PATH",
+    "SYSTEMROOT", "SYSTEMDRIVE", "WINDIR", "COMSPEC", "PATHEXT", "USERPROFILE", "USERNAME",
+    "HOMEDRIVE", "HOMEPATH", "APPDATA", "LOCALAPPDATA",
+    "PYTHONHOME", "PYTHONPATH", "PYTHONPLATLIBDIR", "PYTHONUSERBASE", "PYTHONNOUSERSITE",
+    "PYTHONSAFEPATH", "PYTHONIOENCODING", "PYTHONUTF8",
+})
 
 
 class ProposerError(OptimizationError):
@@ -105,10 +113,21 @@ class ExplorationResult:
     proposer_unknown_microusd: int
 
 
-def _proposer_environment() -> dict[str, str]:
-    return {name: value for name, value in os.environ.items()
-            if not name.upper().endswith(_CREDENTIAL_SUFFIXES)
-            and name.upper() not in _CREDENTIAL_NAMES}
+def _proposer_environment(given: Mapping[str, str]) -> dict[str, str]:
+    """The inherited variables a process needs, then *given*, which replaces any of the same name."""
+    environment = {name: value for name, value in os.environ.items()
+                   if name.upper() in _INHERITED or name.upper().startswith("LC_")}
+    environment.update(given)
+    return environment
+
+
+def _variables(env: object) -> dict[str, str]:
+    if not isinstance(env, Mapping) or not all(
+            isinstance(name, str) and name and "=" not in name and "\0" not in name
+            and isinstance(value, str) and "\0" not in value for name, value in env.items()):
+        raise ValueError("env must map variable names to string values, without '=' in a "
+                         "name or NUL in either")
+    return dict(env)
 
 
 def _kill(process: subprocess.Popen) -> None:
@@ -163,12 +182,15 @@ class SubprocessProposer:
     The program reads the request from standard input and must write one
     JSON object to standard output and exit with status 0 within
     ``timeout_s`` seconds; at the deadline it is killed, even before it has
-    read the request. It inherits the caller's environment without
-    variables named like provider API keys or other credentials, its
-    standard error is discarded, and it is never given the ledger or its
-    path. ``ceiling_microusd`` is the most one call may spend. Give the
-    program's executable itself: a launcher killed at the deadline can
-    leave the program it started running.
+    read the request. Of the caller's environment it inherits only the
+    variables a process needs to start, such as ``PATH``, ``SYSTEMROOT``,
+    ``TEMP``, ``HOME`` and ``LANG``, and those a Python interpreter reads to
+    find its modules; *env* adds variables, such as a key the program
+    needs, and replaces inherited ones of the same name. Its standard error
+    is discarded, and it is never given the ledger or its path.
+    ``ceiling_microusd`` is the most one call may spend. Give the program's
+    executable itself: a launcher killed at the deadline can leave the
+    program it started running.
     """
 
     def __init__(
@@ -178,6 +200,7 @@ class SubprocessProposer:
         ceiling_microusd: int,
         timeout_s: float,
         cwd: str | os.PathLike[str] | None = None,
+        env: Mapping[str, str] | None = None,
     ) -> None:
         if isinstance(argv, (str, bytes)) or not isinstance(argv, Sequence) or not argv or any(
                 not isinstance(item, str) or not item for item in argv):
@@ -189,6 +212,7 @@ class SubprocessProposer:
         self.ceiling_microusd = _count(ceiling_microusd, "ceiling_microusd", 0)
         self.timeout_s = float(timeout_s)
         self.cwd = cwd
+        self.env = {} if env is None else _variables(env)
 
     async def propose(self, request: Mapping[str, Any]) -> dict[str, Any]:
         """Send *request* and return the program's reply object.
@@ -202,7 +226,7 @@ class SubprocessProposer:
         try:
             process = subprocess.Popen(
                 self.argv, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-                stderr=subprocess.DEVNULL, cwd=self.cwd, env=_proposer_environment(),
+                stderr=subprocess.DEVNULL, cwd=self.cwd, env=_proposer_environment(self.env),
                 creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
             )
         except OSError as exc:

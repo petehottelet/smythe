@@ -1382,7 +1382,7 @@ promotion it finds still needs review; see
 
 ### The proposer protocol
 
-`SubprocessProposer(argv, *, ceiling_microusd, timeout_s, cwd=None)` starts
+`SubprocessProposer(argv, *, ceiling_microusd, timeout_s, cwd=None, env=None)` starts
 `argv` once per round, writes one JSON request to its standard input and reads
 one JSON object from its standard output. The request holds:
 
@@ -1404,11 +1404,26 @@ itself: a launcher killed at the deadline, such as a virtual environment's
 `python.exe` on Windows, can leave the program it started running. A reply may
 be at most 1 MiB, and standard error is discarded.
 
-The program inherits the caller's environment without `SMYTHE_MCP_URL` and
-every variable whose name ends in `_API_KEY`, `_ACCESS_KEY`, `_ACCESS_KEY_ID`,
-`_SECRET`, `_SECRET_KEY`, `_TOKEN`, `_PASSWORD` or `_CREDENTIALS`. It never
-receives the ledger or its path; give it a `cwd` that does not hold the
-ledger. Smythe ships no model-backed proposer.
+Of the caller's environment the program inherits only the variables a process
+needs to start, those of them that are set:
+
+- on every platform `PATH`, `TEMP`, `TMP`, `TMPDIR`, `HOME`, `USER`,
+  `LOGNAME`, `TZ`, `LANG`, `LANGUAGE` and every `LC_*` variable;
+- for shared libraries, `LD_LIBRARY_PATH` and `DYLD_LIBRARY_PATH`;
+- on Windows `SYSTEMROOT`, `SYSTEMDRIVE`, `WINDIR`, `COMSPEC`, `PATHEXT`,
+  `USERPROFILE`, `USERNAME`, `HOMEDRIVE`, `HOMEPATH`, `APPDATA` and
+  `LOCALAPPDATA`; and
+- for a Python interpreter, `PYTHONHOME`, `PYTHONPATH`, `PYTHONPLATLIBDIR`,
+  `PYTHONUSERBASE`, `PYTHONNOUSERSITE`, `PYTHONSAFEPATH`, `PYTHONIOENCODING`
+  and `PYTHONUTF8`.
+
+No other variable reaches it, however it is named, so provider keys,
+organization and project IDs, tokens and `SMYTHE_MCP_URL` stay out. `env`
+maps the names of variables to add to their values, such as a key the
+program itself needs, and replaces an inherited variable of the same name;
+`explore()` records none of them. The program never receives the ledger or
+its path; give it a `cwd` that does not hold the ledger. Smythe ships no
+model-backed proposer.
 
 Before each call the registry records a reservation at the proposer's
 ceiling, and the reply's `spent_microusd` settles it. A proposer that could

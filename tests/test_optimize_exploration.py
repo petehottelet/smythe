@@ -616,9 +616,51 @@ def test_the_proposer_view_holds_no_holdout_values_paths_or_credentials(
 
     for environment in folder.glob("environment-*.json"):
         names = set(json.loads(environment.read_text(encoding="utf-8")))
-        assert "SMYTHE_EXPLORATION_SETTING" in names
+        assert "PATH" in names
+        # Only what a process needs to start is inherited, however a variable is named.
         assert not names & {"SMYTHE_EXPLORATION_API_KEY", "SMYTHE_EXPLORATION_TOKEN",
-                            "SMYTHE_MCP_URL"}
+                            "SMYTHE_MCP_URL", "SMYTHE_EXPLORATION_SETTING"}
+
+
+# Credentials named in ways no suffix rule anticipates, and two the old rule caught.
+CREDENTIALS = ("AZURE_OPENAI_KEY", "GITHUB_PAT", "HF_AUTH", "NPM_CONFIG__AUTH", "OPENAI_ORG_ID",
+               "OPENAI_PROJECT_ID", "OPENAI_BASE_URL", "PGPASSFILE", "SSH_AUTH_SOCK",
+               "ANTHROPIC_API_KEY", "SMYTHE_MCP_URL")
+# A program that replies with the environment it was started with.
+ENVIRONMENT = r"""
+import json
+import os
+import sys
+
+json.load(sys.stdin)
+json.dump({"environment": dict(os.environ)}, sys.stdout)
+"""
+
+
+def test_a_proposer_starts_with_only_what_a_process_needs_and_what_the_caller_passes(
+    tmp_path, monkeypatch,
+):
+    for name in CREDENTIALS:
+        monkeypatch.setenv(name, "placeholder-" + name.lower())
+    monkeypatch.setenv("LANG", "C.UTF-8")
+    monkeypatch.setenv("LC_ALL", "C.UTF-8")
+    proposer = SubprocessProposer(
+        [child_executable(), "-c", ENVIRONMENT], ceiling_microusd=0, timeout_s=60, cwd=tmp_path,
+        env={"PROPOSER_MODEL_KEY": "given-explicitly", "LANG": "en_US.UTF-8"})
+
+    # The program starts, reads its request and replies.
+    reply = asyncio.run(proposer.propose({"protocol": "test"}))
+    received = reply["environment"]
+
+    assert not set(received) & set(CREDENTIALS)
+    assert not any("placeholder-" in value for value in received.values())
+    assert received["PATH"] == os.environ["PATH"]
+    assert received["LC_ALL"] == "C.UTF-8"
+    if os.name == "nt":
+        assert received["SYSTEMROOT"] == os.environ["SYSTEMROOT"]
+    # What the caller passes is added, and replaces an inherited value of the same name.
+    assert received["PROPOSER_MODEL_KEY"] == "given-explicitly"
+    assert received["LANG"] == "en_US.UTF-8"
 
 
 def test_a_view_shows_the_reason_of_a_decision_made_before_the_holdout(stores):
@@ -694,6 +736,9 @@ def test_budgets_are_whole_limits(arguments):
 @pytest.mark.parametrize("argv, options", [
     ((), {}), ("python", {}), ([""], {}), (["python"], {"ceiling_microusd": -1}),
     (["python"], {"timeout_s": 0}), (["python"], {"timeout_s": float("inf")}),
+    (["python"], {"env": ["NAME"]}), (["python"], {"env": {"": "value"}}),
+    (["python"], {"env": {"NAME=VALUE": "x"}}), (["python"], {"env": {"NAME": 1}}),
+    (["python"], {"env": {"NAME": "a\0b"}}),
 ])
 def test_subprocess_proposers_need_a_command_a_ceiling_and_a_deadline(argv, options):
     with pytest.raises(ValueError):

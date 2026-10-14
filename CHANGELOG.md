@@ -739,9 +739,12 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   `max_total_exposure_microusd` or a proposer call whose ceiling would pass
   `max_proposer_microusd`; `ExplorationResult` names the stop.
   `SubprocessProposer(argv, ceiling_microusd=..., timeout_s=...)` exchanges
-  one JSON object each way over standard input and output, kills the program
-  at its deadline, and leaves API keys and other credential variables out of
-  its environment; the program never receives the ledger or its path. It sees
+  one JSON object each way over standard input and output, and kills the
+  program at its deadline. Of the caller's environment the program inherits
+  only what a process needs to start, such as `PATH`, `SYSTEMROOT`, `TEMP`,
+  `HOME`, `LANG` and a Python interpreter's `PYTHONPATH`, so no credential
+  reaches it whatever its name, plus the variables `env=` passes; it never
+  receives the ledger or its path. It sees
   `proposer_view(ledger, campaign_ids)`: contracts, candidates, development
   and confirmation evidence, and only whether the holdout passed. Proposals
   that set a reserved path, leave the contract's allowlist or rules, break
