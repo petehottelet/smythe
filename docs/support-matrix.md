@@ -612,8 +612,9 @@ Tests:
   process loss `tests/test_workflow_repair_process_loss.py::test_a_killed_repair_leaves_its_predecessor_intact_and_resumes_without_repeating_work`;
   restriction `tests/test_lineage_retention.py::test_a_restriction_marks_every_run_that_used_the_source_restricted`,
   `tests/test_lineage_retention.py::test_purge_deletes_the_derived_documents_and_keeps_each_tombstone`,
-  `tests/test_lineage_retention.py::test_a_restriction_in_one_scope_leaves_identical_artifacts_in_another_current`
-  and `tests/test_lineage_retention.py::test_a_restriction_reaches_a_successor_in_progress`;
+  `tests/test_lineage_retention.py::test_a_restriction_in_one_scope_leaves_identical_artifacts_in_another_current`,
+  `tests/test_lineage_retention.py::test_a_restriction_reaches_a_successor_in_progress`
+  and `tests/test_lineage_retention.py::test_a_restriction_reaches_a_reused_result_a_successor_already_saved`;
   selective repair against a full recomputation
   `tests/test_archive_maintenance.py::test_selective_repair_publishes_the_bytes_and_decisions_of_a_full_recomputation`
   and `tests/test_archive_maintenance.py::test_selective_repair_does_strictly_less_work_than_full_recomputation`.

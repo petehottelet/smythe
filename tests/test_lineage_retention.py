@@ -17,7 +17,7 @@ import json
 
 import pytest
 
-from fakes import ManualClock
+from fakes import Crash, ManualClock
 from fixture_service import FixtureService, serve_http
 from smythe import (
     AcceptanceDecision, ContextSource, LineagePolicy, OfflineProvider, ReadToolError,
@@ -29,6 +29,7 @@ from smythe.cli import EXIT_RUN_INDETERMINATE, main
 from smythe.evidence import (
     SOURCE_TOMBSTONE_OPERATION, load_source_tombstones, source_tombstone_key,
 )
+from smythe.graph import Node
 from smythe.lineage import (
     PURGE_OPERATION, load_lineage, purged_artifacts, restrict_source, restricted_sources,
 )
@@ -37,7 +38,7 @@ from smythe.workflow_store import WorkflowLeaseError, WorkflowStateError
 from test_action_approvals import CEILING, PROFILE, Host, delivered, intent
 from test_workflow_reuse import (
     CHANGED, KEPT, TEXTS, Catalog, install_replies, research, research_graph, results,
-    stopped_before_running, successor,
+    source_reads, stopped_before_running, successor,
 )
 
 WITHDRAWN = "Withdrawn at its owner's request"
@@ -446,6 +447,85 @@ def test_a_restriction_reaches_a_successor_in_progress(
     (item,) = swarm.plan_repair(sources=Catalog(service)).to_dict()["items"]
     assert (item["run_id"], item["action"], item["status"]) == (first, "review", "restricted")
     assert {"repair_in_progress", "source_tombstoned"} <= set(item["reasons"])
+
+
+def compared_graph(endpoint):
+    """The research graph and a comparison of the survey's and the churn's findings."""
+    graph = research_graph(endpoint)
+    graph.nodes.append(Node(id="compare", label="Compare the findings",
+                            depends_on=["extract-survey", "extract-churn"]))
+    return graph
+
+
+def lost_after_running(swarm, store, run_id, reuse, monkeypatch) -> str:
+    """Start a successor of *run_id* and lose it once its first ``running`` checkpoint is saved.
+
+    That checkpoint saves the reused results as completed, before any node
+    runs or any call is sent.
+    """
+    original, lost = store.save_checkpoint, []
+
+    def save(lease, revision, checkpoint, **kwargs):
+        if lost:
+            raise Crash("Simulated process loss")  # A killed process makes no further writes.
+        saved = original(lease, revision, checkpoint, **kwargs)
+        if checkpoint["status"] == "running":
+            lost.append(saved["revision"])
+            raise Crash("Simulated process loss after a running checkpoint")
+        return saved
+
+    monkeypatch.setattr(store, "save_checkpoint", save)
+    with pytest.raises(Crash):
+        successor(swarm, run_id, reuse)
+    monkeypatch.setattr(store, "save_checkpoint", original)
+    (successor_id,) = [item for item in run_ids(store) if item != run_id]
+    assert store.get_checkpoint(successor_id)["revision"] == lost[0]
+    assert store.inspect_run(successor_id)["call_count"] == 0
+    return successor_id
+
+
+@pytest.mark.parametrize(("reuse", "pending"), [
+    (["read-survey", "read-renewals", "extract-renewals"], "extract-survey"),
+    (KEPT, "compare"),
+], ids=["read-reused", "extraction-reused"])
+def test_a_restriction_reaches_a_reused_result_a_successor_already_saved(
+        store, library, tmp_path, replies, monkeypatch, reuse, pending):
+    service, endpoint = library
+    swarm = research(store, endpoint, tmp_path)
+    first = swarm.execute(compared_graph(endpoint))
+    service.change_source("churn", CHANGED)
+    # The successor is lost after a checkpoint saved its reused results as
+    # completed, before the node that reads one of them ran.
+    second = lost_after_running(swarm, store, first.execution_id,
+                                {node_id: [] for node_id in reuse}, monkeypatch)
+    saved = store.get_checkpoint(second)
+    status = {node["id"]: node["status"] for node in saved["checkpoint"]["graph"]["nodes"]}
+    assert saved["checkpoint"]["status"] == "running"
+    assert {node_id: status[node_id] for node_id in (*reuse, pending)} == {
+        **{node_id: "completed" for node_id in reuse}, pending: "pending"}
+
+    restricted = restrict_source(store, "survey", reason=WITHDRAWN)
+
+    assert {item["run_id"] for item in restricted} == {first.execution_id, second}
+    revision = store.get_checkpoint(second)["revision"]
+    reads, prompts, answer = source_reads(service), [], OfflineProvider.complete
+
+    async def complete(self, system, prompt, model):
+        prompts.append(prompt)
+        return await answer(self, system, prompt, model)
+
+    monkeypatch.setattr(OfflineProvider, "complete", complete)
+    # Resuming refuses the saved reuse the withdrawn text reached before any
+    # node runs: neither the text nor a result derived from it is sent again.
+    with pytest.raises(WorkflowStateError,
+                       match="'read-survey' cannot be reused: a source it used was removed"):
+        swarm.resume(second)
+    assert prompts == [] and source_reads(service) == reads
+    assert store.inspect_run(second)["call_count"] == 0
+    assert store.get_checkpoint(second)["revision"] == revision
+    with pytest.raises(WorkflowStateError, match="'read-survey' cannot be reused"):
+        swarm.resume(second)
+    assert prompts == []
 
 
 def test_a_restriction_made_while_a_successor_runs_reaches_it_before_it_delivers(

@@ -972,9 +972,12 @@ decision follows it:
   withdrawn text, nor a node that depends on one, including a successor
   already in progress when the text is withdrawn: it is restricted with its
   predecessor, or, while another process holds it, takes its predecessor's
-  tombstones when it resumes and before it decides. Resuming it then refuses
-  a reused result that the text reached with `WorkflowStateError`, and one
-  that already kept such a result completes `indeterminate`.
+  tombstones when it resumes and before it decides. Resuming it then
+  refuses, with `WorkflowStateError` and before any node runs, a reused
+  result that the text reached, whether or not a checkpoint already saved
+  that result, so neither the text nor a result derived from it is sent
+  again. A successor that is running when the text is withdrawn completes
+  `indeterminate`.
 - **No republication.** `republish` refuses the run, so a purged document is
   never published again.
 - **No external delivery.** Republication outside the journal goes through
@@ -1010,6 +1013,9 @@ decision follows it:
   before it completes. Another run in progress, such as one reading the
   source itself, is not: call `restrict_source` again after it completes,
   and after a run another process held (`WorkflowLeaseError`) is released.
+  A successor running in another process when the text is withdrawn takes
+  the tombstones only when it decides or resumes: until then its nodes can
+  still read a reused result derived from the text.
 - **Files elsewhere.** Only the files a run published into its artifact
   directory are purged, never copies made elsewhere.
 

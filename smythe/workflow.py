@@ -2569,10 +2569,13 @@ class WorkflowRuntime:
         inputs its ``lineage_reuse`` metadata holds and which the next
         checkpoint consumes. Only a new operation loads and checks the
         predecessor (:func:`_predecessor`, :func:`_reused`); a committed one
-        replays. Either way, the sources removed from this run, which holds
-        its predecessor's current tombstones (:meth:`_inherit_tombstones`),
-        are checked too. Raises ``WorkflowStateError`` for a result its
-        inputs do not bind or that used a source removed from this run.
+        replays. Every reused node, including one an earlier checkpoint
+        already completed, is checked against the sources removed from this
+        run, which holds its predecessor's current tombstones
+        (:meth:`_inherit_tombstones`), so a restriction made since the reuse
+        refuses it before any node reads it. Raises ``WorkflowStateError``
+        for a result its inputs do not bind or that used a source removed
+        from this run.
         """
         loaded, removed = [], None
 
@@ -2584,10 +2587,17 @@ class WorkflowRuntime:
 
         for node in self.graph.nodes:
             inputs = node.metadata.get(LINEAGE_REUSE_KEY)
-            if inputs is None or node.status is NodeStatus.COMPLETED:
+            if inputs is None:
                 continue
-            result = await self._operation_result(f"{_REUSE}/{node.id}", _REUSE, inputs, reuse)
-            if not _reuse_matches(node.id, inputs, result):
+            key, completed = f"{_REUSE}/{node.id}", node.status is NodeStatus.COMPLETED
+            if completed:
+                # A checkpoint consumed its operation already; it is only read.
+                operation = self.store.load_operation(self.run_id, key)
+                result = (None if operation is None or operation["state"] == "started"
+                          else operation["result"])
+            else:
+                result = await self._operation_result(key, _REUSE, inputs, reuse)
+            if result is None or not _reuse_matches(node.id, inputs, result):
                 raise WorkflowStateError(
                     f"The saved reuse of node {node.id!r} does not match its inputs")
             if removed is None:
@@ -2597,7 +2607,8 @@ class WorkflowRuntime:
                 raise WorkflowStateError(
                     f"Node {node.id!r} cannot be reused: a source it used was removed from "
                     "this run")
-            node.status, node.result = NodeStatus.COMPLETED, result["text"]
+            if not completed:
+                node.status, node.result = NodeStatus.COMPLETED, result["text"]
 
     def _artifact_directory(self):
         """The bound run's own directory, ``<artifact_dir>/<run id>``."""

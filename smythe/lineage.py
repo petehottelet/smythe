@@ -834,9 +834,10 @@ def restrict_source(store: Any, source_id: str, *, version: str | None = None,
     run is then restricted (:func:`restricted_sources`). So does each
     successor in progress whose saved graph or ``reuse`` operations name a
     result of its predecessor whose recorded inputs name the text, with a
-    copy of its latest checkpoint: it never uses that result, and is
-    restricted once it completes. Completed runs are restricted first, so a
-    predecessor holds its tombstones before its successors are reached.
+    copy of its latest checkpoint: resuming it refuses that result before
+    any node runs, whether or not a checkpoint saved it. Completed runs are
+    restricted first, so a predecessor holds its tombstones before its
+    successors are reached.
 
     With *purge*, every file the run published is deleted, never through a
     symbolic link, and an ``artifact_purge`` operation records its path

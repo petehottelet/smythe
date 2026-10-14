@@ -1237,11 +1237,12 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   stays `restricted`. A successor holds its predecessor's tombstones, so it
   is refused a withdrawn text as a context source, and a read step that
   reads one again is refused it; it takes those journaled since when it
-  resumes and before it decides, so a restriction made while it is in
-  progress refuses a reused result the text reached on resume and leaves a
-  completed successor `indeterminate`. `smythe runs inspect` lists a lineage run's
-  tombstones and purged files. Text copied into journal checkpoints and
-  provider responses is not scrubbed. See
+  resumes and before it decides. After a restriction made while it is in
+  progress, resuming it refuses a reused result the text reached, whether
+  or not a checkpoint saved it, before any node runs, and a successor
+  running meanwhile completes `indeterminate`. `smythe runs inspect` lists a
+  lineage run's tombstones and purged files. Text copied into journal
+  checkpoints and provider responses is not scrubbed. See
   [restrict a source](docs/lineage.md#restrict-a-source).
 - `Swarm(reserve_for_checks=True)` holds allowance for a run's verifiers and
   its `LLM_MERGE` synthesis so other nodes cannot spend it. Under
