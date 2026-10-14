@@ -9,7 +9,8 @@ its graph as a deterministic architect, with no planning call, which a
 durable run pins by identity and version. A candidate built in an
 environment snapshot no longer applies, and is no longer offered, once a
 tool, capability, validator, skill, model or MCP allowlist it relied on
-changes.
+changes. A candidate learned after a prerequisite changed cannot follow a
+version that lists the old one, so it is stored under a new name.
 """
 
 from __future__ import annotations
@@ -512,14 +513,17 @@ def environment(tmp_path, *, schema=SCHEMA, tools=True, capabilities=("writing",
                                        validators=[identity], models=models)
 
 
-def proven(tmp_path) -> TemplateRecord:
-    """A candidate whose draft step needs a writer, built in the captured environment."""
+def proven(tmp_path, **changes) -> TemplateRecord:
+    """A candidate whose draft step needs a writer, built in the captured environment.
+
+    *changes* are :func:`environment`'s, for a candidate learned after one changed.
+    """
     graph = memo(None)
     graph.nodes[0].required_capabilities = ["writing"]
     graph.nodes[1].required_capabilities = ["judging"]
     row = outcome(structure_sha256=structure_sha256(graph))
     return candidate_from_graph(graph, rows=[row], name="memo", require_success=False,
-                                environment=environment(tmp_path))
+                                environment=environment(tmp_path, **changes))
 
 
 def test_capture_reads_what_a_run_would_use(tmp_path):
@@ -721,6 +725,71 @@ def test_a_changed_environment_invalidates_the_template_with_a_named_reason(
     warnings = [entry.getMessage() for entry in caplog.records if entry.name == "smythe.templates"]
     assert len(warnings) == 2 and all(report.details[0] in text and "'memo'" in text
                                       for text in warnings)
+
+
+# The prerequisites field that a candidate learned after each change no longer
+# lists as the version before it does. The other changes alter only proven_with.
+DROPPED = {"tool-schema": "prerequisites.tools", "tool-removed": "prerequisites.tools",
+           "capability-removed": "prerequisites.capabilities",
+           "validator-version": "prerequisites.validators",
+           "skill-digest": "prerequisites.skills", "skill-removed": "prerequisites.skills"}
+
+
+def files(root):
+    """Each file under *root*, by relative path, with its bytes."""
+    return {path.relative_to(root).as_posix(): path.read_bytes()
+            for path in sorted(root.rglob("*")) if path.is_file()}
+
+
+@pytest.mark.parametrize("case", DROPPED)
+def test_a_candidate_learned_after_a_prerequisite_changed_is_stored_only_under_a_new_name(
+    tmp_path, case,
+):
+    changes, _ = CHANGES[case]
+    record, after = proven(tmp_path), environment(tmp_path, **changes)
+    relearned = proven(tmp_path, **changes)
+    catalog = TemplateCatalog(tmp_path / "catalog")
+    catalog.put(record)
+    before = files(catalog.root)
+    assert check_applicability(relearned, after).valid
+
+    # A later version of a name must follow a stored version of it, and this one
+    # drops or changes a prerequisite of the only one; a change counts as removal.
+    for candidate, field in ((relearned, "parent_version"),
+                             (replace(relearned, parent_version=record.template_version),
+                              DROPPED[case])):
+        with pytest.raises(TemplateValidationError) as refused:
+            catalog.put(candidate)
+        assert (refused.value.node, refused.value.field) == (None, field)
+    assert files(catalog.root) == before and catalog.versions("memo") == [record.template_version]
+
+    # Under a new name it is a first version, offered through that name's own target.
+    renamed = replace(relearned, name="memo-relearned")
+    assert catalog.put(renamed) == renamed.template_version
+    target = "planner.template.memo-relearned"
+    with _in_effect(tmp_path / "registry.sqlite3", {
+            TARGET: {TARGET: record.template_version},
+            target: {target: renamed.template_version}}) as registry:
+        assert [item.builder.template_version for item in catalog.active_templates(
+            registry, ["memo", "memo-relearned"], environment=after)] == [renamed.template_version]
+
+
+@pytest.mark.parametrize("case", sorted(set(CHANGES) - set(DROPPED)))
+def test_a_candidate_learned_under_other_models_or_allowlists_follows_its_predecessor(
+    tmp_path, case,
+):
+    changes, _ = CHANGES[case]
+    record = proven(tmp_path)
+    relearned = replace(proven(tmp_path, **changes), parent_version=record.template_version)
+    catalog = TemplateCatalog(tmp_path / "catalog")
+    catalog.put(record)
+
+    # Only proven_with differs, and a later version may record other digests.
+    assert relearned.to_dict()["prerequisites"] == record.to_dict()["prerequisites"]
+    assert relearned.proven_with != record.proven_with
+    assert catalog.put(relearned) == relearned.template_version
+    assert sorted(catalog.versions("memo")) == sorted([record.template_version,
+                                                       relearned.template_version])
 
 
 def test_every_reason_is_reported_once_with_each_detail(tmp_path):

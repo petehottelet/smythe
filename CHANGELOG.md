@@ -1843,8 +1843,10 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   record's JSON data. A new version of a name the catalog
   already holds must name one of its stored versions as `parent_version`,
   so it is always compared with a stored parent; only a name's first
-  version may name none. `distill_template` and templates built
-  in code are not validated. See
+  version may name none. A prerequisite at another version counts as
+  removed, so a candidate learned after a prerequisite of each stored
+  version of its name changed is stored under a new name.
+  `distill_template` and templates built in code are not validated. See
   [validate a candidate record](docs/learning.md#validate-a-candidate-record).
 - Template versions are activated and rolled back through the policy
   registry. A template's target is `planner.template.<name>`

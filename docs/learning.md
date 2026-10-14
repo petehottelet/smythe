@@ -306,7 +306,11 @@ if structure_sha256(result.graph) in repeated_structures(memory, min_accepted=3)
   [reviewed decision](#activate-and-roll-back-templates). A candidate names
   no parent, so it is stored only as the first version of its name; to store
   it as a later version, name a stored version it follows:
-  `catalog.put(dataclasses.replace(record, parent_version=version))`.
+  `catalog.put(dataclasses.replace(record, parent_version=version))`. It is
+  [validated](#validate-a-candidate-record) against that version and must
+  keep, among other things, every prerequisite that version lists, so a
+  candidate learned after one of them changed is
+  [stored under a new name](#the-template-catalog) instead.
 
 `PlannerMemory.iter_outcomes()` returns the history rows, oldest first. It
 reads the file once, when it is called, never writes it, and skips the rows
@@ -413,6 +417,22 @@ catalog.versions("diligence-review")  # every stored version of that name
   `TemplateValidationError` with `field` `"parent_version"` and writes
   nothing. Only the first version of a name may name no parent, or one the
   catalog does not hold.
+- A later version must keep every prerequisite of the version it names, and
+  a prerequisite at another version counts as removed. A candidate learned
+  after a capability, skill, tool or validator it relied on was removed or
+  changed, such as a skill whose `SKILL.md` digest changed, no longer lists
+  that prerequisite as it was, so it can follow only a stored version that
+  lists none of the prerequisites it dropped or changed. When every stored
+  version of the name lists one of them, the candidate cannot be stored
+  under that name: `put` refuses it with `field` `"parent_version"` when it
+  names no parent, and with the prerequisite's field, such as
+  `"prerequisites.skills"`, when it names a stored version. Store it under
+  a new name instead, whose target `planner.template.<new name>` is
+  activated through its own reviewed decision; the old name's version stays
+  in effect until its target is
+  [retired](optimize.md#resolve-roll-back-and-retire). A candidate whose
+  runs differ only in their model ids or MCP allowlists records other
+  `proven_with` digests and can follow its predecessor.
 - `layout.json` records the catalog's file layout
   (`smythe.templates.TEMPLATE_CATALOG_LAYOUT`, now 1), so a later layout
   change is detected rather than misread. A catalog without the file was
@@ -688,7 +708,13 @@ A version that does not apply is left out, and a warning on the
 the policy registry, the catalog and durable runs that pinned the version
 are unchanged, and [`pinned_templates`](#resume-a-pinned-run) still rebuilds
 it to resume them. To offer the template again, build a candidate from runs
-in the new environment and activate it through a reviewed decision.
+in the new environment and activate it through a reviewed decision. After a
+model or MCP allowlist change, the candidate can be stored as a later
+version of the name. After a prerequisite capability, skill, tool or
+validator was removed or changed, it no longer lists that prerequisite as
+it was, so it cannot follow a version that does; when every stored version
+of the name does, it is stored and activated under a
+[new name](#the-template-catalog).
 
 ## A template's lifecycle
 
@@ -766,7 +792,10 @@ skill files involved.
   follows the registry. Reviews are declared, not authenticated.
 - Applicability compares a record with the environment you capture, not
   with what a run does. Nothing re-evaluates a template whose environment
-  changed; that takes new runs and a new candidate.
+  changed; that takes new runs and a new candidate. A later version cannot
+  leave out a prerequisite of the version it follows or record it at
+  another version, so once a prerequisite of each stored version of a name
+  has changed, a new candidate takes a new name and target.
 - A promotion is only as good as the evaluator behind it: an evaluator whose
   held-out tasks miss what a candidate breaks promotes it. Template
   campaigns have run only on offline fixtures, so no template version has

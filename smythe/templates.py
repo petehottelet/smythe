@@ -882,7 +882,10 @@ class TemplateCatalog:
         of a name the catalog already holds versions of must name one of
         them as its ``parent_version``, so it is always compared with a
         stored parent; only the first version of a name may name none, or a
-        parent the catalog does not hold. A refused record raises
+        parent the catalog does not hold. A prerequisite at another version
+        counts as removed, so a candidate learned after a prerequisite of
+        each stored version of its name changed cannot be stored under that
+        name, only under a new one. A refused record raises
         :class:`TemplateValidationError` and writes nothing.
 
         Storing a record the catalog already holds writes no record or
