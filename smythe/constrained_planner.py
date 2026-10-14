@@ -20,8 +20,8 @@ from smythe.provider import REFUSED_STOP_REASONS, TRUNCATED_STOP_REASONS, Provid
 from smythe.registry import Registry
 from smythe.task import Task
 from smythe.workflow_binding import (
-    ComponentBinding, WorkflowBindingError, _BoundLocal, bind_component,
-    describe_component, provider_description, require_exact,
+    ComponentBinding, WorkflowBindingError, bind_component, describe_component,
+    local_component, provider_description, require_exact,
 )
 
 # The model's selections and params decide the composed graph's size. The
@@ -31,9 +31,8 @@ DEFAULT_MAX_NODES = 64
 
 def _record_version(builder: object) -> str | None:
     """The version a template record's builder builds; None for any other builder."""
-    if isinstance(builder, _BoundLocal):  # A durable run's bound declaration.
-        builder = builder.component
-    version = getattr(builder, "template_version", None)
+    # A durable run's builder is a bound declaration wrapping the record's builder.
+    version = getattr(local_component(builder), "template_version", None)
     return version if type(version) is str else None
 
 

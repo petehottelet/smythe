@@ -315,6 +315,17 @@ class _BoundLocal:
         return self.component(*args, **kwargs)
 
 
+def local_component(component: object) -> object:
+    """The component a ``LocalOnly`` declaration built when a run bound it.
+
+    Binding a declaration wraps the component its factory builds, so read
+    the component's own attributes, such as a template builder's
+    ``template_version``, from what this returns. Any other *component* is
+    returned unchanged.
+    """
+    return component.component if isinstance(component, _BoundLocal) else component
+
+
 def _supported_types():
     from smythe.constrained_planner import ConstrainedArchitect
     from smythe.planner import LLMArchitect, SimpleArchitect

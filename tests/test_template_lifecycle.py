@@ -44,7 +44,7 @@ from smythe.task import Task
 from smythe.templates import (
     TemplateCatalog, TemplateRecord, TemplateRecordError, pinned_templates, template_target,
 )
-from smythe.workflow_binding import LocalOnly
+from smythe.workflow_binding import ComponentBinding, LocalOnly, bind_component, local_component
 from smythe.workflow_store import SQLiteWorkflowStore, WorkflowConflictError
 
 TARGET = "planner.template.report"
@@ -452,6 +452,26 @@ def test_a_routed_plan_keeps_its_template_record_beside_the_routing_decision():
 
     assert graph.planning["templates"] == [used(V2.template_version)]
     assert graph.planning["routing"]["method"] == "fallback_no_classifier"
+
+
+def test_a_durable_run_binds_a_record_builder_that_local_component_returns():
+    binding = ComponentBinding("run-1", "architect", "planning",
+                               call_factory=lambda provider, scope: provider)
+    bound = bind_component(V1.local_only(), binding.child("template:report"),
+                           role="template_builder")
+
+    builder = local_component(bound)
+
+    assert builder is not bound and builder.template_version == V1.template_version
+    assert [node.id for node in builder(Task("Summarize the quarter"))[0]] == list(SECTIONS)
+    # Anything else is returned unchanged.
+    plain = V1.to_template().builder
+    assert local_component(plain) is plain and local_component(None) is None
+    # A durable menu of record builders records their versions, as an ordinary one does.
+    durable = ConstrainedArchitect(OfflineProvider(), [SubGraphTemplate(
+        "report", "A sectioned report", V1.local_only())], model="offline").bind_run(binding)
+    assert durable._compose([{"template": "report"}], Task("Summarize the quarter"))[
+        0].planning == {"templates": [used(V1.template_version)]}
 
 
 def test_public_names_are_exported():
