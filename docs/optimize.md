@@ -329,6 +329,22 @@ refuse a decision with references when they validate it, as
 `smythe optimize inspect --out` does; export reports for such campaigns with a
 release that supports reference arms.
 
+### Evaluate template versions
+
+A template version is a policy for its registry target,
+`planner.template.<name>`, so a campaign can compare a candidate version with
+the version it would replace, as the incumbent, and with a simpler
+alternative as a reference. The repository's
+[template evaluation harness](../benchmarks/README.md#template-evaluation-offline-mechanics),
+`benchmarks/template_eval.py`, runs such campaigns with a single worker as a
+`must_not_be_worse` reference. One trial is one pass over a split's task
+pack, each pack is pinned by SHA-256 in the evaluator manifest, the holdout
+pack holds a task family the other splits do not, and a gate fails a version
+that is applied to a family it must not touch. The harness is offline and
+repository-only, not part of the installed package: its fixtures establish
+the mechanics only, and no number it records is a product or benchmark
+claim.
+
 ## Deterministic offline concurrency campaign
 
 `ConcurrencyScenario` is the first reference evaluator. It simulates a fixed

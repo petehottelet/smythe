@@ -1667,6 +1667,28 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   experimental and off by default, and its overhead times are
   machine-specific. See
   [policy ablations](benchmarks/README.md#policy-ablations-offline-mechanics).
+- An offline template evaluation harness, `benchmarks/template_eval.py`. A
+  template version is an Autotune policy for its registry target,
+  `planner.template.report`: an arm is a `ConstrainedArchitect` over the
+  catalog record of the version the policy names, with an `OfflineProvider`
+  scripting its selection, or `single_agent`, a `SimpleArchitect`. The
+  predecessor version is the incumbent, the candidate the challenger, and
+  `single_agent` a sealed reference arm under `must_not_be_worse`. One trial
+  is one pass over a split's tasks from a task pack generated in Python and
+  pinned by SHA-256; the holdout pack holds a task family development and
+  confirmation do not, and only a holdout trial loads it. A strict acceptance
+  policy per family judges every arm. Trials record accepted and attempted
+  tasks, attributable micro-USD cost and planned nodes, and gate on an
+  unchanged policy, complete accounting, no template on an excluded family
+  and a nonzero accepted count. The evaluator manifest binds the harness
+  file's digest, each split's pinned pack and acceptance policies, the
+  validator identities and the fixture price, and cost per accepted outcome
+  is reported as a ratio of sums, apart from the campaign's own spend.
+  Fixture campaigns promote a version that recovers planted step failures and
+  decline one that drops a section only the held-out family needs (verdict
+  `worse`), one that loses to the single worker and one applied to an
+  excluded family. The harness is repository-only and not packaged. See
+  [template evaluation](benchmarks/README.md#template-evaluation-offline-mechanics).
 - `jobs review RUN_ID [--limit N] [--offset N]` lists only what in a Jobs
   run needs an operator's decision, and the command that carries each
   decision out. Items come from states the run already records: a budget

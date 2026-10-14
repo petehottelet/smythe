@@ -32,6 +32,7 @@ publishing benchmark updates.
 | [Selector comparison](#selector-comparison-offline-mechanics) | Offline mechanics; not claimable | Four selection arms and an Autotune campaign with reference arms on fixtures for both task families; ranks no arm and changes no default |
 | [Trigger ablation](#trigger-ablation-offline-mechanics) | Offline mechanics; not claimable | Routine, evidence-triggered and no supervision on fixtures with planted anomalies, and an Autotune campaign with a reference arm; shows no measured benefit and changes no default |
 | [Policy ablations](#policy-ablations-offline-mechanics) | Offline mechanics; not claimable | Drain, durable drain, capacity admission, budget holds and contradiction synthesis, each against its own baseline on fixtures, and a matched-graph scheduler overhead test; shows no measured benefit and changes no default |
+| [Template evaluation](#template-evaluation-offline-mechanics) | Offline mechanics; not claimable | Fixture template versions against their predecessor and a single worker, in Autotune campaigns with a held-out task family; ranks no template and changes no default |
 | [Jobs at 5,000 operations](jobs_scale_5000_20260907_results.md) | **Claimable correctness observation** | One offline schema-v3 campaign: 5,000 accepted identical fixtures after a hard kill, safe resume, and eight explicit rerolls; zero accepted work reissued and zero calls on completed resume. No comparative timing or model-quality claim. |
 | [Astra/Sol amended study](results/astra_20260913_main/README.md) | **Human review complete; claimable within recorded descriptive scope** | All 200 workflows retained, 191 automatically accepted; all eight flagged answers accepted by human review at 4/4. Anonymous judging, graph/phase breakdowns and task-clustered comparisons. One failed call retains its full $0.169645 reserve. Reused synthetic tasks; all earlier diagnostics and charges remain separate. |
 
@@ -582,6 +583,64 @@ python benchmarks/run_policy_ablations.py   # writes results/policy_ablations_of
 
 Promoting any of these policies needs decided held-out criteria, and live
 evaluation needs an approved budget.
+
+## Template evaluation (offline mechanics)
+
+Is a new template version better than the version it replaces, and better
+than no template at all? [template_eval.py](template_eval.py) is the harness
+for that evaluation, run offline on fixtures. Every step answers with fixture
+content and declared usage, and each fixture version is designed for one
+outcome, so the record it writes establishes mechanics, never template
+quality, and changes no default.
+
+| Arm | What it is |
+|---|---|
+| A template version | A `ConstrainedArchitect` over the [catalog](../docs/learning.md#the-template-catalog) record of the version the policy names, with an `OfflineProvider` scripting its selection; a task of a family the record does not apply to runs on a `SimpleArchitect` |
+| `single_agent` | A `SimpleArchitect`: one worker receives the whole task |
+
+- A campaign's policy maps the template's registry target,
+  `planner.template.report`, to a version or to `single_agent`. The
+  predecessor version is the incumbent, the candidate the challenger, and
+  `single_agent` a sealed [reference arm](../docs/optimize.md#reference-arms)
+  under `must_not_be_worse`, so all three run on the same seeds and a
+  candidate worse than one worker is not promoted.
+- One trial is one pass over a split's tasks. Task packs are generated in
+  Python and pinned by SHA-256: development and confirmation hold briefings,
+  and the holdout holds incident reviews, a family neither earlier split
+  contains. The holdout pack is built, and checked against its pin, only when
+  a holdout trial runs. Every pack also holds a code-change task, a family no
+  template version may apply to.
+- One strict acceptance policy per family, a `TextValidator` that requires
+  the family's sections, judges every arm. A trial records accepted and
+  attempted tasks, attributable cost in micro-USD (declared usage priced in
+  nanoUSD, the pass's total rounded up) and planned nodes. It gates on an
+  unchanged policy, complete accounting, no template on the excluded family
+  and at least one accepted outcome. The
+  [evaluator manifest](../docs/optimize.md#evaluator-manifests) binds the
+  harness file's digest, each split's pinned pack with its acceptance
+  policies, the validator identities and the fixture price.
+- Cost per accepted outcome is an arm's summed cost over its summed accepted
+  outcomes, `undefined` when there are none. Each campaign's own spend is
+  reported apart from it.
+- Four fixture candidates meet one predecessor. One retries every section
+  step: it is promoted and is not worse than one worker. A harmful one also
+  drops the Timeline step that only incident reviews need: it is better on
+  development and confirmation, `worse` on the holdout, and not promoted. One
+  retries only the Sources step: it beats its predecessor, loses to one
+  worker, and is not promoted. One no longer excludes code changes: it fails
+  `applicability.excluded_untouched` in development and is not promoted.
+  Planted faults fail a section step's first answer; a single worker's
+  whole-task answer has no such step.
+- The holdout family is committed with the harness, so it is held out from
+  development and confirmation, not hidden from whoever writes candidates.
+  Thresholds are placeholders, and no decision is reviewed or activated.
+
+```bash
+python benchmarks/template_eval.py   # writes results/template_eval_offline.json
+```
+
+Promoting a template version needs held-out tasks its author has not seen and
+decided thresholds, and live evaluation needs an approved budget.
 
 ## Coming soon
 

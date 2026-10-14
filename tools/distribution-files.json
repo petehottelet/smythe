@@ -280,6 +280,7 @@
     "tests/test_task_consumers.py",
     "tests/test_task_propagation.py",
     "tests/test_task_snapshots.py",
+    "tests/test_template_eval.py",
     "tests/test_template_lifecycle.py",
     "tests/test_template_records.py",
     "tests/test_template_validation.py",
