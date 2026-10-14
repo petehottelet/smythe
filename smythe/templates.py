@@ -26,6 +26,11 @@ holds the version of template *name* in effect.
 ordinary run, :meth:`TemplateCatalog.active_local_templates` declares them
 for a durable run, whose recipe pins them, and :func:`pinned_templates`
 rebuilds the versions a saved recipe pinned.
+
+:func:`repeated_structures` finds the graph structures that accepted runs in
+planner history repeat, and :func:`candidate_from_graph` builds a candidate
+record for one, naming those runs and keeping each failed or rejected run's
+category and evidence digest. A candidate is never stored or activated here.
 """
 
 from __future__ import annotations
@@ -36,7 +41,7 @@ import math
 import os
 import re
 from collections import deque
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from copy import deepcopy
 from dataclasses import dataclass, field, replace
 from pathlib import Path
@@ -53,12 +58,14 @@ from smythe.distill import (
 )
 from smythe.graph import (
     SYNTHESIS_NODE_ID, ExecutionGraph, FailurePolicy, Node, NodeStatus, _has_cycle_in,
+    structure_sha256,
 )
 from smythe.loader import (
     MODEL_NODE_ID, MODEL_PLAN_MAX_DEPTH, MODEL_PLAN_MAX_GATES, MODEL_PLAN_MAX_NODES,
     MODEL_PLAN_MAX_REGENERATIONS, MODEL_PLAN_MAX_RETRIES, MODEL_PLAN_MIN_TIMEOUT_S,
     _build_model_graph,
 )
+from smythe.memory import ExecutionOutcome, PlannerMemory
 from smythe.registry import Registry
 from smythe.task import Task
 from smythe.validation import ValidatorIdentity
@@ -69,6 +76,7 @@ __all__ = [
     "TEMPLATE_RECORD_VERSION", "TemplateCatalog", "TemplateLimits", "TemplateRecord",
     "TemplateRecordError", "TemplateValidationError", "distill_record", "pinned_templates",
     "template_target", "validate_template_record",
+    "candidate_from_graph", "repeated_structures",
 ]
 
 TEMPLATE_RECORD_TYPE = "smythe.template_record"
@@ -1060,3 +1068,114 @@ def pinned_templates(config: Mapping[str, Any], catalog: TemplateCatalog) -> lis
                                       "stored record's declaration")
         templates.append(SubGraphTemplate(name, description, declaration))
     return templates
+
+
+# Promotion from planner history. The decisions that make a run of a
+# structure negative evidence, and the row fields a failure example's
+# evidence digest covers: never text such as a goal or an error message.
+_NOT_ACCEPTED = frozenset({"rejected", "needs_review", "indeterminate"})
+_EVIDENCE_KEYS = ("execution_id", "structure_sha256", "acceptance", "verification",
+                  "rejected_output_sha256", "failure_category", "failure_type")
+
+
+def _min_accepted(value: Any) -> int:
+    if type(value) is not int or value < 1:
+        raise ValueError(f"min_accepted must be a positive integer, got {value!r}")
+    return value
+
+
+def _accepted(row: ExecutionOutcome) -> bool:
+    """Whether *row* names a run of a structure whose output was accepted and that did not fail."""
+    return (row.acceptance == AcceptanceDecision.ACCEPTED.value and row.failure_category is None
+            and row.execution_id is not None and row.structure_sha256 is not None)
+
+
+def repeated_structures(
+    memory: PlannerMemory, *, min_accepted: int,
+) -> dict[str, list[ExecutionOutcome]]:
+    """The graph structures at least *min_accepted* accepted runs in *memory*'s history share.
+
+    A run counts when its row records ``acceptance`` ``"accepted"``, an
+    ``execution_id`` and a ``structure_sha256``, and no
+    ``failure_category``; ``success`` never counts, and each execution id
+    counts once. Returns each such structure digest, in the order its first
+    accepted run was recorded, with the first row of each of its accepted
+    runs. The history file is only read.
+    """
+    _min_accepted(min_accepted)
+    groups: dict[str, dict[str, ExecutionOutcome]] = {}
+    for row in memory.iter_outcomes():
+        if _accepted(row):
+            groups.setdefault(row.structure_sha256, {}).setdefault(row.execution_id, row)
+    return {digest: list(runs.values()) for digest, runs in groups.items()
+            if len(runs) >= min_accepted}
+
+
+def candidate_from_graph(
+    graph: ExecutionGraph,
+    *,
+    rows: Iterable[ExecutionOutcome],
+    name: str,
+    min_accepted: int = 1,
+    description: str | None = None,
+    registry: Registry | None = None,
+    require_success: bool = True,
+    source_task: Task | None = None,
+) -> TemplateRecord:
+    """A candidate template record for *graph*, with the evidence *rows* hold for its structure.
+
+    *rows* are planner history outcomes, such as ``memory.iter_outcomes()``;
+    only those whose ``structure_sha256`` is *graph*'s are read. Each
+    accepted run, as :func:`repeated_structures` counts them, becomes a
+    source run. Each other row with a ``failure_category``, or with
+    ``acceptance`` ``"rejected"``, ``"needs_review"`` or
+    ``"indeterminate"``, becomes a failure example: that category, or else
+    the decision, and the SHA-256 of the row's evidence as canonical JSON,
+    its ``execution_id``, ``structure_sha256``, ``acceptance``,
+    ``verification``, ``rejected_output_sha256``, ``failure_category`` and
+    ``failure_type`` that are set. No text from a row, such as its goal or a
+    failure excerpt, is kept. Rows with equal evidence give one example,
+    and the latest :data:`MAX_FAILURE_EXAMPLES` are kept.
+
+    The other arguments are those of :func:`distill_record`, whose review
+    the candidate keeps. Nothing is stored or activated: store the
+    candidate with :meth:`TemplateCatalog.put` and activate it through a
+    reviewed decision.
+
+    Raises:
+        ValueError: *min_accepted* is not a positive integer.
+        TypeError: A row is not an ``ExecutionOutcome``.
+        DistillationError: For the reasons ``distill_record`` gives, when
+            *graph*'s structure has no digest, or when *rows* hold fewer
+            than *min_accepted* accepted runs of it.
+    """
+    _min_accepted(min_accepted)
+    try:
+        structure = structure_sha256(graph)
+    except (TypeError, ValueError) as error:
+        raise DistillationError(f"cannot digest this graph's structure: {error}") from None
+    runs: dict[str, dict[str, str]] = {}
+    failures: dict[str, dict[str, str]] = {}
+    for row in rows:
+        if not isinstance(row, ExecutionOutcome):
+            raise TypeError("rows must be ExecutionOutcome values, such as "
+                            "PlannerMemory.iter_outcomes() returns")
+        if row.structure_sha256 != structure:
+            continue
+        if _accepted(row):
+            runs.setdefault(row.execution_id, {"execution_id": row.execution_id,
+                                               "structure_sha256": structure,
+                                               "acceptance": row.acceptance})
+        elif row.failure_category is not None or row.acceptance in _NOT_ACCEPTED:
+            digest = sha256_hex({key: getattr(row, key) for key in _EVIDENCE_KEYS
+                                 if getattr(row, key) is not None})
+            failures.pop(digest, None)  # Kept at its latest place.
+            failures[digest] = {"category": row.failure_category or row.acceptance,
+                                "evidence_sha256": digest}
+    if len(runs) < min_accepted:
+        raise DistillationError(f"cannot build a candidate: the rows hold {len(runs)} accepted "
+                                f"runs of this structure, fewer than {min_accepted}")
+    record = distill_record(graph, name=name, description=description, registry=registry,
+                            require_success=require_success, source_task=source_task)
+    return replace(record, source_runs=list(runs.values()),
+                   failure_examples=list(failures.values())[-MAX_FAILURE_EXAMPLES:])

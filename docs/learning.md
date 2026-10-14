@@ -7,7 +7,8 @@ that ran into a template that `ConstrainedArchitect` can offer as a menu item,
 so a proven shape is selected instead of planned again.
 
 This page covers the evidence planner history keeps, failed runs,
-distillation, template records, their versions, their validation as
+distillation, template records, their versions, promoting structure that
+accepted runs repeat to a candidate record, validation of records as
 untrusted candidates, the template catalog, and activating, rolling back and
 pinning template versions. A record is data: building a template from it,
 storing it, activating it and pinning it in a durable run never changes the
@@ -44,7 +45,8 @@ rejected output, also records:
   topology, cost, summed node time and outcome.
 
 The execution id, structure digest and acceptance decision are what a
-template record's [`source_runs`](#template-records) name.
+template record's [`source_runs`](#template-records) name, and what
+[promotion](#promote-repeated-accepted-structure) counts.
 [Durable runs](support-matrix.md#durable-text-workflow-components) still
 refuse `PlannerMemory`.
 
@@ -240,6 +242,59 @@ a reviewer:
 Each list is omitted when it is empty. The review only flags text: it is
 not changed, and each build points labels at the new task as before. The
 review is not part of `template_version`.
+
+## Promote repeated accepted structure
+
+A shape whose runs keep being accepted can become a candidate template, so
+it is selected instead of planned again.
+`repeated_structures(memory, *, min_accepted)` reads planner history and
+returns each [structure digest](#structure-digests) that at least
+`min_accepted` accepted runs share, with the first row of each such run.
+History holds no graphs, so build the candidate from a graph of that
+structure, such as one run's `result.graph`:
+
+```python
+from smythe import (
+    PlannerMemory, TemplateCatalog, candidate_from_graph, repeated_structures, structure_sha256,
+)
+
+memory = PlannerMemory()
+if structure_sha256(result.graph) in repeated_structures(memory, min_accepted=3):
+    record = candidate_from_graph(result.graph, rows=memory.iter_outcomes(), name="memo-review",
+                                  min_accepted=3, registry=swarm.registry)
+    version = TemplateCatalog("templates").put(record)
+```
+
+- **Accepted, not successful.** A run counts only when its row records
+  `acceptance` `accepted`, which a
+  [strict acceptance policy](verifier.md#strict-delivery-acceptance) decides,
+  an `execution_id` and a `structure_sha256`, and no `failure_category`.
+  `success` never counts, so a completed run whose output was rejected, or
+  that no policy evaluated, does not. Each execution id counts once.
+- **Source runs.** `candidate_from_graph(graph, *, rows, name,
+  min_accepted=1, description=None, registry=None, require_success=True,
+  source_task=None)` distills `graph` as `distill_record` does, keeps its
+  [review](#review), and lists each accepted run of the graph's structure in
+  `rows` as a source run. With fewer than `min_accepted` such runs it raises
+  `DistillationError`.
+- **Failure examples.** Each other row of that structure that has a
+  `failure_category`, or whose `acceptance` is `rejected`, `needs_review` or
+  `indeterminate`, becomes a failure example: that category, or else the
+  decision, and `evidence_sha256`, the SHA-256 of the row's `execution_id`,
+  `structure_sha256`, `acceptance`, `verification`,
+  `rejected_output_sha256`, `failure_category` and `failure_type` as
+  canonical JSON, each when set. A completed run that no policy evaluated
+  is not an example. No text from a row is kept, neither its goal nor a
+  failure excerpt. Rows with equal evidence give one example, and the
+  latest 16 are kept.
+- **A candidate only.** Nothing is stored or activated. The catalog
+  [validates](#validate-a-candidate-record) a candidate when it stores it,
+  and a version is put in effect only through a
+  [reviewed decision](#activate-and-roll-back-templates).
+
+`PlannerMemory.iter_outcomes()` returns the history rows, oldest first. It
+reads the file once, when it is called, never writes it, and skips the rows
+recall skips.
 
 ## Validate a candidate record
 

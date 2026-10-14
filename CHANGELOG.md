@@ -1836,6 +1836,20 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   `graph.planning["templates"]`, never in node metadata; templates written
   in code record nothing. See
   [activate and roll back templates](docs/learning.md#activate-and-roll-back-templates).
+- Candidate templates from repeated accepted structure.
+  `repeated_structures(memory, *, min_accepted)` groups planner history by
+  graph structure digest and returns the structures that at least
+  `min_accepted` runs whose output was accepted share, counting each
+  execution id once; `success` alone never counts, so a completed run whose
+  output was rejected does not. `candidate_from_graph(graph, *, rows, name,
+  min_accepted=1, ...)` distills the graph into a `TemplateRecord` whose
+  source runs are those accepted runs and whose failure examples keep, for
+  each failed, rejected, `needs_review` or `indeterminate` run of the
+  structure, only a category and an evidence digest, never text, and raises
+  `DistillationError` below `min_accepted`. Nothing is stored or activated.
+  `PlannerMemory.iter_outcomes()` reads each valid history row, oldest
+  first, without writing. See
+  [promote repeated accepted structure](docs/learning.md#promote-repeated-accepted-structure).
 - Agent Skills directories as a skill source.
   `AgentSkillsProvider({agent_id: [root, ...]})` reads each
   `<root>/<name>/SKILL.md` when it is built and lists each skill as a

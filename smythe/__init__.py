@@ -85,6 +85,7 @@ from smythe.templates import (
     TemplateCatalog, TemplateLimits, TemplateRecord, TemplateRecordError, TemplateValidationError,
     distill_record, pinned_templates, template_target, validate_template_record,
 )
+from smythe.templates import candidate_from_graph, repeated_structures
 from smythe.verifier import (
     CallableVerifier,
     TokenVerifier,
@@ -243,6 +244,7 @@ __all__ = [
     "VerificationRecoveryError",
     "WhiteRabbit",
     "archive_heads",
+    "candidate_from_graph",
     "design_verifier",
     "distill_record",
     "distill_template",
@@ -252,6 +254,7 @@ __all__ = [
     "parse_skill_md",
     "pinned_templates",
     "python_skill",
+    "repeated_structures",
     "review_run",
     "structure_sha256",
     "template_target",
