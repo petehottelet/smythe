@@ -472,7 +472,9 @@ It runs no scripts and loads no remote resources.
 Lists are ordered newest first. Both commands accept `--limit` (1–500,
 default 50) and `--offset` (default 0). Inspection includes complete attempt
 lineage for the selected operation page; its cost and status totals still
-cover the entire run. `--operation` accepts an exact key or stable ID.
+cover the entire run. The text output names the operations a page holds by
+position, such as `Operation page: operations 1-2 of 3 (limit 2)`.
+`--operation` accepts an exact key or stable ID.
 `--events-limit` controls the most recent events (1–1,000, default 100), with
 explicit counts when earlier events are omitted. Select another operation
 page or use `export` for the complete journal.

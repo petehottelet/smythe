@@ -2091,6 +2091,11 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   `run_created` event records how many earlier runs used the token and the
   five most recent run IDs under `approval_reuse`.
   Token derivation, plan hashes and the Jobs schema are unchanged.
+- `jobs inspect` text output names the operations its page holds by
+  position, as `jobs review` does:
+  `Operation page: operations 1-2 of 3 (limit 2)`. It used to print the
+  counts as `2 of 3 (offset 0, limit 2)`, which read as page numbers. The
+  JSON output is unchanged.
 - `ValidationReport` raises `TypeError` when it is constructed with a finding
   that is not a `ValidationFinding`, and keeps its findings as a tuple. It
   used to accept any value, failing only when `passed`, `hard_findings` or

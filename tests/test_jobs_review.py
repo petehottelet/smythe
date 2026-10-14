@@ -615,6 +615,16 @@ def test_suggested_commands_are_quoted_for_the_local_shell(capsys):
     assert cli._command_line(['say "hi"', "a b"], windows=False) == "'say \"hi\"' 'a b'"
 
 
+def test_commands_are_quoted_for_the_hosts_shell_by_default(monkeypatch):
+    argv, quoted = ['say "hi"', "a b"], {}
+    for name in ("nt", "posix"):
+        # Only the quoting call runs while os.name names another host.
+        with monkeypatch.context() as patch:
+            patch.setattr(cli.os, "name", name)
+            quoted[name] = cli._command_line(argv)
+    assert quoted == {"nt": r'"say \"hi\"" "a b"', "posix": "'say \"hi\"' 'a b'"}
+
+
 def test_human_review_escapes_stored_terminal_controls(capsys):
     cli._emit_job_review({
         "run_id": "safe-run", "name": "unsafe\x1b[2J\nname", "status": "failed",

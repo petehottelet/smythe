@@ -856,7 +856,7 @@ def _emit_job_inspection(value: dict[str, Any]) -> None:
     print(f"Cost complete: {'yes' if cost['cost_is_complete'] else 'no'}; "
           f"includes estimates: {'yes' if cost['cost_contains_estimates'] else 'no'}")
     page = value["pagination"]
-    print(f"Operation page: {page['returned']} of {page['total']} (offset {page['offset']}, limit {page['limit']})")
+    print(f"Operation page: {_operation_span(page)} (limit {page['limit']})")
     for operation in value["operations"]:
         print(f"Operation {_terminal_text(operation['operation_key'])} "
               f"({_terminal_text(operation['operation_id'])}): {_terminal_text(operation['status'])}; "
