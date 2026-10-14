@@ -222,3 +222,4 @@ jobs:
           tests/test_optimize_report.py
           tests/test_template_records.py
           tests/test_template_lifecycle.py
+          tests/test_template_promotion.py

@@ -104,7 +104,8 @@ require_success=True)` returns a `SubGraphTemplate`:
 ```python
 from smythe import ConstrainedArchitect, distill_template
 
-template = distill_template(result.graph, name="diligence-review", registry=swarm.registry)
+# agents is the Registry the run's Swarm(registry=agents) used.
+template = distill_template(result.graph, name="diligence-review", registry=agents)
 architect = ConstrainedArchitect(provider=provider, templates=[template])
 ```
 
@@ -265,7 +266,7 @@ from smythe import (
 memory = PlannerMemory()
 if structure_sha256(result.graph) in repeated_structures(memory, min_accepted=3):
     record = candidate_from_graph(result.graph, rows=memory.iter_outcomes(), name="memo-review",
-                                  min_accepted=3, registry=swarm.registry)
+                                  min_accepted=3, registry=agents)
     version = TemplateCatalog("templates").put(record)
 ```
 
@@ -611,8 +612,8 @@ once, and `details` one sentence per problem:
 
 Prerequisites are what a template needs, so an environment that adds a
 capability, skill, tool or validator leaves it applicable, while
-`proven_with` must match exactly. A record without prerequisites or
-`proven_with`, such as one distilled without an environment, applies
+`proven_with` must match exactly. A record with no prerequisites, no
+`proven_with` and no validators named in its expected outputs applies
 anywhere.
 
 Pass `environment=` to `active_templates` or `active_local_templates` to
@@ -622,7 +623,7 @@ offer only the versions in effect that still apply:
 from smythe import TemplateEnvironment
 
 environment = TemplateEnvironment.capture(
-    registry=swarm.registry, tool_runtime=tool_runtime,
+    registry=agents, tool_runtime=tool_runtime,
     validators=policy.validator_identities, models=["gpt-6-astra"])
 templates = catalog.active_templates(registry, ["memo-review"], environment=environment)
 ```

@@ -1445,7 +1445,8 @@ def check_applicability(
     record with ``proven_with`` applies only where the run uses the same
     model ids (``model_changed``) and MCP allowlists
     (``mcp_allowlist_changed``) as the runs it was learned from. A record
-    without prerequisites or ``proven_with`` applies anywhere.
+    with no prerequisites, no ``proven_with`` and no validators named in its
+    expected outputs applies anywhere.
     """
     if not isinstance(record, TemplateRecord) or not isinstance(environment, TemplateEnvironment):
         raise TypeError("check_applicability takes a TemplateRecord and a TemplateEnvironment")
