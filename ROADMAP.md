@@ -498,10 +498,13 @@ connector or paid run.
    it beats its predecessor and a simpler alternative on held-out tasks,
    without mutating the base planner. The
    [template lifecycle](#built-for-the-next-release-reviewable-learning) is
-   built and its mechanics are shown offline. Still open: a template version
-   measured better than its predecessor and a simpler alternative on
-   held-out live tasks, under decided thresholds and an approved evaluation
-   budget. Offline fixtures rank no template
+   built and its mechanics are shown offline. Still open: promoting failure
+   lessons, capability descriptions and reusable procedures into versioned
+   supplemental state, since template records hold graph structure only and
+   failure rows are opt-in planner history; and a template version measured
+   better than its predecessor and a simpler alternative on held-out live
+   tasks, under decided thresholds and an approved evaluation budget. Offline
+   fixtures rank no template.
 8. **Autotune generalization** — run evaluators in a separately supervised
    process that can be stopped at a deadline, and add conservative
    live-evaluator adapters with per-trial price ceilings after the offline

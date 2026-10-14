@@ -304,8 +304,11 @@ def lifecycle(work: Path) -> None:
     try:
         catalog.put(forged)
     except TemplateValidationError as error:
+        assert files(catalog.root) == before, "a refused candidate changed the catalog"
         print(f"  refused a candidate at node {error.node!r}, field {error.field!r}; "
               f"catalog unchanged: {files(catalog.root) == before}")
+    else:
+        raise SystemExit("the catalog stored a candidate that grants itself a tool")
     candidate = catalog.put(TemplateRecord.from_dict(data))  # Validated against its parent.
     print(f"  candidate {candidate[:12]}...: steps {[node['id'] for node in data['blueprint']]}, "
           f"each retried once; validated against its parent")
@@ -313,6 +316,7 @@ def lifecycle(work: Path) -> None:
     print("\n=== 2. A campaign against the predecessor and a single worker ===")
     honest = campaign(ledger_path, PackEvaluator(catalog, PACKS), predecessor, candidate)
     show_campaign(honest)
+    assert not honest.promoted, "the honest campaign promoted the harmful candidate"
     print("  Every pair differs by the same amount, so each interval has zero width:")
     print("  that reflects a deterministic evaluator, not measured precision.")
 
@@ -323,6 +327,8 @@ def lifecycle(work: Path) -> None:
                                    verdict="approve")
         except RegistryError as error:
             print(f"  approval refused: {str(error).rsplit('; ', 1)[-1]}")
+        else:
+            raise SystemExit("a review approved a candidate its campaign did not promote")
         review = registry.record_review(ledger_path, honest.campaign_id, reviewer="brief-owner",
                                         verdict="reject", note="incident reviews lose a section")
         print(f"  review recorded: {review.verdict}, by {review.reviewer} (declared)")
@@ -331,6 +337,7 @@ def lifecycle(work: Path) -> None:
     print("\n=== 4. A fooled evaluator promotes it; it is reviewed and activated ===")
     fooled = campaign(ledger_path, PackEvaluator(catalog, FOOLED_PACKS), predecessor, candidate)
     show_campaign(fooled)
+    assert fooled.promoted, "the fooled campaign did not promote the candidate"
     with PolicyRegistry(registry_path) as registry:
         approval = registry.record_review(ledger_path, fooled.campaign_id, reviewer="brief-owner",
                                           verdict="approve", note="better on every split")
@@ -342,6 +349,7 @@ def lifecycle(work: Path) -> None:
         print(f"  a new incident review built from {outcome.versions[0][:12]}...: "
               f"{outcome.decision}")
         print(f"    {outcome.reasons[0]}")
+        assert outcome.versions[0] == candidate and outcome.decision == "rejected"
 
         print("\n=== 5. Roll back ===")
         ledger_before, catalog_before = files(work)["optimize.sqlite3"], files(catalog.root)
@@ -350,15 +358,18 @@ def lifecycle(work: Path) -> None:
         unchanged = (files(work)["optimize.sqlite3"] == ledger_before
                      and files(catalog.root) == catalog_before)
         print(f"  the ledger and the catalog are unchanged: {unchanged}")
+        assert unchanged, "the rollback changed the ledger or the catalog"
         for event in registry.history(TARGET):
             print(f"  seq {event.seq} {event.action:<9} {event.policy[TARGET][:12]}...")
         kept = run_task(PACKS["holdout"][0], earlier).versions[0]
         print(f"  the architect built before the rollback still builds {kept[:12]}...")
+        assert kept == candidate
 
         print("\n=== 6. A new run resolves the predecessor ===")
         outcome = run_task(PACKS["holdout"][0], new_architect(catalog, registry))
         print(f"  a new incident review built from {outcome.versions[0][:12]}...: "
               f"{outcome.decision}")
+        assert outcome.versions[0] == predecessor and outcome.decision == "accepted"
     with ExperimentLedger(ledger_path, read_only=True) as ledger:
         for result in (honest, fooled):
             (saved,) = ledger.list_decisions(result.campaign_id)
