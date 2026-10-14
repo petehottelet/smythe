@@ -324,6 +324,11 @@ class CompositeToolRuntime(ToolRuntime):
         self._runtimes = runtimes
         _unique(_defined(self))
 
+    @property
+    def runtimes(self) -> tuple[ToolRuntime, ...]:
+        """The tool runtimes this one merges, in the order they were given."""
+        return self._runtimes
+
     def open(self, agent: Agent | None):
         return self._open(agent)
 

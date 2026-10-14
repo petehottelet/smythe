@@ -39,6 +39,7 @@ from smythe.planner import DeterministicArchitect
 from smythe.prompts import PLANNING_SYSTEM_PROMPT
 from smythe.provider import CompletionResult, OfflineProvider, Provider
 from smythe.registry import Registry
+from smythe.skills import SkillRef
 from smythe.swarm import Swarm
 from smythe.task import Task
 from smythe.templates import (
@@ -530,9 +531,9 @@ def test_capture_reads_what_a_run_would_use(tmp_path):
 
     assert captured.capabilities == {"writing", "memo-style", "research"}
     assert dict(captured.skills) == {
-        "memo-style": AgentSkillsProvider({"writer": [tmp_path / "skills" / sha256_hex(
-            ["Write short sentences.", True])[:12]]}).skill("memo-style").version}
-    assert captured.skills["memo-style"].startswith("sha256:")
+        "memo-style": (AgentSkillsProvider({"writer": [tmp_path / "skills" / sha256_hex(
+            ["Write short sentences.", True])[:12]]}).skill("memo-style").version,)}
+    assert captured.skills["memo-style"][0].startswith("sha256:") and captured.skills_complete
     assert {name: dict(tool) for name, tool in captured.tools.items()} == {"search": search.describe()}
     assert dict(captured.mcp_allowlists) == {"fs": ("read_file",)}
     assert captured.validators == {ValidatorIdentity.for_config("forbids", "1", {"marker": MARKER})}
@@ -557,6 +558,102 @@ def test_capture_merges_the_allowlists_of_one_server():
     assert dict(TemplateEnvironment.capture(registry=registry).mcp_allowlists) == {"fs": None}
 
 
+class Lists:
+    """A skill provider listing fixed ``(name, version)`` skills per agent; it raises for *fails*."""
+
+    def __init__(self, skills, *, fails=()) -> None:
+        self.skills, self.fails = skills, set(fails)
+
+    def list_agent_skills(self, agent_id):
+        if agent_id in self.fails:
+            raise RuntimeError("the skill service is unavailable")
+        return [SkillRef(name, version=version) for name, version in self.skills.get(agent_id, ())]
+
+
+def agents(*ids, provider=None) -> Registry:
+    registry = Registry(skill_provider=provider)
+    for agent_id in ids:
+        registry.register(Agent(id=agent_id, profile=AgentProfile(name=agent_id.title())))
+    return registry
+
+
+def needing(*skills) -> TemplateRecord:
+    """The memo record whose prerequisites name each ``(name, version)`` skill."""
+    return replace(distill_record(memo(None), name="memo", require_success=False), prerequisites={
+        "capabilities": [], "skills": [{"name": name, "version": version} for name, version in skills],
+        "tools": [], "validators": []})
+
+
+def test_capture_keeps_every_version_a_skill_is_listed_at():
+    provider = Lists({"writer": [("memo-style", "2")], "editor": [("memo-style", "1")]})
+    for order in (("writer", "editor"), ("editor", "writer")):
+        captured = TemplateEnvironment.capture(registry=agents(*order, provider=provider))
+        assert dict(captured.skills) == {"memo-style": ("1", "2")} and captured.skills_complete
+
+    # A skill must be listed at exactly the versions a record names.
+    assert check_applicability(needing(("memo-style", "1"), ("memo-style", "2")), captured).valid
+    for record, environment in ((needing(("memo-style", "2")), captured),
+                                (needing(("memo-style", "1"), ("memo-style", "2")),
+                                 TemplateEnvironment(skills={"memo-style": "2"}))):
+        assert check_applicability(record, environment) == ApplicabilityReport(
+            False, ("skill_changed",),
+            ("skill 'memo-style' is not listed at exactly the versions the template relies on",))
+    # A candidate records each version it relied on.
+    candidate = candidate_from_graph(memo(None), rows=[outcome()], name="memo",
+                                     require_success=False, environment=captured)
+    assert candidate.to_dict()["prerequisites"]["skills"] == [
+        {"name": "memo-style", "version": "1"}, {"name": "memo-style", "version": "2"}]
+    assert check_applicability(candidate, captured).valid
+
+
+def test_skills_a_provider_cannot_list_leave_templates_that_name_skills_unoffered(
+    tmp_path, caplog,
+):
+    provider = Lists({"writer": [("memo-style", "2")]}, fails={"editor"})
+    with caplog.at_level(logging.WARNING, logger="smythe.templates"):
+        captured = TemplateEnvironment.capture(registry=agents("writer", "editor",
+                                                              provider=provider))
+    assert captured.skills_complete is False and dict(captured.skills) == {"memo-style": ("2",)}
+    warnings = [entry.getMessage() for entry in caplog.records if entry.name == "smythe.templates"]
+    assert len(warnings) == 1 and "'editor'" in warnings[0]
+
+    record = needing(("memo-style", "2"))
+    report = check_applicability(record, captured)
+    assert report == ApplicabilityReport(False, ("skills_unreadable",), (
+        "the skills agents offer could not all be read, and the template relies on skills",))
+    assert "skills_unreadable" in APPLICABILITY_REASONS
+    # A record that names no skill still applies.
+    assert check_applicability(replace(record, prerequisites=None), captured).valid
+    catalog = TemplateCatalog(tmp_path / "catalog")
+    catalog.put(record)
+    with _in_effect(tmp_path / "registry.sqlite3",
+                    {TARGET: {TARGET: record.template_version}}) as registry:
+        assert catalog.active_templates(registry, ["memo"], environment=captured) == []
+        with pytest.raises(TemplateApplicabilityError, match="could not all be read"):
+            catalog.active_local_templates(registry, ["memo"], environment=captured, strict=True)
+    # Nor can a candidate record what it relied on from such a snapshot.
+    with pytest.raises(ValueError, match="skills could not all be read"):
+        candidate_from_graph(memo(None), rows=[outcome()], name="memo", require_success=False,
+                             environment=captured)
+    assert TemplateEnvironment().skills_complete is True
+
+
+def test_capture_reads_providers_and_composite_runtimes_through_public_accessors():
+    provider = Lists({"writer": [("memo-style", "2")]})
+    registry = agents("writer", provider=provider)
+    assert registry.skill_provider is provider and Registry().skill_provider is None
+    with pytest.raises(AttributeError):
+        registry.skill_provider = None  # type: ignore[misc]
+
+    search = LocalTool(ToolSpec("search", "Search the notes", SCHEMA), lambda arguments: "x", "1")
+    other = LocalTool(ToolSpec("lookup", "Look up a word", {"type": "object"}), str, "3")
+    local, mcp = LocalToolRuntime([search], agents={}), MCPToolRuntime()
+    inner = CompositeToolRuntime(local, mcp)
+    outer = CompositeToolRuntime(inner, LocalToolRuntime([other], agents={}))
+    assert inner.runtimes == (local, mcp) and outer.runtimes[0] is inner
+    assert set(TemplateEnvironment.capture(tool_runtime=outer).tools) == {"search", "lookup"}
+
+
 def test_a_candidate_built_in_an_environment_records_what_it_relied_on(tmp_path):
     captured = environment(tmp_path)
     record = proven(tmp_path)
@@ -565,7 +662,7 @@ def test_a_candidate_built_in_an_environment_records_what_it_relied_on(tmp_path)
     # Only the capability a node without an agent needs and an agent offers.
     assert data["prerequisites"] == {
         "capabilities": ["writing"],
-        "skills": [{"name": "memo-style", "version": captured.skills["memo-style"]}],
+        "skills": [{"name": "memo-style", "version": captured.skills["memo-style"][0]}],
         "tools": [dict(captured.tools["search"])],
         "validators": [ValidatorIdentity.for_config("forbids", "1", {"marker": MARKER}).to_dict()]}
     assert data["proven_with"] == {"models_sha256": sha256_hex([MODEL]),
@@ -663,21 +760,28 @@ def test_proven_with_is_part_of_the_template_version(tmp_path):
     (dict(capabilities="writing"), TypeError),
     (dict(capabilities=[""]), ValueError),
     (dict(skills={"memo-style": None}), ValueError),
+    (dict(skills={"memo-style": []}), ValueError),
+    (dict(skills={"memo-style": 2}), TypeError),
+    (dict(skills_complete="false"), TypeError),
     (dict(tools=[{"name": "search", "version": "1"}]), ValueError),
     (dict(tools=[{"name": "search", "version": "1", "schema_sha256": "0" * 64}] * 2), ValueError),
     (dict(mcp_allowlists={"fs": "read_file"}), TypeError),
     (dict(validators=[{"name": "forbids"}]), TypeError),
     (dict(models=[7]), ValueError),
-], ids=["capabilities-text", "blank-capability", "unversioned-skill", "tool-without-schema",
-        "duplicate-tool", "allowlist-text", "validator-data", "model-not-text"])
+], ids=["capabilities-text", "blank-capability", "unversioned-skill", "skill-without-versions",
+        "skill-version-number", "skills-complete-text", "tool-without-schema", "duplicate-tool",
+        "allowlist-text", "validator-data", "model-not-text"])
 def test_an_environment_refuses_malformed_parts(changes, error):
     with pytest.raises(error):
         TemplateEnvironment(**changes)
 
 
 def test_an_environment_is_read_only():
-    captured = TemplateEnvironment(skills={"memo-style": "sha256:" + "0" * 64},
+    captured = TemplateEnvironment(skills={"memo-style": "sha256:" + "0" * 64,
+                                           "tone": ["2", "1", "2"]},
                                    mcp_allowlists={"fs": ["read_file"]})
+    # A skill takes one version or several, each kept once and sorted.
+    assert dict(captured.skills) == {"memo-style": ("sha256:" + "0" * 64,), "tone": ("1", "2")}
     with pytest.raises(TypeError):
         captured.skills["other"] = "1"
     with pytest.raises(AttributeError):

@@ -73,6 +73,7 @@ from smythe.loader import (
     MODEL_PLAN_MAX_REGENERATIONS, MODEL_PLAN_MAX_RETRIES, MODEL_PLAN_MIN_TIMEOUT_S,
     _build_model_graph,
 )
+from smythe.local_tools import CompositeToolRuntime
 from smythe.memory import ExecutionOutcome, PlannerMemory
 from smythe.planner import DeterministicArchitect
 from smythe.registry import Registry
@@ -1221,9 +1222,9 @@ def candidate_from_graph(
     With an *environment*, the one the runs used, the candidate records
     what it relied on, so :func:`check_applicability` can tell when that
     changes: as prerequisites, the capabilities that nodes without an agent
-    profile require and an agent offered, and every skill, tool and
-    validator; and as ``proven_with``, the digests of the model ids and MCP
-    allowlists.
+    profile require and an agent offered, every skill at each version it is
+    listed at, and every tool and validator; and as ``proven_with``, the
+    digests of the model ids and MCP allowlists.
 
     The other arguments are those of :func:`distill_record`, whose review
     the candidate keeps. Nothing is stored or activated: store the
@@ -1231,7 +1232,10 @@ def candidate_from_graph(
     reviewed decision.
 
     Raises:
-        ValueError: *min_accepted* is not a positive integer.
+        ValueError: *min_accepted* is not a positive integer, or
+            *environment*'s skills could not all be read
+            (``skills_complete`` is false), so the candidate could not
+            record every skill it relied on.
         TypeError: A row is not an ``ExecutionOutcome``, or *environment*
             is not a :class:`TemplateEnvironment`.
         DistillationError: For the reasons ``distill_record`` gives, when
@@ -1241,6 +1245,9 @@ def candidate_from_graph(
     _min_accepted(min_accepted)
     if environment is not None and not isinstance(environment, TemplateEnvironment):
         raise TypeError("environment must be a TemplateEnvironment")
+    if environment is not None and not environment.skills_complete:
+        raise ValueError("cannot record what a candidate relied on: the environment's skills "
+                         "could not all be read")
     try:
         structure = structure_sha256(graph)
     except (TypeError, ValueError) as error:
@@ -1275,7 +1282,7 @@ def candidate_from_graph(
         pinned = {"prerequisites": {
             "capabilities": list(required & environment.capabilities),
             "skills": [{"name": name, "version": version}
-                       for name, version in environment.skills.items()],
+                       for name, versions in environment.skills.items() for version in versions],
             "tools": [dict(tool) for tool in environment.tools.values()],
             "validators": [identity.to_dict() for identity in environment.validators],
         }, "proven_with": environment._proven_with()}
@@ -1318,8 +1325,8 @@ class TemplateArchitect(DeterministicArchitect):
 
 # Applicability: the reason codes check_applicability gives, sorted.
 APPLICABILITY_REASONS = ("capability_removed", "mcp_allowlist_changed", "model_changed",
-                         "skill_changed", "skill_removed", "tool_changed", "tool_removed",
-                         "validator_set_changed")
+                         "skill_changed", "skill_removed", "skills_unreadable", "tool_changed",
+                         "tool_removed", "validator_set_changed")
 
 
 @dataclass(frozen=True)
@@ -1365,21 +1372,24 @@ class TemplateEnvironment:
     """What a run would use now, for :func:`check_applicability` to compare a record with.
 
     ``capabilities`` are the capability tags its agents offer; ``skills``
-    maps each skill's name to its version, for an Agent Skill the
-    ``sha256:`` digest of its ``SKILL.md``; ``tools`` lists each tool as
-    ``LocalToolRuntime.describe()`` does (name, version and
-    ``schema_sha256``); ``mcp_allowlists`` maps each MCP server's name to
-    its allowed tools, or None for all; ``validators`` holds the acceptance
-    validators' identities; and ``models`` the model ids. :meth:`capture`
-    reads them from live objects. Every part is read-only.
+    maps each skill's name to the versions it is listed at, sorted, for an
+    Agent Skill the ``sha256:`` digest of its ``SKILL.md`` (pass one version
+    or several); ``tools`` lists each tool as ``LocalToolRuntime.describe()``
+    does (name, version and ``schema_sha256``); ``mcp_allowlists`` maps each
+    MCP server's name to its allowed tools, or None for all; ``validators``
+    holds the acceptance validators' identities; and ``models`` the model
+    ids. ``skills_complete`` is false when a skill provider could not list
+    an agent's skills, so ``skills`` may lack some. :meth:`capture` reads
+    them from live objects. Every part is read-only.
     """
 
     capabilities: Iterable[str] = frozenset()
-    skills: Mapping[str, str] = field(default_factory=dict)
+    skills: Mapping[str, str | Iterable[str]] = field(default_factory=dict)
     tools: Iterable[Mapping[str, str]] = ()
     mcp_allowlists: Mapping[str, Sequence[str] | None] = field(default_factory=dict)
     validators: Iterable[ValidatorIdentity] = ()
     models: Iterable[str] = frozenset()
+    skills_complete: bool = True
 
     def __post_init__(self) -> None:
         tools: dict[str, Mapping[str, str]] = {}
@@ -1395,10 +1405,19 @@ class TemplateEnvironment:
         validators = _items(self.validators, "environment validators")
         if not all(isinstance(item, ValidatorIdentity) for item in validators):
             raise TypeError("environment validators must be ValidatorIdentity values")
+        skills = {}
+        for name, versions in dict(self.skills).items():
+            # One version or a collection of them; None is a missing version.
+            listed = _names((versions,) if versions is None or isinstance(versions, str)
+                            else versions, "skill version")
+            if not listed:
+                raise ValueError(f"skill {name!r} lists no version")
+            skills[_name(name, "skill name")] = tuple(sorted(listed))
+        if type(self.skills_complete) is not bool:
+            raise TypeError("skills_complete must be true or false")
         for key, value in (
             ("capabilities", _names(self.capabilities, "environment capability")),
-            ("skills", MappingProxyType({_name(name, "skill name"): _name(version, "skill version")
-                                         for name, version in dict(self.skills).items()})),
+            ("skills", MappingProxyType(skills)),
             ("tools", MappingProxyType(tools)), ("mcp_allowlists", MappingProxyType(allowlists)),
             ("validators", frozenset(validators)),
             ("models", _names(self.models, "environment model")),
@@ -1414,7 +1433,8 @@ class TemplateEnvironment:
 
         From *registry*: each agent's effective capabilities, leaving out a
         blank tag; each skill with a version that *skill_provider*, by
-        default the registry's own, lists for the agent, since a change to
+        default the registry's own (``Registry.skill_provider``), lists for
+        the agent, at every version an agent lists it at, since a change to
         an unversioned skill cannot be seen; and the ``allowed_tools`` of
         each MCP server on its profile, merged by server name, where None,
         every tool, wins. From *tool_runtime*, a ``LocalToolRuntime`` or a
@@ -1422,24 +1442,40 @@ class TemplateEnvironment:
         are acceptance validators or their identities, such as
         ``AcceptancePolicy.validator_identities``, and *models* the model ids
         a run would use.
+
+        When *skill_provider* raises for an agent, the snapshot leaves out
+        that agent's skills, a warning on the ``smythe.templates`` logger
+        names the agent, and ``skills_complete`` is false:
+        :func:`check_applicability` then refuses every record whose
+        prerequisites name a skill (``skills_unreadable``), and
+        :func:`candidate_from_graph` refuses the snapshot.
         """
         if skill_provider is None:
-            skill_provider = getattr(registry, "_skill_provider", None)
+            skill_provider = getattr(registry, "skill_provider", None)
         capabilities: set[str] = set()
-        skills: dict[str, str] = {}
+        skills: dict[str, set[str]] = {}
+        complete = True
         allowlists: dict[str, list[str] | None] = {}
         for agent in registry.list_agents() if registry is not None else ():
             capabilities.update(tag for tag in registry.effective_capabilities(agent)
                                 if isinstance(tag, str) and tag.strip())
-            refs = skill_provider.list_agent_skills(agent.id) if skill_provider is not None else ()
-            skills.update((ref.name, ref.version) for ref in refs
-                          if isinstance(ref.version, str) and ref.version.strip())
+            try:
+                refs = [(ref.name, ref.version) for ref in (
+                    skill_provider.list_agent_skills(agent.id) if skill_provider is not None
+                    else ())]
+            except Exception:  # The registry falls back to static capabilities here too.
+                logger.warning("Skill provider failed for agent %r; templates whose prerequisites "
+                               "name skills will not apply", agent.id, exc_info=True)
+                complete, refs = False, []
+            for name, version in refs:
+                if isinstance(version, str) and version.strip():
+                    skills.setdefault(name, set()).add(version)
             for server in agent.profile.mcp_servers:
                 held = allowlists.get(server.name, [])
                 allowlists[server.name] = (None if held is None or server.allowed_tools is None
                                            else sorted({*held, *server.allowed_tools}))
         return cls(capabilities=capabilities, skills=skills, tools=_described(tool_runtime),
-                   mcp_allowlists=allowlists, models=models,
+                   mcp_allowlists=allowlists, models=models, skills_complete=complete,
                    validators=[getattr(item, "identity", item) for item in validators])
 
     def _proven_with(self) -> dict[str, str]:
@@ -1452,10 +1488,10 @@ class TemplateEnvironment:
 
 def _described(runtime: Any) -> list[Mapping[str, str]]:
     """``describe()`` of a local tool runtime, or of each one a composite runtime holds."""
+    if isinstance(runtime, CompositeToolRuntime):
+        return [tool for child in runtime.runtimes for tool in _described(child)]
     describe = getattr(runtime, "describe", None)
-    if callable(describe):
-        return list(describe())
-    return [tool for child in getattr(runtime, "_runtimes", ()) for tool in _described(child)]
+    return list(describe()) if callable(describe) else []
 
 
 def check_applicability(
@@ -1464,16 +1500,18 @@ def check_applicability(
     """Whether *record* applies in *environment*, and the reasons it does not.
 
     Each capability in the record's prerequisites must be one an agent
-    offers (``capability_removed``). Each skill and tool there must be
-    available at the same version, and a tool with the same input schema
-    digest (``skill_removed``, ``skill_changed``, ``tool_removed``,
-    ``tool_changed``). Each validator identity the prerequisites or an
-    expected output names must be in use (``validator_set_changed``). A
-    record with ``proven_with`` applies only where the run uses the same
-    model ids (``model_changed``) and MCP allowlists
-    (``mcp_allowlist_changed``) as the runs it was learned from. A record
-    with no prerequisites, no ``proven_with`` and no validators named in its
-    expected outputs applies anywhere.
+    offers (``capability_removed``). Each skill there must be listed at
+    exactly the versions the record names for it (``skill_removed``,
+    ``skill_changed``), and each tool available at the same version and
+    input schema digest (``tool_removed``, ``tool_changed``). When the
+    environment's skills could not all be read, a record whose
+    prerequisites name a skill does not apply (``skills_unreadable``). Each
+    validator identity the prerequisites or an expected output names must
+    be in use (``validator_set_changed``). A record with ``proven_with``
+    applies only where the run uses the same model ids (``model_changed``)
+    and MCP allowlists (``mcp_allowlist_changed``) as the runs it was
+    learned from. A record with no prerequisites, no ``proven_with`` and no
+    validators named in its expected outputs applies anywhere.
     """
     if not isinstance(record, TemplateRecord) or not isinstance(environment, TemplateEnvironment):
         raise TypeError("check_applicability takes a TemplateRecord and a TemplateEnvironment")
@@ -1482,19 +1520,26 @@ def check_applicability(
     for capability in needs.get("capabilities", ()):
         if capability not in environment.capabilities:
             found.append(("capability_removed", f"no agent offers capability {capability!r}"))
-    available = {
-        "skill": {name: {"name": name, "version": version}
-                  for name, version in environment.skills.items()},
-        "tool": {name: dict(tool) for name, tool in environment.tools.items()},
-    }
-    for kind, current in available.items():
-        for item in needs.get(f"{kind}s", ()):
-            now = current.get(item["name"])
-            if now is None:
-                found.append((f"{kind}_removed", f"{kind} {item['name']!r} is not available"))
-            elif now != item:
-                found.append((f"{kind}_changed", f"{kind} {item['name']!r} is not the version "
-                                                 "the template relies on"))
+    skills: dict[str, set[str]] = {}
+    for item in needs.get("skills", ()):
+        skills.setdefault(item["name"], set()).add(item["version"])
+    if skills and not environment.skills_complete:
+        found.append(("skills_unreadable", "the skills agents offer could not all be read, and "
+                                           "the template relies on skills"))
+    for name, versions in skills.items() if environment.skills_complete else ():
+        listed = environment.skills.get(name)
+        if listed is None:
+            found.append(("skill_removed", f"skill {name!r} is not available"))
+        elif set(listed) != versions:
+            found.append(("skill_changed", f"skill {name!r} is not listed at exactly the versions "
+                                           "the template relies on"))
+    for item in needs.get("tools", ()):
+        now = environment.tools.get(item["name"])
+        if now is None:
+            found.append(("tool_removed", f"tool {item['name']!r} is not available"))
+        elif dict(now) != item:
+            found.append(("tool_changed", f"tool {item['name']!r} is not the version the "
+                                          "template relies on"))
     named = [*needs.get("validators", ()),
              *(item for output in _plain(record.expected_outputs) for item in output["validators"])]
     for item in named:

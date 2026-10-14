@@ -70,6 +70,11 @@ class Registry:
         self._cache_ttl = capability_cache_ttl_seconds
         self._capability_cache: dict[str, tuple[set[str], float]] = {}
 
+    @property
+    def skill_provider(self) -> SkillProvider | None:
+        """The skill provider that hydrates agent capabilities, or None."""
+        return self._skill_provider
+
     def workflow_description(self, **defaults) -> dict:
         require_exact(self, Registry)
         if (self._skill_provider is not None

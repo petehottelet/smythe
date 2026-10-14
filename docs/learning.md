@@ -603,19 +603,30 @@ now:
 | Part | Captured from |
 |---|---|
 | `capabilities` | each registry agent's effective capabilities |
-| `skills` | each skill with a version that `skill_provider`, by default the registry's own, lists for an agent: for an [Agent Skill](skills.md#agent-skills-directories), the `sha256:` digest of its `SKILL.md` |
-| `tools` | `describe()` of a `LocalToolRuntime`, or of each one a `CompositeToolRuntime` holds: name, version and `schema_sha256` |
+| `skills` | each skill with a version that `skill_provider`, by default the registry's own (`Registry.skill_provider`), lists for an agent, at every version an agent lists it at: for an [Agent Skill](skills.md#agent-skills-directories), the `sha256:` digest of its `SKILL.md` |
+| `tools` | `describe()` of a `LocalToolRuntime`, or of each one a `CompositeToolRuntime` holds (`CompositeToolRuntime.runtimes`): name, version and `schema_sha256` |
 | `mcp_allowlists` | the `allowed_tools` of each MCP server on an agent's profile, merged by server name; `None`, every tool, wins |
 | `validators` | acceptance validators or their identities, such as `AcceptancePolicy.validator_identities` |
 | `models` | the model ids a run would use |
 
-`TemplateEnvironment(...)` takes the same parts directly, and every part is
-read-only. Given the environment its runs used,
+`TemplateEnvironment(...)` takes the same parts directly, with one version
+or several for each skill, and every part is read-only. `skills` maps each
+skill's name to its sorted versions, so a skill that two agents list at
+different versions keeps both. Given the environment its runs used,
 `candidate_from_graph(..., environment=environment)` records what the
 candidate relied on: as `prerequisites`, the capabilities that nodes without
-an agent profile require and an agent offered, and every skill, tool and
-validator; as `proven_with`, the SHA-256 of the sorted model ids and of the
-MCP allowlists as canonical JSON, never the ids or servers themselves.
+an agent profile require and an agent offered, every skill at each of its
+versions, and every tool and validator; as `proven_with`, the SHA-256 of the
+sorted model ids and of the MCP allowlists as canonical JSON, never the ids
+or servers themselves.
+
+A skill provider that raises for an agent does not stop the snapshot, just
+as `Registry` falls back to the agent's static capabilities. `capture`
+leaves out that agent's skills, logs a warning on the `smythe.templates`
+logger naming the agent, and sets the environment's `skills_complete` to
+false. `check_applicability` then refuses every record whose prerequisites
+name a skill, and `candidate_from_graph` raises `ValueError` rather than
+record a candidate that could lack a skill it relied on.
 
 `check_applicability(record, environment)` returns an
 `ApplicabilityReport(valid, reasons, details)`. `reasons` are the sorted
@@ -625,17 +636,19 @@ once, and `details` one sentence per problem:
 | Reason | When |
 |---|---|
 | `capability_removed` | no agent offers a prerequisite capability |
-| `skill_removed`, `skill_changed` | a prerequisite skill is missing, or at another version |
+| `skill_removed`, `skill_changed` | a prerequisite skill is missing, or not listed at exactly the versions the record names |
+| `skills_unreadable` | the record's prerequisites name a skill, and the skill provider could not list every agent's skills |
 | `tool_removed`, `tool_changed` | a prerequisite tool is missing, or has another version or input schema digest |
 | `validator_set_changed` | a validator identity that the prerequisites or an expected output name is not in use: removed, or at another version or configuration |
 | `model_changed` | the run's model ids are not those `proven_with` records |
 | `mcp_allowlist_changed` | the run's MCP allowlists are not those `proven_with` records |
 
 Prerequisites are what a template needs, so an environment that adds a
-capability, skill, tool or validator leaves it applicable, while
-`proven_with` must match exactly. A record with no prerequisites, no
-`proven_with` and no validators named in its expected outputs applies
-anywhere.
+capability, skill, tool or validator leaves it applicable. A skill the
+record names must be listed at exactly its versions, so another version of
+it beside the recorded one is a change, and `proven_with` must match
+exactly. A record with no prerequisites, no `proven_with` and no validators
+named in its expected outputs applies anywhere.
 
 Pass `environment=` to `active_templates` or `active_local_templates` to
 offer only the versions in effect that still apply:
