@@ -191,9 +191,11 @@ from the journal's copy:
   refresh, is refused: its journal call is settled as rejected, with the
   removal as its reason, and the text is never its result. The node follows
   its failure policy, so `FailurePolicy.SKIP` lets the run continue without
-  it. The refusal matches the exact SHA-256 of the decoded text, so a source
-  served with any byte difference, even in whitespace or line endings, is
-  not recognised as the removed one. A refused read still keeps the fetched
+  it. The refusal matches the SHA-256 of the decoded text, so with the
+  default decoder a source served with any byte difference, even in
+  whitespace or line endings, is not recognised as the removed one, while a
+  custom decoder that normalizes text could map different bytes to the
+  removed text, which is then refused. A refused read still keeps the fetched
   response in the journal as its response evidence, like any read response:
   the tombstone withholds the text from use, it does not erase the record;
 - a completed run's decision, made before the removal, no longer holds:

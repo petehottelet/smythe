@@ -876,19 +876,23 @@ A read makes one request per journaled call and never retries inside it. A
 free read whose response is not a usable 200, such as another status, a
 refused limit or a lost connection, and any read whose decoder fails, settle
 at their known cost as a rejected result, and the step raises `ReadToolError`
-with the status or failure name, never the response body. The node's failure policy decides what happens next:
-`RETRY` reads again as a new journaled call. Resuming re-enters the last
-rejected call of a free, `repeat_safe` read as a new invocation, so a halted
-step reads once more; other rejections replay. A response whose text is that
-of a source [removed from the run](tasks.md#remove-a-source) is settled as
-rejected in the same way, with the removal as its reason, and a text
-accepted before the removal raises `ReadToolError` instead of replaying.
-The refusal compares the exact SHA-256 of the decoded text with the
-tombstone's, so text that differs from the removed source by any byte, even
-in whitespace or line endings, is not recognised as it. The refused response stays in the journal as the
-call's response evidence, as every read response does, and `load_evidence()`
-still returns it: a tombstone withholds text from use, it does not erase a
-record.
+with the status or failure name, never the response body. The node's failure
+policy decides what happens next: `RETRY` reads again as a new journaled
+call. Resuming re-enters the last rejected call of a free, `repeat_safe`
+read as a new invocation, so a halted step reads once more; other rejections
+replay. A response whose text is that of a source
+[removed from the run](tasks.md#remove-a-source) is settled as rejected in
+the same way, with the removal as its reason, and a text accepted before the
+removal raises `ReadToolError` instead of replaying.
+
+The refusal compares the SHA-256 of the decoded text with the tombstone's
+digest. With the default decoder, which reads the body as UTF-8, a response
+that differs from the removed text by any byte, even in whitespace or line
+endings, is not recognised; a custom decoder that normalizes text can map
+other bytes to the removed text, which is then refused. The refused response
+stays in the journal as the call's response evidence, as every read response
+does, and `load_evidence()` still returns it: a tombstone withholds text from
+use, it does not erase a record.
 
 ### Interrupted reads
 
