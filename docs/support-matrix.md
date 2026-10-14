@@ -597,8 +597,9 @@ Tests:
   and `tests/test_repair_plan.py::test_planning_a_read_only_store_changes_nothing_and_calls_nothing`;
   in place `tests/test_workflow_repair.py::test_a_damaged_document_is_rendered_again_and_decided_again_without_new_research`
   and `tests/test_workflow_repair.py::test_a_changed_validator_gets_a_new_decision_and_no_node_runs`;
-  gate validators `tests/test_reuse_decisions.py::test_a_changed_gate_validator_is_never_reused`
-  and `tests/test_workflow_repair.py::test_a_changed_gate_validator_is_not_rechecked_from_old_verdicts`;
+  gate validators `tests/test_reuse_decisions.py::test_a_changed_gate_validator_is_never_reused`,
+  `tests/test_workflow_repair.py::test_a_changed_gate_validator_is_not_rechecked_from_old_verdicts`
+  and `tests/test_workflow_repair.py::test_a_gated_document_is_not_published_again_under_another_gate_verifier`;
   renderers `tests/test_workflow_repair.py::test_a_changed_renderer_regenerates_the_document_in_a_successor`
   and `tests/test_workflow_repair.py::test_a_renderer_added_since_a_run_publishes_its_document_in_a_successor`;
   successor runs `tests/test_workflow_reuse.py::test_a_successor_runs_only_what_a_changed_source_affects`,

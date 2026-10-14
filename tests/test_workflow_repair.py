@@ -540,12 +540,13 @@ def gate_validator(needle: str, version: str) -> LocalOnly:
     return LocalOnly(lambda: Contains(needle, version), "contains", version, role="validator")
 
 
-def judged(store, verifier) -> Swarm:
+def judged(store, verifier, **options) -> Swarm:
     """A lineage run whose gate *verifier* judges the draft, which local code then delivers."""
     return Swarm(model="offline", provider=OfflineProvider(), architect=SimpleArchitect(),
                  run_store=store, max_budget_usd=1, verifier=verifier, acceptance=policy(),
                  lineage=LineagePolicy(access_scope=SCOPE), context_sources=[],
-                 synthesizer=LocalOnly(Draft, "deliver-draft", "1", role="synthesizer"))
+                 synthesizer=LocalOnly(Draft, "deliver-draft", "1", role="synthesizer"),
+                 **options)
 
 
 def gated() -> ExecutionGraph:
@@ -601,6 +602,30 @@ def test_a_changed_gate_validator_is_not_rechecked_from_old_verdicts(store, tmp_
     assert any("gate validator 'contains' rejected" in reason for reason in rejected.reasons)
     # Under the gate validator that judged it, the run is decided again as before.
     assert judged(store, gate_validator("needle", "1")).reevaluate(run_id).accepted
+
+
+def test_a_gated_document_is_not_published_again_under_another_gate_verifier(
+        store, tmp_path, drafts):
+    publishing = {"renderer": MarkdownRenderer(), "artifact_dir": tmp_path / "artifacts"}
+    first = judged(store, gate_validator("needle", "1"), **publishing).execute(gated())
+    run_id = first.execution_id
+    document = current_artifact(store, run_id).publication.path
+    damage(document, "delete")
+    # Another gate validator would reject the same draft.
+    changed = judged(store, gate_validator("absent", "2"), **publishing)
+    before, revision = journal_rows(store, run_id), store.load_run(run_id)["revision"]
+    Counted.checked = []
+
+    # A new decision on the new bytes would read the gates' recorded verdicts.
+    with pytest.raises(WorkflowStateError, match="another gate verifier"):
+        changed.republish(run_id)
+
+    assert journal_rows(store, run_id) == before and store.load_run(run_id)["revision"] == revision
+    assert listing(document.parent) == [".smythe-run-owner.json"]
+    assert Counted.checked == [] and current_decision(store, run_id)["sequence"] == 0
+    # Under the gate validator that judged it, the document is published again.
+    record = judged(store, gate_validator("needle", "1"), **publishing).republish(run_id)
+    assert (record.sequence, record.name) == (1, "document-p1.md")
 
 
 def without_gate_verifiers(saved: dict) -> dict:
