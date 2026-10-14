@@ -147,3 +147,18 @@ def test_an_unquoted_path_takes_in_every_word_up_to_where_it_must_end(home):
     for named in (windows("D:", "My POST Box", "x.txt"), "/srv/My GET Data/x.txt"):
         assert redact_paths(f"open {named} failed") == "open <path>"
     assert redact_paths(f"open {path} then GET") == "open <path>"
+
+
+@pytest.mark.parametrize("value", [WINDOWS_HOME, POSIX_HOME], ids=["windows", "posix"])
+def test_the_home_folder_is_written_as_home_after_any_character(home, value):
+    native = home(value)
+    include = str(value / "include")
+    tail = include[len(native):]
+    # Compiler flags, URLs and elided paths put a character right before it.
+    for text, kept in ((f"cc -I{include} failed", f"cc -I~{tail} failed"),
+                       (f"get https://h{native}{tail} failed", f"get https://h~{tail} failed"),
+                       (f"path ...{include} not found", f"path ...~{tail} not found")):
+        redacted = redact_paths(text)
+        assert "Example" not in redacted and "Person" not in redacted
+        assert redacted == kept
+

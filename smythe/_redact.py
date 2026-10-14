@@ -106,7 +106,8 @@ def redact_paths(text: str) -> str:
     # A home folder at a drive's root names no folder, so nothing is written ~.
     if len(names) >= (1 if lead else 2):
         pattern = lead + r"[\\/]+".join(re.escape(name) for name in names)
-        text = re.sub(r"(?<![\w.~-])" + pattern + r"(?![\w.~-])", "~", text,
+        # Any character may come before it, as in a compiler flag or a URL.
+        text = re.sub(pattern + r"(?![\w.~-])", "~", text,
                       flags=re.IGNORECASE if os.name == "nt" else 0)
     text = _QUOTED_PATH.sub(lambda match: f"{match[1]}<path>{match[1]}", text)
     return _ABSOLUTE_PATH.sub(_path_mark, text)
