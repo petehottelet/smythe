@@ -1,12 +1,15 @@
 """Local tools and Python-backed skills reach only the agents developers name."""
 
 import asyncio
+import gc
 import hashlib
 import json
+import re
 import sys
 import threading
 import time
 import typing
+import warnings
 from contextlib import asynccontextmanager
 
 import pytest
@@ -21,6 +24,7 @@ from smythe.graph import ExecutionGraph, Node, Topology
 from smythe.local_tools import LocalToolSession
 from smythe.registry import Registry
 from smythe.skills import CapabilityHydrationMode
+from smythe.tools import display_name, wire_name
 
 SCHEMA = {"type": "object", "properties": {"since": {"type": "string"}}, "required": ["since"]}
 SEARCH = ToolSpec("notes.search", "Search the release notes.", SCHEMA)
@@ -111,6 +115,66 @@ async def test_handler_errors_return_error_results_without_a_retry(asynchronous)
     assert (result.content, result.is_error) == ("", False)
 
 
+@pytest.mark.parametrize("asynchronous", [False, True], ids=["sync", "async"])
+def test_a_handler_that_returns_a_coroutine_gets_an_error_result_without_a_warning(asynchronous):
+    async def search(arguments):
+        return "found"
+
+    # A handler that calls async code without awaiting it returns the coroutine.
+    def handle(arguments):
+        return search(arguments)
+
+    async def handle_async(arguments):
+        return search(arguments)
+
+    # The whole event loop runs inside the block: a coroutine dropped unawaited
+    # warns when it is freed, which can be as late as the loop's shutdown.
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        result = asyncio.run(session(tool(handle_async if asynchronous else handle)).call(call()))
+        gc.collect()
+    assert (result.content, result.is_error) == (
+        "Tool 'notes.search' returned a coroutine it never awaited, not text; "
+        "declare the handler with async def and await the coroutine", True)
+    assert [str(item.message) for item in caught if "never awaited" in str(item.message)] == []
+
+
+@pytest.mark.parametrize("loop_open", [True, False], ids=["run-going-on", "run-ended"])
+def test_a_coroutine_returned_after_the_timeout_is_closed_without_a_warning(loop_open):
+    release, workers = threading.Event(), []
+
+    async def search(arguments):
+        return "late"
+
+    def block(arguments):
+        workers.append(threading.current_thread())
+        release.wait(10)
+        return search(arguments)
+
+    def return_late():
+        release.set()
+        workers[0].join(10)
+        assert not workers[0].is_alive()
+
+    async def time_out():
+        result = await asyncio.wait_for(session(tool(block, timeout_s=0.05)).call(call()), 10)
+        if loop_open:
+            return_late()
+            for _ in range(3):  # Let the loop run the outcome the thread handed back.
+                await asyncio.sleep(0)
+        return result
+
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        result = asyncio.run(time_out())
+        if not loop_open:
+            return_late()
+        gc.collect()
+    assert (result.content, result.is_error) == (
+        "Tool 'notes.search' did not finish within 0.05 seconds", True)
+    assert [str(item.message) for item in caught if "never awaited" in str(item.message)] == []
+
+
 @pytest.mark.asyncio
 async def test_an_unknown_or_ungranted_tool_returns_an_error_result():
     granted = session(tool())
@@ -170,7 +234,8 @@ async def test_a_timeout_returns_an_error_result():
         finally:
             cancelled.set()
 
-    result = await session(tool(wait_forever, timeout_s=0.05)).call(call())
+    # Bounded, so a timeout that never fires fails the test instead of hanging it.
+    result = await asyncio.wait_for(session(tool(wait_forever, timeout_s=0.05)).call(call()), 10)
     assert (result.content, result.is_error) == (
         "Tool 'notes.search' did not finish within 0.05 seconds", True)
     assert cancelled.is_set()
@@ -525,6 +590,29 @@ async def test_the_composite_runtime_merges_sessions_and_refuses_duplicate_names
         CompositeToolRuntime(tool())
 
 
+@pytest.mark.asyncio
+@pytest.mark.parametrize("local, remote", [("fs.read", "fs__read"), ("fs._read", "fs_.read")])
+async def test_the_composite_runtime_refuses_names_a_provider_would_see_as_one(local, remote):
+    assert wire_name(local) == wire_name(remote)
+    merged = CompositeToolRuntime(
+        LocalToolRuntime([tool(name=local)], agents={"developer": [local]}), FixedRuntime(remote))
+    message = (f"Tool names {local!r} and {remote!r} are both sent to a provider as "
+               f"{wire_name(local)!r}")
+    with pytest.raises(ValueError, match=re.escape(message)):
+        await offered(merged, agent("developer"))
+    # A node offered only one of them opens as before.
+    assert await offered(merged, agent("editor")) == [remote]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("name", ["notes.search", "notes._draft", "notes_search", "notes-search",
+                                  "release.notes.search"])
+async def test_a_tool_is_called_by_the_name_a_provider_reads_back(name):
+    # A provider sends each tool under its wire name and reads a call's name back.
+    result = await session(tool(name=name)).call(call(display_name(wire_name(name))))
+    assert (result.content, result.is_error) == ("found", False)
+
+
 def test_describe_records_each_tool_and_changes_with_its_schema():
     runtime = LocalToolRuntime([tool(name="notes.tag", version="3"), tool()], agents={})
     digest = hashlib.sha256(json.dumps(SCHEMA, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
@@ -582,6 +670,14 @@ INVALID_TOOLS = {
     "schema-list": (lambda: LocalTool(ToolSpec("x", "", []), print, "1"), TypeError, "a JSON Schema object"),
     "schema-nan": (lambda: LocalTool(ToolSpec("x", "", {"maximum": float("nan")}), print, "1"),
                    ValueError, "input_schema value is not canonical JSON data"),
+    # A provider would read a call to either back as another name.
+    "double-underscore": (lambda: LocalTool(ToolSpec("notes__search", "", SCHEMA), print, "1"),
+                          ValueError, re.escape("Tool 'notes__search' could never be called: its "
+                                                "wire name 'notes__search' reads back as "
+                                                "'notes.search'")),
+    "underscore-before-dot": (lambda: LocalTool(ToolSpec("notes_.search", "", SCHEMA), print, "1"),
+                              ValueError, re.escape("wire name 'notes___search' reads back as "
+                                                    "'notes._search'")),
     **{f"timeout-{label}": (lambda value=value: LocalTool(SEARCH, print, "1", timeout_s=value),
                             ValueError, "timeout_s must be a positive, finite number")
        for label, value in {"zero": 0, "negative": -1, "nan": float("nan"), "infinite": float("inf"),

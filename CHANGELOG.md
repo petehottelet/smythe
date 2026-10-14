@@ -1948,10 +1948,15 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   exception, a result that is not text or an expired `timeout_s` returns to
   the model as an error result, while `BudgetValidationError`,
   `ProviderResponseError`, `WorkflowError` and `SecurityStop` stop the node.
+  A handler that returns a coroutine instead of awaiting it gets an error
+  result, and the coroutine is closed unrun, so it never warns.
   Result text is cut to 65,536 characters by default, and `describe()` lists
   each tool's name, version and input-schema digest in the form template
-  records use. `CompositeToolRuntime(*runtimes)` merges local and MCP tool
-  sessions and refuses a tool name that two of them offer. Local tools serve
+  records use. A tool name that contains `__`, or `_` before `.`, is refused,
+  since a provider would read a call to it back as another name.
+  `CompositeToolRuntime(*runtimes)` merges local and MCP tool sessions and
+  refuses a tool name that two of them offer, comparing names as a provider
+  receives them, so `fs.read` and `fs__read` clash. Local tools serve
   ordinary runs; durable text workflows still refuse every `tool_runtime`.
   See [Python-backed skills](docs/skills.md#python-backed-skills) and
   [`examples/20_agent_skills.py`](examples/20_agent_skills.py).
