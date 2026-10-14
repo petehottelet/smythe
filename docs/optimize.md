@@ -30,6 +30,7 @@ ambiguous after a connection failure.
 | `smythe.optimize.workflow_eval` | A trial evaluator that runs one durable text workflow per trial and reports its exact cost |
 | `smythe.optimize.inspection` and `smythe.optimize.report` | Read-only evidence collection, standalone HTML reports, and cross-campaign target reports |
 | `smythe.optimize.registry` | Append-only reviews of terminal decisions and history of the policy version in effect for each target, with activation, rollback and retirement, also from the CLI |
+| `smythe.optimize.exploration` | Bounded exploration: campaigns in rounds on an out-of-process proposer's challengers, under campaign, exposure and proposer-spend caps, with a holdout-redacted view of earlier evidence |
 
 These modules are deliberately separable from proposal generation. A human,
 an agent, or a deterministic grid can propose candidates, but every candidate
@@ -830,6 +831,7 @@ read the SQLite file, or an operator who can attach a debugger can recover the
 secret and is therefore inside the trusted computing base. Run an untrusted
 proposal agent in a separate process or service with only the proposer-facing
 inputs; do not hand it the ledger path or execute it in the runner process.
+[Bounded exploration](#bounded-exploration) runs its proposer this way.
 
 `asyncio` can time out a cooperative async evaluator, but cannot forcibly stop
 synchronous Python that blocks the event-loop thread. The reference simulator
@@ -967,7 +969,9 @@ schema (version 4), its writer barrier, `snapshot()` and
 `smythe optimize inspect --json` are unchanged, and a writable open refuses a
 database that already holds other tables, such as a ledger. Review records
 refer to a ledger campaign by its ID, plan hash and holdout commitment and to
-its decision by ID and payload digest, never by file path.
+its decision by ID and payload digest, never by file path. The registry also
+keeps the [records of bounded explorations](#exploration-records), which
+activation never reads.
 
 Each target has one active pointer and an append-only history numbered 1, 2,
 3, and so on:
@@ -1221,12 +1225,160 @@ one of the three, stops it with `ExperimentLedgerError` (exit code 8).
 `ExperimentLedger.list_campaigns()` lists every campaign, oldest first, as
 `open_campaign()` returns it, without writing or returning holdout secrets.
 
+## Bounded exploration
+
+`explore()` in `smythe.optimize.exploration` runs campaigns in rounds on
+challengers that a proposer program suggests. Each round sends the proposer
+the evidence of the exploration's earlier campaigns, runs its proposals as one
+`OptimizationRunner` campaign against a fixed incumbent, and records the round
+in the [policy registry](#policy-registry). It never reviews or activates
+anything: a promoted decision waits for
+[review](#review-and-activate-a-decision) like any other.
+
+```python
+import asyncio
+
+from smythe.optimize import (
+    ExplorationBudget, OptimizationRunner, PolicyRegistry, SubprocessProposer, explore,
+)
+
+runner = OptimizationRunner(contract, ledger, evaluate,
+                            evaluator_hash=manifest.evaluator_hash, single_change=True)
+proposer = SubprocessProposer(["propose-challengers"], ceiling_microusd=0, timeout_s=60)
+budget = ExplorationBudget(max_campaigns=5, max_total_exposure_microusd=2_000_000,
+                           max_proposer_microusd=0, max_non_promotions=3)
+with PolicyRegistry("policy-registry.sqlite3") as registry:
+    result = asyncio.run(explore(runner, registry, proposer, incumbent, budget))
+print(result.stop_reason, [campaign.campaign_id for campaign in result.campaigns])
+```
+
+The runner must not name a `campaign_id`: each round is a new campaign with
+its automatic ID. The incumbent stays the same for the whole exploration.
+
+### Stop conditions
+
+`ExplorationBudget(max_campaigns, max_total_exposure_microusd,
+max_proposer_microusd, max_non_promotions=None)` bounds the loop, which ends
+with one of these `stop_reason` values:
+
+| `stop_reason` | When |
+|---|---|
+| `promoted` | A campaign promoted its challenger; the first promotion ends the exploration |
+| `max_non_promotions` | That many consecutive campaigns did not promote |
+| `max_campaigns` | The exploration already ran that many campaigns |
+| `max_total_exposure` | The exposure of the exploration's campaigns plus the next campaign's full required reservation would exceed `max_total_exposure_microusd` |
+| `max_proposer_spend` | Proposer charges plus the next call's ceiling would exceed `max_proposer_microusd` |
+| `proposer_finished` | The proposer proposed no challengers |
+| `proposer_failed` | The proposer could not start, was killed at its deadline, exited with another status, sent no valid reply, or declared more than its ceiling |
+| `proposal_refused` | A proposal broke a [bound](#proposal-bounds) |
+
+A campaign's exposure is its ledger `total_exposure_microusd`: confirmed cost,
+reservations and unknown exposure. Its required reservation is its planned
+trials times the contract's `per_trial_reservation_microusd`, as the runner
+plans them. Before calling the proposer the loop checks the smallest
+campaign, with one challenger, against the exposure cap, and once the
+proposals are known it checks the actual plan, before the campaign is
+created.
+
+`ExplorationResult` holds the `exploration_id`, the `stop_reason`, a `detail`
+sentence, each campaign's `OptimizationResult` under `campaigns`,
+`campaign_exposure_microusd`, and the proposer's settled and unknown
+micro-USD. A campaign that raises, such as `OptimizationNeedsAttention` after
+an unknown trial outcome, stops the exploration as `interrupted`, and the
+exception propagates; so does cancellation. An interrupted exploration is not
+resumed: a new exploration has a budget of its own.
+
+Each campaign's holdout decides on its own. Exploration adds no correction
+for testing many challengers across rounds, which is one more reason a
+promotion it finds still needs review.
+
+### The proposer protocol
+
+`SubprocessProposer(argv, *, ceiling_microusd, timeout_s, cwd=None)` starts
+`argv` once per round, writes one JSON request to its standard input and reads
+one JSON object from its standard output. The request holds:
+
+- `protocol` (`"smythe.exploration.v1"`), the `round` number and the call's
+  `ceiling_microusd`;
+- the `contract`, the `incumbent` candidate, `max_challengers` (the
+  contract's `max_candidates` less one) and the runner's `single_change`
+  setting; and
+- `evidence`, the [proposer view](#what-the-proposer-sees) of the
+  exploration's earlier campaigns.
+
+The reply is
+`{"proposals": [{"policy": {...}, "hypothesis": "..."}], "spent_microusd": 0}`:
+each proposal's policy patch and hypothesis, and what the call spent in whole
+micro-USD. An empty `proposals` list ends the exploration. The program must
+reply and exit with status 0 within `timeout_s` seconds; at the deadline it is
+killed. Name the program's executable itself: a launcher killed at the
+deadline, such as a virtual environment's `python.exe` on Windows, can leave
+the program it started running. A reply may be at most 1 MiB, and standard
+error is discarded.
+
+The program inherits the caller's environment without `SMYTHE_MCP_URL` and
+every variable whose name ends in `_API_KEY`, `_ACCESS_KEY`, `_ACCESS_KEY_ID`,
+`_SECRET`, `_SECRET_KEY`, `_TOKEN`, `_PASSWORD` or `_CREDENTIALS`. It never
+receives the ledger or its path; give it a `cwd` that does not hold the
+ledger. Smythe ships no model-backed proposer.
+
+Before each call the registry records a reservation at the proposer's
+ceiling, and the reply's `spent_microusd` settles it. A proposer that could
+not start, was killed, exited with another status, or sent no whole
+`spent_microusd` leaves its charge unknown at the ceiling. A declaration above
+the ceiling is settled as declared. Either stops the exploration as
+`proposer_failed`. A call cancelled with the exploration is killed, and its
+charge is left unknown.
+
+### Proposal bounds
+
+Each proposal becomes a `Candidate` whose parent is the incumbent, and the
+round's plan is checked before the ledger is written. A proposal is refused
+when it sets a [reserved path](#experiment-contracts-and-budgets) in any
+letter case, a path outside the contract's allowlist or a value its rule
+refuses, repeats the incumbent's policy, changes more than one path under
+`single_change`, or brings the plan over the contract's candidate, trial or
+budget caps. A round whose plan repeats an existing campaign, or re-tests a
+policy whose holdout was [already used](#confirmation-and-holdout-protocol),
+is refused too. Explorations run no [reference arms](#reference-arms).
+
+### What the proposer sees
+
+`proposer_view(ledger, campaign_ids)` returns the evidence that `explore()`
+sends, as plain JSON. For each campaign it lists the ID, plan hash, contract,
+incumbent and sealed candidates; the development and confirmation trials,
+each with its candidate, role, seed, status, metrics and gates; and the
+terminal decision's candidate, `promoted`, development scores, confirmation
+assessment and the references' confirmation assessments, with `holdout` only
+`"passed"`, `"failed"` or `"not_run"`. It leaves out holdout trials, seeds,
+trial keys, metrics and assessments, the decision's reason once the holdout
+ran, the holdout commitment, trial errors, costs and times, and every path.
+Each campaign's decision inventory is validated first.
+
+### Exploration records
+
+Each exploration is recorded in the policy registry under its
+`exploration_id`, `exploration_<hex>` unless `explore()` is given one, with
+its settings: the budget, contract hash, evaluator hash, incumbent candidate
+ID and proposer ceiling. Its events, numbered 1, 2, 3 in order, are
+`proposer_reserved`, `proposer_settled` and `proposer_unknown` with their
+micro-USD; `campaign_started` with the campaign ID and its required
+reservation; `campaign_ended` with the campaign's exposure and `promoted` or
+`not_promoted`; and one final `stopped` naming its reason. Nothing follows a
+stop, and a charge is settled or left unknown only while it is reserved.
+`PolicyRegistry.exploration(exploration_id)` returns the settings, the events,
+the `campaign_ids`, the `stop_reason`, and `proposer_cost`: reserved, settled,
+unknown and total-exposure micro-USD. The exploration tables are part of
+registry schema version 1 and have the same append-only triggers and
+writer-version barrier as reviews and activations.
+
 ## Current boundaries
 
 The following pieces remain future work:
 
-- proposal interfaces for human or agent-generated candidates beyond the
-  current deterministic concurrency grid;
+- a model- or agent-backed proposer: [bounded exploration](#bounded-exploration)
+  ships the loop, its bounds and the subprocess protocol, and the installed
+  concurrency campaign still uses its deterministic grid;
 - CLI adapters for general or provider-backed evaluators with conservative
   per-trial price ceilings;
 - calibrated sample-size guidance and a multiple-comparison correction across

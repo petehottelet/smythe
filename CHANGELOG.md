@@ -729,6 +729,29 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   acceptance policy, leaves its run in the journal with nothing spent.
   Nothing is retried, and a trial's run is never run again. See
   [durable workflow trials](docs/optimize.md#durable-workflow-trials).
+- Bounded exploration. `smythe.optimize.explore(runner, registry, proposer,
+  incumbent, budget)` runs one `OptimizationRunner` campaign per round on a
+  proposer program's challengers against a fixed incumbent, and never reviews
+  or activates anything. `ExplorationBudget` stops it at the first promotion,
+  after `max_non_promotions` consecutive campaigns that did not promote, at
+  `max_campaigns`, or before a campaign whose full required reservation would
+  bring the exploration's campaign exposure over
+  `max_total_exposure_microusd` or a proposer call whose ceiling would pass
+  `max_proposer_microusd`; `ExplorationResult` names the stop.
+  `SubprocessProposer(argv, ceiling_microusd=..., timeout_s=...)` exchanges
+  one JSON object each way over standard input and output, kills the program
+  at its deadline, and leaves API keys and other credential variables out of
+  its environment; the program never receives the ledger or its path. It sees
+  `proposer_view(ledger, campaign_ids)`: contracts, candidates, development
+  and confirmation evidence, and only whether the holdout passed. Proposals
+  that set a reserved path, leave the contract's allowlist or rules, break
+  `single_change` or a cap, or repeat a campaign or a used holdout are
+  refused before the ledger is written. Each proposer charge is reserved at
+  the ceiling before the program starts, settled as it declares, or left
+  unknown at the ceiling when it fails or is killed, in new append-only
+  exploration tables of the policy registry's schema version 1, which
+  `PolicyRegistry.exploration()` reports. No model-backed proposer ships. See
+  [bounded exploration](docs/optimize.md#bounded-exploration).
 - Recorded read steps in durable text workflows. A `ReadProfile` declares one
   versioned read: an HTTP `GET` of a URL whose path or query placeholders take
   a step's checked input, a decoder and its version, whether a read can be

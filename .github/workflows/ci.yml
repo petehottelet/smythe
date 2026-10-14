@@ -215,6 +215,7 @@ jobs:
           tests/test_optimize_lease.py
           tests/test_optimize_registry.py
           tests/test_optimize_registry_cli.py
+          tests/test_optimize_exploration.py
           tests/test_optimize_workflow_eval.py
           tests/test_memory.py
           tests/test_optimize_inspection.py
