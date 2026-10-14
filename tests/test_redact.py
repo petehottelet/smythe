@@ -101,9 +101,16 @@ def test_routes_and_url_paths_stay_readable(home):
         "./local/file.txt",
         "~/project/out.json",
         "ratio 1/2/3",
+        "request failed (POST /v1/chat/completions): 404",
+        "retrying 'GET /v1/models/list'",
     )
     for text in kept:
         assert redact_paths(text) == text
+    # A method is one only as a word of its own, so a path after a word that
+    # merely ends in a method's name is redacted.
+    for word in ("INPUT", "OUTPUT", "TARGET", "BUDGET", "DISPATCH", "XPOST", "re-PUT", "app.GET"):
+        assert redact_paths(f"{word} /srv/app/key.json locked") == f"{word} <path>"
+        assert redact_paths(f"{word} /srv/app/key.json: locked") == f"{word} <path>: locked"
     # A route never shields a local path that follows it.
     assert redact_paths("POST /v1/files failed for /srv/app/key.json") == (
         "POST /v1/files failed for <path>")

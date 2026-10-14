@@ -92,8 +92,9 @@ A failure row records:
   in a colon or a semicolon ends the path and keeps its mark, so
   `open D:\data\my report: access denied` becomes
   `open <path>: access denied`. A comma does not end a path, because folder
-  names hold commas. URL paths and routes after an HTTP method, such as
-  `POST /v1/chat/completions`, are kept.
+  names hold commas. URL paths and routes after an HTTP method written as a
+  word of its own, such as `POST /v1/chat/completions`, are kept, while
+  `OUTPUT /srv/app/key.json` becomes `OUTPUT <path>`.
 - The row also records the run's `execution_id`, `structure_sha256`, any
   gate `verification` entries, its cost and timing so far, and `acceptance`
   `not_evaluated`. A resumed run records `resumed` true.

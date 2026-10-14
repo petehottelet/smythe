@@ -1823,12 +1823,12 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   absolute paths `<path>`, whole when quoted and, unquoted, with the words
   after them up to the end of the line, a quote, a URL, an HTTP route or a
   word ending in a colon or semicolon, since the rest of a name with a space
-  cannot be told from them. URL paths and HTTP routes stay. `success` keeps
-  its meaning, and planning prompts keep their format and show each failure
-  row's outcome as `failure`, even for a run whose nodes all completed
-  before synthesis failed. Interrupts, exits and cancellation are never
-  recorded, and a history write that fails is logged without replacing the
-  run's exception.
+  cannot be told from them. URL paths and routes after an HTTP method
+  written as a word of its own stay. `success` keeps its meaning, and
+  planning prompts keep their format and show each failure row's outcome as
+  `failure`, even for a run whose nodes all completed before synthesis
+  failed. Interrupts, exits and cancellation are never recorded, and a
+  history write that fails is logged without replacing the run's exception.
   `PlannerMemory.record_failure()` writes such a row directly. The default
   `PlannerMemory`, and memory objects that implement only `record()`, record
   nothing on failure. See [failed runs](docs/learning.md#failed-runs).

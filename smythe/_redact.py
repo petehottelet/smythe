@@ -30,11 +30,13 @@ ACCOUNT_IDENTIFIER_PATTERNS: tuple[tuple[re.Pattern[str], str], ...] = (
 # Where an absolute path starts: a file URL, a drive root, a UNC root (whose
 # backslashes a repr or JSON text doubles) or a POSIX root of two or more
 # parts. No letter, digit or path character precedes one, so a URL's path and
-# relative paths stay, and a POSIX path after an HTTP method is a route.
+# relative paths stay, and a POSIX path after an HTTP method is a route. A
+# method is one only as a word of its own, at the start of the text or after
+# a space, an opening bracket or a quote: a path after OUTPUT is redacted.
 _HTTP_METHODS = ("GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "CONNECT", "TRACE")
 _PATH_START = (
     r"(?:\bfile:/|(?<![A-Za-z0-9])[A-Za-z]:[\\/]|(?<![\w.~-])\\{2,4}[^\s\\/'\"`]+[\\/]|"
-    + "".join(f"(?<!{method} )" for method in _HTTP_METHODS)
+    + "".join(rf"(?<!(?<![^\s(\[{{'\"`]){method} )" for method in _HTTP_METHODS)
     + r"(?<![\w:/\\.~\]-])/[^\s/'\"`]+/)"
 )
 # A path that starts a quoted string runs to its closing quote, spaces included.
@@ -91,8 +93,9 @@ def redact_paths(text: str) -> str:
     method and its route. A word that ends in a colon or a semicolon ends
     the path and keeps its mark, as in ``<path>: access denied``; a comma
     does not, as folder names hold commas. URL paths and a route after an
-    HTTP method, as in ``POST /v1/chat/completions``, are not local paths
-    and stay.
+    HTTP method written as a word of its own, as in
+    ``POST /v1/chat/completions``, are not local paths and stay; a path
+    after ``OUTPUT`` or ``TARGET`` is redacted.
     """
     try:
         home = str(Path.home())
