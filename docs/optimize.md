@@ -97,13 +97,15 @@ named `acceptance`, `validators`, `verifier`, `evaluator`, `harness`,
 `budget`, `spend`, `ceilings`, `capabilities`, `tools`, `permissions`,
 `authority`, or `holdout`, or any path under one, such as `acceptance.mode`,
 in any letter case. It raises `OptimizationError` naming those fields before
-it reads or writes the ledger. Only whole segments match: `toolbar.layout` is
-not under `tools`. Contract parsing does not apply this rule, so a stored
-contract that declares such a field still loads for inspection and holdout
-accounting, but a campaign stored under it no longer runs or resumes. The rule
-reads field names only; the evaluator decides what each policy value controls,
-so it must not apply a differently named field to acceptance, spend, tools, or
-held-out data.
+it reads or writes the ledger. The rule reads only a path's first segment,
+and only as a whole segment: `toolbar.layout` is not under `tools`, and
+`swarm.acceptance.mode` is not refused, since its first segment is `swarm`.
+Contract parsing does not apply this rule, so a stored contract that declares
+such a field still loads for inspection and holdout accounting, but a campaign
+stored under it no longer runs or resumes. The rule reads field names only;
+the evaluator decides what each policy value controls, so it must not apply a
+differently named field, such as `swarm.acceptance.mode`, to acceptance,
+spend, tools, or held-out data.
 
 `OptimizationRunner(..., single_change=True)` holds each challenger to one
 targeted change: it must differ from the incumbent in exactly one policy path,

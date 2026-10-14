@@ -76,6 +76,11 @@ A failure row records:
 
 - Other errors keep no message, because it can quote task text or local
   data. No row holds a provider's raw response.
+- The row keeps the same task fields a success row keeps, the goal and
+  context with the constraints and done-when criteria, and each node's
+  label, as they were given. Only `failure_excerpt` is redacted, so a path or
+  identifier in the task text stays in the history file, as it does for a
+  run that finishes.
 - The row also records the run's `execution_id`, `structure_sha256`, any
   gate `verification` entries, its cost and timing so far, and `acceptance`
   `not_evaluated`. A resumed run records `resumed` true.
