@@ -513,8 +513,9 @@ The permit then records the outcome of the one submission:
   `begin_attempt()` then refuses the action, so dispatch never sends the
   write again. Only [reconciliation](#reconciliation) makes another attempt
   possible: `claim_retry()` claims a same-key retry, and a `not_executed`
-  finding from `record_finding()` returns the action to `not_dispatched`, so
-  that the next attempt can begin. The attempt keeps its exposure until a
+  finding from `record_finding()` returns the action to `not_dispatched`
+  once no other attempt's outcome is unknown, so that the next attempt can
+  begin. The attempt keeps its exposure until a
   receipt that a lookup finds reports the write's cost, which
   `record_lookup()` confirms.
 
@@ -549,8 +550,11 @@ begun but not claimed is released unsent, and nothing dispatches it again
 until [reconciliation](#reconciliation) or an operator settles the outcome.
 [Inspection](#inspecting-actions) lists a contradicted action as unresolved
 with a `second_effect` when the receipts name two commits, and until a read
-settles it otherwise. Once a late receipt shows an attempt's commit, no
-empty lookup or operator decision finds that attempt not executed.
+settles it otherwise. Once a late receipt shows a commit under the action's
+key, no empty lookup or operator decision finds any of its attempts not
+executed, so the action is not dispatched again: reconciliation reads that
+commit back when a lookup finds it, and otherwise leaves the outcome to an
+operator.
 
 ### Recovery
 
@@ -746,7 +750,8 @@ under its unconsumed approval, so `dispatch()` can send it again while
 attempts remain; that attempt counts toward `max_attempts`. Without a
 declared bound, before the bound has passed, or once the key's window may
 have closed, empty lookups leave the outcome unknown, as they do once a
-[late receipt](#leases-and-late-receipts) shows the attempt's commit.
+[late receipt](#leases-and-late-receipts) shows a commit of any of the
+action's attempts.
 
 The proof assumes that each request leaves within `timeout_s` of its
 dispatch claim. A worker that stalls between its claim and its request for
@@ -806,6 +811,9 @@ is removed, and no confirmed cost is reduced.
 
 Host code that reconciles by itself calls `record_lookup()`, `claim_retry()`
 and `record_finding()` in `smythe.workflow_actions` under the run's lease.
+A `not_executed` finding returns the action to `not_dispatched` only once no
+other attempt's outcome is unknown, and `record_finding()` refuses it once a
+late receipt shows a commit under the action's key.
 
 ### Notices
 
@@ -1141,6 +1149,8 @@ cites the test behind each:
   lookup-only service commit twice; only a deduplicating service answers the
   stalled request from the earlier commit. Its late receipt is kept, appends
   a contradicting finding, and leaves the action listed as unresolved with a
-  `second_effect`, so `smythe runs inspect` exits with 12.
+  `second_effect`, so `smythe runs inspect` exits with 12. From then on no
+  empty lookup or operator decision finds any of the action's attempts not
+  executed, so no further write follows.
 - A worker killed while its write is in flight leaves an unknown outcome,
   which a restarted worker reconciles without writing again.

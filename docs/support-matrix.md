@@ -661,7 +661,8 @@ of absence assumes that each request leaves within `timeout_s` of its
 dispatch claim: only a deduplicating service protects against a worker that
 stalls between its claim and its request past its lease. When such a
 worker's late receipt shows a second commit, the action is listed as
-unresolved with a `second_effect`.
+unresolved with a `second_effect`; once a late receipt shows any commit, no
+empty lookup reopens the action for dispatch.
 
 Tests:
 
@@ -695,6 +696,7 @@ Tests:
 - A worker stalled past its lease before its request leaves: lookup only
   `tests/test_action_reconciliation.py::test_a_late_receipt_that_contradicts_a_not_executed_finding_leaves_the_action_unresolved`
   and `tests/test_runs_cli.py::test_a_second_effect_that_a_late_receipt_shows_exits_12`;
+  a later attempt's empty lookup `tests/test_action_reconciliation.py::test_a_late_commit_keeps_every_attempt_of_its_action_from_being_found_not_executed`;
   deduplication `tests/test_action_reconciliation.py::test_a_deduplicating_service_answers_the_stalled_request_and_nothing_is_unresolved`.
 - Competing workers: `tests/test_action_conformance.py::test_two_threads_racing_to_dispatch_make_one_claim_and_one_effect`
   and `tests/test_action_conformance.py::test_a_worker_in_another_process_and_a_local_worker_race_and_one_claims`.

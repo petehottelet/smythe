@@ -550,18 +550,30 @@ class Paused(Reconciling):
         return super().submit(key, intent, payload, timeout_s)
 
 
-def paused_past_its_lease(store, tmp_path, replies, host, clock, *, dedupe=False):  # noqa: F811
+class Blind(Reconciling):
+    """A connector whose lookups miss every commit, as a service past its declared bound would."""
+
+    def lookup(self, key, target, timeout_s):
+        self.calls.append(("lookup", key))
+        return None
+
+
+def paused_past_its_lease(store, tmp_path, replies, host, clock, *,  # noqa: F811
+                          dedupe=False, visibility=0, **settings):
     """An approved action whose worker claimed its dispatch and stalled, past its lease, before sending.
 
-    The service looks keys up and shows each commit at once. Worker A, in a
-    thread with its own journal connection, waits inside ``submit()``. Returns
-    the action, the service, worker B's connector and runner, and ``resume()``,
-    which lets A's request leave and returns what A's dispatch raised.
+    The service looks keys up and shows each commit *visibility* seconds after
+    it is made, at once by default; *settings* change the profile. Worker A, in
+    a thread with its own journal connection, waits inside ``submit()``.
+    Returns the action, the service, worker B's connector and runner, and
+    ``resume()``, which lets A's request leave and returns what A's dispatch
+    raised.
     """
-    service = FixtureService(clock_ns=clock, dedupe=dedupe, visibility_delay_s=0)
-    connector, paused = Reconciling(service, timeout_s=10), Paused(service, timeout_s=10)
+    service = FixtureService(clock_ns=clock, dedupe=dedupe, visibility_delay_s=visibility)
+    connector = Reconciling(service, timeout_s=10, **settings)
+    paused = Paused(service, timeout_s=10, **settings)
     assert connector.profile == paused.profile and connector.profile.deduplicates is dedupe
-    assert connector.profile.lookup_by_key and connector.profile.visibility_bound_s == 0
+    assert connector.profile.lookup_by_key and connector.profile.visibility_bound_s == visibility
     action, _ = ready(store, tmp_path, replies, host, clock, connector)
     outcome: dict = {}
 
@@ -705,13 +717,6 @@ def test_a_late_receipt_before_the_next_dispatch_stops_it_and_reconciliation_rea
 
 def test_no_lookup_or_decision_finds_an_attempt_not_executed_once_a_late_receipt_shows_its_write(
         store, tmp_path, replies, host, clock):  # noqa: F811
-    class Blind(Reconciling):
-        """A connector whose lookups miss every commit, as a service past its declared bound would."""
-
-        def lookup(self, key, target, timeout_s):
-            self.calls.append(("lookup", key))
-            return None
-
     action, service, connector, worker, resume = paused_past_its_lease(store, tmp_path, replies, host, clock)
     # Worker B recovers the stalled attempt but does not reconcile it before the receipt arrives.
     assert worker.readback(action.run_id, action.action_id).state == "outcome_unknown"
@@ -737,6 +742,92 @@ def test_no_lookup_or_decision_finds_an_attempt_not_executed_once_a_late_receipt
                 note="Checked the audit log")
     assert [entry["finding"] for entry in findings(store, action)] == ["unresolved"]
     assert item(store, action)["state"] == "outcome_unknown" and counts(service, action) == (1, 1, 0)
+
+
+LATER_ATTEMPT = {
+    # The service shows the stalled request's commit to lookups only five seconds after it is made.
+    "commit-not-yet-visible": (5, Reconciling),
+    "lookups-miss-the-commit": (0, Blind),
+}
+
+
+@pytest.mark.parametrize("config", LATER_ATTEMPT.values(), ids=LATER_ATTEMPT.keys())
+def test_a_late_commit_keeps_every_attempt_of_its_action_from_being_found_not_executed(
+        store, tmp_path, replies, host, clock, config):  # noqa: F811
+    visibility, looking = config
+    action, service, connector, worker, resume = paused_past_its_lease(
+        store, tmp_path, replies, host, clock, visibility=visibility, max_attempts=3)
+    found_absent(worker, action)
+    # Worker B's next attempt is lost before it reaches the service, so its outcome is unknown.
+    connector.lost = 1
+    assert worker.dispatch(action.run_id, action.action_id).state == "outcome_unknown"
+    clock.advance(connector.profile.timeout_s + 2)
+    assert isinstance(resume(), WorkflowLeaseError)
+    first, second = item(store, action)["attempts"]
+    assert [entry["finding"] for entry in findings(store, action)] == ["not_executed", "contradicted_absence"]
+    # The visibility bound plus the timeout has now passed since the second attempt's claim.
+    clock.advance(3)
+    before = item(store, action)
+
+    progress = runner(store, looking(service, timeout_s=10, max_attempts=3), host, clock,
+                      lease_ttl_s=LEASE).reconcile(action.run_id, action.action_id)
+
+    # The stalled request committed under the action's key, so no empty lookup proves any attempt absent.
+    assert (progress.state, progress.next_action) == ("outcome_unknown", "operator_review")
+    *_, finding = findings(store, action)
+    assert (finding["attempt_id"], finding["finding"], finding["reason"]) == (
+        second["attempt_id"], "unresolved",
+        "a late receipt shows that the write took effect, so an empty lookup proves nothing")
+    after = intact(store, action, before)
+    assert [entry["state"] for entry in after["attempts"]] == ["outcome_unknown"] * 2
+    view = inspect_actions(store, action.run_id)
+    assert view["unresolved"] == [action.action_id]
+    assert (view["items"][0]["contradiction"], view["items"][0]["next_action"]) == (
+        "contradicted_absence", "operator_review")
+    # Nothing dispatches a third attempt: one write reached the service.
+    with pytest.raises(ActionStateError, match="is outcome_unknown"):
+        worker.dispatch(action.run_id, action.action_id)
+    assert counts(service, action) == (1, 1, 0) and len(service.snapshot()["objects"]) == 1
+    # The journal refuses a not_executed finding for either attempt.
+    lease = store.acquire_lease(action.run_id, "worker-c", ttl_s=LEASE)
+    for attempt, shown in ((first, "it"), (second, "attempt 1")):
+        with pytest.raises(ActionStateError, match=f"a late receipt shows that {shown} took effect"):
+            workflow_actions.record_finding(store, lease, attempt["attempt_id"], "not_executed", "a guess")
+    store.release_lease(lease)
+    assert item(store, action)["state"] == "outcome_unknown" and store.audit(action.run_id)["ok"]
+
+
+def test_a_not_executed_finding_leaves_the_outcome_unknown_while_another_attempt_is_unsettled(
+        store, tmp_path, replies, host, clock):  # noqa: F811
+    service = FixtureService(clock_ns=clock, lookup_by_key=False)
+    connector = Reconciling(service, max_attempts=3)
+    action, _ = unknown(store, tmp_path, replies, host, clock, connector, committed=False)
+    # The same-key retry is lost too, so the outcomes of both attempts are unknown.
+    connector.lost = 1
+    worker = runner(store, connector, host, clock)
+    assert worker.reconcile(action.run_id, action.action_id).state == "outcome_unknown"
+    first, retry = item(store, action)["attempts"]
+    assert (first["state"], retry["state"]) == ("outcome_unknown", "outcome_unknown")
+    lease = store.acquire_lease(action.run_id, "host-reconciler", ttl_s=LEASE)
+
+    workflow_actions.record_finding(store, lease, retry["attempt_id"], "not_executed", "the retry never arrived")
+
+    # The first attempt may still have taken effect, so nothing dispatches the action.
+    assert item(store, action)["state"] == "outcome_unknown"
+    assert records(store, action, "finding")[-1]["payload"]["finding"] == "not_executed"
+    store.release_lease(lease)
+    with pytest.raises(ActionStateError, match="is outcome_unknown"):
+        worker.dispatch(action.run_id, action.action_id)
+    assert inspect_actions(store, action.run_id)["items"][0]["next_action"] == "reconcile"
+
+    # Once the first attempt is found not executed as well, the next attempt makes the one write.
+    lease = store.acquire_lease(action.run_id, "host-reconciler", ttl_s=LEASE)
+    workflow_actions.record_finding(store, lease, first["attempt_id"], "not_executed", "it never arrived either")
+    store.release_lease(lease)
+    assert item(store, action)["state"] == "not_dispatched"
+    assert worker.dispatch(action.run_id, action.action_id).attempt["state"] == "acknowledged"
+    assert connector.made("submit") == 3 and counts(service, action) == (1, 1, 0)
+    assert store.audit(action.run_id)["ok"]
 
 
 # ---------------------------------------------------------------------------

@@ -303,8 +303,8 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   A late receipt that shows a commit of an attempt found not executed
   appends a `contradicted_absence` finding, returns an action that was
   `not_dispatched` again to `outcome_unknown`, releasing an unclaimed
-  attempt, and keeps any empty lookup or operator decision from finding that
-  attempt not executed again.
+  attempt, and keeps any empty lookup or operator decision from finding any
+  attempt of that action not executed, so it is not dispatched again.
   `recover_actions()` releases prepared attempts and turns dispatched ones
   into `outcome_unknown` without resending or releasing exposure, and
   `reject()` releases an attempt prepared but not yet claimed. A run's
@@ -339,7 +339,8 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   causes a submission, and shows that the write was not made only once a
   declared `visibility_bound_s` plus the connector's timeout has passed since
   the dispatch while the key is still inside its window; the action is then
-  `not_dispatched` again under its unconsumed approval. That proof assumes
+  `not_dispatched` again under its unconsumed approval once no other
+  attempt's outcome is unknown. That proof assumes
   each request leaves within the timeout of its claim: only a deduplicating
   service protects against a worker that stalls past its lease before its
   request leaves. A deduplicating

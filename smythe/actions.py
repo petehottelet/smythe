@@ -1439,9 +1439,10 @@ class ActionRunner:
         made (``not_executed``; the action is ``not_dispatched`` again) only
         once a declared ``visibility_bound_s`` plus ``timeout_s`` has passed
         since the latest dispatch claim while the key's window is open, and
-        no late receipt shows the attempt's commit. That proof assumes each
-        request leaves within ``timeout_s`` of its claim; a late receipt that
-        contradicts it is recorded (see :func:`inspect_actions`). With
+        no late receipt shows a commit of any of the action's attempts. That
+        proof assumes each request leaves within ``timeout_s`` of its claim;
+        a late receipt that contradicts it is recorded (see
+        :func:`inspect_actions`) and keeps the action from dispatch. With
         ``deduplicates`` alone, one same-key retry is made within
         ``max_attempts`` while the window is open and :func:`check_authority`
         passes, and its receipt is read back; with neither, nothing is sent.
@@ -1507,9 +1508,10 @@ class ActionRunner:
             if receipt is not None:
                 found = receipt
                 break
+            # A late receipt that shows any attempt's commit under the key outweighs every empty lookup.
             reason = ("no lookup answered" if error is not None
                       else "a late receipt shows that the write took effect, so an empty lookup proves nothing"
-                      if attempt_id in status["committed"] else _absence_unproven(profile, first, last, now))
+                      if status["committed"] else _absence_unproven(profile, first, last, now))
             if reason is None:
                 journal.record_finding(self.store, lease, attempt_id, "not_executed",
                                        "an empty lookup after the visibility bound, inside the key's window, "

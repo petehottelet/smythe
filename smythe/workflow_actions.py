@@ -945,6 +945,18 @@ def _late_commits(db, action_id):
     return commits
 
 
+def _late_numbers(db, action_id):
+    """The number of each attempt whose commit a late receipt shows, by attempt ID, oldest first.
+
+    Once there is one, a write under the action's key is known, so no
+    attempt of the action can be found not executed.
+    """
+    committed = _late_commits(db, action_id)
+    return {row[0]: row[1] for row in db.execute(
+        "SELECT attempt_id,number FROM workflow_action_attempts WHERE action_id=? ORDER BY number", (action_id,))
+        if row[0] in committed}
+
+
 def _contradiction(db, action_id, attempts):
     """How late receipts contradicted the action's ``not_executed`` findings or decisions, or None.
 
@@ -1190,10 +1202,11 @@ def record_finding(store, lease, attempt_id, finding, reason, evidence=()):
     """Append what reconciliation found about an attempt as a ``finding`` record.
 
     ``not_executed`` says the attempt never took effect: it and its action
-    must be ``outcome_unknown``, no late receipt may show its commit, and the
-    action returns to ``not_dispatched`` under its unconsumed approval, while
-    the attempt keeps its unknown exposure. ``unresolved`` says that
-    reconciliation can do no more and
+    must be ``outcome_unknown``, and no late receipt may show a commit of any
+    of the action's attempts. The action returns to ``not_dispatched`` under
+    its unconsumed approval once no other attempt's outcome is unknown, and
+    stays ``outcome_unknown`` until then; the attempt keeps its unknown
+    exposure. ``unresolved`` says that reconciliation can do no more and
     changes no state: the attempt must be ``outcome_unknown`` with its action,
     or acknowledged with its action ``dispatched``. The caller holds the run's
     lease. *reason* is kept redacted and *evidence* names the action's records
@@ -1212,9 +1225,11 @@ def record_finding(store, lease, attempt_id, finding, reason, evidence=()):
                 finding == "not_executed" or states != ("acknowledged", "dispatched")):
             raise ActionStateError(f"Attempt {attempt_id!r} is {attempt['state']} and its action {action['state']}; "
                                    f"no {finding} finding applies")
-        if finding == "not_executed" and attempt_id in _late_commits(db, action["action_id"]):
+        shown = _late_numbers(db, action["action_id"]) if finding == "not_executed" else {}
+        if shown:
+            which = "it" if attempt_id in shown else f"attempt {next(iter(shown.values()))}"
             raise ActionStateError(f"Attempt {attempt_id!r} cannot be found not executed: a late receipt shows "
-                                   "that it took effect")
+                                   f"that {which} took effect")
         known = {row[0] for row in db.execute("SELECT record_id FROM workflow_action_records WHERE action_id=?",
                                               (action["action_id"],))}
         if not all(type(item) is str and item in known for item in evidence):
@@ -1230,7 +1245,10 @@ def record_finding(store, lease, attempt_id, finding, reason, evidence=()):
         record_id = _append(store, db, action, "finding", {
             "attempt_id": attempt_id, "finding": finding, "reason": _error(reason), "evidence": evidence,
             "attempts": count})
-        state = "not_dispatched" if finding == "not_executed" else action["state"]
+        state = action["state"]
+        if finding == "not_executed":
+            # Another attempt whose outcome is still unknown may have taken effect.
+            state = "outcome_unknown" if _unsettled(db, action["action_id"]) else "not_dispatched"
         db.execute("UPDATE workflow_actions SET state=?,updated=? WHERE action_id=?",
                    (state, store._clock_ns(), action["action_id"]))
         store._event(db, lease.run_id, "action_finding", payload={
@@ -1271,10 +1289,7 @@ def decide(store, action, attempts, decision, verified, evidence=None):
         if store._run(db, row["run_id"])["blocked_reason"] == _SECURITY_STOP:
             raise ActionNotAuthorized(f"Action {action.action_id!r} cannot be decided: a security stop holds "
                                       "the run")
-        committed = _late_commits(db, action.action_id)
-        shown = [attempt[0] for attempt in db.execute("SELECT number,attempt_id FROM workflow_action_attempts "
-                                                      "WHERE action_id=? ORDER BY number", (action.action_id,))
-                 if attempt[1] in committed]
+        shown = list(_late_numbers(db, action.action_id).values())
         if decision == "not_executed" and shown:
             raise ActionStateError(f"Action {action.action_id!r} cannot be found not executed: a late receipt "
                                    f"shows that attempt {shown[0]} took effect")
