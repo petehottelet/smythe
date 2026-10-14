@@ -710,9 +710,10 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   `ExperimentLedger.list_campaigns()` lists every campaign read-only. Each
   command takes `--registry` (default `~/.smythe/policy-registry.sqlite3`)
   and `--json`; invalid input exits with code 2 before any file is opened,
-  and a refused change or a stale `--expected-seq` exits with code 8 and
-  records nothing. The ledger schema, campaign report version 1 and
-  `smythe optimize inspect --json` output are unchanged. See
+  and a refused review or change or a stale `--expected-seq` exits with
+  code 8, records nothing and creates no registry. The ledger schema,
+  campaign report version 1 and `smythe optimize inspect --json` output are
+  unchanged. See
   [review and change targets from the CLI](docs/optimize.md#review-and-change-targets-from-the-cli)
   and [cross-campaign target report](docs/optimize.md#cross-campaign-target-report).
 - `smythe.optimize.workflow_eval.workflow_trial_evaluator(runtime_factory,

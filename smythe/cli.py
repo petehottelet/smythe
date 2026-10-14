@@ -1581,7 +1581,7 @@ def _evidence_sha256(path: str | None) -> str | None:
 def _dispatch_registry(args: argparse.Namespace) -> int:
     """Record a review, change a target, or report one; history opens both files read-only."""
     from smythe.optimize.inspection import collect_target_report
-    from smythe.optimize.registry import PolicyRegistry
+    from smythe.optimize.registry import PolicyRegistry, _reviewable
 
     command = args.optimize_command
     _check_registry_arguments(args)
@@ -1594,6 +1594,9 @@ def _dispatch_registry(args: argparse.Namespace) -> int:
         # Read-only like inspect; checked first so a missing ledger creates no registry.
         if not Path(args.ledger).is_file():
             raise FileNotFoundError(f"no optimization ledger at {args.ledger}")
+        if not Path(args.registry).exists():
+            # A review that would be refused must not leave a new, empty registry.
+            _reviewable(args.ledger, args.campaign_id, args.verdict)
         with PolicyRegistry(args.registry) as registry:
             value = registry.record_review(
                 args.ledger, args.campaign_id, reviewer=args.reviewer, verdict=args.verdict,

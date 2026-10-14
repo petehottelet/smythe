@@ -320,6 +320,31 @@ def _decision_reference(ledger: ExperimentLedger, campaign_id: str) -> dict[str,
     return reference
 
 
+def _reviewable(
+    ledger: ExperimentLedger | str | os.PathLike[str], campaign_id: str, verdict: str
+) -> dict[str, Any]:
+    """The decision reference a *verdict* on *campaign_id* records, read without writing.
+
+    *ledger* is an open ledger or the path of a closed one. Raises
+    :class:`RegistryError` when the campaign cannot be reviewed or the
+    verdict approves a decision that was not promoted.
+    """
+
+    try:
+        if isinstance(ledger, ExperimentLedger):
+            reference = _decision_reference(ledger, campaign_id)
+        else:
+            # Its close repeats the quiescence check before anything is written.
+            with ExperimentLedger(ledger, read_only=True) as source:
+                reference = _decision_reference(source, campaign_id)
+    except ExperimentLedgerError as exc:
+        raise RegistryError(f"campaign {campaign_id!r} cannot be reviewed: {exc}") from exc
+    if verdict == "approve" and reference["promoted"] is not True:
+        raise RegistryError(f"decision {reference['decision_id']!r} was not promoted; "
+                            "only a promoted decision can be approved")
+    return reference
+
+
 def _target(value: object) -> str:
     if not isinstance(value, str) or _DOTTED_FIELD_RE.fullmatch(value) is None:
         raise ValueError("target must be a dotted policy name such as 'planner.template.report'")
@@ -716,18 +741,7 @@ class PolicyRegistry:
             raise ValueError("evidence_sha256 must be 64 lowercase hex characters")
         if note != "":
             note = _nonempty(note, "note", maximum=1024)
-        try:
-            if isinstance(ledger, ExperimentLedger):
-                reference = _decision_reference(ledger, campaign_id)
-            else:
-                # Its close repeats the quiescence check before anything is written.
-                with ExperimentLedger(ledger, read_only=True) as source:
-                    reference = _decision_reference(source, campaign_id)
-        except ExperimentLedgerError as exc:
-            raise RegistryError(f"campaign {campaign_id!r} cannot be reviewed: {exc}") from exc
-        if verdict == "approve" and reference["promoted"] is not True:
-            raise RegistryError(f"decision {reference['decision_id']!r} was not promoted; "
-                                "only a promoted decision can be approved")
+        reference = _reviewable(ledger, campaign_id, verdict)
         text = _json_text({**reference, "verdict": verdict, "reviewer": reviewer,
                            "evidence_sha256": evidence_sha256, "note": note})
         row = {"review_id": _review_id(text), "campaign_id": reference["campaign_id"],

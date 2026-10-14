@@ -1250,7 +1250,10 @@ read `--ledger PATH` (default `~/.smythe/optimize.sqlite3`).
 
 `review CAMPAIGN_ID --verdict approve|reject --reviewer NAME` records a review
 with `record_review()` and prints its ID. It opens the ledger read-only, so
-the ledger must be closed and checkpointed, and creates a missing registry.
+the ledger must be closed and checkpointed. It creates a missing registry
+only for a review it records: the ledger and the campaign's decision are
+checked first, so a review of an unknown campaign, of one without a terminal
+decision, or approving a decision that was not promoted leaves no file.
 `--evidence FILE` records the plain hex SHA-256 of the file's bytes as
 `evidence_sha256`; neither its path nor its content is stored. `--note` adds
 one line. The reviewer is declared, not authenticated.
@@ -1270,7 +1273,7 @@ configuration: new work resolves the policy in effect from the registry.
 | 2 | Invalid input: a malformed target, seq, campaign ID, name, reason or note, a verdict other than `approve` or `reject`, or an unreadable evidence file; checked before any file is opened or created |
 | 8 | A refused change (`RegistryError`, such as approving a decision that was not promoted, a review whose incumbent is not in effect, restoring the entry already in effect, or no registry), a stale `--expected-seq` (`RegistryConflictError`), a missing campaign, ledger or registry, or a file a writer still holds open |
 
-A command that exits with 2 or 8 records nothing.
+A command that exits with 2 or 8 records nothing and creates no registry.
 
 ### Cross-campaign target report
 

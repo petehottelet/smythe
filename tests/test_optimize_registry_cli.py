@@ -391,3 +391,27 @@ def test_changes_need_an_existing_registry_and_never_create_one(files, tmp_path,
                             "--verdict", "approve", "--reviewer", "owner")
     assert code == EXIT_OPTIMIZE_STATE and output["error"]["type"] == "FileNotFoundError"
     assert not registry.parent.exists()
+
+
+@pytest.mark.parametrize("campaign, verdict, message", [
+    ("unknown", "reject", "campaign 'unknown' cannot be reviewed"),
+    ("stopped", "reject", "has no terminal decision to review"),
+    ("rejected", "approve", "was not promoted"),
+], ids=["unknown-campaign", "no-terminal-decision", "approving-a-rejection"])
+def test_a_refused_first_review_creates_no_registry(files, tmp_path, capsys, campaign, verdict,
+                                                    message):
+    registry = tmp_path / "new" / "registry.sqlite3"
+    ledger_bytes = files[0].read_bytes()
+    code, output = optimize(capsys, (files[0], registry), "review", campaign, "--verdict", verdict,
+                            "--reviewer", "owner")
+    assert code == EXIT_OPTIMIZE_STATE and output["error"]["type"] == "RegistryError"
+    assert message in output["error"]["message"]
+    assert not registry.parent.exists()
+    assert files[0].read_bytes() == ledger_bytes
+    # The first review that is recorded creates the registry.
+    code, output = optimize(capsys, (files[0], registry), "review", "promoted", "--verdict",
+                            "approve", "--reviewer", "owner")
+    assert code == EXIT_OK and registry.is_file()
+    with PolicyRegistry(registry, read_only=True) as reader:
+        assert [review.review_id for review in reader.reviews("promoted")] == [
+            output["review"]["review_id"]]

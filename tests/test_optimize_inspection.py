@@ -13,6 +13,7 @@ import pytest
 
 from smythe.optimize.contracts import Candidate, ExperimentContract, MetricObjective, ObjectiveDirection
 from smythe.optimize.inspection import collect_optimization_report, collect_target_report
+from smythe.optimize import registry as registry_module
 from smythe.optimize.ledger import ExperimentLedger, ExperimentLedgerError, PromotionDecision
 from smythe.optimize.registry import PolicyRegistry
 
@@ -421,6 +422,46 @@ def test_a_target_touched_by_no_campaign_reports_none_and_no_cost(tmp_path):
         assert report["campaigns"] == []
         assert report["optimization_cost"] == {"campaigns": 0, **dict.fromkeys(COST_FIELDS, 0),
                                                "unknown_trials": 0}
+
+
+def test_a_target_matches_a_policy_path_by_whole_segments(tmp_path):
+    path, registry_path = tmp_path / "campaigns.db", empty_registry(tmp_path / "registry.db")
+    make_ledger(path, campaign="nested", field="labels.x")
+    # 'label' is a prefix of the path's first segment, not a segment of it.
+    assert target_report(path, registry_path, "label")["campaigns"] == []
+    for target in ("labels", "labels.x"):
+        report = target_report(path, registry_path, target)
+        assert [item["campaign_id"] for item in report["campaigns"]] == ["nested"]
+
+
+def test_a_campaign_lists_only_the_reviews_sealed_to_it(tmp_path, monkeypatch):
+    path, other = tmp_path / "campaigns.db", tmp_path / "other.db"
+    registry_path = tmp_path / "registry.db"
+    for ledger_path in (path, other):
+        make_ledger(ledger_path, campaign="second", states=("completed", "completed"), decision=True)
+    with ExperimentLedger(path, read_only=True) as ledger, \
+            ExperimentLedger(other, read_only=True) as elsewhere:
+        commitment = ledger.get_holdout_seed_commitment("second")
+        # A campaign of the same ID in another ledger has its own holdout commitment.
+        assert elsewhere.get_holdout_seed_commitment("second") != commitment
+
+    original = registry_module._decision_reference
+    with PolicyRegistry(registry_path) as registry:
+        own = registry.record_review(path, "second", reviewer="owner", verdict="reject")
+        registry.record_review(other, "second", reviewer="owner", verdict="reject")
+        # Reviews that name the campaign but differ in one other part of its seal.
+        for field, value in (("plan_hash", "sha256:" + "f" * 64),
+                             ("holdout_commitment", "sha256:" + "0" * 64)):
+            monkeypatch.setattr(registry_module, "_decision_reference",
+                                lambda ledger, campaign_id, field=field, value=value: {
+                                    **original(ledger, campaign_id), field: value})
+            registry.record_review(path, "second", reviewer="owner", verdict="reject", note=field)
+        monkeypatch.setattr(registry_module, "_decision_reference", original)
+        assert len(registry.reviews("second")) == 4
+
+    (campaign,) = target_report(path, registry_path)["campaigns"]
+    assert (campaign["plan_hash"], campaign["holdout_commitment"]) == (PLAN, commitment)
+    assert [review["review_id"] for review in campaign["reviews"]] == [own.review_id]
 
 
 def test_an_unrecorded_verdict_is_none_and_an_invalid_one_stops_the_report(tmp_path):
