@@ -376,7 +376,7 @@ successors are not looked up, and every item comes from that projection:
 | Kind | Holds back | When | Resolve with |
 |---|---|---|---|
 | `security_stop` | admission | A [security stop](execution.md#security-stops) ended the run; it is then the run's only item | Nothing in this run: a new run |
-| `budget_overrun`, `unknown_exposure`, `evidence_conflict` | admission | That `blocked_reason` closed a durable run's admission; `observed` gives the `unknown_nanousd` and each call in `unknown_cost_calls` | Nothing in this run: a new run, once the charges are checked |
+| `budget_overrun`, `unknown_exposure`, `evidence_conflict` | admission | That `blocked_reason` closed a durable run's admission; `observed` gives the `unknown_nanousd` and, under `unknown_calls`, each call whose charge is unknown, as `inspect` lists it in `unknown_cost_calls` | Nothing in this run: a new run, once the charges are checked |
 | `unreadable` | completion | A run that a page of runs cannot read, with its error | Restore it, or read it with the release that wrote it |
 | `run_failed` | completion | The run stopped before it completed; `observed` gives its node counts and any `unresolved` accounting | The resume or reconciliation that `inspect`'s next action names |
 | `decision_uncommitted` | completion | A strict run's nodes all completed, but no decision was committed: it stopped, or is still finishing, between synthesis and its decision | Resume, which decides on the output again and never accepts it unchecked |

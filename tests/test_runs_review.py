@@ -18,13 +18,14 @@ import pytest
 from fakes import LOST_RESPONSE, Crash, ManualClock, NativeTransport, crash_when
 from fixture_service import FixtureService, serve_http
 from smythe import (
-    AcceptanceDecision, AcceptancePolicy, FileCheckpointStore, OfflineProvider, SimpleArchitect,
-    SQLiteWorkflowStore, Swarm, Task,
+    AcceptanceDecision, AcceptancePolicy, FileCheckpointStore, LineagePolicy, OfflineProvider,
+    SimpleArchitect, SQLiteWorkflowStore, Swarm, Task,
 )
+import smythe._run_inspection as run_inspection
 from smythe._run_inspection import RUN_REVIEW_KINDS, review_run
 from smythe.cli import (
-    EXIT_INTERRUPTED, EXIT_INVALID_INPUT, EXIT_JOB_STATE, EXIT_LOCAL_ERROR, EXIT_OK, build_parser,
-    main,
+    EXIT_INTERRUPTED, EXIT_INVALID_INPUT, EXIT_JOB_STATE, EXIT_LOCAL_ERROR, EXIT_OK,
+    EXIT_RUN_NOT_ACCEPTED, build_parser, main,
 )
 from smythe.jobs.inspection import REVIEW_BLOCKS, REVIEW_VERSION
 from smythe.lineage import restrict_source
@@ -634,6 +635,68 @@ def test_a_scan_reviews_the_newest_runs_first_within_its_limit(tmp_path, capsys)
     lines = capsys.readouterr().out.splitlines()
     assert lines[0] == "Runs reviewed: 2 of 5 in ordinary checkpoints, newest first (offset 0, limit 2)"
     assert lines[-1] == "More runs: use --offset 2"
+
+
+def test_a_journal_scan_reviews_the_newest_runs_first_within_its_limit(tmp_path, capsys):
+    path, clock, created = tmp_path / "runs.db", ManualClock(), []
+    with SQLiteWorkflowStore(path, clock_ns=clock) as store:
+        for outcome, settings in (("reject", {}), ("raise", {"on_invalid": "needs_review"}),
+                                  ("raise", {})):
+            swarm = durable_swarm(store, acceptance=policy(outcome, **settings))
+            created.append(swarm.execute(graph()).execution_id)
+            clock.advance(1)
+    rejected, review, undecided = created  # oldest first
+
+    def scanned(*arguments):
+        packet = reviewed(capsys, "--journal", path, *arguments)
+        return packet["page"], [(item["kind"], item["subject"]["run_id"]) for item in packet["items"]]
+
+    # A journal's runs are reviewed by creation, the newest first.
+    assert scanned() == (
+        {"limit": 50, "offset": 0, "total": 3, "returned": 3, "has_more": False},
+        [("indeterminate", undecided), ("needs_review", review), ("rejected", rejected)])
+    assert scanned("--limit", "2") == (
+        {"limit": 2, "offset": 0, "total": 3, "returned": 2, "has_more": True},
+        [("indeterminate", undecided), ("needs_review", review)])
+    assert scanned("--offset", "2") == (
+        {"limit": 50, "offset": 2, "total": 3, "returned": 1, "has_more": False},
+        [("rejected", rejected)])
+    assert scanned("--offset", "1", "--limit", "1") == (
+        {"limit": 1, "offset": 1, "total": 3, "returned": 1, "has_more": True},
+        [("needs_review", review)])
+    assert scanned("--offset", "3")[1] == []
+    assert main(["runs", "--journal", str(path), "review", "--limit", "2"]) == EXIT_OK
+    lines = capsys.readouterr().out.splitlines()
+    assert lines[0] == ("Runs reviewed: 2 of 3 in durable workflow journal, newest first "
+                        "(offset 0, limit 2)")
+    assert lines[-1] == "More runs: use --offset 2"
+
+
+def test_a_review_never_looks_up_a_lineage_runs_successors(tmp_path, capsys, monkeypatch):
+    path = tmp_path / "runs.db"
+    with SQLiteWorkflowStore(path) as store:
+        run_id = durable_swarm(store, acceptance=policy("reject"), lineage=LineagePolicy()).execute(
+            graph()).execution_id
+    archive, scopes = run_inspection._archive, []
+
+    def scope_read(store, access_scope):
+        scopes.append(access_scope)
+        return archive(store, access_scope)
+
+    monkeypatch.setattr(run_inspection, "_archive", scope_read)
+    # Inspection reads every run in the access scope to find the run's successors.
+    assert main(["runs", "--journal", str(path), "--json", "inspect", run_id]) == (
+        EXIT_RUN_NOT_ACCEPTED)
+    assert output(capsys)["inspect"]["lineage"]["successors"] == []
+    assert scopes == [LineagePolicy().access_scope]
+
+    # A review reads each run once, as inspection does, without its successors.
+    scopes.clear()
+    assert kinds(reviewed(capsys, "--journal", path)) == ["rejected"]
+    assert kinds(reviewed(capsys, "--journal", path, run_id)) == ["rejected"]
+    with SQLiteWorkflowStore(path, read_only=True) as store:
+        assert kinds(review_run(store)) == ["rejected"]
+    assert scopes == []
 
 
 def test_review_options_and_refusals_have_stable_exit_codes(tmp_path, capsys):
