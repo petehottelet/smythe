@@ -1100,9 +1100,10 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   review; a changed tool, decoder, component, context assembly, agent or
   task regenerates the node and everything that depends on it, while other
   branches are reused; a missing or changed document with current inputs is
-  rendered again, but a document whose renderer changed regenerates its
-  synthesis in a successor that keeps every other node
-  (`renderer_changed`); a changed validator set or policy calls for a
+  rendered again, but a renderer that changed, was added to a run that
+  published no document, or was removed regenerates the synthesis in a
+  successor that keeps every other node (`renderer_changed`); a changed
+  validator set or policy calls for a
   recheck; a changed gate verifier or gate validator regenerates the gate and the
   nodes it judged (`gate_validator_changed`), never rechecking their
   recorded verdicts, and under a gate validator a gate recorded without its

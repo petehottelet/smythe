@@ -599,7 +599,8 @@ Tests:
   and `tests/test_workflow_repair.py::test_a_changed_validator_gets_a_new_decision_and_no_node_runs`;
   gate validators `tests/test_reuse_decisions.py::test_a_changed_gate_validator_is_never_reused`
   and `tests/test_workflow_repair.py::test_a_changed_gate_validator_is_not_rechecked_from_old_verdicts`;
-  renderers `tests/test_workflow_repair.py::test_a_changed_renderer_regenerates_the_document_in_a_successor`;
+  renderers `tests/test_workflow_repair.py::test_a_changed_renderer_regenerates_the_document_in_a_successor`
+  and `tests/test_workflow_repair.py::test_a_renderer_added_since_a_run_publishes_its_document_in_a_successor`;
   successor runs `tests/test_workflow_reuse.py::test_a_successor_runs_only_what_a_changed_source_affects`,
   `tests/test_workflow_reuse.py::test_a_successor_in_another_access_scope_is_refused`
   and `tests/test_workflow_reuse.py::test_gates_and_the_nodes_they_judge_are_never_reused`;

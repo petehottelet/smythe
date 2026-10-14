@@ -358,7 +358,7 @@ def test_an_artifact_that_cannot_be_checked_needs_review(integrity, code):
 
 
 def test_a_run_without_a_document_needs_no_integrity_finding():
-    assert evaluate(lineage(artifact=None), state(integrity={})).action == "reuse"
+    assert evaluate(lineage(artifact=None), state(integrity={}, renderer=None)).action == "reuse"
 
 
 @pytest.mark.parametrize("renderer", [
@@ -380,9 +380,20 @@ def test_a_changed_renderer_regenerates_the_publication(renderer):
     # A gate is never kept in an item that computes something again.
     gated = evaluate(lineage(gate=True), state(renderer=renderer))
     assert actions(gated)["check"] == actions(gated)["extract_b"] == "regenerate"
-    # A run that published no document has no renderer to compare.
-    assert evaluate(lineage(artifact=None), state(renderer=renderer, integrity={})).action == (
-        "reuse")
+
+
+@pytest.mark.parametrize("renderer", [
+    RENDERER, {"name": "plain-brief", "version": "1", "spec_sha256": digest("plain brief")},
+], ids=["markdown", "another"])
+def test_a_renderer_added_since_a_run_without_a_document_regenerates_the_publication(renderer):
+    # A run that published no document was made without a renderer.
+    decision = evaluate(lineage(artifact=None), state(renderer=renderer, integrity={}))
+
+    # A renderer configured since publishes a document the run never had, from a new synthesis.
+    assert (decision.action, decision.reasons) == ("regenerate", ("renderer_changed",))
+    assert actions(decision) == {**dict.fromkeys(NODES[:-1], "reuse"), "write": "regenerate"}
+    # Without a renderer now, there is still nothing to publish.
+    assert evaluate(lineage(artifact=None), state(renderer=None, integrity={})).action == "reuse"
 
 
 @pytest.mark.parametrize("status", ["missing", "changed"])
@@ -469,7 +480,7 @@ def test_regeneration_reaches_exactly_the_nodes_a_run_resets(changed_id):
         node(node_id, depends_on=depends_on, result=node_id != changed_id)
         for node_id, depends_on in DIAMOND.items()])
     decision = evaluate(ArtifactLineage.from_dict(data), state(
-        agents={digest("agent " + node_id) for node_id in DIAMOND}))
+        agents={digest("agent " + node_id) for node_id in DIAMOND}, renderer=None))
     graph = ExecutionGraph(topology=[], nodes=[
         Node(label=node_id, id=node_id, depends_on=list(depends_on))
         for node_id, depends_on in DIAMOND.items()])

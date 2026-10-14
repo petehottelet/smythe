@@ -716,6 +716,55 @@ def test_a_changed_renderer_regenerates_the_document_in_a_successor(
     assert (after["run_id"], after["action"]) == (entry["successor_run_id"], "reuse")
 
 
+def test_a_renderer_added_since_a_run_publishes_its_document_in_a_successor(
+        store, library, tmp_path, model_calls):
+    service = library[0]
+    # A run made without a renderer published no document.
+    _, result = completed(store, library, tmp_path, renderer=None, artifact_dir=None)
+    run_id = result.execution_id
+    assert load_lineage(store, run_id).artifact is None
+    rendered = research(store, library, tmp_path, acceptance=policy())
+    catalog = Catalog(service)
+    # The run itself never publishes under the renderer it was not made with.
+    with pytest.raises(WorkflowConflictError, match="renderer differs"):
+        rendered.resume(run_id)
+
+    plan = rendered.plan_repair(sources=catalog)
+
+    # A new run would publish a document: the synthesis is regenerated to make it, and nothing else.
+    (item,) = plan.to_dict()["items"]
+    assert (item["action"], item["status"], item["reasons"]) == (
+        "regenerate", "stale", ["renderer_changed"])
+    assert {node["id"]: node["action"] for node in item["nodes"]} == {
+        **dict.fromkeys(LINEAGE_NODES[:-1], "reuse"), "synthesis": "regenerate"}
+    assert (item["work"]["read_calls"], item["work"]["model_steps"],
+            item["work"]["publications"]) == (0, 0, 1)
+    reads, prompts = source_reads(service), list(model_calls)
+    applied = rendered.repair(plan, plan_sha256=plan.plan_sha256, max_total_budget_usd=1,
+                              reason=REASON, sources=catalog)
+    (entry,) = applied.to_dict()["items"]
+    assert (entry["outcome"], entry["decision"]) == ("applied", "accepted")
+    # Every node is kept: nothing is read or called, and the renderer publishes the brief.
+    assert entry["work"] == IDLE | {"new_runs": 1, "reused_nodes": 4, "publications": 1,
+                                    "acceptance_evaluations": 1}
+    assert source_reads(service) == reads and model_calls == prompts
+    successor = entry["successor_run_id"]
+    published = current_artifact(store, successor).publication
+    assert published.name == "document.md"
+    assert published.path.read_bytes() == f"# {QUESTION}\n\n{result.output.rstrip()}\n".encode()
+    assert load_lineage(store, successor).artifact["renderer"]["name"] == "markdown_renderer"
+    # The successor replaced the run, and nothing is left to repair.
+    (after,) = rendered.plan_repair(sources=catalog).to_dict()["items"]
+    assert (after["run_id"], after["action"]) == (successor, "reuse")
+    # Without a renderer again, a new run would publish nothing.
+    unrendered = research(store, library, tmp_path, acceptance=policy(), renderer=None,
+                          artifact_dir=None)
+    (removed,) = unrendered.plan_repair(sources=catalog).to_dict()["items"]
+    assert (removed["run_id"], removed["action"], removed["reasons"]) == (
+        successor, "regenerate", ["renderer_changed"])
+    assert removed["work"]["publications"] == 0
+
+
 def test_republication_is_refused_when_the_synthesis_digest_does_not_match_the_lineage(
         store, library, tmp_path):
     swarm, result = completed(store, library, tmp_path)

@@ -3,8 +3,8 @@
 :func:`evaluate` compares one :class:`~smythe.lineage.ArtifactLineage` record
 with a :class:`CurrentState`: the sources a developer's :class:`SourceCatalog`
 describes, and the validators, acceptance policy, gate verifier, tools,
-components, context assembly and agents a run would use now, with the
-published file's integrity.
+components, renderer, context assembly and agents a run would use now, with
+the published file's integrity.
 It returns an :class:`ItemDecision`: an action for the item and for each node,
 the stable reason codes in :data:`REASONS` behind them, and the authority any
 kept result is kept under. It is a pure function. It reads no store or file,
@@ -367,9 +367,10 @@ def evaluate(lineage: ArtifactLineage | None, state: CurrentState) -> ItemDecisi
     Otherwise each node's sources, tool, component, context assembly, agent
     and task are compared with *state*, and each gate's verifier, which the
     nodes it judged go with, and a node that regenerates or needs review
-    takes its dependents with it. A published document whose renderer is
-    not the state's regenerates the nodes nothing depends on, which made
-    it. When any node is computed again, a
+    takes its dependents with it. A recorded renderer that is not the
+    state's, a run without a document counting as made with none,
+    regenerates the nodes nothing depends on, which the document is made
+    from. When any node is computed again, a
     gate (a node of kind ``gate``) and the nodes it depends on are never
     reused. With nothing computed again, the published file's integrity,
     the acceptance decision and the validator set and policy decide. The
@@ -405,10 +406,11 @@ def evaluate(lineage: ArtifactLineage | None, state: CurrentState) -> ItemDecisi
     for node in nodes:
         for dependency in node["depends_on"]:
             children[dependency].append(node["id"])
-    renderer = None if state.renderer is None else dict(state.renderer)
-    if lineage.artifact is not None and _plain(lineage.artifact["renderer"]) != renderer:
-        # Another renderer makes the document again from what nothing else
-        # depends on: the synthesis, in a record a run writes.
+    # A run that published no document was made without a renderer.
+    recorded = None if lineage.artifact is None else _plain(lineage.artifact["renderer"])
+    if recorded != (None if state.renderer is None else dict(state.renderer)):
+        # Another renderer, or one added or removed, makes the document again
+        # from what nothing else depends on: the synthesis, in a record a run writes.
         for node_id, dependents in children.items():
             if not dependents:
                 own[node_id].add("renderer_changed")
@@ -618,8 +620,12 @@ def _kinds(nodes: Iterable[Mapping[str, Any]]) -> dict[str, int]:
 
 
 def _work(record: ArtifactLineage | None, decision: ItemDecision,
-          free_tools: frozenset[str]) -> dict[str, Any]:
-    """What carrying out *decision* would take, predicted from *record*; nothing is called."""
+          free_tools: frozenset[str], publishes: bool) -> dict[str, Any]:
+    """What carrying out *decision* would take, predicted from *record*; nothing is called.
+
+    *publishes* says whether a new run would publish a document: whether a
+    renderer is configured now.
+    """
     action = decision.action
     pairs = list(zip(record.nodes, decision.nodes)) if record is not None else []
     runs = int(action == "regenerate")
@@ -634,7 +640,7 @@ def _work(record: ArtifactLineage | None, decision: ItemDecision,
     return {"nodes_reused": _kinds(kept), "nodes_regenerated": _kinds(again),
             "read_calls": len(reads), "model_steps": models,
             "publications": int(action == "rerender" or bool(
-                runs and record is not None and record.artifact is not None)),
+                runs and record is not None and publishes)),
             "acceptance_evaluations": int(action in ("recheck", "rerender", "regenerate")),
             "new_runs": runs,
             "may_incur_charges": bool(runs) and (record is None or models > 0 or charged),
@@ -699,8 +705,8 @@ def repair_plan(store: Any, recipe: Mapping[str, Any], catalog: SourceCatalog,
 
     *recipe* is the recipe a new run would record, and it must hold a
     lineage policy: its access scope chooses the runs, and its validators,
-    acceptance policy, gate verifier, read profiles, synthesizer, context
-    assembly and agents make the :class:`CurrentState`. An agent a run
+    acceptance policy, gate verifier, read profiles, synthesizer, renderer,
+    context assembly and agents make the :class:`CurrentState`. An agent a run
     recorded that the recipe's registry does not define, such as one
     assigned when the run was planned, stays current. *catalog* describes
     each source once.
@@ -768,7 +774,7 @@ def repair_plan(store: Any, recipe: Mapping[str, Any], catalog: SourceCatalog,
         planned.append({"run_id": run_id,
                         "lineage_sha256": None if record is None else record.sha256,
                         "status": status, **decision.to_dict(),
-                        "work": _work(record, decision, free),
+                        "work": _work(record, decision, free, state.renderer is not None),
                         **({"repairs_in_progress": repairing} if repairing else {})})
     return RepairPlan(store.store_id, state.access_scope, planned,
                       [_source(source_id, described.seen[source_id])

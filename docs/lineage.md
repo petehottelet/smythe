@@ -395,7 +395,7 @@ most conservative of its own reasons.
 | A gate whose recorded `verifier` is not the state's gate verifier and gate validators, and each node it depends on | `regenerate` | `gate_validator_changed` |
 | A gate recorded without a `verifier`, and each node it depends on, when the state names gate validators | `undeclared_coverage` | `gate_validator_unknown` |
 | A gate, and each node it depends on, in an item where any node regenerates or needs review | `regenerate` | `gate_pair` |
-| A published document whose renderer is not the state's, for each node nothing depends on: the synthesis | `regenerate` | `renderer_changed` |
+| A recorded renderer that is not the state's, a run that published no document having none, for each node nothing depends on: the synthesis | `regenerate` | `renderer_changed` |
 | A published document that is missing, or holds other bytes | `rerender` | `artifact_missing`, `artifact_changed` |
 | A published document that cannot be checked safely, cannot be read, or has no `verified` finding | `review` | `artifact_unsafe`, `artifact_unreadable`, `artifact_unchecked` |
 | A recorded decision other than `accepted` | `review` | `decision_not_accepted` |
@@ -425,12 +425,13 @@ most conservative of its own reasons.
   but regenerating is the conservative route. A record written before records
   named their gates' verifier is unknown on that point, so under a gate
   validator it gets `undeclared_coverage`.
-- **Renderers.** A document is published by the renderer its record names.
-  Another renderer, another version or description of it, or none, makes
-  the document another way, so the synthesis regenerates in a successor run
-  that keeps the other nodes, as `republish`, which renders only with the
-  run's own renderer, cannot. A run that published no document has no
-  renderer to compare.
+- **Renderers.** A document is published by the renderer its record names,
+  and a run that published no document was made without one. Another
+  renderer, another version or description of it, a renderer added since or
+  none makes the document another way, or makes one the run never had, so
+  the synthesis regenerates in a successor run that keeps the other nodes
+  and publishes with the current renderer, if any, as `republish`, which
+  renders only with the run's own renderer, cannot.
 - **Nothing computed, item rules decide.** When no node regenerates or needs
   review, the published document, the recorded decision, and the validator
   set and policy decide, and every node takes the item's action: `reuse`,
@@ -500,7 +501,7 @@ calls for, or None where the policy's `undeclared_coverage` decides.
 | `node_incomplete` | `regenerate` | The node has no result. |
 | `dependency_changed` | `regenerate` | A node this one depends on regenerates. |
 | `gate_validator_changed` | `regenerate` | Another gate verifier or gate validator would judge this gate, or the gate this node goes with. |
-| `renderer_changed` | `regenerate` | Another renderer, or none, would publish the document this node's result was rendered into. |
+| `renderer_changed` | `regenerate` | Another renderer, or none, would publish the document made from this node's result, or a renderer would publish one the run never had. |
 | `gate_pair` | `regenerate` | A gate, or a node a gate depends on, in an item that computes something again. |
 | `reuse_disabled` | `regenerate` | The policy's `reuse` is off. |
 | `artifact_missing` | `rerender` | The published document is missing. |
@@ -630,15 +631,15 @@ repairs.
 
 ### Predicted work
 
-`work` predicts what carrying out an item takes, from its record alone;
-nothing is called to predict it.
+`work` predicts what carrying out an item takes, from its record and the
+current state; nothing is called to predict it.
 
 | Action | Predicted work |
 |---|---|
 | `reuse` | Every node is kept (`nodes_reused`); nothing else |
 | `recheck` | Every node is kept; one acceptance evaluation |
 | `rerender` | Every node is kept; one publication and one acceptance evaluation |
-| `regenerate` | One new run that keeps the nodes marked `reuse` and runs the others (`nodes_regenerated`): a read call for each read step it runs, a model step for each model node and gate and for a synthesis without a local component; one publication when the run published a document; one acceptance evaluation |
+| `regenerate` | One new run that keeps the nodes marked `reuse` and runs the others (`nodes_regenerated`): a read call for each read step it runs, a model step for each model node and gate and for a synthesis without a local component; one publication when a renderer is configured; one acceptance evaluation |
 | `review` | Nothing: a person decides |
 
 `may_incur_charges` is true for a new run that makes a model step, a read

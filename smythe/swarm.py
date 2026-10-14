@@ -1554,7 +1554,7 @@ class Swarm:
         of the archive (:func:`~smythe.reuse.archive_heads`), is evaluated
         (:func:`~smythe.reuse.evaluate`) against what a new run of this
         Swarm would use: its strict policy's validators, its gate verifier,
-        read profiles, synthesizer, context assembly and agents, and the
+        read profiles, synthesizer, renderer, context assembly and agents, and the
         sources that *sources*, a zero-cost :class:`~smythe.reuse.SourceCatalog`,
         describes. The journal is opened again read-only, so no lease is
         taken, nothing is written, no provider is called and no source is
