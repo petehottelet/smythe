@@ -446,8 +446,12 @@ connector or paid run.
    A candidate becomes active only after it beats its predecessor and a
    simpler alternative on held-out tasks. In progress: distilled templates
    are [versioned records](docs/learning.md#template-records) in an
-   append-only catalog, and a durable run pins an exact template version;
-   evaluation, activation and rollback are not built yet
+   append-only catalog; a reviewed Autotune decision
+   [activates a template version](docs/learning.md#activate-and-roll-back-templates)
+   for new runs, a rollback restores the previous one without changing
+   running work, and a durable run pins the exact versions it started with.
+   A built-in evaluator that runs template candidates on held-out tasks is
+   not built yet
 8. **Native Agent Skills support** — built for the next release.
    [Agent Skills directories](docs/skills.md#agent-skills-directories) are
    discovered directly, beside the OpenClaw and MCP skill providers, and lend

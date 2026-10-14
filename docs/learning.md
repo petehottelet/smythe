@@ -8,9 +8,10 @@ so a proven shape is selected instead of planned again.
 
 This page covers the evidence planner history keeps, failed runs,
 distillation, template records, their versions, their validation as
-untrusted candidates, and the template catalog. A record is data: building a
-template from it, storing it and pinning it in a durable run never changes
-the base planner, and nothing is promoted or activated automatically.
+untrusted candidates, the template catalog, and activating, rolling back and
+pinning template versions. A record is data: building a template from it,
+storing it, activating it and pinning it in a durable run never changes the
+base planner, and nothing is promoted or activated automatically.
 
 ## Evidence in planner history
 
@@ -369,7 +370,113 @@ architect = ConstrainedArchitect(provider, [template], model="gpt-6-astra")
 The run's recipe records the identity and version, so it pins the exact
 template. Resuming the run with a template of another version raises
 `WorkflowConflictError`; resume with the record the catalog holds for the
-saved version instead.
+saved version instead, which [`pinned_templates`](#resume-a-pinned-run)
+rebuilds.
+
+## Activate and roll back templates
+
+The catalog keeps every version, and the
+[policy registry](optimize.md#policy-registry) records which one new runs
+use. A template's target is `planner.template.<name>`, which
+`template_target(name)` returns, and its policy maps the target to a
+template version:
+
+```text
+{"planner.template.report": "<template version>"}
+```
+
+A template whose name is not one dotted segment, a letter followed by up to
+63 letters, digits, `-` or `_`, has no target: `template_target` raises
+`ValueError`.
+
+A version is put in effect only through a reviewed Autotune decision. The
+campaign's contract makes the target its mutable field, with the template
+versions as string choices, such as `MutableFieldRule("string",
+choices=(v1, v2))`, and its evaluator builds each candidate's template from
+the catalog. An approving review of a promoted decision is then activated
+for the target, and the first activation records the incumbent version as
+the target's baseline:
+
+```python
+from smythe import ConstrainedArchitect, TemplateCatalog, template_target
+from smythe.optimize import PolicyRegistry
+
+catalog = TemplateCatalog("templates")
+target = template_target("report")  # "planner.template.report"
+with PolicyRegistry("policy-registry.sqlite3") as registry:
+    review = registry.record_review("optimize.sqlite3", campaign_id,
+                                    reviewer="report-owner", verdict="approve")
+    registry.activate(target, review.review_id, expected_seq=0,
+                      actor="release-operator", reason="approved for new reports")
+    architect = ConstrainedArchitect(provider, catalog.active_templates(registry, ["report"]))
+```
+
+- `catalog.active_templates(registry, names)` returns `record.to_template()`
+  for the version of each name in effect, in the order of `names`, for an
+  ordinary run. It reads the registry, which may be opened read-only, and
+  never writes it. A `ConstrainedArchitect` copies its menu when it is
+  built, so an architect keeps offering the versions it was built with;
+  build a new one, for example for each run, to offer the versions in effect.
+- `catalog.active_local_templates(registry, names)` returns the same
+  templates with `record.local_only()` as their builders, for a
+  [durable run](#durable-runs), whose recipe then pins those versions.
+- A retired template has no version in effect and is left out. A name whose
+  target has no history, and a version the catalog does not hold, raise
+  `KeyError`. A policy that holds anything besides the target's version, or
+  that names a version of another template, raises `TemplateRecordError`.
+
+A rollback appends an event that restores an earlier version (see
+[resolve, roll back and retire](optimize.md#resolve-roll-back-and-retire)):
+
+```python
+with PolicyRegistry("policy-registry.sqlite3") as registry:
+    registry.rollback(target, to_seq=1, expected_seq=len(registry.history(target)),
+                      actor="release-operator", reason="v2 drops the conclusions")
+```
+
+New architects and new durable runs then resolve the restored version, and
+the history keeps the baseline, activation and rollback events. A rollback
+writes only the registry. The catalog, the Autotune ledger, durable
+journals, architects already built and running work are unchanged, and the
+ledger's decisions and trials stay readable through a read-only open.
+
+### Resume a pinned run
+
+A durable run keeps the versions its recipe pinned, whatever is activated or
+rolled back later. Resuming it with a template of another version, such as
+the one now in effect, raises `WorkflowConflictError` and changes nothing.
+`pinned_templates(config, catalog)` rebuilds the pinned versions:
+
+```python
+from smythe import ConstrainedArchitect, Swarm, pinned_templates
+
+config = store.load_run(run_id)["config"]
+architect = ConstrainedArchitect(provider, pinned_templates(config, catalog), model="gpt-6-astra")
+swarm = Swarm(model="gpt-6-astra", provider=provider, run_store=store, architect=architect)
+result = swarm.resume(run_id)
+```
+
+`config` is the saved recipe, whose architect is a `ConstrainedArchitect`,
+or that architect's description within it, such as a router tier's
+`config["components"]["router"]["constrained"]`. Each template keeps the
+recipe's name and description, and its builder is `record.local_only()` for
+the recorded version, so the rebuilt recipe matches the saved one, and so
+does its `config_sha256`, and the run finishes on the versions it started
+with. A version the catalog
+does not hold raises `KeyError`. A template whose builder is not a record's
+declaration, such as one written in code, raises `TemplateRecordError`.
+
+### Which versions a plan used
+
+When a `ConstrainedArchitect` composes a plan from templates built from
+records, by `to_template()`, `local_only()` or `distill_template`, the
+graph's `planning["templates"]` lists each such selection as
+`{"name", "index", "version"}`: the template's menu name, its position among
+the selections, which also prefixes its node ids, and its template version.
+Templates written in code add nothing, so their plans keep `planning` as
+before, and node metadata never carries a version. Like the
+[routing decision](architecture.md#routing-decisions), the record is
+informational: checkpoints and durable plans save it with the graph.
 
 ## Limits
 
@@ -377,5 +484,7 @@ saved version instead.
   lineage, and a record whose parent the catalog does not hold is checked
   against the limits only. It does not read the instructions in labels and
   personas.
-- A catalog has no activation, review or rollback state. Choosing which
-  version a planner offers is the caller's decision.
+- The catalog has no activation, review or rollback state; the policy
+  registry holds it. An architect offers the templates it was given, so
+  only a menu built by `active_templates` or `active_local_templates`
+  follows the registry. Reviews are declared, not authenticated.

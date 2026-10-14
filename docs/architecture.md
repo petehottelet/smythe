@@ -476,7 +476,12 @@ repeat the source goal and text that holds a rooted or home path. A
 stores only a record that `validate_template_record` accepts as an untrusted
 candidate: no key that grants authority, the generated-plan limits, and no
 weaker gate than its parent's. `record.local_only()` pins an exact version
-in a durable run's recipe. See [learning from runs](learning.md).
+in a durable run's recipe. A reviewed Autotune decision activates a template
+version under the [policy registry](optimize.md#policy-registry) target
+`planner.template.<name>`: `TemplateCatalog.active_templates()` builds the
+versions in effect for new runs, a rollback changes only new runs, and
+`pinned_templates()` rebuilds the versions a durable recipe pinned. See
+[learning from runs](learning.md).
 
 This keeps learning reviewable: execution history informs future choices, and
 promoted graph structure becomes an explicit template rather than an invisible

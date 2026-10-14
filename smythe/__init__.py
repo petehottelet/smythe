@@ -83,7 +83,7 @@ from smythe.synthesizer import Synthesizer, SynthesisStrategy
 from smythe.task import Task
 from smythe.templates import (
     TemplateCatalog, TemplateLimits, TemplateRecord, TemplateRecordError, TemplateValidationError,
-    distill_record, validate_template_record,
+    distill_record, pinned_templates, template_target, validate_template_record,
 )
 from smythe.verifier import (
     CallableVerifier,
@@ -250,9 +250,11 @@ __all__ = [
     "lint_contributions",
     "load_graph",
     "parse_skill_md",
+    "pinned_templates",
     "python_skill",
     "review_run",
     "structure_sha256",
+    "template_target",
     "validate_template_record",
 ]
 __version__ = "0.9.1"

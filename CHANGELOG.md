@@ -1769,6 +1769,24 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   also accepts a record's JSON data. `distill_template` and templates built
   in code are not validated. See
   [validate a candidate record](docs/learning.md#validate-a-candidate-record).
+- Template versions are activated and rolled back through the policy
+  registry. A template's target is `planner.template.<name>`
+  (`template_target(name)`), whose policy maps it to a template version, so
+  a reviewed Autotune decision activates a version and a rollback restores
+  the previous one. `TemplateCatalog.active_templates(registry, names)`
+  builds the version of each name in effect for ordinary runs, leaving out
+  a retired template, and `active_local_templates(registry, names)` declares
+  them with `record.local_only()` for durable runs, whose recipes pin them.
+  A `ConstrainedArchitect` keeps the menu it was built with, and a rollback
+  writes only the registry, so running work keeps its versions.
+  `pinned_templates(config, catalog)` rebuilds the versions a saved durable
+  recipe pinned, leaving the recipe unchanged, to resume the run; resuming
+  with another version still raises `WorkflowConflictError`. A plan composed
+  from templates built from records, including `distill_template`'s, lists
+  each such selection's name, index and template version in
+  `graph.planning["templates"]`, never in node metadata; templates written
+  in code record nothing. See
+  [activate and roll back templates](docs/learning.md#activate-and-roll-back-templates).
 - Agent Skills directories as a skill source.
   `AgentSkillsProvider({agent_id: [root, ...]})` reads each
   `<root>/<name>/SKILL.md` when it is built and lists each skill as a

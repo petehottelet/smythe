@@ -939,6 +939,9 @@ A promoted decision is a statistical result, not a change to what runs.
 that changed: review, activation and rollback are separate, explicit
 operations, each with its own record. The registry never edits application
 configuration; callers resolve the active version when they build new work.
+A template target, `planner.template.<name>`, holds a template version that
+new constrained plans build; see
+[activate and roll back templates](learning.md#activate-and-roll-back-templates).
 
 The registry is its own SQLite file, `~/.smythe/policy-registry.sqlite3` by
 default, with schema version 1. It never writes an Autotune ledger: the ledger

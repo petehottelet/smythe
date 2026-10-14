@@ -19,6 +19,13 @@ A record's structure can come from model output, so
 :meth:`TemplateCatalog.put` stores only a record that passes: no key that
 grants authority, the model-plan limits unless a developer passes others, and
 no weaker gate, output check or prerequisite than its parent's.
+
+A policy registry target ``planner.template.<name>`` (:func:`template_target`)
+holds the version of template *name* in effect.
+:meth:`TemplateCatalog.active_templates` builds those versions for an
+ordinary run, :meth:`TemplateCatalog.active_local_templates` declares them
+for a durable run, whose recipe pins them, and :func:`pinned_templates`
+rebuilds the versions a saved recipe pinned.
 """
 
 from __future__ import annotations
@@ -60,7 +67,8 @@ from smythe.workflow_binding import LocalOnly
 __all__ = [
     "MAX_FAILURE_EXAMPLES", "TEMPLATE_CATALOG_LAYOUT", "TEMPLATE_RECORD_TYPE",
     "TEMPLATE_RECORD_VERSION", "TemplateCatalog", "TemplateLimits", "TemplateRecord",
-    "TemplateRecordError", "TemplateValidationError", "distill_record", "validate_template_record",
+    "TemplateRecordError", "TemplateValidationError", "distill_record", "pinned_templates",
+    "template_target", "validate_template_record",
 ]
 
 TEMPLATE_RECORD_TYPE = "smythe.template_record"
@@ -91,6 +99,8 @@ _PATH = re.compile(r"(?<![\w.~/\\:<-])(?:[A-Za-z]:[\\/]|\\\\\w|/[\w.-]|~[\w.-]*[
 _AUTHORITY_KEYS = frozenset({"mcp_servers", "model", "env", "command", "url", "tools",
                              "allowed_tools", "acceptance", "evaluator", "budget"})
 _RECORD_FIELDS = frozenset({("prerequisites", "tools"), ("source_runs", int, "acceptance")})
+# A template's name as one segment of its policy registry target.
+_TARGET_NAME = re.compile(r"[A-Za-z][A-Za-z0-9_-]{0,63}")
 
 
 class TemplateRecordError(ValueError):
@@ -388,6 +398,8 @@ class TemplateRecord:
 
         Each build returns new pending nodes whose labels point at the new
         task, and a new registry holding one agent per recorded persona.
+        The builder's ``template_version`` is this record's, which a plan
+        composed from it records in ``graph.planning["templates"]``.
         """
         blueprint = _plain(self.blueprint)
 
@@ -426,6 +438,7 @@ class TemplateRecord:
                 )
             return nodes, template_registry
 
+        builder.template_version = self.template_version  # type: ignore[attr-defined]
         return SubGraphTemplate(name=self.name, description=self.description, builder=builder)
 
     def local_only(self) -> LocalOnly:
@@ -783,6 +796,19 @@ def validate_template_record(
     return record
 
 
+def template_target(name: str) -> str:
+    """The policy registry target ``planner.template.<name>`` of template *name*.
+
+    Its policy maps the target to the template version in effect. The name
+    must be one dotted segment: a letter, then up to 63 letters, digits,
+    ``-`` or ``_``; any other raises ``ValueError``.
+    """
+    if not isinstance(name, str) or _TARGET_NAME.fullmatch(name) is None:
+        raise ValueError(f"template name {name!r} must be one dotted segment to have a "
+                         "policy registry target")
+    return f"planner.template.{name}"
+
+
 class TemplateCatalog:
     """Template records kept as append-only files under ``root``.
 
@@ -880,6 +906,66 @@ class TemplateCatalog:
             return []
         return [version for version in found if self.get(version).name == name]
 
+    def active_templates(self, registry: Any, names: Sequence[str]) -> list[SubGraphTemplate]:
+        """The version of each template in *names* that *registry* has in effect, for ordinary runs.
+
+        *registry* is a ``smythe.optimize.PolicyRegistry``, read and never
+        written. Each name's target (:func:`template_target`) must map
+        itself, and nothing else, to a version this catalog holds of a
+        record with that name. Returns ``record.to_template()`` for each, in
+        the order of *names*; a retired template has no version in effect
+        and is left out. A ``ConstrainedArchitect`` keeps the menu it is
+        built with, so build a new one to offer later activations.
+
+        Raises:
+            KeyError: A name has never had a version in effect, or the
+                catalog does not hold the version in effect.
+            TemplateRecordError: The policy in effect holds anything but a
+                version of that template, or the stored record is invalid.
+        """
+        return [record.to_template() for record in self._active(registry, names)]
+
+    def active_local_templates(self, registry: Any, names: Sequence[str]) -> list[SubGraphTemplate]:
+        """:meth:`active_templates` declared for a durable run.
+
+        Each builder is ``record.local_only()``, so the run's recipe pins the
+        versions in effect when it starts, and a later activation or
+        rollback never changes the run; :func:`pinned_templates` rebuilds
+        them to resume it.
+        """
+        return [SubGraphTemplate(record.name, record.description, record.local_only())
+                for record in self._active(registry, names)]
+
+    def _active(self, registry: Any, names: Sequence[str]) -> list[TemplateRecord]:
+        if isinstance(names, str):
+            raise TypeError("names must be a sequence of template names, not one string")
+        records = []
+        for name in names:
+            target = template_target(name)
+            active = registry.resolve(target)
+            if active is None:
+                if not registry.history(target):
+                    raise KeyError(f"template {name!r} has no version activated in the registry")
+                continue  # Retired: no version is in effect.
+            version = active.policy.get(target)
+            if set(active.policy) != {target} or not isinstance(version, str):
+                raise TemplateRecordError(
+                    f"the policy in effect for {target} must hold only its template version")
+            records.append(self._named(name, version))
+        return records
+
+    def _named(self, name: str, version: str) -> TemplateRecord:
+        """The record stored for *version*, which must be a version of template *name*."""
+        try:
+            record = self.get(version)
+        except KeyError:
+            raise KeyError(f"the catalog does not hold version {version} of template "
+                           f"{name!r}") from None
+        if record.name != name:
+            raise TemplateRecordError(
+                f"template version {version} is named {record.name!r}, not {name!r}")
+        return record
+
     def _publish(self, folder: str, name: str, content: bytes, problem: str) -> None:
         """Publish *content* unless the file already holds it; other bytes raise."""
         try:
@@ -928,3 +1014,49 @@ class TemplateCatalog:
         if len(data) > limit:
             raise TemplateRecordError(f"template catalog file {where} is too large")
         return data
+
+
+def pinned_templates(config: Mapping[str, Any], catalog: TemplateCatalog) -> list[SubGraphTemplate]:
+    """The record templates a saved durable recipe pinned, rebuilt from *catalog*.
+
+    *config* is a durable run's saved recipe,
+    ``SQLiteWorkflowStore.load_run(run_id)["config"]``, whose architect is a
+    ``ConstrainedArchitect``, or the description of such an architect in a
+    recipe, such as a router tier's. Each template keeps the recipe's name
+    and description, and its builder is ``record.local_only()`` for the
+    exact version the recipe names. A ``ConstrainedArchitect`` given them
+    and the run's other settings describes the same recipe, so resume
+    continues the run on those versions, whichever version is in effect now.
+
+    Raises:
+        KeyError: The catalog does not hold a pinned version.
+        TemplateRecordError: *config* holds no ``ConstrainedArchitect`` menu,
+            a template's builder is not a record's ``local_only()``
+            declaration, or the stored record does not match it.
+    """
+    architect: Any = config
+    if isinstance(architect, Mapping) and architect.get("type") == "text_workflow":
+        components = architect.get("components")
+        architect = components.get("architect") if isinstance(components, Mapping) else None
+    menu = (architect.get("templates") if isinstance(architect, Mapping)
+            and architect.get("type") == "constrained_architect" else None)
+    if not isinstance(menu, list):
+        raise TemplateRecordError("the recipe's architect is not a ConstrainedArchitect with a "
+                                  "template menu")
+    templates = []
+    for entry in menu:
+        entry = entry if isinstance(entry, Mapping) else {}
+        name, description, builder = (entry.get(key) for key in ("name", "description", "builder"))
+        identity = builder.get("identity") if isinstance(builder, Mapping) else None
+        if (not isinstance(name, str) or not isinstance(description, str)
+                or not isinstance(identity, str) or not identity.startswith("template:")
+                or (builder.get("type"), builder.get("role")) != ("local_only", "template_builder")):
+            raise TemplateRecordError(f"template {name!r} in the recipe was not built from a "
+                                      "template record")
+        declaration = catalog._named(identity.removeprefix("template:"),
+                                     builder.get("version")).local_only()
+        if declaration.workflow_description() != dict(builder):
+            raise TemplateRecordError(f"template {name!r} in the recipe does not match the "
+                                      "stored record's declaration")
+        templates.append(SubGraphTemplate(name, description, declaration))
+    return templates
