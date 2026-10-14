@@ -299,6 +299,82 @@ def test_the_policy_gate_fails_a_pass_judged_by_another_policy(catalog_versions,
     assert trial["gates"]["applicability.excluded_untouched"] is True
 
 
+class UnpricedRisks(template_eval.SectionWriter):
+    """The fixture model, except that each Risks step's cost is unknown."""
+
+    async def complete(self, system, prompt, model):
+        result = await super().complete(system, prompt, model)
+        if "Your step: Write the Risks section" in prompt:
+            result = replace(result, cost_usd_unknown=True)
+        return result
+
+
+def test_a_pass_with_a_call_of_unknown_cost_fails_its_accounting_gate(
+        catalog_versions, monkeypatch):
+    catalog, versions = catalog_versions
+    pack = PACKS["development"].load()
+    record = catalog.get(versions["predecessor"])
+    monkeypatch.setattr(template_eval, "SectionWriter", UnpricedRisks)
+    tasks = {task.task_id: task for task in pack.tasks}
+
+    # A briefing whose Risks step answered has a call of unknown cost; a
+    # change summary has no Risks step.
+    assert run_task(tasks["briefing-outage"], record)["cost_known"] is False
+    assert run_task(tasks["change-retry"], record)["cost_known"] is True
+    trial = run_pass(pack, record, seed=0)
+    assert trial["gates"]["accounting.complete"] is False
+    assert all(gate for name, gate in trial["gates"].items() if name != "accounting.complete")
+    # The single worker writes the whole task in one step, so every cost is known.
+    assert run_pass(pack, None, seed=0)["gates"]["accounting.complete"] is True
+
+
+def test_a_pass_that_accepts_no_outcome_fails_its_nonzero_gate(catalog_versions):
+    catalog, versions = catalog_versions
+    record = catalog.get(versions["predecessor"])
+    # The predecessor skips a failed step, so each briefing misses the section planted in it.
+    pack = TaskPack("template-eval-rejected", tuple(
+        template_eval._task("briefing", f"briefing-{section.lower()}", "the quarterly plan", section)
+        for section in template_eval.SECTIONS["briefing"]), (template_eval.EXCLUDED_FAMILY,))
+
+    trial = run_pass(pack, record, seed=0)
+    assert trial["metrics"]["accepted_count"] == 0
+    assert {task["outcome"] for task in trial["tasks"]} == {"rejected"}
+    assert trial["gates"]["accepted.nonzero"] is False
+    assert all(gate for name, gate in trial["gates"].items() if name != "accepted.nonzero")
+
+
+def test_the_evaluator_hash_binds_the_bytes_of_each_harness_file(
+        offline_run, tmp_path, monkeypatch):
+    record, _ = offline_run
+    # Every campaign of the record was judged by the harness files as they are.
+    for campaign in record["campaigns"].values():
+        assert campaign["evaluator_manifest"]["code_digest"] == template_eval.code_digest()
+
+    base = evaluator_manifest(PACKS)
+    contract = campaign_contract(("a" * 64, "b" * 64), seed=0)
+    for name in template_eval.EVALUATOR_SOURCES:
+        (tmp_path / name).parent.mkdir(parents=True, exist_ok=True)
+        (tmp_path / name).write_bytes((ROOT / name).read_bytes())
+    monkeypatch.setattr(template_eval, "REPO_ROOT", tmp_path)
+    assert evaluator_manifest(PACKS) == base
+
+    for name in template_eval.EVALUATOR_SOURCES:
+        source = tmp_path / name
+        original = source.read_bytes()
+        # Line endings are normalized, so a checkout's CRLF copy is the same evaluator.
+        source.write_bytes(original.replace(b"\r\n", b"\n").replace(b"\n", b"\r\n"))
+        assert evaluator_manifest(PACKS) == base
+        source.write_bytes(original + b"# one more line\n")
+        changed = evaluator_manifest(PACKS)
+        assert changed.code_digest != base.code_digest
+        assert changed.split_manifests == base.split_manifests
+        assert changed.evaluator_hash != base.evaluator_hash
+        assert holdout_identity(contract, changed.evaluator_hash) != holdout_identity(
+            contract, base.evaluator_hash)
+        source.write_bytes(original)
+    assert evaluator_manifest(PACKS) == base
+
+
 def test_held_out_tasks_load_only_in_the_holdout_split(catalog_versions):
     catalog, versions = catalog_versions
     pinned = PACKS["holdout"]

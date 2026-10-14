@@ -848,6 +848,30 @@ def test_strict_run_records_its_decision_and_only_a_digest_of_rejected_output(
         assert "rejected_output_sha256" not in row
 
 
+def test_strict_run_without_a_gate_records_its_acceptance_as_evidence(tmp_path):
+    path = tmp_path / "history.jsonl"
+    task = Task("Research signal under a strict policy without a gate")
+    graph = ExecutionGraph(topology=[Topology.SERIAL], task=task,
+                           nodes=[Node(id="draft", label="Draft the memo")])
+    policy = AcceptancePolicy(mode="strict", final_validators=[_Forbids("DEFECT")])
+    swarm = Swarm(model="m", provider=_Steps({"Draft": ["A clean draft."]}),
+                  memory=PlannerMemory(path), artifact_dir=None, acceptance=policy)
+
+    result = swarm.execute(graph)
+    [row] = _history_rows(path)
+    [outcome] = PlannerMemory(path).recall(task)
+
+    # No gate left a receipt and nothing was rejected: the acceptance record
+    # alone makes the run's evidence worth keeping.
+    assert "verification_receipt" not in result.graph.nodes[0].metadata
+    assert result.rejected_output is None
+    assert outcome.acceptance == result.acceptance.decision.value == "accepted"
+    assert outcome.execution_id == result.execution_id
+    assert outcome.structure_sha256 == structure_sha256(result.graph)
+    assert (outcome.verification, outcome.rejected_output_sha256) == (None, None)
+    assert set(row) == _PREVIOUS_KEYS | {"execution_id", "structure_sha256"}
+
+
 def test_strict_exhausted_gate_records_the_rejection_and_its_failing_verdict(tmp_path):
     path = tmp_path / "history.jsonl"
     task = Task("Research signal under a strict policy")

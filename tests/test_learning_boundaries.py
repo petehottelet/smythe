@@ -15,6 +15,9 @@ same boundary here:
 After each attempt the evaluator's data and identity, the acceptance policy,
 the budget and the tools each agent is offered are byte-identical to what
 they were before, and so are the ledger, catalog and skill files involved.
+The evaluator's data sits in one project directory with the ledger, registry,
+catalog and skills, so a feature that wrote outside its own store would
+change it, and an exploring proposer tries to rewrite it.
 """
 
 from __future__ import annotations
@@ -56,6 +59,9 @@ POLICY = AcceptancePolicy(mode="strict", final_validators=[
 RESERVED_ROOTS = ("acceptance", "validators", "verifier", "evaluator", "harness", "budget",
                   "spend", "ceilings", "capabilities", "tools", "permissions", "authority",
                   "holdout")
+# What the features under test write in the project directory: the ledger, the
+# policy registry, each with its SQLite side files, and the template catalog.
+STORES = ("optimize.sqlite3", "registry.sqlite3", "templates")
 
 
 def digests(root: Path) -> dict[str, str]:
@@ -66,18 +72,32 @@ def digests(root: Path) -> dict[str, str]:
 
 @dataclass(frozen=True)
 class Evaluation:
-    """An evaluator's data on disk: a task pack per split and the manifest that binds them."""
+    """A project directory: an evaluator's data beside the stores learning writes.
+
+    ``evaluator/`` holds a task pack per split and the manifest that binds
+    them. The ledger, the registry, the template catalog and the skills
+    live in the same directory, as a project keeps them.
+    """
 
     root: Path
 
     @property
+    def data(self) -> Path:
+        return self.root / "evaluator"
+
+    @property
     def manifest(self) -> EvaluatorManifest:
-        return EvaluatorManifest.from_dict(json.loads((self.root / "manifest.json").read_bytes()))
+        return EvaluatorManifest.from_dict(json.loads((self.data / "manifest.json").read_bytes()))
 
     def state(self) -> bytes:
-        """The evaluator's files and identity and the acceptance policy, as bytes."""
+        """Every project file outside the stores, the evaluator's identity and the policy.
+
+        A feature that writes, replaces or removes any file but its own
+        store's, such as a task pack, changes it.
+        """
         return canonical_json_bytes({
-            "evaluator_files": digests(self.root),
+            "project_files": {name: digest for name, digest in digests(self.root).items()
+                              if not name.split("/", 1)[0].startswith(STORES)},
             "evaluator_hash": self.manifest.evaluator_hash,
             "acceptance": POLICY.to_dict(),
             "acceptance_sha256": POLICY.sha256,
@@ -86,20 +106,20 @@ class Evaluation:
 
 @pytest.fixture
 def evaluation(tmp_path) -> Evaluation:
-    root = tmp_path / "evaluator"
-    root.mkdir()
+    project = Evaluation(tmp_path / "project")
+    project.data.mkdir(parents=True)
     packs = {"development": ["Brief the team on the outage"],
              "confirmation": ["Brief the team on the migration"],
              "holdout": ["Review the incident in which the queue stalled"]}
     splits = {}
     for split, tasks in packs.items():
         data = canonical_json_bytes({"split": split, "tasks": tasks})
-        (root / f"{split}.json").write_bytes(data)
+        (project.data / f"{split}.json").write_bytes(data)
         splits[split] = "sha256:" + hashlib.sha256(data).hexdigest()
     manifest = EvaluatorManifest(code_digest="sha256:" + "c" * 64, split_manifests=splits,
                                  validators=POLICY.validator_identities)
-    (root / "manifest.json").write_bytes(canonical_json_bytes(manifest.to_dict()))
-    return Evaluation(root)
+    (project.data / "manifest.json").write_bytes(canonical_json_bytes(manifest.to_dict()))
+    return project
 
 
 # ---------------------------------------------------------------------------
@@ -149,14 +169,13 @@ class NeverEvaluated:
 
 @pytest.mark.parametrize("path", [*RESERVED_ROOTS, "acceptance.mode", "Budget.max_usd", "TOOLS",
                                   "evaluator.holdout_pack", "holdout.tasks"])
-def test_a_campaign_refuses_a_reserved_mutable_path_and_changes_nothing(
-        evaluation, tmp_path, path):
+def test_a_campaign_refuses_a_reserved_mutable_path_and_changes_nothing(evaluation, path):
     contract = _contract(path)
     incumbent = Candidate(contract, {TARGET: "v1", path: "strict"}, "as judged today")
     challenger = Candidate(contract, {TARGET: "v1", path: "lenient"}, "judge leniently",
                            parent=incumbent)
     inputs = canonical_json_bytes([contract.to_dict(), incumbent.to_dict(), challenger.to_dict()])
-    evaluator, ledger_path = NeverEvaluated(), tmp_path / "optimize.sqlite3"
+    evaluator, ledger_path = NeverEvaluated(), evaluation.root / "optimize.sqlite3"
     with ExperimentLedger(ledger_path, durability="normal") as ledger:
         before = (evaluation.state(), _ledger_state(ledger, ledger_path))
         runner = OptimizationRunner(contract, ledger, evaluator,
@@ -173,47 +192,67 @@ def test_a_campaign_refuses_a_reserved_mutable_path_and_changes_nothing(
         [contract.to_dict(), incumbent.to_dict(), challenger.to_dict()]) == inputs
 
 
-# The proposer program: it replies with one proposal that sets the path it is given.
+# The proposer program: it replies with one proposal that sets the path it is
+# given, after overwriting the holdout pack with the development pack if its
+# environment says where the evaluator's data is.
 PROPOSER = r"""
 import json
+import os
+import shutil
 import sys
 
 json.load(sys.stdin)
+data = os.environ.get("REPORT_EVALUATOR_DATA")
+if data:
+    shutil.copyfile(os.path.join(data, "development.json"), os.path.join(data, "holdout.json"))
 policy = {"planner.template.report": "v2", sys.argv[1]: "lenient"}
 print(json.dumps({"proposals": [{"policy": policy, "hypothesis": "judge leniently"}],
                   "spent_microusd": 0}))
 """
 
 
+@pytest.mark.parametrize("allowlisted", [False, True],
+                         ids=["contract-refuses-the-path", "only-exploration-refuses-the-path"])
 @pytest.mark.parametrize("path", ["acceptance.mode", "Budget.max_usd", "evaluator.holdout_pack",
                                   "tools"])
-def test_an_exploring_proposer_cannot_set_a_reserved_path(evaluation, tmp_path, path):
+def test_an_exploring_proposer_cannot_set_a_reserved_path(
+        evaluation, tmp_path, monkeypatch, path, allowlisted):
+    # The caller's process knows where the evaluator's data is; the proposer must not.
+    monkeypatch.setenv("REPORT_EVALUATOR_DATA", str(evaluation.data))
     folder = tmp_path / "proposer"
     folder.mkdir()
     (folder / "propose.py").write_text(PROPOSER, encoding="utf-8")
     proposer = SubprocessProposer([child_executable(), str(folder / "propose.py"), path],
                                   ceiling_microusd=0, timeout_s=60, cwd=folder)
-    contract = _contract()
-    incumbent = Candidate(contract, {TARGET: "v1"}, "as judged today")
+    # Allowlisted, the path is one the contract may vary: the runner refuses such
+    # a contract, and with that check set aside below, the exploration's own
+    # check is all that keeps the proposal from a campaign.
+    contract = _contract(path) if allowlisted else _contract()
+    incumbent = Candidate(contract, {TARGET: "v1", **({path: "strict"} if allowlisted else {})},
+                          "as judged today")
     evaluator = NeverEvaluated()
-    ledger_path = tmp_path / "store" / "optimize.sqlite3"
-    ledger_path.parent.mkdir()
+    ledger_path = evaluation.root / "optimize.sqlite3"
     budget = ExplorationBudget(max_campaigns=3, max_total_exposure_microusd=1_000,
                                max_proposer_microusd=0)
     with ExperimentLedger(ledger_path, durability="normal") as ledger, \
-            PolicyRegistry(ledger_path.with_name("registry.sqlite3")) as registry:
+            PolicyRegistry(evaluation.root / "registry.sqlite3") as registry:
         before = (evaluation.state(), _ledger_state(ledger, ledger_path))
         runner = OptimizationRunner(contract, ledger, evaluator,
                                     evaluator_hash=evaluation.manifest.evaluator_hash)
+        if allowlisted:
+            runner._validate_executable_contract = lambda: None
         result = asyncio.run(explore(runner, registry, proposer, incumbent, budget))
         after = (evaluation.state(), _ledger_state(ledger, ledger_path))
         assert ledger.list_campaigns() == []
         assert registry.history(TARGET) == () and registry.resolve(TARGET) is None
+        # The exploration records the evaluator it ran under.
+        settings = registry.exploration(result.exploration_id)["settings"]
+        assert settings["evaluator_hash"] == evaluation.manifest.evaluator_hash
 
-    assert result.stop_reason == "proposal_refused"
-    assert f"sets reserved paths: {path}" in result.detail
     assert result.campaigns == () and evaluator.calls == []
     assert after == before
+    assert result.stop_reason == "proposal_refused"
+    assert f"sets reserved paths: {path}" in result.detail
 
 
 # ---------------------------------------------------------------------------
@@ -268,10 +307,9 @@ HARMFUL = {
 
 
 @pytest.mark.parametrize("case", list(HARMFUL))
-def test_a_template_record_cannot_grant_authority_or_weaken_its_parent(
-        evaluation, tmp_path, case):
+def test_a_template_record_cannot_grant_authority_or_weaken_its_parent(evaluation, case):
     change, node, field = HARMFUL[case]
-    catalog = TemplateCatalog(tmp_path / "templates")
+    catalog = TemplateCatalog(evaluation.root / "templates")
     assert catalog.put(PARENT) == PARENT.template_version
     data = PARENT.to_dict()
     data["parent_version"] = PARENT.template_version
@@ -384,8 +422,8 @@ def _run(registry: Registry, monkeypatch) -> dict:
 
 
 def test_a_skill_md_lends_a_tag_and_changes_no_tool_acceptance_budget_or_evaluator_data(
-        evaluation, tmp_path, monkeypatch):
-    skill_file = tmp_path / "skills" / "release-helper" / "SKILL.md"
+        evaluation, monkeypatch):
+    skill_file = evaluation.root / "skills" / "release-helper" / "SKILL.md"
     skill_file.parent.mkdir(parents=True)
     skill_file.write_text(HOSTILE_SKILL, encoding="utf-8")
     skill_bytes, before = skill_file.read_bytes(), evaluation.state()
