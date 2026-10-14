@@ -4,11 +4,14 @@ Planner history groups accepted runs by their graph's structure digest. A
 structure that enough accepted runs share becomes a candidate record whose
 source runs name those runs and whose failure examples keep only a category
 and an evidence digest for each failed or not-accepted run of that structure.
-A candidate is only a candidate: nothing is activated.
+A candidate is only a candidate: nothing is activated. A record also builds
+its graph as a deterministic architect, with no planning call, which a
+durable run pins by identity and version.
 """
 
 from __future__ import annotations
 
+import asyncio
 from dataclasses import asdict
 import json
 
@@ -17,18 +20,25 @@ import pytest
 import smythe
 from smythe._canonical import canonical_bytes, sha256_hex
 from smythe.acceptance import AcceptancePolicy
+from smythe.constrained_planner import ConstrainedArchitect
+from smythe.constrained_prompts import CONSTRAINED_SYSTEM_PROMPT
 from smythe.distill import DistillationError
 from smythe.graph import ExecutionGraph, Node, Topology, structure_sha256
 from smythe.memory import ExecutionOutcome, PlannerMemory
 from smythe.optimize import PolicyRegistry
-from smythe.provider import CompletionResult, Provider
+from smythe.planner import DeterministicArchitect
+from smythe.prompts import PLANNING_SYSTEM_PROMPT
+from smythe.provider import CompletionResult, OfflineProvider, Provider
 from smythe.swarm import Swarm
 from smythe.task import Task
 from smythe.templates import (
-    MAX_FAILURE_EXAMPLES, TemplateCatalog, candidate_from_graph, distill_record,
-    repeated_structures,
+    MAX_FAILURE_EXAMPLES, TemplateArchitect, TemplateCatalog, TemplateRecord,
+    candidate_from_graph, distill_record, repeated_structures,
 )
 from smythe.validation import ValidationReport, ValidatorIdentity, hard_finding
+from smythe.workflow_binding import LocalOnly
+from smythe.workflow_store import SQLiteWorkflowStore, WorkflowConflictError
+from test_distill import _completed_gated_graph, _completed_graph
 
 MARKER = "DEFECT-4c1e"
 GOALS = ("Summarize the quarter", "Review the annual budget", "Plan the offsite")
@@ -319,3 +329,130 @@ def test_a_graph_without_a_structure_digest_is_refused():
 def test_promotion_names_are_exported():
     for name in ("candidate_from_graph", "repeated_structures"):
         assert name in smythe.__all__ and getattr(smythe, name) is getattr(smythe.templates, name)
+
+
+# ---------------------------------------------------------------------------
+# Deterministic templates
+# ---------------------------------------------------------------------------
+
+
+class Selects(Provider):
+    """A template-selection model that picks the named templates in order."""
+
+    def __init__(self, *names: str) -> None:
+        self.names = names
+
+    async def complete(self, system, prompt, model):
+        return CompletionResult(json.dumps([{"template": name} for name in self.names]))
+
+
+class NoCalls(Provider):
+    async def complete(self, system, prompt, model):
+        raise AssertionError("a deterministic template makes no provider call")
+
+
+def gated_record() -> TemplateRecord:
+    graph, registry = _completed_gated_graph()
+    return distill_record(graph, name="memo", registry=registry)
+
+
+def shape(graph, registry):
+    """What a plan builds, with agents by their profile rather than their random ids."""
+    agents = {agent.id: agent.profile for agent in registry.list_agents()}
+    return {
+        "structure": structure_sha256(graph), "topology": graph.topology,
+        "planning": graph.planning, "agents": len(agents),
+        "nodes": [(node.id, node.label, node.depends_on, node.verifies, node.status,
+                   node.required_capabilities, node.metadata, node.max_regenerations,
+                   (agents[node.agent_id].name, agents[node.agent_id].persona,
+                    agents[node.agent_id].capabilities))
+                  for node in graph.nodes],
+    }
+
+
+def test_as_architect_builds_what_selecting_the_template_builds_without_a_call():
+    record = gated_record()
+    task = Task("Write the quarterly memo")
+    selected = ConstrainedArchitect(Selects("memo"), [record.to_template()]).plan(task)
+
+    architect = record.as_architect()
+    built = architect.plan(task)
+    again = asyncio.run(architect.aplan(task))
+
+    assert type(architect) is TemplateArchitect and isinstance(architect, DeterministicArchitect)
+    assert architect.record is record
+    assert shape(*built) == shape(*selected) == shape(*again)
+    assert [node.id for node in built[0].nodes] == ["memo-0-draft", "memo-0-check"]
+    assert built[0].planning == {"templates": [
+        {"name": "memo", "index": 0, "version": record.template_version}]}
+    # Each plan builds its own nodes and agents.
+    assert built[0].nodes[0] is not again[0].nodes[0]
+    assert {agent.id for agent in built[1].list_agents()}.isdisjoint(
+        agent.id for agent in again[1].list_agents())
+
+    graph = Swarm(model="m", provider=NoCalls(), architect=architect, artifact_dir=None).plan(task)
+    assert [node.id for node in graph.nodes] == ["memo-0-draft", "memo-0-check"]
+    assert graph.planning["templates"] == built[0].planning["templates"]
+
+
+def test_as_architect_builds_a_record_of_any_size():
+    blueprint = [{"id": f"step-{index}", "label": f"Step {index}",
+                  "depends_on": [f"step-{index - 1}"] if index else [], "capabilities": [],
+                  "profile": None, "verifies": None, "max_regenerations": 0,
+                  "failure_policy": "halt", "max_retries": 0, "timeout_s": None,
+                  "attach_dep_artifacts": False, "metadata": {}} for index in range(80)]
+    record = TemplateRecord(name="long", description="Eighty steps", blueprint=blueprint)
+
+    graph, _ = record.as_architect().plan(Task("Do the long thing"))
+
+    assert len(graph.nodes) == 80 and graph.nodes[-1].depends_on == ["long-0-step-78"]
+
+
+def test_a_template_architect_builds_only_a_record():
+    with pytest.raises(TypeError, match="TemplateRecord"):
+        TemplateArchitect(gated_record().to_template())
+
+
+def test_as_architect_pins_the_template_identity_and_version_in_durable_runs(
+    tmp_path, monkeypatch,
+):
+    systems = []
+
+    async def complete(self, system, prompt, model):
+        systems.append(system)
+        return CompletionResult("Step done", cost_usd=0)
+
+    monkeypatch.setattr(OfflineProvider, "complete", complete)
+    graph, registry = _completed_graph()
+    first = distill_record(graph, name="learned", registry=registry)
+    changed = first.to_dict()
+    changed["blueprint"][0]["max_retries"] = 2
+    second = TemplateRecord.from_dict(changed)
+    declaration = first.as_architect().local_only()
+
+    def durable(record, store):
+        return Swarm(model="offline", provider=OfflineProvider(), run_store=store,
+                     architect=record.as_architect().local_only())
+
+    assert declaration == LocalOnly(object, "template:learned", first.template_version)
+    assert declaration.role == "architect" and type(declaration.factory()) is TemplateArchitect
+    with SQLiteWorkflowStore(tmp_path / "runs.db") as store:
+        recipes = [durable(record, store)._workflow_runtime().recipe
+                   for record in (first, first, second)]
+        assert recipes[0] == recipes[1] != recipes[2]
+        assert recipes[0]["components"]["architect"] == {
+            "type": "local_only", "role": "architect", "identity": "template:learned",
+            "version": first.template_version}
+
+        run_id = durable(first, store).plan(Task("Assess gadgets")).run_ref["run_id"]
+        with pytest.raises(WorkflowConflictError, match="saved recipe"):
+            durable(second, store).resume(run_id)
+        result = durable(first, store).resume(run_id)
+        saved = store.load_run(run_id)
+
+    assert [node.id for node in result.graph.nodes] == ["learned-0-research", "learned-0-review"]
+    assert result.output == "Step done" and saved["status"] == "completed"
+    assert result.graph.planning == {"templates": [
+        {"name": "learned", "index": 0, "version": first.template_version}]}
+    # Only the steps called a provider: planning never did.
+    assert systems and not {PLANNING_SYSTEM_PROMPT, CONSTRAINED_SYSTEM_PROMPT} & set(systems)

@@ -9,8 +9,8 @@ so a proven shape is selected instead of planned again.
 This page covers the evidence planner history keeps, failed runs,
 distillation, template records, their versions, promoting structure that
 accepted runs repeat to a candidate record, validation of records as
-untrusted candidates, the template catalog, and activating, rolling back and
-pinning template versions. A record is data: building a template from it,
+untrusted candidates, the template catalog, building a template without a
+planning call, and activating, rolling back and pinning template versions. A record is data: building a template from it,
 storing it, activating it and pinning it in a durable run never changes the
 base planner, and nothing is promoted or activated automatically.
 
@@ -427,6 +427,34 @@ template. Resuming the run with a template of another version raises
 `WorkflowConflictError`; resume with the record the catalog holds for the
 saved version instead, which [`pinned_templates`](#resume-a-pinned-run)
 rebuilds.
+
+## Build a template without planning
+
+A template that suits every task a run receives needs no selection call.
+`record.as_architect()` returns a `TemplateArchitect`
+(`smythe.templates.TemplateArchitect`), a `DeterministicArchitect` that
+builds the record's graph in local code:
+
+```python
+from smythe import Swarm
+
+swarm = Swarm(model="gpt-6-astra", architect=catalog.get(version).as_architect())
+```
+
+- Each plan is the graph a `ConstrainedArchitect` composes when its model
+  selects the template once: node ids prefixed `<name>-0-`, labels pointed
+  at the task, a new registry of the record's agents, and
+  `graph.planning["templates"]` naming the record's version. Planning makes
+  no provider call.
+- A [strict acceptance policy](verifier.md#strict-delivery-acceptance)
+  counts its gates as gates you supplied, as it does those of a
+  `ConstrainedArchitect`'s templates.
+- A durable run takes `record.as_architect().local_only()`, a
+  `LocalOnly(role="architect")` declaration with identity `template:<name>`
+  and the record's `template_version`, so the recipe pins the exact
+  template, and resuming with another version raises
+  `WorkflowConflictError`. Resume with the record the catalog holds for the
+  saved version.
 
 ## Activate and roll back templates
 

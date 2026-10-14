@@ -1850,6 +1850,15 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   `PlannerMemory.iter_outcomes()` reads each valid history row, oldest
   first, without writing. See
   [promote repeated accepted structure](docs/learning.md#promote-repeated-accepted-structure).
+- Deterministic templates. `TemplateRecord.as_architect()` returns a
+  `TemplateArchitect`, a `DeterministicArchitect` that builds the record's
+  graph for every task with no planning call: the graph a
+  `ConstrainedArchitect` composes when it selects the template once, with
+  the same node ids and `graph.planning["templates"]` entry. Its
+  `local_only()` declares it for durable runs as `LocalOnly(role="architect")`
+  with identity `template:<name>` and the template version, so the recipe
+  pins the exact template. See
+  [build a template without planning](docs/learning.md#build-a-template-without-planning).
 - Agent Skills directories as a skill source.
   `AgentSkillsProvider({agent_id: [root, ...]})` reads each
   `<root>/<name>/SKILL.md` when it is built and lists each skill as a

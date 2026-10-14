@@ -31,6 +31,8 @@ rebuilds the versions a saved recipe pinned.
 planner history repeat, and :func:`candidate_from_graph` builds a candidate
 record for one, naming those runs and keeping each failed or rejected run's
 category and evidence digest. A candidate is never stored or activated here.
+:meth:`TemplateRecord.as_architect` builds a record's graph with no planning
+call, and a durable run pins it by identity and version.
 """
 
 from __future__ import annotations
@@ -52,7 +54,7 @@ from smythe._canonical import canonical_bytes, sha256_hex
 from smythe._publish import MAX_ARTIFACT_BYTES, _regular_path, atomic_publish_bytes
 from smythe.acceptance import AcceptanceDecision
 from smythe.agent import Agent, AgentProfile
-from smythe.constrained_planner import SubGraphTemplate
+from smythe.constrained_planner import ConstrainedArchitect, SubGraphTemplate
 from smythe.distill import (
     _STRUCTURAL_METADATA_KEYS, DistillationError, _describe, _profile_of, _specialize,
 )
@@ -66,6 +68,7 @@ from smythe.loader import (
     _build_model_graph,
 )
 from smythe.memory import ExecutionOutcome, PlannerMemory
+from smythe.planner import DeterministicArchitect
 from smythe.registry import Registry
 from smythe.task import Task
 from smythe.validation import ValidatorIdentity
@@ -76,7 +79,7 @@ __all__ = [
     "TEMPLATE_RECORD_VERSION", "TemplateCatalog", "TemplateLimits", "TemplateRecord",
     "TemplateRecordError", "TemplateValidationError", "distill_record", "pinned_templates",
     "template_target", "validate_template_record",
-    "candidate_from_graph", "repeated_structures",
+    "TemplateArchitect", "candidate_from_graph", "repeated_structures",
 ]
 
 TEMPLATE_RECORD_TYPE = "smythe.template_record"
@@ -460,6 +463,10 @@ class TemplateRecord:
         """
         return LocalOnly(lambda: self.to_template().builder, f"template:{self.name}",
                          self.template_version, role="template_builder")
+
+    def as_architect(self) -> TemplateArchitect:
+        """A :class:`TemplateArchitect` that builds this template for any task without planning."""
+        return TemplateArchitect(self)
 
 
 def _label_findings(blueprint: list[dict[str, Any]], goal: Any) -> list[dict[str, Any]]:
@@ -1179,3 +1186,36 @@ def candidate_from_graph(
                             require_success=require_success, source_task=source_task)
     return replace(record, source_runs=list(runs.values()),
                    failure_examples=list(failures.values())[-MAX_FAILURE_EXAMPLES:])
+
+
+class TemplateArchitect(DeterministicArchitect):
+    """Builds one template record's graph in local code, with no planning call.
+
+    ``record.as_architect()`` returns one. Each plan is the graph a
+    ``ConstrainedArchitect`` composes when its model selects the template
+    once: node ids prefixed ``<name>-0-``, labels pointed at the task, a new
+    registry of the record's agents, and ``graph.planning["templates"]``
+    naming the record's version. A durable run takes :meth:`local_only`.
+    """
+
+    def __init__(self, record: TemplateRecord) -> None:
+        if not isinstance(record, TemplateRecord):
+            raise TypeError("a TemplateArchitect builds a TemplateRecord")
+        self.record = record
+
+    def plan(self, task: Task) -> tuple[ExecutionGraph, Registry]:
+        # Composed as a selection is, so the two build the same graph.
+        composer = ConstrainedArchitect(None, [self.record.to_template()],  # type: ignore[arg-type]
+                                        max_nodes=len(self.record.blueprint))
+        return composer._compose([{"template": self.record.name}], task)
+
+    def local_only(self) -> LocalOnly:
+        """This architect declared for a durable run, ``LocalOnly(role="architect")``.
+
+        Its identity is ``template:<name>`` and its version the record's
+        ``template_version``, so the run's recipe pins this exact template,
+        and resuming with another version raises ``WorkflowConflictError``.
+        """
+        record = self.record
+        return LocalOnly(lambda: TemplateArchitect(record), f"template:{record.name}",
+                         record.template_version)
