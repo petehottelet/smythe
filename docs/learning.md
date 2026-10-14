@@ -84,13 +84,16 @@ A failure row records:
 - The home folder is found in any spelling of its separators, including the
   doubled backslashes of a repr or JSON text. A path that starts a quoted
   string is removed up to the closing quote, spaces included, as Python's
-  own error messages quote paths. Unquoted, a path ends at a space unless
-  the next word holds a separator or a dot or is capitalized; such a word is
-  taken as part of the path: `C:\Program Files\Tool\run.exe`,
-  `D:\data\report final.txt` and `D:\data\My Report` are removed whole, as
-  is a following word such as `and/or` or `Permission`, while in
-  `D:\data\my report` the word `report` stays. URL paths and routes after an
-  HTTP method, such as `POST /v1/chat/completions`, are kept.
+  own error messages quote paths. Unquoted, the rest of a name with a space
+  cannot be told from the words after it, so they are removed with the
+  path, in preference to keeping part of it, up to the end of the line, a
+  quote, a URL, or an HTTP method and its route:
+  `open D:\data\my report failed` becomes `open <path>`. A word that ends
+  in a colon or a semicolon ends the path and keeps its mark, so
+  `open D:\data\my report: access denied` becomes
+  `open <path>: access denied`. A comma does not end a path, because folder
+  names hold commas. URL paths and routes after an HTTP method, such as
+  `POST /v1/chat/completions`, are kept.
 - The row also records the run's `execution_id`, `structure_sha256`, any
   gate `verification` entries, its cost and timing so far, and `acceptance`
   `not_evaluated`. A resumed run records `resumed` true.

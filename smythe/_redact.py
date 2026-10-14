@@ -39,14 +39,22 @@ _PATH_START = (
 )
 # A path that starts a quoted string runs to its closing quote, spaces included.
 _QUOTED_PATH = re.compile(r"(['\"`])" + _PATH_START + r"(?:(?!\1)[^\r\n])*\1")
-# Any other runs to a space or quote, and on past a space while the next word
-# holds a separator or a dot or is capitalized, as the rest of a name with a
-# space would be; a URL or an HTTP method and its route is never taken in.
+# Any other path's last name cannot be told from the words after it, so it
+# runs on past each space to the end of the line, a quote, a URL, or an HTTP
+# method and its route, and ends after a word that ends in a colon or a
+# semicolon, as a message after a path often starts; a comma, which folder
+# names hold, does not end it.
 _WORD = r"[^\s'\"`]"
+_ENDS_PATH = ":;"
 _ABSOLUTE_PATH = re.compile(
-    _PATH_START + _WORD + r"*(?: +(?![A-Za-z][\w+.-]*://|(?:" + "|".join(_HTTP_METHODS)
-    + r") )(?=[A-ZÀ-ÖØ-Þ]|" + _WORD + r"*(?:[\\/]|\.\w))" + _WORD + r"+)*"
+    _PATH_START + _WORD + r"*(?:(?<![" + _ENDS_PATH + r"]) +(?![A-Za-z][\w+.-]*://|(?:"
+    + "|".join(_HTTP_METHODS) + r") )" + _WORD + r"+)*"
 )
+
+
+def _path_mark(match: re.Match[str]) -> str:
+    """``<path>`` for an unquoted path, keeping the colon or semicolon that ended it."""
+    return "<path>" + match[0][-1] if match[0][-1] in _ENDS_PATH else "<path>"
 
 
 def redact_account_identifiers(value: Any) -> Any:
@@ -77,12 +85,14 @@ def redact_paths(text: str) -> str:
     as a repr or JSON text doubles backslashes, and without case on
     Windows, so a user name that holds a space is removed whole. A path that
     starts a quoted string is removed up to the closing quote. Unquoted, a
-    path ends at a space unless the next word holds a separator or a dot or
-    is capitalized, so a name with a space, such as another user's folder,
-    is removed whole, and so is a neighbouring word such as ``and/or``, in
-    preference to keeping part of a path; any other word stays, even one of
-    the path's last name. URL paths and a route after an HTTP method, as in
-    ``POST /v1/chat/completions``, are not local paths and stay.
+    name with a space, such as another user's folder, cannot be told from
+    the words after it, so they are removed with the path, in preference to
+    keeping part of it, up to the end of the line, a quote, a URL, or an HTTP
+    method and its route. A word that ends in a colon or a semicolon ends
+    the path and keeps its mark, as in ``<path>: access denied``; a comma
+    does not, as folder names hold commas. URL paths and a route after an
+    HTTP method, as in ``POST /v1/chat/completions``, are not local paths
+    and stay.
     """
     try:
         home = str(Path.home())
@@ -96,4 +106,4 @@ def redact_paths(text: str) -> str:
         text = re.sub(r"(?<![\w.~-])" + pattern + r"(?![\w.~-])", "~", text,
                       flags=re.IGNORECASE if os.name == "nt" else 0)
     text = _QUOTED_PATH.sub(lambda match: f"{match[1]}<path>{match[1]}", text)
-    return _ABSOLUTE_PATH.sub("<path>", text)
+    return _ABSOLUTE_PATH.sub(_path_mark, text)

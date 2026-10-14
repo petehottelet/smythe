@@ -1159,7 +1159,7 @@ def fake_home(tmp_path, monkeypatch):
 def test_a_provider_error_excerpt_is_redacted_and_capped(tmp_path, fake_home, parallel):
     organization = "org-" + "A1b2" * 6
     key_file, bundle = fake_home / "keys" / "service.json", tmp_path / "certs" / "bundle.pem"
-    message = (f"Rate limit reached for {organization} using {key_file} and {bundle}"
+    message = (f"Rate limit reached for {organization} using {key_file} and {bundle}: limit 20"
                + " on requests per minute" * 20)
     path = tmp_path / "history.jsonl"
     task = Task("Research signal that is rate limited")
@@ -1174,7 +1174,7 @@ def test_a_provider_error_excerpt_is_redacted_and_capped(tmp_path, fake_home, pa
     assert (outcome.failure_category, outcome.failure_type) == ("transient", "RateLimitError")
     assert outcome.failure_excerpt.startswith(
         f"Rate limit reached for org-[redacted] using {os.path.join('~', 'keys', 'service.json')}"
-        " and <path> on requests per minute on requests"
+        " and <path>: limit 20 on requests per minute on requests"
     )
     assert len(outcome.failure_excerpt) == 200 and outcome.failure_excerpt.endswith("…")
     for private in (organization, str(fake_home), fake_home.as_posix(), str(tmp_path),
@@ -1212,7 +1212,8 @@ def test_path_redaction_replaces_the_home_folder_and_other_absolute_paths(fake_h
         "file:///srv/app/key.json",
     ):
         assert _redact.redact_paths(f"open '{absolute}' failed") == "open '<path>' failed"
-        assert _redact.redact_paths(f"open {absolute} failed") == "open <path> failed"
+        assert _redact.redact_paths(f"open {absolute}: failed") == "open <path>: failed"
+        assert _redact.redact_paths(f"open {absolute} failed") == "open <path>"
     for kept in ("see https://api.example.com/v1/models/list", "relative/dir/file.txt",
                  "./local/file.txt", "~/project/out.json", "ratio 1/2/3", "org-chart"):
         assert _redact.redact_paths(kept) == kept

@@ -37,16 +37,25 @@ def home(monkeypatch):
     windows("D:", "data", "report final.txt"),
     windows("D:", "data", "My Report"),
     windows("C:", "Users", "Other Person"),
+    windows("C:", "Users", "jane doe"),
+    windows("D:", "projects", "acme merger plan"),
     windows("", "", "fileserver", "shared drive", "run.txt"),
     "/srv/My Data/out.json",
+    "/srv/clients/acme secret",
     "file:///srv/My Data/key.json",
-], ids=["program-files", "two-spaces", "final-name", "capitalized-name", "another-user", "unc",
-        "posix", "file-url"])
+], ids=["program-files", "two-spaces", "final-name", "capitalized-name", "another-user",
+        "lowercase-user", "lowercase-words", "unc", "posix", "posix-lowercase", "file-url"])
 def test_an_absolute_path_with_a_space_is_redacted_whole(home, path):
     home(WINDOWS_HOME)
     escaped = path.replace(BACKSLASH, BACKSLASH * 2)
-    assert redact_paths(f"open {path} failed") == "open <path> failed"
-    assert redact_paths(f"open {escaped} failed") == "open <path> failed"
+    for spelling in (path, escaped):
+        # Unquoted, the words after a path cannot be told from the rest of its
+        # last name, so they are removed with it.
+        assert redact_paths(f"open {spelling} failed") == "open <path>"
+        assert redact_paths(f"open {spelling} is locked") == "open <path>"
+        assert redact_paths(f"open {spelling}: access denied") == "open <path>: access denied"
+        assert redact_paths(f"Permission denied: {spelling}") == "Permission denied: <path>"
+        assert redact_paths(f"open {spelling} failed\nretrying") == "open <path>\nretrying"
     for quote in ("'", '"', "`"):
         quoted = f"{quote}{path}{quote}"
         assert redact_paths(f"open {quoted} failed") == f"open {quote}<path>{quote} failed"
@@ -99,19 +108,31 @@ def test_routes_and_url_paths_stay_readable(home):
     assert redact_paths("POST /v1/files failed for /srv/app/key.json") == (
         "POST /v1/files failed for <path>")
     assert redact_paths("open /srv/app/key.json then GET /v1/models") == (
-        "open <path> then GET /v1/models")
+        "open <path> GET /v1/models")
     assert redact_paths("open /srv/app/key.json POST /v1/models") == (
         "open <path> POST /v1/models")
 
 
-def test_an_unquoted_path_ends_before_a_word_that_cannot_continue_it(home):
+def test_an_unquoted_path_takes_in_every_word_up_to_where_it_must_end(home):
     home(WINDOWS_HOME)
     path = windows("D:", "data", "out.json")
-    assert redact_paths(f"open {path} on request 7") == "open <path> on request 7"
-    assert redact_paths(f"open {path} https://example.com/a") == "open <path> https://example.com/a"
-    # A word with a separator or a dot, or a capitalized one, is taken in, in
-    # preference to keeping part of a path; a lowercase word ends it.
-    assert redact_paths(f"open {path} and/or more") == "open <path> more"
-    assert redact_paths(f"open {path} Permission denied") == "open <path> denied"
-    assert redact_paths(f"open {windows('D:', 'data', 'my report')} failed") == (
-        "open <path> report failed")
+    # Any word can be the rest of a name with a space, so each is taken in, in
+    # preference to keeping part of a path.
+    for after in ("on request 7", "and/or more", "Permission denied", "failed, retrying"):
+        assert redact_paths(f"open {path} {after}") == "open <path>"
+    assert redact_paths(f"open {windows('D:', 'data', 'my report')} failed") == "open <path>"
+    # A comma does not end a path, as folder names hold commas.
+    clients = windows("D:", "clients", "Smith, John", "notes.txt")
+    assert redact_paths(f"open {clients} failed") == "open <path>"
+    # A word that ends in a colon or a semicolon ends it, and its mark stays.
+    assert redact_paths(f"open {path}: denied") == "open <path>: denied"
+    assert redact_paths(f"open {windows('D:', 'data', 'my report')}: denied") == (
+        "open <path>: denied")
+    assert redact_paths(f"open {path} now; retrying") == "open <path>; retrying"
+    # So do the end of a line, a quote, a URL, and an HTTP method and its route.
+    assert redact_paths(f"open {path} failed\nretrying") == "open <path>\nretrying"
+    assert redact_paths(f"open {path} failed 'x'") == "open <path> 'x'"
+    assert redact_paths(repr(f"open {path} failed")) == "'open <path>'"
+    assert redact_paths(f"open {path} see https://example.com/a") == (
+        "open <path> https://example.com/a")
+    assert redact_paths(f"open {path} then GET /v1/models") == "open <path> GET /v1/models"
