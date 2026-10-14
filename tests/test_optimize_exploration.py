@@ -37,9 +37,11 @@ from smythe.optimize.contracts import (
     ExperimentContract,
     MetricObjective,
     MutableFieldRule,
+    canonical_json_bytes,
 )
 from smythe.optimize.exploration import (
     ExplorationBudget,
+    ProposerError,
     SubprocessProposer,
     explore,
     proposer_view,
@@ -81,6 +83,30 @@ if reply == "hang":
 if reply == "fail":
     sys.exit(3)
 sys.stdout.write(reply if isinstance(reply, str) else json.dumps(reply))
+"""
+
+# A program that answers its first call with first-reply.json, when the file
+# exists, and otherwise beats for a minute without reading its request.
+UNREAD = r"""
+import os
+import sys
+import time
+
+folder = sys.argv[1]
+calls = os.path.join(folder, "calls")
+with open(calls, "ab") as handle:
+    handle.write(b".")
+first = os.path.join(folder, "first-reply.json")
+if os.path.exists(first) and os.path.getsize(calls) == 1:
+    sys.stdin.read()
+    with open(first, encoding="utf-8") as handle:
+        sys.stdout.write(handle.read())
+    sys.exit(0)
+stop = time.monotonic() + 60
+while time.monotonic() < stop:
+    with open(os.path.join(folder, "beat"), "ab") as handle:
+        handle.write(b".")
+    time.sleep(0.05)
 """
 
 
@@ -326,6 +352,60 @@ def test_a_failed_proposer_leaves_its_charge_unknown_at_the_ceiling(stores, repl
         # The program was running at its deadline and was killed.
         assert _beats(folder) > 0
         _assert_stopped_beating(folder)
+
+
+def test_a_proposer_that_never_reads_its_request_is_killed_at_its_deadline(tmp_path):
+    proposer = SubprocessProposer([child_executable(), "-c", UNREAD, str(tmp_path)],
+                                  ceiling_microusd=1, timeout_s=5)
+    started = time.monotonic()
+    # The request is larger than any pipe buffer, so writing it blocks until the program dies.
+    with pytest.raises(ProposerError, match="within 5 seconds and was killed"):
+        asyncio.run(proposer.propose({"padding": "x" * (1 << 20)}))
+    assert time.monotonic() - started < 30
+    assert _beats(tmp_path) > 0
+    _assert_stopped_beating(tmp_path)
+
+
+class _TimedProposer(SubprocessProposer):
+    """Records each request's size in bytes and how long its call took."""
+
+    calls: list[tuple[int, float]]
+
+    async def propose(self, request):
+        started = time.monotonic()
+        try:
+            return await super().propose(request)
+        finally:
+            self.calls.append((len(canonical_json_bytes(request)),
+                               time.monotonic() - started))
+
+
+def test_exploration_kills_a_proposer_that_stops_before_reading_a_later_request(stores):
+    ledger, registry, folder = stores
+    (folder / "first-reply.json").write_text(json.dumps(_reply(3)), encoding="utf-8")
+    proposer = _TimedProposer([child_executable(), "-c", UNREAD, str(folder)],
+                              ceiling_microusd=12, timeout_s=5)
+    proposer.calls = []
+    runner = _runner(ledger)
+    result = asyncio.run(explore(runner, registry, proposer, _incumbent(runner.contract),
+                                 _budget()))
+
+    assert result.stop_reason == "proposer_failed" and "was killed" in result.detail
+    assert len(result.campaigns) == 1 and not result.campaigns[0].promoted
+    assert len(proposer.calls) == 2
+    size, seconds = proposer.calls[1]
+    # The second request, with the first campaign's evidence, outgrows a Windows pipe buffer.
+    assert size > 4096
+    assert seconds < 30
+    assert _beats(folder) > 0
+    _assert_stopped_beating(folder)
+    record = registry.exploration(result.exploration_id)
+    assert _kinds(record)[-3:] == [(2, "proposer_reserved"), (2, "proposer_unknown"),
+                                   (2, "stopped")]
+    assert record["events"][-2]["microusd"] == 12 and "killed" in record["events"][-2]["detail"]
+    assert record["proposer_cost"] == {"reserved_microusd": 0, "settled_microusd": 0,
+                                       "unknown_microusd": 12, "total_exposure_microusd": 12}
+    _assert_nothing_activated(registry)
 
 
 def test_a_declaration_above_the_ceiling_is_settled_and_stops_exploration(stores):

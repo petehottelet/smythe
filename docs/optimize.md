@@ -1311,10 +1311,10 @@ The reply is
 each proposal's policy patch and hypothesis, and what the call spent in whole
 micro-USD. An empty `proposals` list ends the exploration. The program must
 reply and exit with status 0 within `timeout_s` seconds; at the deadline it is
-killed. Name the program's executable itself: a launcher killed at the
-deadline, such as a virtual environment's `python.exe` on Windows, can leave
-the program it started running. A reply may be at most 1 MiB, and standard
-error is discarded.
+killed, even if it has not read its request. Name the program's executable
+itself: a launcher killed at the deadline, such as a virtual environment's
+`python.exe` on Windows, can leave the program it started running. A reply may
+be at most 1 MiB, and standard error is discarded.
 
 The program inherits the caller's environment without `SMYTHE_MCP_URL` and
 every variable whose name ends in `_API_KEY`, `_ACCESS_KEY`, `_ACCESS_KEY_ID`,

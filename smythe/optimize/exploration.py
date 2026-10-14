@@ -21,6 +21,7 @@ import json
 import math
 import os
 import subprocess
+import threading
 import uuid
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
@@ -117,19 +118,42 @@ def _kill(process: subprocess.Popen) -> None:
 
 
 def _exchange(process: subprocess.Popen, data: bytes, timeout: float) -> tuple[int, bytes] | None:
-    """The program's exit status and output, or ``None`` once it is killed at the deadline."""
+    """The program's exit status and output, or ``None`` once it is killed at the deadline.
 
+    A watchdog kills the program at the deadline even while the request is
+    still being written: on Windows, ``communicate`` writes standard input
+    without a timeout, so a program that stops before reading a request
+    larger than the pipe buffer would otherwise outlive its deadline.
+    """
+
+    lock = threading.Lock()
+    state = {"done": False, "killed": False}
+
+    def expire() -> None:
+        with lock:
+            if not state["done"]:
+                state["killed"] = True
+                _kill(process)
+
+    watchdog = threading.Timer(timeout, expire)
+    watchdog.daemon = True
+    watchdog.start()
     try:
         stdout, _ = process.communicate(data, timeout=timeout)
     except subprocess.TimeoutExpired:
-        _kill(process)
+        expire()
         try:
             process.communicate(timeout=_REAP_SECONDS)
         except subprocess.TimeoutExpired:
             # A launcher was killed, but a program it started still holds the pipe.
             process.wait()
         return None
-    return process.returncode, stdout
+    finally:
+        watchdog.cancel()
+    with lock:
+        # A watchdog kill can let communicate return the killed program's status and output.
+        state["done"] = True
+        return None if state["killed"] else (process.returncode, stdout)
 
 
 class SubprocessProposer:
@@ -137,12 +161,13 @@ class SubprocessProposer:
 
     The program reads the request from standard input and must write one
     JSON object to standard output and exit with status 0 within
-    ``timeout_s`` seconds; at the deadline it is killed. It inherits the
-    caller's environment without variables named like provider API keys or
-    other credentials, its standard error is discarded, and it is never
-    given the ledger or its path. ``ceiling_microusd`` is the most one call
-    may spend. Give the program's executable itself: a launcher killed at
-    the deadline can leave the program it started running.
+    ``timeout_s`` seconds; at the deadline it is killed, even before it has
+    read the request. It inherits the caller's environment without
+    variables named like provider API keys or other credentials, its
+    standard error is discarded, and it is never given the ledger or its
+    path. ``ceiling_microusd`` is the most one call may spend. Give the
+    program's executable itself: a launcher killed at the deadline can
+    leave the program it started running.
     """
 
     def __init__(
