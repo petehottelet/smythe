@@ -657,6 +657,31 @@ def test_explore_refuses_a_fixed_campaign_or_reserved_mutable_fields_before_reco
     assert _requests(folder) == 0 and ledger.list_campaigns() == []
 
 
+def test_a_given_exploration_id_is_recorded_without_surrounding_whitespace(stores):
+    ledger, registry, folder = stores
+    (folder / "replies.json").write_text(json.dumps([_reply(6)]), encoding="utf-8")
+    runner = _runner(ledger)
+    result = asyncio.run(explore(runner, registry, _proposer(folder), _incumbent(runner.contract),
+                                 _budget(), exploration_id=" padded\n"))
+
+    assert (result.exploration_id, result.stop_reason) == ("padded", "promoted")
+    record = registry.exploration("padded")
+    assert record["stop_reason"] == "promoted"
+    assert record["campaign_ids"] == [result.campaigns[0].campaign_id]
+    assert _count(registry.path, "explorations") == 1
+
+
+@pytest.mark.parametrize("exploration_id", ["", "  ", 0, "../exploration"])
+def test_an_invalid_exploration_id_is_refused_before_recording(stores, exploration_id):
+    ledger, registry, folder = stores
+    runner = _runner(ledger)
+    with pytest.raises(ValueError, match="exploration_id"):
+        asyncio.run(explore(runner, registry, _proposer(folder), _incumbent(runner.contract),
+                            _budget(), exploration_id=exploration_id))
+    assert _count(registry.path, "explorations") == 0
+    assert _requests(folder) == 0 and ledger.list_campaigns() == []
+
+
 @pytest.mark.parametrize("arguments", [
     {"max_campaigns": 0}, {"max_campaigns": True}, {"max_total_exposure_microusd": -1},
     {"max_proposer_microusd": 1.5}, {"max_non_promotions": 0},

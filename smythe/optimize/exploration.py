@@ -40,6 +40,7 @@ from smythe.optimize.ledger import (
     CampaignNotFoundError,
     ExperimentLedger,
     HoldoutAlreadyUsedError,
+    _safe_id,
 )
 from smythe.optimize.registry import PolicyRegistry
 
@@ -346,6 +347,8 @@ async def explore(
     ``"proposer_finished"``, ``"proposer_failed"`` or ``"proposal_refused"``.
     An exception from a campaign, such as an unknown trial outcome, is
     recorded as an ``"interrupted"`` stop and raised. Nothing is activated.
+    A given ``exploration_id`` must be a safe identifier and is recorded
+    without surrounding whitespace; by default it is ``exploration_<hex>``.
     """
 
     if not isinstance(runner, OptimizationRunner):
@@ -362,7 +365,9 @@ async def explore(
     contract = runner.contract
     if not isinstance(incumbent, Candidate) or incumbent.contract_hash != contract.contract_hash:
         raise OptimizationError("the incumbent must be a candidate of the runner's contract")
-    identifier = exploration_id or "exploration_" + uuid.uuid4().hex
+    # Every event is recorded under the ID as stored, without surrounding whitespace.
+    identifier = ("exploration_" + uuid.uuid4().hex if exploration_id is None
+                  else _safe_id(exploration_id, "exploration_id"))
     ceiling = proposer.ceiling_microusd
     registry._start_exploration(identifier, {
         "budget": {name: getattr(budget, name) for name in budget.__dataclass_fields__},

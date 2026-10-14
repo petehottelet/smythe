@@ -1359,10 +1359,13 @@ Each campaign's decision inventory is validated first.
 
 Each exploration is recorded in the policy registry under its
 `exploration_id`, `exploration_<hex>` unless `explore()` is given one, with
-its settings: the budget, contract hash, evaluator hash, incumbent candidate
-ID and proposer ceiling. Its events, numbered 1, 2, 3 in order, are
-`proposer_reserved`, `proposer_settled` and `proposer_unknown` with their
-micro-USD; `campaign_started` with the campaign ID and its required
+its settings. A given ID is 1 to 128 letters, digits, dots, hyphens and
+underscores beginning with a letter or digit, and is recorded without
+surrounding whitespace; an invalid one is refused before anything is
+recorded. The settings are the budget, contract hash, evaluator hash,
+incumbent candidate ID and proposer ceiling. Its events, numbered 1, 2, 3 in
+order, are `proposer_reserved`, `proposer_settled` and `proposer_unknown`
+with their micro-USD; `campaign_started` with the campaign ID and its required
 reservation; `campaign_ended` with the campaign's exposure and `promoted` or
 `not_promoted`; and one final `stopped` naming its reason. Nothing follows a
 stop, and a charge is settled or left unknown only while it is reserved.
