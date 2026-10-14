@@ -27,12 +27,25 @@ ACCOUNT_IDENTIFIER_PATTERNS: tuple[tuple[re.Pattern[str], str], ...] = (
     (re.compile(r"\bproject_number[:=] ?[0-9]{6,}"), "project_number:[redacted]"),
 )
 
-# An absolute path, up to the next space or quote: a file URL, one with a
-# drive or UNC root, or a POSIX one of two or more parts that no letter,
-# digit or path character precedes, so a URL's path and relative paths stay.
+# Where an absolute path starts: a file URL, a drive root, a UNC root (whose
+# backslashes a repr or JSON text doubles) or a POSIX root of two or more
+# parts. No letter, digit or path character precedes one, so a URL's path and
+# relative paths stay, and a POSIX path after an HTTP method is a route.
+_HTTP_METHODS = ("GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "CONNECT", "TRACE")
+_PATH_START = (
+    r"(?:\bfile:/|(?<![A-Za-z0-9])[A-Za-z]:[\\/]|(?<![\w.~-])\\{2,4}[^\s\\/'\"`]+[\\/]|"
+    + "".join(f"(?<!{method} )" for method in _HTTP_METHODS)
+    + r"(?<![\w:/\\.~\]-])/[^\s/'\"`]+/)"
+)
+# A path that starts a quoted string runs to its closing quote, spaces included.
+_QUOTED_PATH = re.compile(r"(['\"`])" + _PATH_START + r"(?:(?!\1)[^\r\n])*\1")
+# Any other runs to a space or quote, and on past a space while the next word
+# holds a separator or a dot, as the rest of a name with a space would; a URL
+# is never taken in.
+_WORD = r"[^\s'\"`]"
 _ABSOLUTE_PATH = re.compile(
-    r"(?:\bfile:/|(?<![A-Za-z0-9])[A-Za-z]:[\\/]|\\\\[^\s\\/'\"]+[\\/]"
-    r"|(?<![\w:/\\.~-])/[^\s/'\"]+/)[^\s'\"]*"
+    _PATH_START + _WORD + r"*(?: +(?![A-Za-z][\w+.-]*://)(?=" + _WORD + r"*(?:[\\/]|\.\w))"
+    + _WORD + r"+)*"
 )
 
 
@@ -60,15 +73,27 @@ def error_text(error: object) -> str:
 def redact_paths(text: str) -> str:
     """*text* with the home folder written ``~`` and every other absolute path ``<path>``.
 
-    The home folder matches with either separator, and without case on
-    Windows, so a user name that holds a space is removed whole.
+    The home folder matches with any run of separators between its names,
+    as a repr or JSON text doubles backslashes, and without case on
+    Windows, so a user name that holds a space is removed whole. A path that
+    starts a quoted string is removed up to the closing quote. Unquoted, a
+    path ends at a space unless the next word holds a separator or a dot, so
+    a folder or file name with a space is removed whole, and so is a
+    neighbouring word such as ``and/or``, in preference to keeping part of a
+    path; a word with neither stays, even one of the path's last name. URL
+    paths and a route after an HTTP method, as in ``POST
+    /v1/chat/completions``, are not local paths and stay.
     """
     try:
         home = str(Path.home())
     except (RuntimeError, KeyError, OSError):
         home = ""
-    if home.strip("\\/"):
-        flags = re.IGNORECASE if os.name == "nt" else 0
-        for spelling in {home, home.replace("\\", "/")}:
-            text = re.sub(re.escape(spelling) + r"(?![\w.~-])", "~", text, flags=flags)
+    names = [name for name in re.split(r"[\\/]+", home) if name]
+    lead = r"[\\/]+" if home[:1] in ("\\", "/") else ""
+    # A home folder at a drive's root names no folder, so nothing is written ~.
+    if len(names) >= (1 if lead else 2):
+        pattern = lead + r"[\\/]+".join(re.escape(name) for name in names)
+        text = re.sub(r"(?<![\w.~-])" + pattern + r"(?![\w.~-])", "~", text,
+                      flags=re.IGNORECASE if os.name == "nt" else 0)
+    text = _QUOTED_PATH.sub(lambda match: f"{match[1]}<path>{match[1]}", text)
     return _ABSOLUTE_PATH.sub("<path>", text)

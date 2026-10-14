@@ -1818,8 +1818,11 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   before its exception propagates, with `failure_category` (its failure
   class), `failure_type` (the exception's class name) and, for provider and
   service errors only, a `failure_excerpt` of at most 200 characters with
-  account identifiers redacted, the home folder written `~` and other
-  absolute paths `<path>`. `success` keeps its meaning, and planning prompts
+  account identifiers redacted, the home folder written `~` in any spelling
+  of its separators, including a repr's doubled backslashes, and other
+  absolute paths `<path>`, whole when quoted and, unquoted, past each space
+  before a word with a separator or a dot; URL paths and routes after an
+  HTTP method stay. `success` keeps its meaning, and planning prompts
   keep their format and show each failure row's outcome as `failure`, even
   for a run whose nodes all completed before synthesis failed. Interrupts,
   exits and cancellation are never recorded, and a history write that fails

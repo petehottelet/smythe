@@ -252,6 +252,7 @@
     "tests/test_readme_charts.py",
     "tests/test_readme_quickstart.py",
     "tests/test_recovery_chart.py",
+    "tests/test_redact.py",
     "tests/test_registry.py",
     "tests/test_release_gate.py",
     "tests/test_repair_plan.py",
