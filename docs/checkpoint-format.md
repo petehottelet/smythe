@@ -548,7 +548,7 @@ the stop after these checks, or `None` without one.
 4. Restores per-node costs into the budget so the resumed run keeps counting against the original cap.
 5. Executes the remaining nodes on the async executor, one at a time unless the resuming Swarm has `parallel=True` (then up to `max_concurrency`), synthesizes over the full graph, decides delivery acceptance under a strict policy, and writes the final checkpoint.
 
-Ordinary checkpoints have no lease or ownership fence: `FileCheckpointStore` keeps whichever snapshot was written last, so resume a run from one process at a time.
+Ordinary checkpoints have no lease or ownership fence: two processes that resume one execution id both run its pending nodes, and `FileCheckpointStore` keeps whichever snapshot was written last. Resume each execution id from one process at a time; see [who owns each execution responsibility](support-matrix.md#who-owns-each-execution-responsibility).
 
 The trace on a resumed `SwarmResult` covers only the resumed portion; spans from before the crash are not reconstructed. Its `timing` likewise measures the resuming call, with `resumed` set and `latency_complete` false, and lists the earlier calls' saved segments before its own.
 

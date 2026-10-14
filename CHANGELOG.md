@@ -1965,6 +1965,22 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   real effect. An evaluator that returns the same metrics on every seed
   promotes with three pairs and a zero-width interval. See
   [choosing sample sizes](docs/optimize.md#choosing-sample-sizes).
+- A [support matrix section](docs/support-matrix.md#who-owns-each-execution-responsibility)
+  states who owns each execution responsibility on ordinary runs, durable
+  text workflows and Jobs: admission and scheduling, logical and attempt
+  identity, permission to dispatch, calling again, settling cost, keeping
+  results for recovery, stopping, waits and timers, ownership and stale
+  writers, recovery after process loss, observation and upgrades, with the
+  test behind each cell and a procedure for upgrading with work in flight.
+  Ordinary checkpoints have no ownership fence: two processes that resume
+  one execution id both run its pending nodes, and the snapshot written last
+  wins. A durable run's lease lasts 60 seconds and its event loop renews it
+  every 15 seconds; a resume while another process holds the lease raises
+  `WorkflowLeaseError` before any call, and a run whose lease lapses while
+  its event loop is blocked fails with `WorkflowLeaseError` and resumes
+  without sending a saved request again. `tests/test_support_matrix.py` pins
+  these behaviors, and a repository test checks the section's rows, columns
+  and cited tests.
 
 ### Changed
 

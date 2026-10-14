@@ -67,6 +67,54 @@ def test_the_templates_section_cites_each_path_and_the_learning_boundaries():
         assert f"| {path} |" in section, path
 
 
+OWNERSHIP_PATHS = ["Ordinary runs", "Durable text workflows", "Jobs"]
+OWNERSHIP_ROWS = [
+    "Admission and scheduling", "Logical and attempt identity", "Permission to dispatch",
+    "Calling again", "Settling cost and its unit", "Keeping results for recovery",
+    "Stop and cancellation", "Waits and timers", "Ownership and stale writers",
+    "Recovery after process loss", "Observing without controlling",
+    "Upgrading with work in flight",
+]
+
+
+def ownership_section():
+    text = PAGE.read_text(encoding="utf-8")
+    assert "\n## Who owns each execution responsibility\n" in text
+    section = text.split("\n## Who owns each execution responsibility\n", 1)[1].split("\n## ", 1)[0]
+    # The section follows the retry-owner list and precedes the durable components.
+    assert text.index("Who calls again after a failure") < text.index(section)
+    assert text.index(section) < text.index("\n## Durable text workflow components\n")
+    return section
+
+
+def test_the_ownership_table_has_a_cell_for_each_path_and_responsibility():
+    rows = [[cell.strip() for cell in line.strip().strip("|").split("|")]
+            for line in ownership_section().splitlines() if line.startswith("|")]
+    header, rule, *body = rows
+    assert header == ["Responsibility", *OWNERSHIP_PATHS]
+    assert len(rule) == 4 and all(set(cell) == {"-"} for cell in rule)
+    assert [row[0] for row in body] == OWNERSHIP_ROWS
+    # "None" is stated where nothing owns a responsibility; no cell is left blank.
+    assert all(len(row) == 4 and all(row) for row in body), body
+
+
+def test_every_ownership_cell_cites_a_test_for_its_path():
+    section = ownership_section()
+    tests = section.split("\nTests:\n", 1)[1]
+    items = {}
+    for block in tests.strip().split("\n- "):
+        name, _, citations = block.removeprefix("- ").partition(":")
+        items[name] = " ".join(citations.split())
+    assert list(items) == OWNERSHIP_ROWS
+    for name, citations in items.items():
+        # One part per path, in the table's order, each naming at least one test.
+        parts = citations.split("; ")
+        assert len(parts) == len(OWNERSHIP_PATHS), name
+        for part, path in zip(parts, OWNERSHIP_PATHS):
+            assert part.startswith(path if path == "Jobs" else path.lower()), (name, part)
+            assert NODE_ID.search(part), (name, part)
+
+
 def test_every_cited_test_exists():
     cited = cited_node_ids()
     collected = collected_node_ids(sorted({node.split("::")[0] for node in cited}))

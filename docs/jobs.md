@@ -734,6 +734,9 @@ This fences durable dispatch admission and journal writes. A request already
 marked dispatched can still reach or finish at the provider after ownership
 expires. Its uncommitted outcome remains unknown until investigated; the lease
 does not cancel an external request or make it safe to repeat automatically.
+The support matrix compares this ownership with that of ordinary runs and
+durable text workflows: see
+[who owns each execution responsibility](support-matrix.md#who-owns-each-execution-responsibility).
 
 A completed run starts zero new operations, and resume rechecks the bytes of
 its accepted artifacts before reporting their

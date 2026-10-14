@@ -433,6 +433,17 @@ The SQLite journal uses WAL, full synchronization, fenced leases, and checkpoint
 revisions. Heartbeats renew ownership during calls. A former owner can append
 immutable late evidence for its exact dispatch, but cannot advance the run.
 Recovery settles available late evidence before admitting new work.
+
+A run's lease lasts 60 seconds, and a heartbeat on the run's event loop
+renews it every 15 seconds. A process that ends without releasing the lease,
+such as one that was killed, keeps the run until it lapses: resuming sooner
+raises `WorkflowLeaseError` before any call, and resuming once it has lapsed
+continues the run. Blocking the event loop for more than about 45 seconds can
+also let the lease lapse; the run then fails with `WorkflowLeaseError`, and
+resuming it continues the run, settling a response saved during the stall
+instead of sending its request again. See
+[who owns each execution responsibility](support-matrix.md#who-owns-each-execution-responsibility)
+for how ownership compares across the three execution paths.
 Each plan, execute or resume entry audits the whole journal once when it
 starts. A checkpoint saved during the run reads only the calls it consumes
 and, once a node has been regenerated, the keys of settled and reserved calls;

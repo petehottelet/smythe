@@ -8,7 +8,7 @@ verification, trace, artifact, and recovery controls.
 
 - [README](../README.md) — product overview, measured evidence, and quickstart
 - [Architecture](architecture.md) — the two core abstractions and component boundaries
-- [Support matrix](support-matrix.md) — which providers, verifiers, tools, stores and Jobs profiles each execution path accepts, with the test behind each cell
+- [Support matrix](support-matrix.md) — which providers, verifiers, tools, stores and Jobs profiles each execution path accepts, and who owns each execution responsibility on each path, from admission, dispatch and cost to cancellation, leases, recovery and upgrades with work in flight, with the test behind each cell
 - [Examples](../examples/README.md) — offline-first feature tours plus explicitly gated live integrations
 - [Benchmarks](../benchmarks/README.md) — evidence status, protocols, and raw records
 - [Smythe 0.9.1](release-0.9.1.md) — patch release: missing Gemini images fail their node, Gemini 3.1 image defaults, and account identifiers and local paths kept out of benchmark records; upgrading from 0.9.0
