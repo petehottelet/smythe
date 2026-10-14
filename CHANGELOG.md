@@ -1938,6 +1938,14 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   ordinary runs; durable text workflows still refuse every `tool_runtime`.
   See [Python-backed skills](docs/skills.md#python-backed-skills) and
   [`examples/20_agent_skills.py`](examples/20_agent_skills.py).
+- Sample-size and repeated-comparison guidance for Autotune, from the paired
+  Student-t promotion bound: the smallest observed improvement each number
+  of pairs can promote, the pairs a stage needs to pass a given true
+  improvement, and how repeated campaigns, and proposers that see
+  confirmation results, raise the chance of promoting a challenger with no
+  real effect. An evaluator that returns the same metrics on every seed
+  promotes with three pairs and a zero-width interval. See
+  [choosing sample sizes](docs/optimize.md#choosing-sample-sizes).
 
 ### Changed
 
@@ -2061,6 +2069,11 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   composes from its templates records them under `graph.planning["templates"]`,
   so such checkpoints gain that key. See
   [distill a template](docs/learning.md#distill-a-template).
+- `benchmarks/run_optimizer.py` and `benchmarks/run_banner_optimizer.py` are
+  labeled diagnostic. They keep a change whose mean judge score beats the
+  incumbent's by a fixed margin, with no paired bound, sealed holdout or
+  review, so a change they keep is not a promotion and supports no claim. See
+  [prompt-policy optimizer loops](benchmarks/README.md#prompt-policy-optimizer-loops-diagnostic).
 
 ### Fixed
 

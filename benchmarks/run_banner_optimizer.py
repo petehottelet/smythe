@@ -8,6 +8,12 @@
         --budget-usd 8 --iteration-cost-ceiling-usd 1.4 \
         --max-cost-per-call-usd 0.06
 
+Evidence status: diagnostic, outside promotion claims. The keep rule below
+compares mean judge scores against a noise margin, with no paired confidence
+bound, sealed holdout, reference arm, held-out task family or review. A kept
+direction is a lead for a smythe.optimize campaign, not a promotion, and the
+journal supports no promotion or benchmark claim (docs/optimize.md).
+
 The karpathy/autoresearch loop (the same pattern as run_optimizer.py for
 the asset suite, here applied to the *banner* pipeline): an LLM proposes
 ONE targeted change to the creative direction, the full banner suite

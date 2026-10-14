@@ -33,6 +33,7 @@ publishing benchmark updates.
 | [Trigger ablation](#trigger-ablation-offline-mechanics) | Offline mechanics; not claimable | Routine, evidence-triggered and no supervision on fixtures with planted anomalies, and an Autotune campaign with a reference arm; shows no measured benefit and changes no default |
 | [Policy ablations](#policy-ablations-offline-mechanics) | Offline mechanics; not claimable | Drain, durable drain, capacity admission, budget holds and contradiction synthesis, each against its own baseline on fixtures, and a matched-graph scheduler overhead test; shows no measured benefit and changes no default |
 | [Template evaluation](#template-evaluation-offline-mechanics) | Offline mechanics; not claimable | Fixture template versions against their predecessor and a single worker, in Autotune campaigns with a held-out task family; ranks no template and changes no default |
+| [Prompt-policy optimizer loops](#prompt-policy-optimizer-loops-diagnostic) | Diagnostic; outside promotion claims | A judged prompt change is kept when its mean score beats the incumbent's by a fixed margin, with no paired bound, sealed holdout or review |
 | [Jobs at 5,000 operations](jobs_scale_5000_20260907_results.md) | **Claimable correctness observation** | One offline schema-v3 campaign: 5,000 accepted identical fixtures after a hard kill, safe resume, and eight explicit rerolls; zero accepted work reissued and zero calls on completed resume. No comparative timing or model-quality claim. |
 | [Astra/Sol amended study](results/astra_20260913_main/README.md) | **Human review complete; claimable within recorded descriptive scope** | All 200 workflows retained, 191 automatically accepted; all eight flagged answers accepted by human review at 4/4. Anonymous judging, graph/phase breakdowns and task-clustered comparisons. One failed call retains its full $0.169645 reserve. Reused synthetic tasks; all earlier diagnostics and charges remain separate. |
 
@@ -641,6 +642,20 @@ python benchmarks/template_eval.py   # writes results/template_eval_offline.json
 
 Promoting a template version needs held-out tasks its author has not seen and
 decided thresholds, and live evaluation needs an approved budget.
+
+## Prompt-policy optimizer loops (diagnostic)
+
+[run_optimizer.py](run_optimizer.py) tunes the brand asset suite's prompt
+policies, and [run_banner_optimizer.py](run_banner_optimizer.py) the banner
+suite's creative direction. A model proposes one change, the suite runs live,
+a vision judge scores the result, and the change is kept when its mean score
+beats the incumbent's by a fixed margin. That rule has no paired confidence
+bound, sealed holdout, reference arm, held-out task family or review, so
+both loops are diagnostic: a change they keep is a lead for an
+[Autotune campaign](../docs/optimize.md#choosing-sample-sizes), not a
+promotion, and their journals support no promotion or benchmark claim. The
+[2026-07-12 smoke run](image_benchmarks.md#judge-variance-and-the-optimizer-loop-2026-07-12)
+keeps that scope.
 
 ## Coming soon
 

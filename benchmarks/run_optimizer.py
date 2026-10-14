@@ -3,6 +3,12 @@
     python benchmarks/run_optimizer.py --iterations 2 --budget-usd 2.25 --iteration-cost-ceiling-usd 0.75 --max-cost-per-call-usd 0.06
     python benchmarks/run_optimizer.py --iterations 20 --budget-usd 16 --iteration-cost-ceiling-usd 0.75 --max-cost-per-call-usd 0.06
 
+Evidence status: diagnostic, outside promotion claims. The keep rule below
+compares mean judge scores against a fixed margin, with no paired confidence
+bound, sealed holdout, reference arm, held-out task family or review. A kept
+change is a lead for a smythe.optimize campaign, not a promotion, and the
+journal supports no promotion or benchmark claim (docs/optimize.md).
+
 The loop (the karpathy/autoresearch pattern, applied to prompts instead
 of train.py): an LLM proposes ONE targeted change to the brand config's
 prompt policies, the full suite runs live, a vision judge scores brand

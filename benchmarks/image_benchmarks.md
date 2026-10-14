@@ -231,7 +231,8 @@ against noise. Those are historical output-estimate costs. The current
 optimizer requires caller-supplied image-call and all-in iteration ceilings,
 and refuses to start the baseline unless one full iteration fits inside the
 declared budget. Verify live pricing instead of treating historical numbers as
-a quote.
+a quote. The loop is diagnostic: a change it keeps is not a promotion
+([evidence status](README.md#prompt-policy-optimizer-loops-diagnostic)).
 
 ## Planned next
 

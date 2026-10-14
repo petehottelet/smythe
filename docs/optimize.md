@@ -207,7 +207,8 @@ expansion. Resuming the same ledger reproduces the holdout, while a fresh
 ledger gets an independent holdout. Three pairs are only a
 structural minimum, not a claim of useful statistical power. Choose repetition
 counts from measured evaluator variance, and use a larger sample when the
-expected improvement is small.
+expected improvement is small; [choosing sample sizes](#choosing-sample-sizes)
+gives the numbers.
 
 A challenger policy gets one sealed holdout per holdout identity in a ledger.
 The holdout identity covers what defines the holdout evaluation and its
@@ -268,6 +269,81 @@ is tested on confirmation and holdout at the contract confidence. Screening
 many challengers therefore favors one that was lucky in development, and the
 independent one-time holdout is an important guard against that selection
 bias.
+
+### Choosing sample sizes
+
+The promotion bound decides how much evidence a stage needs. With `n` pairs
+whose improvements have mean `d` and standard deviation `s`, a stage passes
+only when `d - t * s / sqrt(n)` exceeds `min_improvement`, so the observed
+`(d - min_improvement) / s` must exceed `t / sqrt(n)`. At the default
+confidence of 0.95:
+
+| Pairs | `t` | Smallest observed `(d - min_improvement) / s` that passes |
+|---:|---:|---:|
+| 3 | 4.303 | 2.48 |
+| 5 | 2.776 | 1.24 |
+| 10 | 2.262 | 0.72 |
+| 20 | 2.093 | 0.47 |
+| 30 | 2.045 | 0.37 |
+| 50 | 2.010 | 0.28 |
+| 100 | 1.984 | 0.20 |
+
+A challenger whose true improvement is just that size passes about half the
+time. To size a split, estimate `s`, the standard deviation of paired
+improvements, from a pilot on the same evaluator: for example, the
+confirmation trials of an earlier campaign, or the incumbent paired with
+itself on development seeds. For the improvement `D` you expect, the pairs one
+stage needs, when paired improvements are roughly normal, are:
+
+| True `(D - min_improvement) / s` | Pairs to pass with chance 0.8 | Pairs to pass with chance 0.9 |
+|---:|---:|---:|
+| 2.0 | 5 | 5 |
+| 1.5 | 6 | 7 |
+| 1.0 | 10 | 13 |
+| 0.75 | 16 | 21 |
+| 0.5 | 34 | 44 |
+| 0.3 | 90 | 119 |
+| 0.2 | 199 | 265 |
+
+Promotion needs confirmation and the holdout to pass on independent seeds, so
+their chances multiply: 0.9 at each stage gives about 0.81. Set
+`confirmation_repetitions` and `holdout_repetitions` from the 0.9 column, and
+set `min_improvement` to the smallest change worth putting in effect rather
+than zero. A trial that covers several tasks, such as one pass over a task
+pack, usually varies less than a single task, so it needs fewer pairs. These
+tables are for confidence 0.95; a higher confidence needs more pairs.
+
+**Zero variance.** An evaluator that returns the same metrics on every seed,
+such as a deterministic fixture or a cached judgment, gives identical paired
+improvements. Their spread is zero, so the bound equals their mean, and any
+mean above `min_improvement` passes with the minimum three pairs and a
+zero-width interval. That describes the evaluator, not measured precision:
+check that seeds and tasks vary what it measures before relying on such a
+decision.
+
+**Repeated comparisons.** At the default confidence each confirmation or
+holdout test passes a challenger with no real effect about 2.5% of the time,
+and nothing corrects for how many such tests are run:
+
+- Development screens every challenger without an interval and passes the
+  best one on, and only that one is tested at the contract confidence. The
+  screening itself has no correction.
+- Development and confirmation seeds, and the tasks they draw, are the same
+  in every campaign under one contract. A proposer that has seen earlier
+  confirmation results, as an [exploration's](#what-the-proposer-sees) has,
+  can fit them, which leaves the holdout as the only independent test.
+  Across `m` campaigns of challengers with no real effect, the chance that at
+  least one is promoted is then up to `1 - 0.975^m`: about 12% for five
+  campaigns, 22% for ten and 40% for twenty. With both stages independent,
+  it is about 0.06% per campaign.
+- Each [reference arm](#reference-arms) is compared at the contract
+  confidence, with no correction across references.
+
+To keep the chance of any such promotion across `m` planned campaigns near
+2.5%, set `confidence` to `1 - 0.05 / m` (0.99 for five, 0.995 for ten) and
+size the splits for it; cap the campaigns that draw from a finite held-out
+pack with [`max_holdout_draws`](#finite-task-pools); and review each promoted
+decision before [activating it](#review-and-activate-a-decision).
 
 ### Reference arms
 
@@ -1290,7 +1366,8 @@ resumed: a new exploration has a budget of its own.
 
 Each campaign's holdout decides on its own. Exploration adds no correction
 for testing many challengers across rounds, which is one more reason a
-promotion it finds still needs review.
+promotion it finds still needs review; see
+[repeated comparisons](#choosing-sample-sizes).
 
 ### The proposer protocol
 
@@ -1382,19 +1459,32 @@ The following pieces remain future work:
 - a model- or agent-backed proposer: [bounded exploration](#bounded-exploration)
   ships the loop, its bounds and the subprocess protocol, and the installed
   concurrency campaign still uses its deterministic grid;
-- CLI adapters for general or provider-backed evaluators with conservative
-  per-trial price ceilings;
-- calibrated sample-size guidance and a multiple-comparison correction across
-  development challengers; and
+- conservative live-evaluator adapters, for the CLI or for general
+  provider-backed evaluators, with per-trial price ceilings: the
+  [durable workflow trial adapter](#durable-workflow-trials) is tested
+  offline only;
+- evaluators run in a separately supervised process that can be stopped at
+  a deadline;
+- a multiple-comparison correction across development challengers or
+  campaigns, in place of the
+  [guidance on repeated comparisons](#choosing-sample-sizes); and
 - statistical comparison across campaigns, beyond the
   [cross-campaign target report](#cross-campaign-target-report), and
   authenticated reviewers for the [policy registry](#policy-registry).
 
 The runner bounds what a campaign may vary:
 [reserved fields](#experiment-contracts-and-budgets) such as acceptance,
-spend, and tool settings cannot be mutable, and `single_change` limits each
-challenger to one changed field. It does not sandbox evaluator code, which
-runs in the runner's process and decides what each policy value controls.
+spend, and tool settings cannot be mutable, whether a contract or an
+exploring proposer names them, and `single_change` limits each challenger to
+one changed field. It does not sandbox evaluator code, which runs in the
+runner's process and decides what each policy value controls.
+
+The repository's earlier prompt-policy loops, `benchmarks/run_optimizer.py`
+and `benchmarks/run_banner_optimizer.py`, keep a change whose mean judge
+score beats the incumbent's by a fixed margin, with no paired bound, sealed
+holdout, reference arm or review. They are diagnostic: a change they keep is
+not a promotion and supports no claim
+([evidence status](../benchmarks/README.md#prompt-policy-optimizer-loops-diagnostic)).
 
 The installed concurrency campaign is intentionally offline. Custom in-process
 evaluators can use `OptimizationRunner`. A live evaluator must supply its own
