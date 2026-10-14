@@ -3,6 +3,8 @@
 docs/support-matrix.md cites these tests by node id. A rejection cell proves
 that the refusal happens before any provider method runs and before any SDK
 client exists, including the planning and routing calls a run would make.
+The ownership tests at the end pin who owns an execution responsibility
+where no other test does, including a responsibility that nothing owns.
 """
 
 from __future__ import annotations
@@ -16,7 +18,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from fakes import RATE_LIMITED, MessagesTransport, NativeTransport
+from fakes import RATE_LIMITED, Gate, ManualClock, MessagesTransport, NativeTransport
 from smythe import (
     AcceptancePolicy, AnthropicMessagesProvider, AnthropicProvider, Artifact,
     BudgetEstimateRequired, CallableVerifier, ChatMessage, CompletionResult, FailurePolicy,
@@ -36,7 +38,7 @@ from smythe.jobs.providers import ProviderPreflightError, ProviderPreflightKind
 from smythe.jobs.runner import JobRunner
 from smythe.jobs.store import SQLiteRunStore
 from smythe.pricing_anthropic import MODEL as FABLE
-from smythe.workflow_store import WorkflowConflictError
+from smythe.workflow_store import WorkflowConflictError, WorkflowLeaseError
 
 BUILT_IN_PROVIDERS = (
     OfflineProvider, AnthropicProvider, OpenAIProvider, OpenAIImageProvider, GeminiProvider,
@@ -826,3 +828,166 @@ def test_jobs_manifest_has_no_validator_tool_or_memory_fields(section, field):
     target[field] = []
     with pytest.raises(ManifestValidationError, match="unknown fields"):
         JobManifestV1.from_dict(manifest)
+
+
+# ---------------------------------------------------------------------------
+# Who owns each execution responsibility
+# ---------------------------------------------------------------------------
+
+
+class Unavailable(Provider):
+    async def complete(self, system: str, prompt: str, model: str) -> CompletionResult:
+        raise RuntimeError("provider unavailable")
+
+
+class Resumer(Provider):
+    """Answers with its own name once the test lets its call through."""
+
+    def __init__(self, name: str) -> None:
+        self.name, self.gate, self.calls = name, Gate(), []
+
+    async def complete(self, system: str, prompt: str, model: str) -> CompletionResult:
+        self.calls.append(prompt)
+        await self.gate.wait()
+        return CompletionResult(self.name, prompt_tokens=1, completion_tokens=1)
+
+
+def test_ordinary_checkpoints_do_not_fence_a_second_resumer(tmp_path):
+    graph = ExecutionGraph([Topology.SERIAL], [Node(id="draft", label="Draft")])
+    with pytest.raises(RuntimeError, match="provider unavailable"):
+        Swarm(model="custom", provider=Unavailable(), checkpoint_store=FileCheckpointStore(tmp_path),
+              artifact_dir=None).execute(graph)
+    [execution_id] = FileCheckpointStore(tmp_path).list_ids()
+    first, second = Resumer("first"), Resumer("second")
+
+    async def resume_twice():
+        # Two processes, each with its own store on one directory, resume one run.
+        runs = [asyncio.create_task(Swarm(model="custom", provider=provider, artifact_dir=None,
+                                          checkpoint_store=FileCheckpointStore(tmp_path))
+                                    .aresume(execution_id))
+                for provider in (first, second)]
+        assert await first.gate.reached() and await second.gate.reached()
+        first.gate.release()
+        earlier = await runs[0]
+        second.gate.release()
+        return earlier, await runs[1]
+
+    earlier, later = asyncio.run(resume_twice())
+
+    # Nothing fenced the second resumer: each sent the pending node's call.
+    assert len(first.calls) == 1 and second.calls == first.calls
+    assert (earlier.output, later.output) == ("first", "second")
+    # The snapshot written last replaced the first resumer's.
+    saved = FileCheckpointStore(tmp_path).load(execution_id)
+    assert saved["status"] == "completed"
+    assert [node["result"] for node in saved["graph"]["nodes"]] == ["second"]
+    assert [path.name for path in tmp_path.iterdir()] == [f"{execution_id}.json"]
+
+
+def offline_calls(monkeypatch) -> list[str]:
+    """Record, from here on, every prompt a durable run sends to OfflineProvider."""
+    calls, complete = [], OfflineProvider.complete
+
+    async def record(self, system, prompt, model):
+        calls.append(prompt)
+        return await complete(self, system, prompt, model)
+
+    monkeypatch.setattr(OfflineProvider, "complete", record)
+    return calls
+
+
+def test_a_durable_resume_waits_for_another_owners_live_lease_before_any_call(tmp_path, monkeypatch):
+    clock = ManualClock()
+    with SQLiteWorkflowStore(tmp_path / "runs.db", clock_ns=clock) as store:
+        run_id = durable_swarm(store).plan(Task("Report")).run_ref["run_id"]
+        # Another process holds the run, as a killed one does until its lease lapses.
+        held = store.acquire_lease(run_id, "another-process", ttl_s=60)
+        before = store.inspect_run(run_id)
+        calls = offline_calls(monkeypatch)
+        clock.advance(59)
+        with pytest.raises(WorkflowLeaseError, match="active lease"):
+            durable_swarm(store).resume(run_id)
+        assert calls == [] and store.inspect_run(run_id) == before
+
+        clock.advance_past(held.expires_at_ns)
+        result = durable_swarm(store).resume(run_id)
+        # The lapsed owner can no longer write to the run.
+        with pytest.raises(WorkflowLeaseError, match="expired or was superseded"):
+            store.release_lease(held)
+    assert result.output == "offline: Report" and calls == ["Report"]
+
+
+def recorded(method, into: list):
+    """Wrap *method* so that each value it returns is appended to *into*."""
+    def call(*args, **kwargs):
+        into.append(method(*args, **kwargs))
+        return into[-1]
+    return call
+
+
+def test_a_durable_run_holds_a_60_second_lease_that_its_event_loop_renews_every_15_seconds(
+    tmp_path, monkeypatch,
+):
+    clock, sleep, complete = ManualClock(), asyncio.sleep, OfflineProvider.complete
+    intervals, beat, leases, renewals = [], {}, [], []
+
+    async def heartbeat_sleep(delay, result=None):
+        if delay != 15:
+            return await sleep(delay, result)
+        # Each heartbeat interval ends only when the test lets it.
+        intervals.append(delay)
+        await beat.setdefault("next", asyncio.Event()).wait()
+        del beat["next"]
+        return result
+
+    async def slow(self, system, prompt, model):
+        clock.advance(50)
+        beat.setdefault("next", asyncio.Event()).set()
+        for _ in range(1000):  # Yield until the heartbeat has renewed the lease.
+            if renewals:
+                break
+            await sleep(0)
+        # Past the first lease's 60 seconds, the renewed lease still holds the run.
+        clock.advance(50)
+        return await complete(self, system, prompt, model)
+
+    monkeypatch.setattr(asyncio, "sleep", heartbeat_sleep)
+    monkeypatch.setattr(OfflineProvider, "complete", slow)
+    with SQLiteWorkflowStore(tmp_path / "runs.db", clock_ns=clock) as store:
+        monkeypatch.setattr(store, "acquire_lease", recorded(store.acquire_lease, leases))
+        monkeypatch.setattr(store, "heartbeat", recorded(store.heartbeat, renewals))
+        started = clock()
+        result = durable_swarm(store).execute(Task("Report"))
+
+    [lease], [renewed] = leases, renewals
+    assert lease.expires_at_ns == started + 60 * 10**9
+    assert renewed.epoch == lease.epoch and renewed.expires_at_ns == started + (50 + 60) * 10**9
+    assert intervals[:2] == [15, 15]
+    assert result.output == "offline: Report"
+
+
+def test_a_durable_run_whose_lease_lapses_during_a_stall_fails_and_resumes_without_calling_again(
+    tmp_path, monkeypatch,
+):
+    clock = ManualClock()
+    complete, calls = OfflineProvider.complete, []
+
+    async def stalled(self, system, prompt, model):
+        calls.append(prompt)
+        if len(calls) == 1:
+            # Blocking work that never yields lets no heartbeat run.
+            clock.advance(61)
+        return await complete(self, system, prompt, model)
+
+    monkeypatch.setattr(OfflineProvider, "complete", stalled)
+    with SQLiteWorkflowStore(tmp_path / "runs.db", clock_ns=clock) as store:
+        with pytest.raises(WorkflowLeaseError):
+            durable_swarm(store).execute(Task("Report"))
+        [run] = store.list_runs()
+        [call] = store.inspect_run(run["run_id"])["calls"]
+        result = durable_swarm(store).resume(run["run_id"])
+        accounting = store.inspect_run(run["run_id"])
+    assert (call["state"], call["billing_state"]) == ("response_saved", "reserved")
+    # Resuming settles the response the stalled call saved instead of sending it again.
+    assert result.output == "offline: Report" and calls == ["Report"]
+    assert accounting["status"] == "completed" and accounting["unknown_nanousd"] == 0
