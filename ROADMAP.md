@@ -295,7 +295,9 @@ data or the tools agents are offered
 - **Reviewable template lifecycle** — distilled graphs become
   [versioned template records](docs/learning.md#template-records) in an
   append-only catalog, validated as untrusted candidates that cannot grant
-  authority or weaken their parent's gates. Planner history keeps
+  authority. Each record is compared with the parent it names, and every
+  version of a name after the first must name a stored one, so a later
+  version cannot weaken its parent's gates. Planner history keeps
   verification and acceptance evidence and, opt-in, failed runs, and
   structure that repeated accepted runs share becomes a
   [candidate record](docs/learning.md#promote-repeated-accepted-structure).
@@ -305,10 +307,12 @@ data or the tools agents are offered
   reviewed decision [activates it](docs/learning.md#activate-and-roll-back-templates)
   for new runs, a rollback restores the previous version without changing
   running work, and durable runs pin the exact versions they started with. A
-  record [builds its graph without a planning call](docs/learning.md#build-a-template-without-planning),
-  and it stops being offered when the tools, capabilities, skills,
-  validators, models or MCP allowlists it was proven with
-  [change](docs/learning.md#applicability). The offline
+  record [builds its graph without a planning call](docs/learning.md#build-a-template-without-planning).
+  A menu the caller builds with the environment a run would use leaves out
+  a template once the tools, capabilities, skills, validators, models or
+  MCP allowlists it was proven with [change](docs/learning.md#applicability);
+  a menu built without one offers it as before. Records name no sources, so
+  a source change is not part of applicability. The offline
   [template-lifecycle example](examples/21_template_lifecycle.py) records a
   template, rejects a harmful candidate on held-out tasks, and rolls back the
   same candidate after a fooled evaluator promotes it.

@@ -13,9 +13,9 @@ untrusted candidates, the template catalog, building a template without a
 planning call, activating, rolling back and pinning template versions,
 when a template stops applying because what its runs relied on changed, a
 template's lifecycle from record to rollback, and what learning cannot
-change. A record is data: building a template from it,
-storing it, activating it and pinning it in a durable run never changes the
-base planner, and nothing is promoted or activated automatically.
+change. A record is data: building a template from it, storing it,
+activating it and pinning it in a durable run never changes the base
+planner, and nothing is promoted or activated automatically.
 
 ## Evidence in planner history
 
@@ -172,12 +172,13 @@ A record's JSON form:
   configuration or filesystem paths: no key holds them, and every unknown
   key is refused. Free text, the description, labels and personas, is copied
   verbatim from the graph and its agents, so it can still hold a path or the
-  source task's subject; the [review](#review) flags both. `prerequisites` names what a template expects to find,
-  such as a tool by name, version and schema digest; it grants nothing.
-  Validators appear as `ValidatorIdentity` data (name, version and
-  configuration digest), never as code or configuration. `proven_with` holds
-  only the digests of the model ids and MCP allowlists that a candidate's
-  runs used, to tell when they [change](#applicability).
+  source task's subject; the [review](#review) flags both. `prerequisites`
+  names what a template expects to find, such as a tool by name, version
+  and schema digest; it grants nothing. Validators appear as
+  `ValidatorIdentity` data (name, version and configuration digest), never
+  as code or configuration. `proven_with` holds only the digests of the
+  model ids and MCP allowlists that a candidate's runs used, to tell when
+  they [change](#applicability).
 - **Optional sections.** Everything after `blueprint` is optional and is
   omitted when empty, never written as null or an empty list. Lists inside
   `applicability` and `prerequisites` are sets: they are sorted and hold each
@@ -204,10 +205,10 @@ whitespace, UTF-8):
 
 - `template_version` covers what decides what the template builds: the type,
   version, name, description, blueprint, applicability, prerequisites,
-  `proven_with` and expected outputs. Any change to a gate, policy, edge, label, persona or
-  applicability gives a new version. Key order does not change it, and
-  neither do `failure_examples`, `tests`, `source_runs`, `parent_version` or
-  `review`.
+  `proven_with` and expected outputs. Any change to a gate, policy, edge,
+  label, persona or applicability gives a new version. Key order does not
+  change it, and neither do `failure_examples`, `tests`, `source_runs`,
+  `parent_version` or `review`.
 - `record_sha256` covers the whole record. Records are equal, and hash
   alike, exactly when their `record_sha256` is equal, so a timeout of `90`
   and one of `90.0` make different records.
@@ -286,9 +287,9 @@ if structure_sha256(result.graph) in repeated_structures(memory, min_accepted=3)
   does, keeps its [review](#review), and lists each accepted run of the
   graph's structure in `rows` as a source run. With fewer than
   `min_accepted` such runs it raises `DistillationError`. Given the
-  `environment` the runs used, it also records what they relied on, so the
-  template stops being offered when that changes (see
-  [applicability](#applicability)).
+  `environment` the runs used, it also records what they relied on, so a
+  menu built with the environment a later run would use leaves the
+  template out once that changes (see [applicability](#applicability)).
 - **Failure examples.** Each other row of that structure that has a
   `failure_category`, or whose `acceptance` is `rejected`, `needs_review` or
   `indeterminate`, becomes a failure example: that category, or else the
@@ -394,17 +395,17 @@ template = catalog.get(version).to_template()
 catalog.versions("diligence-review")  # every stored version of that name
 ```
 
-- `put(record, *, parent=None, limits=None)` [validates](#validate-a-candidate-record)
-  the record, a `TemplateRecord` or its JSON data, under `limits` and
-  against `parent` or, without one, against the record the catalog holds
-  for the candidate's `parent_version`, when it holds one. A refused record
-  raises `TemplateValidationError` and writes nothing. `put` returns the
-  record's template version. Storing a record the catalog already holds
-  writes no record or version file. A catalog holds
-  one record per version: a different record for a stored version, for
-  example one with other source runs, raises `TemplateRecordError` and the
-  stored record is kept. Two processes that store the same record at once
-  both succeed.
+- `put(record, *, parent=None, limits=None)`
+  [validates](#validate-a-candidate-record) the record, a `TemplateRecord`
+  or its JSON data, under `limits` and against `parent` or, without one,
+  against the record the catalog holds for the candidate's
+  `parent_version`, when it holds one. A refused record raises
+  `TemplateValidationError` and writes nothing. `put` returns the record's
+  template version. Storing a record the catalog already holds writes no
+  record or version file. A catalog holds one record per version: a
+  different record for a stored version, for example one with other source
+  runs, raises `TemplateRecordError` and the stored record is kept. Two
+  processes that store the same record at once both succeed.
 - Every new version of a name the catalog already holds versions of must
   name one of them as its `parent_version`, and is validated against it, so
   a later version cannot drop a gate by naming no parent, or by naming a
@@ -552,6 +553,24 @@ writes only the registry. The catalog, the Autotune ledger, durable
 journals, architects already built and running work are unchanged, and the
 ledger's decisions and trials stay readable through a read-only open.
 
+The installed CLI records the same review and makes the same changes for a
+template's target:
+
+```bash
+smythe optimize review CAMPAIGN_ID --verdict approve --reviewer report-owner \
+    --ledger optimize.sqlite3 --registry policy-registry.sqlite3
+smythe optimize activate planner.template.report REVIEW_ID --expected-seq 0 \
+    --actor release-operator --reason "approved for new reports" \
+    --registry policy-registry.sqlite3
+smythe optimize rollback planner.template.report --to-seq 1 --expected-seq 2 \
+    --actor release-operator --reason "v2 drops the conclusions" \
+    --registry policy-registry.sqlite3
+```
+
+`retire` and `history` work the same way; see
+[review and change targets from the CLI](optimize.md#review-and-change-targets-from-the-cli)
+for every command, its options and its exit codes.
+
 ### Resume a pinned run
 
 A durable run keeps the versions its recipe pinned, whatever is activated or
@@ -574,9 +593,9 @@ or that architect's description within it, such as a router tier's
 recipe's name and description, and its builder is `record.local_only()` for
 the recorded version, so the rebuilt recipe matches the saved one, and so
 does its `config_sha256`, and the run finishes on the versions it started
-with. A version the catalog
-does not hold raises `KeyError`. A template whose builder is not a record's
-declaration, such as one written in code, raises `TemplateRecordError`.
+with. A version the catalog does not hold raises `KeyError`. A template
+whose builder is not a record's declaration, such as one written in code,
+raises `TemplateRecordError`.
 
 ### Which versions a plan used
 
