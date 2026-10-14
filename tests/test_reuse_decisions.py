@@ -17,14 +17,14 @@ import smythe.reuse
 from fakes import release_price_version
 from fixture_service import FixtureService
 from smythe import (
-    ArtifactLineage, CurrentState, ItemDecision, LineagePolicy, SourceStatus, ValidatorIdentity,
-    WorkflowBindingError,
+    ArtifactLineage, CurrentState, ItemDecision, LineagePolicy, LocalOnly, MarkdownRenderer,
+    SourceStatus, ValidatorIdentity, WorkflowBindingError,
 )
 from smythe._canonical import sha256_hex
 from smythe.context import CONTEXT_ASSEMBLY_VERSION
 from smythe.executor_base import ExecutorBase
 from smythe.graph import ExecutionGraph, Node
-from smythe.lineage import validator_set_sha256
+from smythe.lineage import renderer_identity, validator_set_sha256
 from smythe.reuse import ACTIONS, REASONS, NodeDecision, evaluate
 from smythe.verifier import TOKEN_VERIFIER_IDENTITY
 from smythe.workflow_artifact import PublishedArtifact, artifact_integrity
@@ -394,6 +394,33 @@ def test_a_renderer_added_since_a_run_without_a_document_regenerates_the_publica
     assert actions(decision) == {**dict.fromkeys(NODES[:-1], "reuse"), "write": "regenerate"}
     # Without a renderer now, there is still nothing to publish.
     assert evaluate(lineage(artifact=None), state(renderer=None, integrity={})).action == "reuse"
+
+
+class PlainBrief:
+    """A LocalOnly renderer."""
+
+    filename = "brief.txt"
+
+    def render(self, output, task):
+        return output
+
+
+def test_a_renderer_identity_names_a_configured_renderer_as_a_record_does():
+    markdown = renderer_identity(MarkdownRenderer())
+    assert markdown == {"name": "markdown_renderer", "version": "1",
+                        "spec_sha256": sha256_hex({"type": "markdown_renderer", "version": 1})}
+    local = renderer_identity(LocalOnly(PlainBrief, "plain-brief", "2", role="renderer"))
+    assert (local["name"], local["version"]) == ("plain-brief", "2")
+    assert renderer_identity(LocalOnly(PlainBrief, "plain-brief", "3", role="renderer")) != local
+    assert renderer_identity(None) is None
+    # It is what a state compares a record's renderer with.
+    record = lineage(artifact={**record_data()["artifact"], "renderer": markdown})
+    assert evaluate(record, state(renderer=renderer_identity(MarkdownRenderer()))).action == "reuse"
+    assert evaluate(record, state(renderer=local)).reasons == ("renderer_changed",)
+    for value in (object(), "markdown_renderer", MarkdownRenderer,
+                  LocalOnly(PlainBrief, "plain-brief", "1", role="synthesizer")):
+        with pytest.raises(WorkflowBindingError):
+            renderer_identity(value)
 
 
 @pytest.mark.parametrize("status", ["missing", "changed"])

@@ -174,8 +174,12 @@ class CurrentState:
     ``TokenVerifier``, or ``validator-v1`` with the identities of the gate
     validators in ``gate_validators``, which are kept as a sorted set.
     ``renderer`` is the renderer a run would publish its document with, as a
-    record names it (``name``, ``version`` and ``spec_sha256``), or None for
-    none. Every part is read-only.
+    record names it (``name``, ``version`` and ``spec_sha256``, which
+    :func:`~smythe.lineage.renderer_identity` gives), or None for none.
+    A part left at its default is compared as it is: without a renderer,
+    every run that published a document regenerates its synthesis, and
+    without the gate verifier and gate validators, every gate a gate
+    validator judged regenerates. Every part is read-only.
     """
 
     catalog: SourceCatalog

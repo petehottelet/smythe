@@ -277,7 +277,8 @@ action for the item, one for each node, the [reason codes](#reason-codes)
 behind them, and the authority under which anything is kept.
 
 ```python
-from smythe import CurrentState, LineagePolicy, SourceStatus
+from smythe import CurrentState, LineagePolicy, MarkdownRenderer, SourceStatus
+from smythe.lineage import renderer_identity
 from smythe.reuse import evaluate
 
 
@@ -301,6 +302,7 @@ state = CurrentState(
     tools={"handbook": {"version": "1", "decoder_version": "utf8-text-v1"}},
     components={"brief-writer": "2"},
     agents=agent_digests,
+    renderer=renderer_identity(MarkdownRenderer()),  # the runs' renderer
     integrity={run_id: "verified"},
     lineage=LineagePolicy(access_scope="research-team"),
 )
@@ -331,10 +333,17 @@ would use now. Each part is checked when it is built and kept read-only.
 | `integrity` | `{}` | A run id mapped to its published document's integrity `status`: `verified`, `missing`, `changed`, `unsafe`, `unreadable` or `not_checked`, as [`smythe runs inspect`](runs.md#published-documents) reports it. |
 | `lineage` | `LineagePolicy()` | The configured policy, whose `access_scope`, `reuse` and `undeclared_coverage` apply. |
 | `gate_verifier` | `token-v2` | The gate verifier a run would judge its gates with, as its recipe's `verifier` names it: `smythe.verifier.TOKEN_VERIFIER_IDENTITY` for `TokenVerifier`, or `validator-v1` for a gate validator. |
-| `gate_validators` | none | The gate validators' `ValidatorIdentity` values, kept as a sorted set. |
-| `renderer` | None | The renderer a run would publish its document with, as a record names it: `{"name", "version", "spec_sha256"}`, or None for none. |
+| `gate_validators` | none | The gate validators' `ValidatorIdentity` values (each validator's `identity`), kept as a sorted set. |
+| `renderer` | None | The renderer a run would publish its document with, as a record names it: `{"name", "version", "spec_sha256"}`, which `smythe.lineage.renderer_identity(renderer)` gives for a `MarkdownRenderer` or a `LocalOnly` renderer; None for none. |
 
-A price release changes none of these, so it never changes a decision.
+A part left at its default is compared as it is, not skipped. A state
+without a `renderer` regenerates the synthesis of every run that published a
+document (`renderer_changed`), and one without the `gate_verifier` and
+`gate_validators` a run would use regenerates every gate that a gate
+validator judged (`gate_validator_changed`). A
+[repair plan](#plan-a-repair) builds the state from the `Swarm`'s
+configuration, so it names them all. A price release changes none of these,
+so it never changes a decision.
 
 ### The source catalog
 

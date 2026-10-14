@@ -21,14 +21,14 @@ import pytest
 import test_workflow_reuse as successors
 from fixture_service import FixtureService, serve_http
 from smythe import (
-    AcceptancePolicy, ContextSource, CurrentState, LineagePolicy, OfflineProvider, ReadToolError,
-    RepairPlan, SimpleArchitect, SourceStatus, SQLiteWorkflowStore, Swarm, Task, TextValidator,
-    archive_heads,
+    AcceptancePolicy, ContextSource, CurrentState, LineagePolicy, MarkdownRenderer, OfflineProvider,
+    ReadToolError, RepairPlan, SimpleArchitect, SourceStatus, SQLiteWorkflowStore, Swarm, Task,
+    TextValidator, archive_heads,
 )
 from smythe._canonical import sha256_hex
 from smythe._run_inspection import inspect_journal
 from smythe.graph import ExecutionGraph
-from smythe.lineage import load_lineage
+from smythe.lineage import load_lineage, renderer_identity
 from smythe.reuse import STATUSES, derived_status, evaluate
 from smythe.workflow_artifact import current_artifact
 from smythe.workflow_store import WorkflowNotFoundError, _canonical, _sha
@@ -180,6 +180,9 @@ def test_a_plan_over_three_runs_equals_the_evaluator_decisions(built, tmp_path):
                 assert {key: item[key] for key in ("action", "reasons", "nodes", "authority")} \
                     == decision.to_dict()
                 assert item["lineage_sha256"] == load_lineage(store, run_id).sha256
+                # The configured renderer is named as each record names it.
+                assert load_lineage(store, run_id).artifact["renderer"] == renderer_identity(
+                    MarkdownRenderer()) == MARKDOWN
     full = listed[runs["full"]]
     # Only the renewals read, the extractions given it and the brief run again.
     assert {node["id"]: node["action"] for node in full["nodes"]} == {

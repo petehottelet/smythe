@@ -1113,9 +1113,13 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   they judge are never reused in an item that computes anything again,
   `reuse=False` turns reuse and rendering again into regeneration, and a
   record in another access scope is invisible before any digest is
-  compared. A catalog that declares itself metered is refused. The
-  evaluator reads no store or file and its output is deterministic JSON
-  data. See [reuse decisions](docs/lineage.md#reuse-decisions).
+  compared. A state part left at its default is compared as it is, so a
+  state without a renderer regenerates every published document's
+  synthesis; `smythe.lineage.renderer_identity()` names a configured
+  renderer as a record does. A catalog that declares itself metered is
+  refused. The evaluator reads no store or file and its output is
+  deterministic JSON data. See
+  [reuse decisions](docs/lineage.md#reuse-decisions).
 - Read-only repair plans for artifact lineage.
   `Swarm.plan_repair(execution_ids=None, *, sources)` evaluates each run in
   the Swarm's access scope, by default the heads of the archive, against

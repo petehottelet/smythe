@@ -35,15 +35,15 @@ from smythe.graph import ExecutionGraph, Node, NodeStatus
 from smythe.validation import ValidatorIdentity, _require_keys, _require_sha256
 from smythe.verifier import node_generation
 from smythe.workflow_artifact import PublishedArtifact, publications, read_publication
-from smythe.workflow_binding import WorkflowBindingError
+from smythe.workflow_binding import WorkflowBindingError, describe_component
 from smythe.workflow_store import WorkflowStateError
 from smythe.workflow_tools import READ_STEP_KEY
 
 __all__ = [
     "LINEAGE_OPERATION", "LINEAGE_POLICY_VERSION", "LINEAGE_RECORD_VERSION", "LINEAGE_REUSE_KEY",
     "PURGE_OPERATION", "ArtifactLineage", "LineagePolicy", "build_lineage", "lineage_key",
-    "load_lineage", "purged_artifacts", "restrict_source", "restricted_sources",
-    "validator_set_sha256",
+    "load_lineage", "purged_artifacts", "renderer_identity", "restrict_source",
+    "restricted_sources", "validator_set_sha256",
 ]
 
 LINEAGE_POLICY_VERSION = 1
@@ -538,6 +538,21 @@ def _renderer(description: Mapping[str, Any]) -> dict[str, str]:
     return {"name": _label(description.get("identity", description.get("type"))),
             "version": _label(str(description.get("version"))),
             "spec_sha256": sha256_hex(description)}
+
+
+def renderer_identity(renderer: Any) -> dict[str, str] | None:
+    """The identity a lineage record gives *renderer*'s documents, or None for no renderer.
+
+    *renderer* is a :class:`~smythe.workflow_artifact.MarkdownRenderer` or a
+    renderer declared with ``LocalOnly(..., role="renderer")``, as a durable
+    run takes it. The identity is the ``name``, ``version`` and
+    ``spec_sha256`` that a record's ``artifact.renderer`` holds and
+    :class:`~smythe.reuse.CurrentState` compares with it. Nothing is
+    rendered or called. Raises ``WorkflowBindingError`` for anything else.
+    """
+    if renderer is None:
+        return None
+    return _renderer(describe_component(renderer, role="renderer"))
 
 
 def _matching_digests(record: ArtifactLineage) -> set[str]:
