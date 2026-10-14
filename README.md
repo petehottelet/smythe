@@ -324,7 +324,8 @@ matrix of supported configurations, and broader external-task benchmarks,
 including separately controlled Astra scheduler and framework studies.
 See the [roadmap](ROADMAP.md) for status and acceptance criteria.
 The [support matrix](docs/support-matrix.md) shows what each execution path
-accepts today, with the test behind each cell. The
+accepts today and what owns each execution responsibility on it, with the test
+behind each cell. The
 [source-to-artifact example](examples/16_source_to_artifact.py) runs a
 durable research workflow offline and without keys, from bundled sources
 through an interruption and resume to an accepted document whose evidence
