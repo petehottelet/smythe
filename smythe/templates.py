@@ -18,7 +18,8 @@ A record's structure can come from model output, so
 :func:`validate_template_record` checks one as an untrusted candidate, and
 :meth:`TemplateCatalog.put` stores only a record that passes: no key that
 grants authority, the model-plan limits unless a developer passes others, and
-no weaker gate, output check or prerequisite than its parent's.
+no weaker gate, output check or prerequisite than its parent's. Every version
+of a name after the first must name a stored version of it as its parent.
 
 A policy registry target ``planner.template.<name>`` (:func:`template_target`)
 holds the version of template *name* in effect.
@@ -864,8 +865,12 @@ class TemplateCatalog:
 
         :func:`validate_template_record` checks it first, under *limits*
         and against *parent*: by default the record this catalog holds for
-        the candidate's ``parent_version``, when it holds one. A refused
-        record raises :class:`TemplateValidationError` and writes nothing.
+        the candidate's ``parent_version``, when it holds one. A new version
+        of a name the catalog already holds versions of must name one of
+        them as its ``parent_version``, so it is always compared with a
+        stored parent; only the first version of a name may name none, or a
+        parent the catalog does not hold. A refused record raises
+        :class:`TemplateValidationError` and writes nothing.
 
         Storing a record the catalog already holds writes no record or
         version file. A different record for a stored version, such as one
@@ -873,11 +878,21 @@ class TemplateCatalog:
         stored one is kept.
         """
         record = _candidate(record)
+        try:
+            self._digest(record.template_version)
+        except KeyError:  # A new version: a later one must name a stored version of its name.
+            held = self.versions(record.name)
+            if held and record.parent_version not in held:
+                raise _refuse(None, "parent_version", (
+                    f"is not set, but the catalog holds versions of template {record.name!r}; "
+                    "a new version must name one of them" if record.parent_version is None else
+                    f"names {record.parent_version}, which is not a version of template "
+                    f"{record.name!r} that the catalog holds"))
         if parent is None and record.parent_version is not None:
             try:
                 parent = self.get(record.parent_version)
             except KeyError:
-                pass  # A parent this catalog does not hold is not compared.
+                pass  # The first version of a name: a parent the catalog does not hold.
         record = validate_template_record(record, parent=parent, limits=limits)
         self._check_layout()
         data, digest, version = (canonical_bytes(record.to_dict()), record.record_sha256,

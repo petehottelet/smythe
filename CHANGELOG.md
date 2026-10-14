@@ -1838,7 +1838,10 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   or prerequisite. `TemplateCatalog.put(record, *, parent=None,
   limits=None)` validates first, by default against the stored record of
   the candidate's `parent_version`, writes nothing for a refused record, and
-  also accepts a record's JSON data. `distill_template` and templates built
+  also accepts a record's JSON data. A new version of a name the catalog
+  already holds must name one of its stored versions as `parent_version`,
+  so it is always compared with a stored parent; only a name's first
+  version may name none. `distill_template` and templates built
   in code are not validated. See
   [validate a candidate record](docs/learning.md#validate-a-candidate-record).
 - Template versions are activated and rolled back through the policy

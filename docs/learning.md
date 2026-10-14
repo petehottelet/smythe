@@ -212,7 +212,9 @@ whitespace, UTF-8):
   alike, exactly when their `record_sha256` is equal, so a timeout of `90`
   and one of `90.0` make different records.
 
-`parent_version` names the template version a record was derived from.
+`parent_version` names the template version a record was derived from. The
+[catalog](#the-template-catalog) requires it of every version of a name after
+the first.
 
 ### Structure digests
 
@@ -300,7 +302,10 @@ if structure_sha256(result.graph) in repeated_structures(memory, min_accepted=3)
 - **A candidate only.** Nothing is stored or activated. The catalog
   [validates](#validate-a-candidate-record) a candidate when it stores it,
   and a version is put in effect only through a
-  [reviewed decision](#activate-and-roll-back-templates).
+  [reviewed decision](#activate-and-roll-back-templates). A candidate names
+  no parent, so it is stored only as the first version of its name; to store
+  it as a later version, name a stored version it follows:
+  `catalog.put(dataclasses.replace(record, parent_version=version))`.
 
 `PlannerMemory.iter_outcomes()` returns the history rows, oldest first. It
 reads the file once, when it is called, never writes it, and skips the rows
@@ -393,6 +398,13 @@ catalog.versions("diligence-review")  # every stored version of that name
   example one with other source runs, raises `TemplateRecordError` and the
   stored record is kept. Two processes that store the same record at once
   both succeed.
+- Every new version of a name the catalog already holds versions of must
+  name one of them as its `parent_version`, and is validated against it, so
+  a later version cannot drop a gate by naming no parent, or by naming a
+  version of another template. Otherwise `put` raises
+  `TemplateValidationError` with `field` `"parent_version"` and writes
+  nothing. Only the first version of a name may name no parent, or one the
+  catalog does not hold.
 - `layout.json` records the catalog's file layout
   (`smythe.templates.TEMPLATE_CATALOG_LAYOUT`, now 1), so a later layout
   change is detected rather than misread. A catalog without the file was
@@ -704,9 +716,11 @@ skill files involved.
 ## Limits
 
 - Validation compares a candidate with one parent, not with the whole
-  lineage, and a record whose parent the catalog does not hold is checked
-  against the limits only. It does not read the instructions in labels and
-  personas.
+  lineage, and does not read the instructions in labels and personas. The
+  first version of a name has no stored parent and is checked against the
+  limits only, and the catalog takes no lock, so two processes that each
+  store a version of a new name at the same time can both store it without
+  a parent.
 - The catalog has no activation, review or rollback state; the policy
   registry holds it. An architect offers the templates it was given, so
   only a menu built by `active_templates` or `active_local_templates`
