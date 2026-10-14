@@ -359,8 +359,15 @@ candidate is refused when:
   `failure_policy` `skip`, under which a failing judge or target is passed
   over and the run continues without a verdict; and no validator of an
   expected output and no prerequisite of the parent may be removed. A
-  prerequisite at another version counts as removed. A candidate's
-  `parent_version`, when set, must be the parent's version.
+  prerequisite at another version counts as removed. The parent's
+  `proven_with` may not be dropped, which would let the template
+  [apply](#applicability) under any models and MCP allowlists, though a
+  candidate proven elsewhere may record other digests; and every task
+  family in the parent's `excluded_task_families` must stay excluded. The
+  other `applicability` fields, `task_families`, `keywords` and
+  `required_context_keys`, are not compared, and no library code acts on
+  them. A candidate's `parent_version`, when set, must be the parent's
+  version.
 
 Validation checks structure and authority, not instructions: a label or
 persona that tells a judge to pass everything is for a reviewer to catch.

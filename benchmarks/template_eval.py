@@ -658,18 +658,29 @@ FIXTURE_VERSIONS = {
 }
 
 
+def _fixture_record(label: str, parent_version: str | None) -> TemplateRecord:
+    description, sections, retried, excludes = FIXTURE_VERSIONS[label]
+    return TemplateRecord(
+        name=TEMPLATE, description=description,
+        blueprint=[_step(section, retries=int(section in retried)) for section in sections],
+        applicability=_APPLICABILITY if excludes else None, parent_version=parent_version)
+
+
 def fixture_catalog(root: str | Path) -> tuple[TemplateCatalog, dict[str, str]]:
-    """A catalog under *root* holding every fixture version, and each label's version."""
+    """A catalog under *root* holding every fixture version, and each label's version.
+
+    The catalog refuses a version that drops an exclusion its parent has, so
+    the version without the exclusion is stored first, and the predecessor,
+    which adds it, names that version as its parent. Every other version
+    names the predecessor.
+    """
     catalog = TemplateCatalog(root)
-    versions: dict[str, str] = {}
-    for label, (description, sections, retried, excludes) in FIXTURE_VERSIONS.items():
-        record = TemplateRecord(
-            name=TEMPLATE, description=description,
-            blueprint=[_step(section, retries=int(section in retried)) for section in sections],
-            applicability=_APPLICABILITY if excludes else None,
-            parent_version=versions.get("predecessor"))
-        versions[label] = catalog.put(record)
-    return catalog, versions
+    versions = {"unexcluded": catalog.put(_fixture_record("unexcluded", None))}
+    versions["predecessor"] = catalog.put(_fixture_record("predecessor", versions["unexcluded"]))
+    for label in FIXTURE_VERSIONS:
+        if label not in versions:
+            versions[label] = catalog.put(_fixture_record(label, versions["predecessor"]))
+    return catalog, {label: versions[label] for label in FIXTURE_VERSIONS}
 
 
 def _pack_record(pack: TaskPack) -> dict[str, Any]:

@@ -1834,11 +1834,13 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   the generated-plan limits, or the developer's `TemplateLimits`, including
   a gate that does not depend on the node it verifies; and, compared with a
   parent, for a dropped or retargeted gate, lowered `max_regenerations`, a
-  gate or target relaxed to `skip`, or a removed expected-output validator
-  or prerequisite. `TemplateCatalog.put(record, *, parent=None,
-  limits=None)` validates first, by default against the stored record of
-  the candidate's `parent_version`, writes nothing for a refused record, and
-  also accepts a record's JSON data. A new version of a name the catalog
+  gate or target relaxed to `skip`, a removed expected-output validator or
+  prerequisite, a dropped `proven_with`, or a task family the parent's
+  applicability excludes that it no longer excludes.
+  `TemplateCatalog.put(record, *, parent=None, limits=None)` validates
+  first, by default against the stored record of the candidate's
+  `parent_version`, writes nothing for a refused record, and also accepts a
+  record's JSON data. A new version of a name the catalog
   already holds must name one of its stored versions as `parent_version`,
   so it is always compared with a stored parent; only a name's first
   version may name none. `distill_template` and templates built

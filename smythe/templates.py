@@ -779,6 +779,16 @@ def _check_parent(
                 label = item if isinstance(item, str) else item["name"]
                 raise _refuse(None, f"prerequisites.{key}", f"drops {label!r}, which the parent "
                                                             "lists")
+    # Without proven_with a record applies under any models and MCP allowlists;
+    # a child proven elsewhere records other digests instead.
+    if parent.proven_with and not record.proven_with:
+        raise _refuse(None, "proven_with", "is dropped, so the template would apply under models "
+                                           "and MCP allowlists the parent was never proven with")
+    kept_families = set((record.applicability or {}).get("excluded_task_families", ()))
+    for family in (parent.applicability or {}).get("excluded_task_families", ()):
+        if family not in kept_families:
+            raise _refuse(None, "applicability.excluded_task_families",
+                          f"drops {family!r}, which the parent excludes")
 
 
 def validate_template_record(
@@ -805,8 +815,10 @@ def validate_template_record(
     - given a *parent*, guarantees less than the parent does: a gate is
       dropped or verifies another node, a gate's ``max_regenerations`` is
       lowered, a gate or its target is relaxed to ``failure_policy`` skip,
-      or an expected-output validator or a prerequisite is removed. The
-      record's ``parent_version``, if set, must be the parent's version.
+      an expected-output validator or a prerequisite is removed, the
+      parent's ``proven_with`` is dropped, or a task family the parent's
+      applicability excludes is no longer excluded. The record's
+      ``parent_version``, if set, must be the parent's version.
 
     Developer code is trusted, so ``distill_template`` and templates a
     developer builds are not checked; records are.
