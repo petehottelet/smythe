@@ -1821,8 +1821,8 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   account identifiers redacted, the home folder written `~` in any spelling
   of its separators, including a repr's doubled backslashes, and other
   absolute paths `<path>`, whole when quoted and, unquoted, past each space
-  before a word with a separator or a dot; URL paths and routes after an
-  HTTP method stay. `success` keeps its meaning, and planning prompts
+  before a capitalized word or one with a separator or a dot. URL paths and
+  HTTP routes stay. `success` keeps its meaning, and planning prompts
   keep their format and show each failure row's outcome as `failure`, even
   for a run whose nodes all completed before synthesis failed. Interrupts,
   exits and cancellation are never recorded, and a history write that fails

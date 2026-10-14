@@ -40,12 +40,12 @@ _PATH_START = (
 # A path that starts a quoted string runs to its closing quote, spaces included.
 _QUOTED_PATH = re.compile(r"(['\"`])" + _PATH_START + r"(?:(?!\1)[^\r\n])*\1")
 # Any other runs to a space or quote, and on past a space while the next word
-# holds a separator or a dot, as the rest of a name with a space would; a URL
-# is never taken in.
+# holds a separator or a dot or is capitalized, as the rest of a name with a
+# space would be; a URL or an HTTP method and its route is never taken in.
 _WORD = r"[^\s'\"`]"
 _ABSOLUTE_PATH = re.compile(
-    _PATH_START + _WORD + r"*(?: +(?![A-Za-z][\w+.-]*://)(?=" + _WORD + r"*(?:[\\/]|\.\w))"
-    + _WORD + r"+)*"
+    _PATH_START + _WORD + r"*(?: +(?![A-Za-z][\w+.-]*://|(?:" + "|".join(_HTTP_METHODS)
+    + r") )(?=[A-ZÀ-ÖØ-Þ]|" + _WORD + r"*(?:[\\/]|\.\w))" + _WORD + r"+)*"
 )
 
 
@@ -77,12 +77,12 @@ def redact_paths(text: str) -> str:
     as a repr or JSON text doubles backslashes, and without case on
     Windows, so a user name that holds a space is removed whole. A path that
     starts a quoted string is removed up to the closing quote. Unquoted, a
-    path ends at a space unless the next word holds a separator or a dot, so
-    a folder or file name with a space is removed whole, and so is a
-    neighbouring word such as ``and/or``, in preference to keeping part of a
-    path; a word with neither stays, even one of the path's last name. URL
-    paths and a route after an HTTP method, as in ``POST
-    /v1/chat/completions``, are not local paths and stay.
+    path ends at a space unless the next word holds a separator or a dot or
+    is capitalized, so a name with a space, such as another user's folder,
+    is removed whole, and so is a neighbouring word such as ``and/or``, in
+    preference to keeping part of a path; any other word stays, even one of
+    the path's last name. URL paths and a route after an HTTP method, as in
+    ``POST /v1/chat/completions``, are not local paths and stay.
     """
     try:
         home = str(Path.home())

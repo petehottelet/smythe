@@ -85,10 +85,11 @@ A failure row records:
   doubled backslashes of a repr or JSON text. A path that starts a quoted
   string is removed up to the closing quote, spaces included, as Python's
   own error messages quote paths. Unquoted, a path ends at a space unless
-  the next word holds a separator or a dot, which is then taken as part of
-  it: `C:\Program Files\Tool\run.exe` and `D:\data\report final.txt` are
-  removed whole, as is a following word such as `and/or`, while in
-  `D:\data\My Report` the word `Report` stays. URL paths and routes after an
+  the next word holds a separator or a dot or is capitalized; such a word is
+  taken as part of the path: `C:\Program Files\Tool\run.exe`,
+  `D:\data\report final.txt` and `D:\data\My Report` are removed whole, as
+  is a following word such as `and/or` or `Permission`, while in
+  `D:\data\my report` the word `report` stays. URL paths and routes after an
   HTTP method, such as `POST /v1/chat/completions`, are kept.
 - The row also records the run's `execution_id`, `structure_sha256`, any
   gate `verification` entries, its cost and timing so far, and `acceptance`

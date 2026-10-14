@@ -35,10 +35,13 @@ def home(monkeypatch):
     windows("C:", "Program Files", "Tool", "run.exe"),
     windows("D:", "My Data", "Runs 2026", "out.json"),
     windows("D:", "data", "report final.txt"),
+    windows("D:", "data", "My Report"),
+    windows("C:", "Users", "Other Person"),
     windows("", "", "fileserver", "shared drive", "run.txt"),
     "/srv/My Data/out.json",
     "file:///srv/My Data/key.json",
-], ids=["program-files", "two-spaces", "final-name", "unc", "posix", "file-url"])
+], ids=["program-files", "two-spaces", "final-name", "capitalized-name", "another-user", "unc",
+        "posix", "file-url"])
 def test_an_absolute_path_with_a_space_is_redacted_whole(home, path):
     home(WINDOWS_HOME)
     escaped = path.replace(BACKSLASH, BACKSLASH * 2)
@@ -97,6 +100,8 @@ def test_routes_and_url_paths_stay_readable(home):
         "POST /v1/files failed for <path>")
     assert redact_paths("open /srv/app/key.json then GET /v1/models") == (
         "open <path> then GET /v1/models")
+    assert redact_paths("open /srv/app/key.json POST /v1/models") == (
+        "open <path> POST /v1/models")
 
 
 def test_an_unquoted_path_ends_before_a_word_that_cannot_continue_it(home):
@@ -104,5 +109,9 @@ def test_an_unquoted_path_ends_before_a_word_that_cannot_continue_it(home):
     path = windows("D:", "data", "out.json")
     assert redact_paths(f"open {path} on request 7") == "open <path> on request 7"
     assert redact_paths(f"open {path} https://example.com/a") == "open <path> https://example.com/a"
-    # A word with a separator or a dot is taken in, in preference to keeping part of a path.
+    # A word with a separator or a dot, or a capitalized one, is taken in, in
+    # preference to keeping part of a path; a lowercase word ends it.
     assert redact_paths(f"open {path} and/or more") == "open <path> more"
+    assert redact_paths(f"open {path} Permission denied") == "open <path> denied"
+    assert redact_paths(f"open {windows('D:', 'data', 'my report')} failed") == (
+        "open <path> report failed")
