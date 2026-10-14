@@ -36,6 +36,7 @@ from smythe.workflow_binding import WorkflowBindingError
 from smythe.workflow_store import CallKey, WorkflowStateError
 from test_acceptance_operator_decision import RecordingHost, durable_operator
 from test_source_evidence import CLAIM, KEPT, MISLEADING, SOURCES, STRONG, artifact
+from test_workflow_acceptance import Raises
 
 REASON = "deleted at the owner's request"
 REMOVED_AT = "2026-10-01T09:00:00Z"
@@ -531,6 +532,35 @@ def test_an_operator_cannot_accept_output_delivered_from_a_removed_source(store,
     assert rejected.acceptance.decision is AcceptanceDecision.REJECTED and not rejected.accepted
     assert (rejected.output, rejected.rejected_output) == ("", left.rejected_output)
     assert durable(store, acceptance=TEXT_ONLY).resume(run_id).acceptance == rejected.acceptance
+
+
+def test_an_operator_cannot_accept_output_left_for_review_after_a_removal(store, replies):
+    replies["Write"] = artifact("# Billing\n\nA 2019 poll favoured annual billing.\n\n", POLL_ONLY)
+    review = AcceptancePolicy(mode="strict", final_validators=[Raises()], on_invalid="needs_review")
+    run_id = durable(store, acceptance=review).execute(single()).execution_id
+    left = current_decision(store, run_id)["record"]
+    assert left.decision is AcceptanceDecision.NEEDS_REVIEW
+    remove(store, run_id, acceptance=review)
+    host, revision = RecordingHost(), store.get_checkpoint(run_id)["revision"]
+    decisions = store.list_operations(run_id, "acceptance")
+
+    # The removal makes no new decision, so the run is still left for review,
+    # and an operator cannot accept what nothing can tell rests on other text.
+    refused = re.escape(
+        "An operator cannot accept output delivered from a removed source: source "
+        f"'renewals-2026' that the run delivered from was removed ({REASON})")
+    for acceptance in (None, review):
+        with pytest.raises(WorkflowStateError, match=refused):
+            durable(store, acceptance=acceptance).reevaluate(
+                run_id, operator=durable_operator(host, store, run_id))
+    assert host.verified == []
+    assert store.get_checkpoint(run_id)["revision"] == revision
+    assert store.list_operations(run_id, "acceptance") == decisions
+    assert current_decision(store, run_id)["record"] == left
+
+    rejected = durable(store, acceptance=None).reevaluate(
+        run_id, operator=durable_operator(host, store, run_id, "rejected"))
+    assert rejected.acceptance.decision is AcceptanceDecision.REJECTED and not rejected.accepted
 
 
 # ---------------------------------------------------------------------------
