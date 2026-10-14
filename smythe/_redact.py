@@ -45,12 +45,12 @@ _QUOTED_PATH = re.compile(r"(['\"`])" + _PATH_START + r"(?:(?!\1)[^\r\n])*\1")
 # runs on past each space to the end of the line, a quote, a URL, or an HTTP
 # method and its route, and ends after a word that ends in a colon or a
 # semicolon, as a message after a path often starts; a comma, which folder
-# names hold, does not end it.
+# names hold, does not end it, nor does a method's name with no route after it.
 _WORD = r"[^\s'\"`]"
 _ENDS_PATH = ":;"
 _ABSOLUTE_PATH = re.compile(
     _PATH_START + _WORD + r"*(?:(?<![" + _ENDS_PATH + r"]) +(?![A-Za-z][\w+.-]*://|(?:"
-    + "|".join(_HTTP_METHODS) + r") )" + _WORD + r"+)*"
+    + "|".join(_HTTP_METHODS) + r") /)" + _WORD + r"+)*"
 )
 
 

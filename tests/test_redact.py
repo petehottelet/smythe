@@ -143,3 +143,7 @@ def test_an_unquoted_path_takes_in_every_word_up_to_where_it_must_end(home):
     assert redact_paths(f"open {path} see https://example.com/a") == (
         "open <path> https://example.com/a")
     assert redact_paths(f"open {path} then GET /v1/models") == "open <path> GET /v1/models"
+    # A method's name with no route after it can be part of a folder's name.
+    for named in (windows("D:", "My POST Box", "x.txt"), "/srv/My GET Data/x.txt"):
+        assert redact_paths(f"open {named} failed") == "open <path>"
+    assert redact_paths(f"open {path} then GET") == "open <path>"
