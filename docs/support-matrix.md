@@ -532,6 +532,43 @@ Tests:
   `tests/test_workflow_binding.py::test_registry_never_invokes_external_hydration_during_preflight`,
   `tests/test_agent_skills.py::test_static_snapshot_pins_effective_capabilities_in_a_detached_static_registry`
   and `tests/test_agent_skills.py::test_static_snapshot_keeps_static_capabilities_when_the_provider_fails`.
+- With template records and Autotune campaigns:
+  `tests/test_learning_boundaries.py::test_a_skill_md_lends_a_tag_and_changes_no_tool_acceptance_budget_or_evaluator_data`.
+
+## Templates and policy versions
+
+[Template records](learning.md#template-records) hold the structure a plan is
+built from, and the [policy registry](optimize.md#policy-registry) records
+which version new runs use. A template version is put in effect only by a
+reviewed Autotune decision, and a rollback writes only the registry. No
+template record, skill or campaign changes acceptance, budgets, evaluator
+data or the tools agents are offered
+([what learning cannot change](learning.md#what-learning-cannot-change)).
+
+| Path | Template versions | Planner history |
+|---|---|---|
+| Ordinary runs | `record.to_template()` in a `ConstrainedArchitect`, `record.as_architect()`, or `TemplateCatalog.active_templates()` for the versions in effect; an architect keeps the versions it was built with | `PlannerMemory` records verification and acceptance evidence and, with `record_failures=True`, failed runs; `candidate_from_graph()` builds candidates from its rows |
+| Durable text workflows | `record.local_only()`, `record.as_architect().local_only()` or `active_local_templates()`, whose versions the recipe pins; `pinned_templates()` rebuilds them to resume, and another version raises `WorkflowConflictError` | Rejected: `memory` raises `WorkflowBindingError` before any call |
+| Jobs | Unsupported: manifests have no planner, so no template version applies | Unsupported: manifests have no memory field |
+
+Autotune trials can also run one durable text workflow each through
+`workflow_trial_evaluator` ([durable workflow trials](optimize.md#durable-workflow-trials)).
+
+Tests:
+
+- Ordinary runs: `tests/test_template_lifecycle.py::test_active_templates_build_the_version_in_effect_for_each_name`,
+  `tests/test_template_promotion.py::test_as_architect_builds_what_selecting_the_template_builds_without_a_call`
+  and `tests/test_template_promotion.py::test_accepted_runs_of_one_structure_yield_a_candidate`.
+- Durable text workflows: `tests/test_template_records.py::test_local_only_pins_the_record_version_in_a_durable_recipe`,
+  `tests/test_template_promotion.py::test_as_architect_pins_the_template_identity_and_version_in_durable_runs`,
+  `tests/test_template_lifecycle.py::test_pinned_templates_rebuild_the_saved_menu_exactly`
+  and `tests/test_support_matrix.py::test_durable_run_rejects_component_before_any_call[memory]`.
+- Jobs: `tests/test_support_matrix.py::test_jobs_manifest_has_no_validator_tool_or_memory_fields`.
+- Rollback while work is in progress: `tests/test_template_lifecycle.py::test_a_rolled_back_version_leaves_running_work_and_earlier_architects_on_theirs`.
+- Workflow trials: `tests/test_optimize_workflow_eval.py::test_offline_durable_trials_complete_at_zero_cost`.
+- What learning cannot change: `tests/test_learning_boundaries.py::test_a_campaign_refuses_a_reserved_mutable_path_and_changes_nothing`,
+  `tests/test_learning_boundaries.py::test_an_exploring_proposer_cannot_set_a_reserved_path`
+  and `tests/test_learning_boundaries.py::test_a_template_record_cannot_grant_authority_or_weaken_its_parent`.
 
 ## Jobs
 

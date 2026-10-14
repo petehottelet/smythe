@@ -1938,6 +1938,25 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   ordinary runs; durable text workflows still refuse every `tool_runtime`.
   See [Python-backed skills](docs/skills.md#python-backed-skills) and
   [`examples/20_agent_skills.py`](examples/20_agent_skills.py).
+- [`examples/21_template_lifecycle.py`](examples/21_template_lifecycle.py)
+  runs a template's lifecycle offline and without keys, with an evaluator it
+  defines. Three accepted runs in planner history become a candidate record,
+  validated and stored as the predecessor, and a record that would grant
+  itself a tool is refused. An Autotune campaign compares a candidate that
+  drops a step with its predecessor and a single-worker reference arm and
+  rejects it on held-out incident reviews, and the policy registry refuses
+  to approve that decision. An evaluator that holds out only briefings
+  promotes the same candidate, which is reviewed and activated; the next
+  incident review is rejected, and a rollback restores the predecessor for
+  new runs without changing the ledger, the catalog or an architect already
+  built. `tests/test_examples_smoke.py` runs the example.
+  `tests/test_learning_boundaries.py` checks in one place that no Autotune
+  campaign or exploring proposer varies a reserved path, no template record
+  grants authority or weakens its parent, and no `SKILL.md` changes the
+  tools agents are offered, acceptance, the budget or evaluator data, each
+  of which stays byte-identical. See
+  [a template's lifecycle](docs/learning.md#a-templates-lifecycle) and
+  [what learning cannot change](docs/learning.md#what-learning-cannot-change).
 - Sample-size and repeated-comparison guidance for Autotune, from the paired
   Student-t promotion bound: the smallest observed improvement each number
   of pairs can promote, the pairs a stage needs to pass a given true

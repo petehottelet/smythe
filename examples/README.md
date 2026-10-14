@@ -1,6 +1,6 @@
 # Smythe examples
 
-Examples 01–05, 08–20 and the acquisition-diligence example run offline
+Examples 01–05, 08–21 and the acquisition-diligence example run offline
 out of the box. A built-in `DemoProvider` returns deterministic responses so
 you can inspect planning, fan-out, budgets, recovery, and synthesis without an
 API key. Examples 06 and 07 are live MCP integration tours. These examples
@@ -12,12 +12,14 @@ pip install -e .            # from the repo root
 python examples/14_durable_text_workflow.py
 ```
 
-Examples 14, 15, 16, 17, 18, 19 and 20 explicitly select fixture responses even when API keys are set.
+Examples 14, 15, 16, 17, 18, 19, 20 and 21 explicitly select fixture responses even when API keys are set.
 Example 14 demonstrates planning, execution and recovery with zero provider calls.
 Examples 16 and 18 read their bundled sources from a server they start on the
 loopback address and make no other network request. Example 19 publishes to an
 in-memory service it defines and makes no network request. Example 20 uses a
-scripted provider that calls tools, which `OfflineProvider` does not.
+scripted provider that calls tools, which `OfflineProvider` does not. Example
+21 judges template versions with an evaluator it defines and keeps its
+catalog, ledger and registry in a temporary folder.
 The [0.9.1 release guide](../docs/release-0.9.1.md) covers upgrading from 0.9.0,
 the [0.9.0 guide](../docs/release-0.9.0.md) upgrading from 0.8.2, the
 [0.8.2 guide](../docs/release-0.8.2.md) upgrading from 0.8.1, the
@@ -130,4 +132,5 @@ savings.
 | [18_archive_maintenance.py](18_archive_maintenance.py) | Maintain an archive of four accepted briefs with [artifact lineage](../docs/lineage.md). One shared source gets a new version, one published brief is damaged and one final validator's version is bumped. A [repair plan](../docs/lineage.md#plan-a-repair) shows before anything runs that the two briefs reading the revised source regenerate only its read, its extraction and the brief, that the damaged brief is published again and that the untouched one is decided again. [Applying it](../docs/lineage.md#apply-a-repair-plan) does that under an explicit allowance, and the results each successor kept are inspected apart from the conclusions that changed. A full recomputation in a second journal publishes the same bytes with the same decisions, and a table compares the reads, model steps, local steps, publications, acceptance evaluations and new runs each took. |
 | [19_governed_publication.py](19_governed_publication.py) | An accepted document delivered to another service as a governed [external action](../docs/actions.md): a strict durable run publishes a release announcement, the journal prepares an action bound to its exact bytes, an approval verified by a local approval host authorizes it, and the first submission commits but loses its answer. `smythe runs inspect` exits with 12 until [reconciliation](../docs/actions.md#reconciliation) finds the key, reads the post back and reconciles the action with one write on the service. |
 | [20_agent_skills.py](20_agent_skills.py) | An [Agent Skill](../docs/skills.md) whose `SKILL.md` asks for Bash and Write lends two agents a capability tag and is granted nothing. [`python_skill()`](../docs/skills.md#python-backed-skills) makes it a tool backed by a Python function, and a `LocalToolRuntime` offers that tool to the developer agent's id alone: a generated plan routes both steps through the tag, the model calls the tool in the developer's step, and the editor, holding the same tag, is offered no tool. The tool's name, version and schema digest are printed for records. |
+| [21_template_lifecycle.py](21_template_lifecycle.py) | A [template's lifecycle](../docs/learning.md#a-templates-lifecycle): three accepted runs in planner history become a candidate record, validated and stored as the predecessor, and a record that would grant itself a tool is refused. An [Autotune campaign](../docs/optimize.md#evaluate-template-versions) compares a candidate that drops a step with its predecessor and a single worker, and rejects it on held-out incident reviews; the registry refuses to approve that decision. An evaluator that holds out only briefings is fooled into promoting it, a review approves it and it is activated, and the next incident review is rejected. A [rollback](../docs/optimize.md#resolve-roll-back-and-retire) restores the predecessor for new runs without touching the ledger or the catalog. Fixtures show the mechanics only. |
 | [acquisition_diligence/](acquisition_diligence/) | **Complete acquisition-diligence example.** Task intake → generated `fork-join → adversarial → serial` topology → parallel specialists → red-team review → final memo, with committed expected artifacts (graph, trace, memo). |

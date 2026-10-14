@@ -10,8 +10,10 @@ This page covers the evidence planner history keeps, failed runs,
 distillation, template records, their versions, promoting structure that
 accepted runs repeat to a candidate record, validation of records as
 untrusted candidates, the template catalog, building a template without a
-planning call, activating, rolling back and pinning template versions, and
-when a template stops applying because what its runs relied on changed. A record is data: building a template from it,
+planning call, activating, rolling back and pinning template versions,
+when a template stops applying because what its runs relied on changed, a
+template's lifecycle from record to rollback, and what learning cannot
+change. A record is data: building a template from it,
 storing it, activating it and pinning it in a durable run never changes the
 base planner, and nothing is promoted or activated automatically.
 
@@ -637,6 +639,68 @@ are unchanged, and [`pinned_templates`](#resume-a-pinned-run) still rebuilds
 it to resume them. To offer the template again, build a candidate from runs
 in the new environment and activate it through a reviewed decision.
 
+## A template's lifecycle
+
+Each step above is a separate, explicit operation.
+[`examples/21_template_lifecycle.py`](../examples/21_template_lifecycle.py)
+runs them in order, offline and without keys:
+
+1. **Record.** Strict runs record their acceptance decision and structure
+   digest in planner history. `repeated_structures` finds a structure that
+   accepted runs repeat, and `candidate_from_graph` distills it into a record
+   that names those runs.
+2. **Validate and store.** `TemplateCatalog.put` validates each candidate,
+   whether distilled, written by hand or proposed by a model, against its
+   parent before it stores it. A candidate whose step grants itself a tool is
+   refused and writes nothing.
+3. **Evaluate.** An [Autotune campaign](optimize.md#evaluate-template-versions)
+   makes the template's target its mutable field. The version in effect, or
+   the predecessor, is the incumbent and the candidate the challenger, and a
+   simpler arm, such as a single worker, is a
+   [reference](optimize.md#reference-arms) under `must_not_be_worse`. A task
+   family that only the holdout holds tests what development and confirmation
+   did not.
+4. **Review and activate.** A reviewer approves a promoted decision, and
+   activation puts the candidate in effect for new runs. A decision that was
+   not promoted cannot be approved.
+5. **Roll back.** A rollback puts the previous version back in effect for new
+   runs and writes only the registry. Running work keeps its versions.
+
+Validation and evaluation catch different things. Validation reads structure
+and authority: in the example, a candidate that drops its Timeline step
+passes, because its parent declares no check that needs one. Its campaign
+rejects it, since it is better on the briefings of development and
+confirmation and `worse` on the incident reviews held out. Evaluation is in
+turn only as good as its held-out tasks: a second evaluator whose holdout
+holds only briefings promotes the same candidate. Once a reviewer approves it
+and it is activated, the next incident review is rejected for its missing
+section, and a rollback restores the predecessor. A review approves a
+decision, not a template, so check what the evaluator held out before
+approving one.
+
+The example's fixtures show the mechanics only. Its evaluator is
+deterministic, so each decision rests on three identical pairs; read
+[choosing sample sizes](optimize.md#choosing-sample-sizes) before sizing a
+real campaign.
+
+## What learning cannot change
+
+Template records, Agent Skills and Autotune campaigns change what new work
+is built from, and none of them can change how work is judged, what it may
+spend or what it may do:
+
+| What learns | What it can change | What it cannot change |
+|---|---|---|
+| A template record | The structure and instructions a plan is built from | The tools, MCP servers, models or environment agents get, acceptance, budgets or evaluation: no record holds them, and a candidate that checks less than its parent is [refused](#validate-a-candidate-record) |
+| An Agent Skill | A capability tag that routes work to an agent | The tools an agent is offered, acceptance, the budget, prompts or evaluator data, whatever its `SKILL.md` declares ([skills](skills.md#what-a-skill-can-and-cannot-change)) |
+| An Autotune campaign | A policy under its target | A [reserved path](optimize.md#experiment-contracts-and-budgets), such as acceptance, validators, the evaluator, budgets, tools or the holdout, whether its contract or an exploring proposer names it |
+
+`tests/test_learning_boundaries.py` checks the three in one place: after
+each refused or harmless attempt, the evaluator's data and identity, the
+acceptance policy, the budget and the tools each agent is offered are
+byte-identical to what they were before, as are the ledger, catalog and
+skill files involved.
+
 ## Limits
 
 - Validation compares a candidate with one parent, not with the whole
@@ -650,3 +714,7 @@ in the new environment and activate it through a reviewed decision.
 - Applicability compares a record with the environment you capture, not
   with what a run does. Nothing re-evaluates a template whose environment
   changed; that takes new runs and a new candidate.
+- A promotion is only as good as the evaluator behind it: an evaluator whose
+  held-out tasks miss what a candidate breaks promotes it. Template
+  campaigns have run only on offline fixtures, so no template version has
+  been shown to do better than its predecessor on real tasks.

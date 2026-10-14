@@ -283,6 +283,61 @@ is unchanged.
   identifiers or local paths, and a repository test fails on any tracked file
   that does.
 
+## Built for the next release: reviewable learning
+
+These are built and tested offline but not yet released. Each is opt-in:
+nothing is promoted or activated automatically, and no default changes. What
+these items still need is listed under [Then](#then-recorded-context-governed-actions-and-reuse).
+No template, skill or campaign can change acceptance, budgets, evaluator
+data or the tools agents are offered
+([what learning cannot change](docs/learning.md#what-learning-cannot-change)).
+
+- **Reviewable template lifecycle** — distilled graphs become
+  [versioned template records](docs/learning.md#template-records) in an
+  append-only catalog, validated as untrusted candidates that cannot grant
+  authority or weaken their parent's gates. Planner history keeps
+  verification and acceptance evidence and, opt-in, failed runs, and
+  structure that repeated accepted runs share becomes a
+  [candidate record](docs/learning.md#promote-repeated-accepted-structure).
+  An Autotune campaign
+  [evaluates a version](docs/optimize.md#evaluate-template-versions) against
+  its predecessor and a simpler reference arm on held-out task families; a
+  reviewed decision [activates it](docs/learning.md#activate-and-roll-back-templates)
+  for new runs, a rollback restores the previous version without changing
+  running work, and durable runs pin the exact versions they started with. A
+  record [builds its graph without a planning call](docs/learning.md#build-a-template-without-planning),
+  and it stops being offered when the tools, capabilities, skills,
+  validators, models or MCP allowlists it was proven with
+  [change](docs/learning.md#applicability). The offline
+  [template-lifecycle example](examples/21_template_lifecycle.py) records a
+  template, rejects a harmful candidate on held-out tasks, and rolls back the
+  same candidate after a fooled evaluator promotes it.
+- **Native Agent Skills support** —
+  [Agent Skills directories](docs/skills.md#agent-skills-directories) are
+  discovered directly, beside the OpenClaw and MCP skill providers, and lend
+  agents capability tags only: declared `allowed-tools` are recorded and
+  never granted, instructions never enter a prompt, and durable runs pin a
+  static snapshot of the tags.
+  [Python-backed skills](docs/skills.md#python-backed-skills) are developer
+  tools that a local tool runtime offers only to the agent ids you list, on
+  ordinary runs. Running a skill's bundled scripts, putting its instructions
+  into prompts and tools in durable text workflows are not covered.
+- **Bounded Autotune generalization** — no campaign or exploring proposer
+  may vary a [reserved path](docs/optimize.md#experiment-contracts-and-budgets)
+  such as acceptance, budgets, tools or the holdout, and a campaign can hold
+  each challenger to one change. The guide gives
+  [sample-size and repeated-comparison guidance](docs/optimize.md#choosing-sample-sizes)
+  from the paired promotion bound. The CLI
+  [reviews, activates, rolls back and retires](docs/optimize.md#review-and-change-targets-from-the-cli)
+  policies, and `smythe optimize history` gives a read-only
+  [cross-campaign report](docs/optimize.md#cross-campaign-target-report) of a
+  target's campaigns, decisions, activations and optimization cost, never
+  netted against inference savings. Trials can run as
+  [durable workflows](docs/optimize.md#durable-workflow-trials), and
+  [bounded exploration](docs/optimize.md#bounded-exploration) runs campaigns
+  on an out-of-process proposer's challengers under campaign, exposure and
+  proposer-spend caps.
+
 ## Completed benchmark evidence
 
 Every benchmark publication includes the [materials completion check](docs/current-materials.md#completion-check-for-every-benchmark-update): current glyph sheets, previews, exports, charts, links, and consistent documentation.
@@ -439,48 +494,23 @@ connector or paid run.
 6. **Integrate asset policy with Jobs v1** — manifest-native production brand
    masters, OCR and perceptual brand validators, select-from-N curation, and
    deterministic export bundles built from accepted attempt pointers
-7. **Reviewable continual learning** — promote successful graph structures,
-   failure lessons, capability descriptions, and reusable procedures into
-   versioned supplemental state with diffs and rollback, extending
-   `PlannerMemory` and `distill_template` without mutating the base planner.
-   A candidate becomes active only after it beats its predecessor and a
-   simpler alternative on held-out tasks. In progress: distilled templates
-   are [versioned records](docs/learning.md#template-records) in an
-   append-only catalog; a reviewed Autotune decision
-   [activates a template version](docs/learning.md#activate-and-roll-back-templates)
-   for new runs, a rollback restores the previous one without changing
-   running work, and a durable run pins the exact versions it started with.
-   Structure that repeated accepted runs share becomes a
-   [candidate record](docs/learning.md#promote-repeated-accepted-structure),
-   never activated automatically. A record
-   [builds its graph without a planning call](docs/learning.md#build-a-template-without-planning)
-   as a deterministic architect that durable runs pin, and its
-   [applicability](docs/learning.md#applicability) is invalidated when the
-   tools, capabilities, skills, validators, models or MCP allowlists it was
-   proven with change. A built-in evaluator that runs template candidates on
-   held-out tasks is not built yet
-8. **Native Agent Skills support** — built for the next release.
-   [Agent Skills directories](docs/skills.md#agent-skills-directories) are
-   discovered directly, beside the OpenClaw and MCP skill providers, and lend
-   agents capability tags only: declared `allowed-tools` are recorded and
-   never granted, instructions never enter a prompt, and durable runs pin a
-   static snapshot of the tags.
-   [Python-backed skills](docs/skills.md#python-backed-skills) are developer
-   tools that a local tool runtime offers only to the agent ids you list, on
-   ordinary runs. Skills never grant tools or change acceptance criteria.
-   Running a skill's bundled scripts, putting its instructions into prompts
-   and tools in durable text workflows are not covered
-9. **Autotune generalization** — add calibrated sample-size and
-   repeated-comparison guidance, cross-campaign reports, process-
-   supervised evaluator isolation, and conservative live-evaluator adapters
-   after the offline campaign. Optimizers cannot change acceptance criteria,
-   spend ceilings, permissions or held-out data. In progress:
-   `smythe optimize history` gives a read-only
-   [cross-campaign report](docs/optimize.md#cross-campaign-target-report) of
-   one policy target's campaigns, decisions, activations and optimization
-   cost, never netted against inference savings, and the CLI
-   [reviews, activates, rolls back and retires](docs/optimize.md#review-and-change-targets-from-the-cli)
-   policies. Statistical comparison across campaigns is not built yet
+7. **Reviewable continual learning** — a candidate becomes active only after
+   it beats its predecessor and a simpler alternative on held-out tasks,
+   without mutating the base planner. The
+   [template lifecycle](#built-for-the-next-release-reviewable-learning) is
+   built and its mechanics are shown offline. Still open: a template version
+   measured better than its predecessor and a simpler alternative on
+   held-out live tasks, under decided thresholds and an approved evaluation
+   budget. Offline fixtures rank no template
+8. **Autotune generalization** — run evaluators in a separately supervised
+   process that can be stopped at a deadline, and add conservative
+   live-evaluator adapters with per-trial price ceilings after the offline
+   campaign. Optimizers cannot change acceptance criteria, spend ceilings,
+   permissions or held-out data. Reserved paths, sample-size guidance,
+   cross-campaign reports, registry commands and bounded exploration are
+   [built](#built-for-the-next-release-reviewable-learning). Statistical
+   comparison across campaigns and a correction for repeated comparisons are
+   not built
 
 ### Evidence and scale
 

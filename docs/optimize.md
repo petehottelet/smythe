@@ -319,7 +319,9 @@ improvements. Their spread is zero, so the bound equals their mean, and any
 mean above `min_improvement` passes with the minimum three pairs and a
 zero-width interval. That describes the evaluator, not measured precision:
 check that seeds and tasks vary what it measures before relying on such a
-decision.
+decision. The evaluator in
+[`examples/21_template_lifecycle.py`](../examples/21_template_lifecycle.py)
+is like this, and each of its decisions rests on three identical pairs.
 
 **Repeated comparisons.** At the default confidence each confirmation or
 holdout test passes a challenger with no real effect about 2.5% of the time,
@@ -421,6 +423,15 @@ that is applied to a family it must not touch. The harness is offline and
 repository-only, not part of the installed package: its fixtures establish
 the mechanics only, and no number it records is a product or benchmark
 claim.
+
+[`examples/21_template_lifecycle.py`](../examples/21_template_lifecycle.py)
+runs the whole lifecycle offline with an evaluator it defines: a candidate
+that is better on development and confirmation briefings and `worse` on
+held-out incident reviews is rejected, and the registry refuses to approve that
+decision. A second evaluator whose holdout holds only briefings promotes the
+same candidate, which a review approves and an activation puts in effect,
+until a rollback restores its predecessor. See
+[a template's lifecycle](learning.md#a-templates-lifecycle).
 
 ## Deterministic offline concurrency campaign
 
@@ -1477,7 +1488,9 @@ The runner bounds what a campaign may vary:
 spend, and tool settings cannot be mutable, whether a contract or an
 exploring proposer names them, and `single_change` limits each challenger to
 one changed field. It does not sandbox evaluator code, which runs in the
-runner's process and decides what each policy value controls.
+runner's process and decides what each policy value controls. Template
+records and Agent Skills keep the same boundary; see
+[what learning cannot change](learning.md#what-learning-cannot-change).
 
 The repository's earlier prompt-policy loops, `benchmarks/run_optimizer.py`
 and `benchmarks/run_banner_optimizer.py`, keep a change whose mean judge

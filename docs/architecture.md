@@ -493,6 +493,14 @@ and `active_templates(..., environment=...)` then leaves that version out;
 see [applicability](learning.md#applicability) and
 [learning from runs](learning.md).
 
+Evaluation, promotion and rollback stay separate operations: an Autotune
+campaign compares a candidate version with its predecessor and a simpler
+reference arm on held-out tasks, a reviewed decision activates it, and a
+rollback restores the previous version for new runs.
+[`examples/21_template_lifecycle.py`](../examples/21_template_lifecycle.py)
+runs that lifecycle offline; see
+[a template's lifecycle](learning.md#a-templates-lifecycle).
+
 This keeps learning reviewable: execution history informs future choices, and
 promoted graph structure becomes an explicit template rather than an invisible
 prompt mutation.
@@ -532,6 +540,10 @@ prompt mutation.
   delivered output it could not decide, and counts a passed gate toward
   acceptance only when the developer supplied it.
 - A verifier may reset only its target and downstream dependents.
+- Learning chooses what new work is built from, never how it is judged. A
+  template record, an Agent Skill or an Autotune campaign cannot change
+  acceptance, budgets, evaluator data or the tools an agent is offered
+  ([what learning cannot change](learning.md#what-learning-cannot-change)).
 - A resumed run keeps completed results, recorded spend, and consumed control allowances.
 
 The [cost guardrails](budgets.md) reject malformed usage and block unresolved

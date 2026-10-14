@@ -55,6 +55,18 @@ def test_the_lineage_and_repair_section_cites_each_path_and_its_tests():
         assert f"| {path} |" in section, path
 
 
+def test_the_templates_section_cites_each_path_and_the_learning_boundaries():
+    text = PAGE.read_text(encoding="utf-8")
+    section = text.split("\n## Templates and policy versions\n", 1)[1].split("\n## ", 1)[0]
+    cited = set(NODE_ID.findall(section))
+    for module in ("test_template_lifecycle.py", "test_template_promotion.py",
+                   "test_template_records.py", "test_optimize_workflow_eval.py",
+                   "test_learning_boundaries.py", "test_support_matrix.py"):
+        assert any(node.startswith(f"tests/{module}::") for node in cited), module
+    for path in ("Durable text workflows", "Ordinary runs", "Jobs"):
+        assert f"| {path} |" in section, path
+
+
 def test_every_cited_test_exists():
     cited = cited_node_ids()
     collected = collected_node_ids(sorted({node.split("::")[0] for node in cited}))

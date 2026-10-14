@@ -114,10 +114,25 @@ A skill cannot:
   byte-identical with and without skills, and the planner's prompt differs
   only by the tags it lists. Only a Python-backed skill that you register
   sends its description to the model, as its tool's description, and only to
-  the agents you list.
+  the agents you list;
+- change an evaluator's data or an Autotune campaign. Discovery reads each
+  `SKILL.md` and nothing else, and a frontmatter key such as `acceptance`,
+  `budget` or `evaluator` is kept by name in `ignored_fields`, where it does
+  nothing.
 
 A tag can still route a node to an agent that already holds tools, so give
 tool-bearing agents only the skills you would trust with those tools.
+`tests/test_learning_boundaries.py` checks this boundary beside those of
+template records and Autotune campaigns: with a `SKILL.md` that declares
+tools and acceptance, budget and evaluator fields, node prompts, offered
+tools, the acceptance policy, the budget and the evaluator's files are
+byte-identical to a run without it. See
+[what learning cannot change](learning.md#what-learning-cannot-change).
+
+A [template record](learning.md#applicability) learned from runs that used a
+skill can list the skill's version as a prerequisite. Once that `SKILL.md`
+changes, `active_templates(..., environment=...)` leaves the template out
+until a candidate built from new runs is activated.
 
 ## Python-backed skills
 
