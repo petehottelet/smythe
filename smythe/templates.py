@@ -33,12 +33,16 @@ record for one, naming those runs and keeping each failed or rejected run's
 category and evidence digest. A candidate is never stored or activated here.
 :meth:`TemplateRecord.as_architect` builds a record's graph with no planning
 call, and a durable run pins it by identity and version.
+:class:`TemplateEnvironment` snapshots what a run would use, and
+:func:`check_applicability` says whether a record still applies there; the
+catalog's active templates can leave out those that do not.
 """
 
 from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import math
 import os
 import re
@@ -51,6 +55,7 @@ from types import MappingProxyType
 from typing import Any
 
 from smythe._canonical import canonical_bytes, sha256_hex
+from smythe._errors import PicklableError
 from smythe._publish import MAX_ARTIFACT_BYTES, _regular_path, atomic_publish_bytes
 from smythe.acceptance import AcceptanceDecision
 from smythe.agent import Agent, AgentProfile
@@ -80,7 +85,11 @@ __all__ = [
     "TemplateRecordError", "TemplateValidationError", "distill_record", "pinned_templates",
     "template_target", "validate_template_record",
     "TemplateArchitect", "candidate_from_graph", "repeated_structures",
+    "APPLICABILITY_REASONS", "ApplicabilityReport", "TemplateApplicabilityError",
+    "TemplateEnvironment", "check_applicability",
 ]
+
+logger = logging.getLogger("smythe.templates")
 
 TEMPLATE_RECORD_TYPE = "smythe.template_record"
 TEMPLATE_RECORD_VERSION = 1
@@ -93,7 +102,7 @@ _LAYOUT = canonical_bytes({"type": "smythe.template_catalog", "layout": TEMPLATE
 MAX_FAILURE_EXAMPLES = 16
 # The fields that decide what a template builds; template_version hashes them.
 _BEHAVIOR_KEYS = ("type", "version", "name", "description", "blueprint", "applicability",
-                  "prerequisites", "expected_outputs")
+                  "prerequisites", "proven_with", "expected_outputs")
 _LIST_SECTIONS = frozenset({"expected_outputs", "failure_examples", "tests", "source_runs"})
 _HEX = re.compile(r"[0-9a-f]{64}")
 # Words a label review compares: four or more letters or digits.
@@ -260,6 +269,8 @@ _NODE = _object({
     "max_retries": _count, "timeout_s": _nullable(_seconds), "attach_dep_artifacts": _flag,
     "metadata": _object({}, {key: _string for key in _STRUCTURAL_METADATA_KEYS}),
 })
+# A tool as LocalToolRuntime.describe() lists it.
+_TOOL = _object({"name": _name, "version": _name, "schema_sha256": _hex})
 # The optional sections, in record order. Each is omitted when empty.
 _SECTIONS: dict[str, _Check] = {
     "applicability": _object({key: _list(_name, unique=True) for key in (
@@ -267,9 +278,10 @@ _SECTIONS: dict[str, _Check] = {
     "prerequisites": _object({
         "capabilities": _list(_name, unique=True),
         "skills": _list(_object({"name": _name, "version": _name}), unique=True),
-        "tools": _list(_object({"name": _name, "version": _name, "schema_sha256": _hex}),
-                       unique=True),
+        "tools": _list(_TOOL, unique=True),
         "validators": _list(_validator, unique=True)}),
+    # Digests of the model ids and MCP allowlists a candidate's runs used.
+    "proven_with": _object({"models_sha256": _hex, "mcp_allowlists_sha256": _hex}),
     "expected_outputs": _list(_object({"node": _name, "description": _string,
                                        "validators": _list(_validator, unique=True)})),
     "failure_examples": _list(_object({"category": _name, "evidence_sha256": _hex})),
@@ -300,11 +312,11 @@ class TemplateRecord:
     with each item once, and an empty section is omitted.
 
     ``template_version`` is the SHA-256 of the type, version, name,
-    description, blueprint, applicability, prerequisites and expected
-    outputs as canonical JSON, so evidence, tests, source runs and review
-    never change it. ``record_sha256`` covers the whole record. Every part
-    is read-only. Records compare and hash by ``record_sha256``, so a
-    timeout of ``90`` and one of ``90.0`` make different records.
+    description, blueprint, applicability, prerequisites, ``proven_with``
+    and expected outputs as canonical JSON, so evidence, tests, source runs
+    and review never change it. ``record_sha256`` covers the whole record.
+    Every part is read-only. Records compare and hash by ``record_sha256``,
+    so a timeout of ``90`` and one of ``90.0`` make different records.
     """
 
     name: str
@@ -312,6 +324,7 @@ class TemplateRecord:
     blueprint: tuple[Mapping[str, Any], ...]
     applicability: Mapping[str, Any] | None = None
     prerequisites: Mapping[str, Any] | None = None
+    proven_with: Mapping[str, Any] | None = None
     expected_outputs: tuple[Mapping[str, Any], ...] = ()
     failure_examples: tuple[Mapping[str, Any], ...] = ()
     tests: tuple[Mapping[str, Any], ...] = ()
@@ -921,7 +934,10 @@ class TemplateCatalog:
             return []
         return [version for version in found if self.get(version).name == name]
 
-    def active_templates(self, registry: Any, names: Sequence[str]) -> list[SubGraphTemplate]:
+    def active_templates(
+        self, registry: Any, names: Sequence[str], *,
+        environment: TemplateEnvironment | None = None, strict: bool = False,
+    ) -> list[SubGraphTemplate]:
         """The version of each template in *names* that *registry* has in effect, for ordinary runs.
 
         *registry* is a ``smythe.optimize.PolicyRegistry``, read and never
@@ -932,15 +948,26 @@ class TemplateCatalog:
         and is left out. A ``ConstrainedArchitect`` keeps the menu it is
         built with, so build a new one to offer later activations.
 
+        With an *environment*, a version that does not apply there
+        (:func:`check_applicability`) is left out too, and a warning on the
+        ``smythe.templates`` logger gives the reasons; with *strict*, it
+        raises :class:`TemplateApplicabilityError` instead.
+
         Raises:
             KeyError: A name has never had a version in effect, or the
                 catalog does not hold the version in effect.
             TemplateRecordError: The policy in effect holds anything but a
                 version of that template, or the stored record is invalid.
+            TemplateApplicabilityError: With *strict*, a version in effect
+                does not apply in *environment*.
         """
-        return [record.to_template() for record in self._active(registry, names)]
+        return [record.to_template()
+                for record in self._offered(registry, names, environment, strict)]
 
-    def active_local_templates(self, registry: Any, names: Sequence[str]) -> list[SubGraphTemplate]:
+    def active_local_templates(
+        self, registry: Any, names: Sequence[str], *,
+        environment: TemplateEnvironment | None = None, strict: bool = False,
+    ) -> list[SubGraphTemplate]:
         """:meth:`active_templates` declared for a durable run.
 
         Each builder is ``record.local_only()``, so the run's recipe pins the
@@ -949,7 +976,7 @@ class TemplateCatalog:
         them to resume it.
         """
         return [SubGraphTemplate(record.name, record.description, record.local_only())
-                for record in self._active(registry, names)]
+                for record in self._offered(registry, names, environment, strict)]
 
     def _active(self, registry: Any, names: Sequence[str]) -> list[TemplateRecord]:
         if isinstance(names, str):
@@ -968,6 +995,25 @@ class TemplateCatalog:
                     f"the policy in effect for {target} must hold only its template version")
             records.append(self._named(name, version))
         return records
+
+    def _offered(
+        self, registry: Any, names: Sequence[str],
+        environment: TemplateEnvironment | None = None, strict: bool = False,
+    ) -> list[TemplateRecord]:
+        records = self._active(registry, names)
+        if environment is None:
+            return records
+        offered = []
+        for record in records:
+            report = check_applicability(record, environment)
+            if report.valid:
+                offered.append(record)
+            elif strict:
+                raise TemplateApplicabilityError(record.name, record.template_version, report)
+            else:
+                logger.warning("Template %r version %s is not offered: %s", record.name,
+                               record.template_version, "; ".join(report.details))
+        return offered
 
     def _named(self, name: str, version: str) -> TemplateRecord:
         """The record stored for *version*, which must be a version of template *name*."""
@@ -1128,6 +1174,7 @@ def candidate_from_graph(
     registry: Registry | None = None,
     require_success: bool = True,
     source_task: Task | None = None,
+    environment: TemplateEnvironment | None = None,
 ) -> TemplateRecord:
     """A candidate template record for *graph*, with the evidence *rows* hold for its structure.
 
@@ -1144,6 +1191,13 @@ def candidate_from_graph(
     failure excerpt, is kept. Rows with equal evidence give one example,
     and the latest :data:`MAX_FAILURE_EXAMPLES` are kept.
 
+    With an *environment*, the one the runs used, the candidate records
+    what it relied on, so :func:`check_applicability` can tell when that
+    changes: as prerequisites, the capabilities that nodes without an agent
+    profile require and an agent offered, and every skill, tool and
+    validator; and as ``proven_with``, the digests of the model ids and MCP
+    allowlists.
+
     The other arguments are those of :func:`distill_record`, whose review
     the candidate keeps. Nothing is stored or activated: store the
     candidate with :meth:`TemplateCatalog.put` and activate it through a
@@ -1151,12 +1205,15 @@ def candidate_from_graph(
 
     Raises:
         ValueError: *min_accepted* is not a positive integer.
-        TypeError: A row is not an ``ExecutionOutcome``.
+        TypeError: A row is not an ``ExecutionOutcome``, or *environment*
+            is not a :class:`TemplateEnvironment`.
         DistillationError: For the reasons ``distill_record`` gives, when
             *graph*'s structure has no digest, or when *rows* hold fewer
             than *min_accepted* accepted runs of it.
     """
     _min_accepted(min_accepted)
+    if environment is not None and not isinstance(environment, TemplateEnvironment):
+        raise TypeError("environment must be a TemplateEnvironment")
     try:
         structure = structure_sha256(graph)
     except (TypeError, ValueError) as error:
@@ -1184,8 +1241,19 @@ def candidate_from_graph(
                                 f"runs of this structure, fewer than {min_accepted}")
     record = distill_record(graph, name=name, description=description, registry=registry,
                             require_success=require_success, source_task=source_task)
+    pinned: dict[str, Any] = {}
+    if environment is not None:
+        required = {capability for node in _plain(record.blueprint) if node["profile"] is None
+                    for capability in node["capabilities"]}
+        pinned = {"prerequisites": {
+            "capabilities": list(required & environment.capabilities),
+            "skills": [{"name": name, "version": version}
+                       for name, version in environment.skills.items()],
+            "tools": [dict(tool) for tool in environment.tools.values()],
+            "validators": [identity.to_dict() for identity in environment.validators],
+        }, "proven_with": environment._proven_with()}
     return replace(record, source_runs=list(runs.values()),
-                   failure_examples=list(failures.values())[-MAX_FAILURE_EXAMPLES:])
+                   failure_examples=list(failures.values())[-MAX_FAILURE_EXAMPLES:], **pinned)
 
 
 class TemplateArchitect(DeterministicArchitect):
@@ -1219,3 +1287,198 @@ class TemplateArchitect(DeterministicArchitect):
         record = self.record
         return LocalOnly(lambda: TemplateArchitect(record), f"template:{record.name}",
                          record.template_version)
+
+
+# Applicability: the reason codes check_applicability gives, sorted.
+APPLICABILITY_REASONS = ("capability_removed", "mcp_allowlist_changed", "model_changed",
+                         "skill_changed", "skill_removed", "tool_changed", "tool_removed",
+                         "validator_set_changed")
+
+
+@dataclass(frozen=True)
+class ApplicabilityReport:
+    """Whether a template record applies in an environment, and why not.
+
+    ``reasons`` holds the sorted codes of :data:`APPLICABILITY_REASONS`
+    behind any problem, each once, and ``details`` one sentence per problem.
+    """
+
+    valid: bool
+    reasons: tuple[str, ...] = ()
+    details: tuple[str, ...] = ()
+
+
+class TemplateApplicabilityError(PicklableError, ValueError):
+    """A template version in effect does not apply in the environment a run would use.
+
+    ``name`` and ``version`` identify it, and ``report`` says why. It
+    survives pickle and copy with those attributes.
+    """
+
+    def __init__(self, name: str, version: str, report: ApplicabilityReport) -> None:
+        super().__init__(f"template {name!r} version {version} does not apply: "
+                         f"{'; '.join(report.details)}")
+        self.name, self.version, self.report = name, version, report
+
+
+def _items(values: Any, what: str) -> list[Any]:
+    if isinstance(values, (str, bytes, Mapping)) or not isinstance(values, Iterable):
+        raise TypeError(f"{what} must be a list")
+    return list(values)
+
+
+def _names(values: Any, what: str) -> frozenset[str]:
+    if isinstance(values, (str, bytes)) or not isinstance(values, Iterable):
+        raise TypeError(f"{what} must be a collection of names")
+    return frozenset(_name(value, what) for value in values)
+
+
+@dataclass(frozen=True, kw_only=True)
+class TemplateEnvironment:
+    """What a run would use now, for :func:`check_applicability` to compare a record with.
+
+    ``capabilities`` are the capability tags its agents offer; ``skills``
+    maps each skill's name to its version, for an Agent Skill the
+    ``sha256:`` digest of its ``SKILL.md``; ``tools`` lists each tool as
+    ``LocalToolRuntime.describe()`` does (name, version and
+    ``schema_sha256``); ``mcp_allowlists`` maps each MCP server's name to
+    its allowed tools, or None for all; ``validators`` holds the acceptance
+    validators' identities; and ``models`` the model ids. :meth:`capture`
+    reads them from live objects. Every part is read-only.
+    """
+
+    capabilities: Iterable[str] = frozenset()
+    skills: Mapping[str, str] = field(default_factory=dict)
+    tools: Iterable[Mapping[str, str]] = ()
+    mcp_allowlists: Mapping[str, Sequence[str] | None] = field(default_factory=dict)
+    validators: Iterable[ValidatorIdentity] = ()
+    models: Iterable[str] = frozenset()
+
+    def __post_init__(self) -> None:
+        tools: dict[str, Mapping[str, str]] = {}
+        for tool in _items(self.tools, "environment tools"):
+            tool = _TOOL(_plain(tool), "environment tool")
+            if tool["name"] in tools:
+                raise ValueError(f"environment tool {tool['name']!r} is listed more than once")
+            tools[tool["name"]] = MappingProxyType(tool)
+        allowlists = {}
+        for server, allowed in dict(self.mcp_allowlists).items():
+            allowlists[_name(server, "MCP server name")] = (
+                None if allowed is None else tuple(sorted(_names(allowed, "allowed MCP tool"))))
+        validators = _items(self.validators, "environment validators")
+        if not all(isinstance(item, ValidatorIdentity) for item in validators):
+            raise TypeError("environment validators must be ValidatorIdentity values")
+        for key, value in (
+            ("capabilities", _names(self.capabilities, "environment capability")),
+            ("skills", MappingProxyType({_name(name, "skill name"): _name(version, "skill version")
+                                         for name, version in dict(self.skills).items()})),
+            ("tools", MappingProxyType(tools)), ("mcp_allowlists", MappingProxyType(allowlists)),
+            ("validators", frozenset(validators)),
+            ("models", _names(self.models, "environment model")),
+        ):
+            object.__setattr__(self, key, value)
+
+    @classmethod
+    def capture(
+        cls, *, registry: Registry | None = None, skill_provider: Any = None,
+        tool_runtime: Any = None, validators: Iterable[Any] = (), models: Iterable[str] = (),
+    ) -> TemplateEnvironment:
+        """Snapshot what a run would use now.
+
+        From *registry*: each agent's effective capabilities, leaving out a
+        blank tag; each skill with a version that *skill_provider*, by
+        default the registry's own, lists for the agent, since a change to
+        an unversioned skill cannot be seen; and the ``allowed_tools`` of
+        each MCP server on its profile, merged by server name, where None,
+        every tool, wins. From *tool_runtime*, a ``LocalToolRuntime`` or a
+        ``CompositeToolRuntime`` holding them, ``describe()``. *validators*
+        are acceptance validators or their identities, such as
+        ``AcceptancePolicy.validator_identities``, and *models* the model ids
+        a run would use.
+        """
+        if skill_provider is None:
+            skill_provider = getattr(registry, "_skill_provider", None)
+        capabilities: set[str] = set()
+        skills: dict[str, str] = {}
+        allowlists: dict[str, list[str] | None] = {}
+        for agent in registry.list_agents() if registry is not None else ():
+            capabilities.update(tag for tag in registry.effective_capabilities(agent)
+                                if isinstance(tag, str) and tag.strip())
+            refs = skill_provider.list_agent_skills(agent.id) if skill_provider is not None else ()
+            skills.update((ref.name, ref.version) for ref in refs
+                          if isinstance(ref.version, str) and ref.version.strip())
+            for server in agent.profile.mcp_servers:
+                held = allowlists.get(server.name, [])
+                allowlists[server.name] = (None if held is None or server.allowed_tools is None
+                                           else sorted({*held, *server.allowed_tools}))
+        return cls(capabilities=capabilities, skills=skills, tools=_described(tool_runtime),
+                   mcp_allowlists=allowlists, models=models,
+                   validators=[getattr(item, "identity", item) for item in validators])
+
+    def _proven_with(self) -> dict[str, str]:
+        """The ``proven_with`` section of a candidate whose runs used this environment."""
+        return {"models_sha256": sha256_hex(sorted(self.models)),
+                "mcp_allowlists_sha256": sha256_hex({
+                    name: None if allowed is None else list(allowed)
+                    for name, allowed in self.mcp_allowlists.items()})}
+
+
+def _described(runtime: Any) -> list[Mapping[str, str]]:
+    """``describe()`` of a local tool runtime, or of each one a composite runtime holds."""
+    describe = getattr(runtime, "describe", None)
+    if callable(describe):
+        return list(describe())
+    return [tool for child in getattr(runtime, "_runtimes", ()) for tool in _described(child)]
+
+
+def check_applicability(
+    record: TemplateRecord, environment: TemplateEnvironment,
+) -> ApplicabilityReport:
+    """Whether *record* applies in *environment*, and the reasons it does not.
+
+    Each capability in the record's prerequisites must be one an agent
+    offers (``capability_removed``). Each skill and tool there must be
+    available at the same version, and a tool with the same input schema
+    digest (``skill_removed``, ``skill_changed``, ``tool_removed``,
+    ``tool_changed``). Each validator identity the prerequisites or an
+    expected output names must be in use (``validator_set_changed``). A
+    record with ``proven_with`` applies only where the run uses the same
+    model ids (``model_changed``) and MCP allowlists
+    (``mcp_allowlist_changed``) as the runs it was learned from. A record
+    without prerequisites or ``proven_with`` applies anywhere.
+    """
+    if not isinstance(record, TemplateRecord) or not isinstance(environment, TemplateEnvironment):
+        raise TypeError("check_applicability takes a TemplateRecord and a TemplateEnvironment")
+    found: list[tuple[str, str]] = []
+    needs = _plain(record.prerequisites or {})
+    for capability in needs.get("capabilities", ()):
+        if capability not in environment.capabilities:
+            found.append(("capability_removed", f"no agent offers capability {capability!r}"))
+    available = {
+        "skill": {name: {"name": name, "version": version}
+                  for name, version in environment.skills.items()},
+        "tool": {name: dict(tool) for name, tool in environment.tools.items()},
+    }
+    for kind, current in available.items():
+        for item in needs.get(f"{kind}s", ()):
+            now = current.get(item["name"])
+            if now is None:
+                found.append((f"{kind}_removed", f"{kind} {item['name']!r} is not available"))
+            elif now != item:
+                found.append((f"{kind}_changed", f"{kind} {item['name']!r} is not the version "
+                                                 "the template relies on"))
+    named = [*needs.get("validators", ()),
+             *(item for output in _plain(record.expected_outputs) for item in output["validators"])]
+    for item in named:
+        if ValidatorIdentity.from_dict(item) not in environment.validators:
+            found.append(("validator_set_changed",
+                          f"validator {item['name']!r} version {item['version']!r} with that "
+                          "configuration is not in use"))
+    pins = environment._proven_with()
+    for key, code, what in (("models_sha256", "model_changed", "model ids"),
+                            ("mcp_allowlists_sha256", "mcp_allowlist_changed",
+                             "MCP server allowlists")):
+        if record.proven_with and record.proven_with[key] != pins[key]:
+            found.append((code, f"the run's {what} are not those the template was learned with"))
+    return ApplicabilityReport(not found, tuple(sorted({code for code, _ in found})),
+                               tuple(dict.fromkeys(detail for _, detail in found)))

@@ -10,7 +10,8 @@ This page covers the evidence planner history keeps, failed runs,
 distillation, template records, their versions, promoting structure that
 accepted runs repeat to a candidate record, validation of records as
 untrusted candidates, the template catalog, building a template without a
-planning call, and activating, rolling back and pinning template versions. A record is data: building a template from it,
+planning call, activating, rolling back and pinning template versions, and
+when a template stops applying because what its runs relied on changed. A record is data: building a template from it,
 storing it, activating it and pinning it in a durable run never changes the
 base planner, and nothing is promoted or activated automatically.
 
@@ -151,6 +152,7 @@ A record's JSON form:
   "prerequisites": {"capabilities", "skills": [{"name", "version"}],
                     "tools": [{"name", "version", "schema_sha256"}],
                     "validators": [validator identities]},
+  "proven_with": {"models_sha256", "mcp_allowlists_sha256"},
   "expected_outputs": [{"node", "description", "validators"}],
   "failure_examples": [{"category", "evidence_sha256"}],
   "tests": [{"name", "sha256"}],
@@ -170,7 +172,9 @@ A record's JSON form:
   source task's subject; the [review](#review) flags both. `prerequisites` names what a template expects to find,
   such as a tool by name, version and schema digest; it grants nothing.
   Validators appear as `ValidatorIdentity` data (name, version and
-  configuration digest), never as code or configuration.
+  configuration digest), never as code or configuration. `proven_with` holds
+  only the digests of the model ids and MCP allowlists that a candidate's
+  runs used, to tell when they [change](#applicability).
 - **Optional sections.** Everything after `blueprint` is optional and is
   omitted when empty, never written as null or an empty list. Lists inside
   `applicability` and `prerequisites` are sets: they are sorted and hold each
@@ -196,8 +200,8 @@ A record has two SHA-256 digests of canonical JSON (sorted keys, no
 whitespace, UTF-8):
 
 - `template_version` covers what decides what the template builds: the type,
-  version, name, description, blueprint, applicability, prerequisites and
-  expected outputs. Any change to a gate, policy, edge, label, persona or
+  version, name, description, blueprint, applicability, prerequisites,
+  `proven_with` and expected outputs. Any change to a gate, policy, edge, label, persona or
   applicability gives a new version. Key order does not change it, and
   neither do `failure_examples`, `tests`, `source_runs`, `parent_version` or
   `review`.
@@ -273,10 +277,13 @@ if structure_sha256(result.graph) in repeated_structures(memory, min_accepted=3)
   that no policy evaluated, does not. Each execution id counts once.
 - **Source runs.** `candidate_from_graph(graph, *, rows, name,
   min_accepted=1, description=None, registry=None, require_success=True,
-  source_task=None)` distills `graph` as `distill_record` does, keeps its
-  [review](#review), and lists each accepted run of the graph's structure in
-  `rows` as a source run. With fewer than `min_accepted` such runs it raises
-  `DistillationError`.
+  source_task=None, environment=None)` distills `graph` as `distill_record`
+  does, keeps its [review](#review), and lists each accepted run of the
+  graph's structure in `rows` as a source run. With fewer than
+  `min_accepted` such runs it raises `DistillationError`. Given the
+  `environment` the runs used, it also records what they relied on, so the
+  template stops being offered when that changes (see
+  [applicability](#applicability)).
 - **Failure examples.** Each other row of that structure that has a
   `failure_category`, or whose `acceptance` is `rejected`, `needs_review` or
   `indeterminate`, becomes a failure example: that category, or else the
@@ -561,6 +568,74 @@ before, and node metadata never carries a version. Like the
 [routing decision](architecture.md#routing-decisions), the record is
 informational: checkpoints and durable plans save it with the graph.
 
+## Applicability
+
+A template learned from accepted runs relied on what those runs used: tools
+at their versions and input schemas, capabilities agents offered, skills at
+their digests, acceptance validators, models and MCP server allowlists.
+When one of them changes, that evidence no longer covers the template.
+`TemplateEnvironment.capture(*, registry=None, skill_provider=None,
+tool_runtime=None, validators=(), models=())` snapshots what a run would use
+now:
+
+| Part | Captured from |
+|---|---|
+| `capabilities` | each registry agent's effective capabilities |
+| `skills` | each skill with a version that `skill_provider`, by default the registry's own, lists for an agent: for an [Agent Skill](skills.md#agent-skills-directories), the `sha256:` digest of its `SKILL.md` |
+| `tools` | `describe()` of a `LocalToolRuntime`, or of each one a `CompositeToolRuntime` holds: name, version and `schema_sha256` |
+| `mcp_allowlists` | the `allowed_tools` of each MCP server on an agent's profile, merged by server name; `None`, every tool, wins |
+| `validators` | acceptance validators or their identities, such as `AcceptancePolicy.validator_identities` |
+| `models` | the model ids a run would use |
+
+`TemplateEnvironment(...)` takes the same parts directly, and every part is
+read-only. Given the environment its runs used,
+`candidate_from_graph(..., environment=environment)` records what the
+candidate relied on: as `prerequisites`, the capabilities that nodes without
+an agent profile require and an agent offered, and every skill, tool and
+validator; as `proven_with`, the SHA-256 of the sorted model ids and of the
+MCP allowlists as canonical JSON, never the ids or servers themselves.
+
+`check_applicability(record, environment)` returns an
+`ApplicabilityReport(valid, reasons, details)`. `reasons` are the sorted
+codes of `smythe.templates.APPLICABILITY_REASONS` behind any problem, each
+once, and `details` one sentence per problem:
+
+| Reason | When |
+|---|---|
+| `capability_removed` | no agent offers a prerequisite capability |
+| `skill_removed`, `skill_changed` | a prerequisite skill is missing, or at another version |
+| `tool_removed`, `tool_changed` | a prerequisite tool is missing, or has another version or input schema digest |
+| `validator_set_changed` | a validator identity that the prerequisites or an expected output name is not in use: removed, or at another version or configuration |
+| `model_changed` | the run's model ids are not those `proven_with` records |
+| `mcp_allowlist_changed` | the run's MCP allowlists are not those `proven_with` records |
+
+Prerequisites are what a template needs, so an environment that adds a
+capability, skill, tool or validator leaves it applicable, while
+`proven_with` must match exactly. A record without prerequisites or
+`proven_with`, such as one distilled without an environment, applies
+anywhere.
+
+Pass `environment=` to `active_templates` or `active_local_templates` to
+offer only the versions in effect that still apply:
+
+```python
+from smythe import TemplateEnvironment
+
+environment = TemplateEnvironment.capture(
+    registry=swarm.registry, tool_runtime=tool_runtime,
+    validators=policy.validator_identities, models=["gpt-6-astra"])
+templates = catalog.active_templates(registry, ["memo-review"], environment=environment)
+```
+
+A version that does not apply is left out, and a warning on the
+`smythe.templates` logger names it and gives the details. With
+`strict=True` it raises `TemplateApplicabilityError` instead, whose `name`,
+`version` and `report` say which version and why. Nothing is deactivated:
+the policy registry, the catalog and durable runs that pinned the version
+are unchanged, and [`pinned_templates`](#resume-a-pinned-run) still rebuilds
+it to resume them. To offer the template again, build a candidate from runs
+in the new environment and activate it through a reviewed decision.
+
 ## Limits
 
 - Validation compares a candidate with one parent, not with the whole
@@ -571,3 +646,6 @@ informational: checkpoints and durable plans save it with the graph.
   registry holds it. An architect offers the templates it was given, so
   only a menu built by `active_templates` or `active_local_templates`
   follows the registry. Reviews are declared, not authenticated.
+- Applicability compares a record with the environment you capture, not
+  with what a run does. Nothing re-evaluates a template whose environment
+  changed; that takes new runs and a new candidate.

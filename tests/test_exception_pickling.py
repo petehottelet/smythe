@@ -25,7 +25,9 @@ from smythe.provider import (
     ProviderAccountingCancelledError, ProviderAccountingError, ProviderResponseError,
 )
 from smythe.provider_responses import PreparedRequest, RawResponseEnvelope, ResponseQuoteError
-from smythe.templates import TemplateValidationError
+from smythe.templates import (
+    ApplicabilityReport, TemplateApplicabilityError, TemplateValidationError,
+)
 from smythe.workflow_provider import ProviderRequestRejectedError, WorkflowQuoteError
 
 
@@ -91,6 +93,10 @@ CUSTOM_CONSTRUCTED = {
     TemplateValidationError: lambda: TemplateValidationError(
         "template node 'draft' max_retries is 4, above the limit of 3", node="draft",
         field="max_retries",
+    ),
+    TemplateApplicabilityError: lambda: TemplateApplicabilityError(
+        "memo", "a" * 64, ApplicabilityReport(False, ("tool_changed",), (
+            "tool 'search' is not the version the template relies on",)),
     ),
 }
 

@@ -1859,6 +1859,23 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   with identity `template:<name>` and the template version, so the recipe
   pins the exact template. See
   [build a template without planning](docs/learning.md#build-a-template-without-planning).
+- Template applicability. `TemplateEnvironment.capture(registry=...,
+  tool_runtime=..., validators=..., models=...)` snapshots the agents'
+  effective capabilities, skill versions such as Agent Skills digests,
+  `LocalToolRuntime.describe()`, MCP server allowlists, acceptance validator
+  identities and model ids. `candidate_from_graph(..., environment=...)`
+  records what the candidate relied on as prerequisites and in a new
+  optional `proven_with` section, part of the template version, that holds
+  only digests of the model ids and MCP allowlists.
+  `check_applicability(record, environment)` returns an
+  `ApplicabilityReport(valid, reasons, details)` with the reason codes
+  `capability_removed`, `skill_removed`, `skill_changed`, `tool_removed`,
+  `tool_changed`, `validator_set_changed`, `model_changed` and
+  `mcp_allowlist_changed`. `TemplateCatalog.active_templates()` and
+  `active_local_templates()` take `environment=` to leave out a version in
+  effect that no longer applies, logging why, or with `strict=True` raise
+  `TemplateApplicabilityError`; nothing is deactivated, and pinned durable
+  runs are unchanged. See [applicability](docs/learning.md#applicability).
 - Agent Skills directories as a skill source.
   `AgentSkillsProvider({agent_id: [root, ...]})` reads each
   `<root>/<name>/SKILL.md` when it is built and lists each skill as a

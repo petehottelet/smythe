@@ -85,7 +85,10 @@ from smythe.templates import (
     TemplateCatalog, TemplateLimits, TemplateRecord, TemplateRecordError, TemplateValidationError,
     distill_record, pinned_templates, template_target, validate_template_record,
 )
-from smythe.templates import candidate_from_graph, repeated_structures
+from smythe.templates import (
+    ApplicabilityReport, TemplateApplicabilityError, TemplateEnvironment, candidate_from_graph,
+    check_applicability, repeated_structures,
+)
 from smythe.verifier import (
     CallableVerifier,
     TokenVerifier,
@@ -119,6 +122,7 @@ __all__ = [
     "AgentSkillsProvider",
     "AnthropicProvider",
     "AnthropicMessagesProvider",
+    "ApplicabilityReport",
     "ArchitectError",
     "Artifact",
     "ArtifactLineage",
@@ -218,7 +222,9 @@ __all__ = [
     "Synthesizer",
     "SynthesisStrategy",
     "Task",
+    "TemplateApplicabilityError",
     "TemplateCatalog",
+    "TemplateEnvironment",
     "TemplateLimits",
     "TemplateRecord",
     "TemplateRecordError",
@@ -245,6 +251,7 @@ __all__ = [
     "WhiteRabbit",
     "archive_heads",
     "candidate_from_graph",
+    "check_applicability",
     "design_verifier",
     "distill_record",
     "distill_template",

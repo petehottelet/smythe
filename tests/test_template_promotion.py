@@ -6,39 +6,53 @@ source runs name those runs and whose failure examples keep only a category
 and an evidence digest for each failed or not-accepted run of that structure.
 A candidate is only a candidate: nothing is activated. A record also builds
 its graph as a deterministic architect, with no planning call, which a
-durable run pins by identity and version.
+durable run pins by identity and version. A candidate built in an
+environment snapshot no longer applies, and is no longer offered, once a
+tool, capability, validator, skill, model or MCP allowlist it relied on
+changes.
 """
 
 from __future__ import annotations
 
 import asyncio
-from dataclasses import asdict
+from dataclasses import asdict, replace
 import json
+import logging
+import typing
 
 import pytest
 
 import smythe
 from smythe._canonical import canonical_bytes, sha256_hex
 from smythe.acceptance import AcceptancePolicy
+from smythe.agent import Agent, AgentProfile
+from smythe.agent_skills import AgentSkillsProvider
 from smythe.constrained_planner import ConstrainedArchitect
 from smythe.constrained_prompts import CONSTRAINED_SYSTEM_PROMPT
 from smythe.distill import DistillationError
 from smythe.graph import ExecutionGraph, Node, Topology, structure_sha256
+from smythe.local_tools import CompositeToolRuntime, LocalTool, LocalToolRuntime
+from smythe.mcp import MCPServerSpec, MCPToolRuntime
 from smythe.memory import ExecutionOutcome, PlannerMemory
 from smythe.optimize import PolicyRegistry
 from smythe.planner import DeterministicArchitect
 from smythe.prompts import PLANNING_SYSTEM_PROMPT
 from smythe.provider import CompletionResult, OfflineProvider, Provider
+from smythe.registry import Registry
 from smythe.swarm import Swarm
 from smythe.task import Task
 from smythe.templates import (
-    MAX_FAILURE_EXAMPLES, TemplateArchitect, TemplateCatalog, TemplateRecord,
-    candidate_from_graph, distill_record, repeated_structures,
+    APPLICABILITY_REASONS, MAX_FAILURE_EXAMPLES, ApplicabilityReport, TemplateApplicabilityError,
+    TemplateArchitect, TemplateCatalog, TemplateEnvironment, TemplateRecord, TemplateRecordError,
+    TemplateValidationError, candidate_from_graph, check_applicability, distill_record,
+    repeated_structures, validate_template_record,
 )
+from smythe.tools import ToolSpec
 from smythe.validation import ValidationReport, ValidatorIdentity, hard_finding
 from smythe.workflow_binding import LocalOnly
 from smythe.workflow_store import SQLiteWorkflowStore, WorkflowConflictError
 from test_distill import _completed_gated_graph, _completed_graph
+from test_template_lifecycle import _in_effect
 
 MARKER = "DEFECT-4c1e"
 GOALS = ("Summarize the quarter", "Review the annual budget", "Plan the offsite")
@@ -456,3 +470,243 @@ def test_as_architect_pins_the_template_identity_and_version_in_durable_runs(
         {"name": "learned", "index": 0, "version": first.template_version}]}
     # Only the steps called a provider: planning never did.
     assert systems and not {PLANNING_SYSTEM_PROMPT, CONSTRAINED_SYSTEM_PROMPT} & set(systems)
+
+
+# ---------------------------------------------------------------------------
+# Applicability
+# ---------------------------------------------------------------------------
+
+
+SCHEMA = {"type": "object", "properties": {"query": {"type": "string"}}}
+MODEL = "gpt-6-astra"
+TARGET = "planner.template.memo"
+
+
+def skill_file(root, body: str) -> None:
+    folder = root / "memo-style"
+    folder.mkdir(parents=True, exist_ok=True)
+    (folder / "SKILL.md").write_text(
+        f"---\nname: memo-style\ndescription: How memos are written\n---\n{body}\n",
+        encoding="utf-8")
+
+
+def environment(tmp_path, *, schema=SCHEMA, tools=True, capabilities=("writing",),
+                validator="1", body="Write short sentences.", skills=True, models=(MODEL,),
+                allowed=("read_file",)) -> TemplateEnvironment:
+    """Capture an environment from live objects; each argument changes one part of it."""
+    root = tmp_path / "skills" / sha256_hex([body, skills])[:12]
+    if skills:
+        skill_file(root, body)
+    root.mkdir(parents=True, exist_ok=True)
+    registry = Registry(skill_provider=AgentSkillsProvider({"writer": [root]}))
+    registry.register(Agent(id="writer", profile=AgentProfile(
+        name="Writer", capabilities=list(capabilities))))
+    registry.register(Agent(id="reader", profile=AgentProfile(
+        name="Reader", capabilities=["research"],
+        mcp_servers=[MCPServerSpec("fs", "stdio", command="fs-server", allowed_tools=allowed)])))
+    search = LocalTool(ToolSpec("search", "Search the notes", schema), lambda arguments: "found", "1")
+    runtime = LocalToolRuntime([search] if tools else [], agents={"writer": ["search"] if tools else []})
+    identity = ValidatorIdentity.for_config("forbids", validator, {"marker": MARKER})
+    return TemplateEnvironment.capture(registry=registry, tool_runtime=runtime,
+                                       validators=[identity], models=models)
+
+
+def proven(tmp_path) -> TemplateRecord:
+    """A candidate whose draft step needs a writer, built in the captured environment."""
+    graph = memo(None)
+    graph.nodes[0].required_capabilities = ["writing"]
+    graph.nodes[1].required_capabilities = ["judging"]
+    row = outcome(structure_sha256=structure_sha256(graph))
+    return candidate_from_graph(graph, rows=[row], name="memo", require_success=False,
+                                environment=environment(tmp_path))
+
+
+def test_capture_reads_what_a_run_would_use(tmp_path):
+    captured = environment(tmp_path)
+    search = LocalTool(ToolSpec("search", "Search the notes", SCHEMA), lambda arguments: "x", "1")
+    other = LocalTool(ToolSpec("lookup", "Look up a word", {"type": "object"}), str, "3")
+    composite = CompositeToolRuntime(LocalToolRuntime([search], agents={}), MCPToolRuntime(),
+                                     LocalToolRuntime([other], agents={}))
+
+    assert captured.capabilities == {"writing", "memo-style", "research"}
+    assert dict(captured.skills) == {
+        "memo-style": AgentSkillsProvider({"writer": [tmp_path / "skills" / sha256_hex(
+            ["Write short sentences.", True])[:12]]}).skill("memo-style").version}
+    assert captured.skills["memo-style"].startswith("sha256:")
+    assert {name: dict(tool) for name, tool in captured.tools.items()} == {"search": search.describe()}
+    assert dict(captured.mcp_allowlists) == {"fs": ("read_file",)}
+    assert captured.validators == {ValidatorIdentity.for_config("forbids", "1", {"marker": MARKER})}
+    assert captured.models == {MODEL}
+    assert TemplateEnvironment.capture().capabilities == frozenset()
+    assert set(TemplateEnvironment.capture(tool_runtime=composite).tools) == {"search", "lookup"}
+    # Validators may be given as validators; their identities are kept.
+    assert TemplateEnvironment.capture(validators=[Forbids()]).validators == {Forbids.identity}
+
+
+def test_capture_merges_the_allowlists_of_one_server():
+    def reader(name, allowed):
+        server = MCPServerSpec("fs", "stdio", command="fs-server", allowed_tools=allowed)
+        return Agent(profile=AgentProfile(name=name, mcp_servers=[server]))
+
+    registry = Registry()
+    for name, allowed in (("one", ("read_file",)), ("two", ("list", "read_file"))):
+        registry.register(reader(name, allowed))
+    assert dict(TemplateEnvironment.capture(registry=registry).mcp_allowlists) == {
+        "fs": ("list", "read_file")}
+    registry.register(reader("three", None))  # Every tool of the server.
+    assert dict(TemplateEnvironment.capture(registry=registry).mcp_allowlists) == {"fs": None}
+
+
+def test_a_candidate_built_in_an_environment_records_what_it_relied_on(tmp_path):
+    captured = environment(tmp_path)
+    record = proven(tmp_path)
+    data = record.to_dict()
+
+    # Only the capability a node without an agent needs and an agent offers.
+    assert data["prerequisites"] == {
+        "capabilities": ["writing"],
+        "skills": [{"name": "memo-style", "version": captured.skills["memo-style"]}],
+        "tools": [dict(captured.tools["search"])],
+        "validators": [ValidatorIdentity.for_config("forbids", "1", {"marker": MARKER}).to_dict()]}
+    assert data["proven_with"] == {"models_sha256": sha256_hex([MODEL]),
+                                   "mcp_allowlists_sha256": sha256_hex({"fs": ["read_file"]})}
+    assert validate_template_record(data) == record == TemplateRecord.from_dict(data)
+    assert check_applicability(record, captured) == ApplicabilityReport(True)
+    assert check_applicability(record, environment(tmp_path, capabilities=("writing", "edit"),
+                                                   validator="1")).valid
+    # A record without prerequisites applies anywhere.
+    assert check_applicability(distill_record(memo(None), name="memo", require_success=False),
+                               TemplateEnvironment()).valid
+
+
+CHANGES = {
+    "tool-schema": (dict(schema={"type": "object", "properties": {"q": {"type": "string"}}}),
+                    "tool_changed"),
+    "tool-removed": (dict(tools=False), "tool_removed"),
+    "capability-removed": (dict(capabilities=()), "capability_removed"),
+    "validator-version": (dict(validator="2"), "validator_set_changed"),
+    "skill-digest": (dict(body="Write long sentences."), "skill_changed"),
+    "skill-removed": (dict(skills=False), "skill_removed"),
+    "model-id": (dict(models=("gpt-6-astra-mini",)), "model_changed"),
+    "model-added": (dict(models=(MODEL, "gpt-6-astra-mini")), "model_changed"),
+    "mcp-allowlist": (dict(allowed=("read_file", "write_file")), "mcp_allowlist_changed"),
+}
+
+
+@pytest.mark.parametrize("case", CHANGES)
+def test_a_changed_environment_invalidates_the_template_with_a_named_reason(
+    tmp_path, case, caplog,
+):
+    changes, reason = CHANGES[case]
+    record = proven(tmp_path)
+    catalog = TemplateCatalog(tmp_path / "catalog")
+    catalog.put(record)
+    before, after = environment(tmp_path), environment(tmp_path, **changes)
+
+    report = check_applicability(record, after)
+
+    assert (report.valid, report.reasons) == (False, (reason,)) and len(report.details) == 1
+    assert reason in APPLICABILITY_REASONS
+    with _in_effect(tmp_path / "registry.sqlite3",
+                    {TARGET: {TARGET: record.template_version}}) as registry:
+        assert [item.name for item in catalog.active_templates(
+            registry, ["memo"], environment=before)] == ["memo"]
+        with caplog.at_level(logging.WARNING, logger="smythe.templates"):
+            assert catalog.active_templates(registry, ["memo"], environment=after) == []
+            assert catalog.active_local_templates(registry, ["memo"], environment=after) == []
+        for active in (catalog.active_templates, catalog.active_local_templates):
+            with pytest.raises(TemplateApplicabilityError) as caught:
+                active(registry, ["memo"], environment=after, strict=True)
+            assert (caught.value.name, caught.value.version, caught.value.report) == (
+                "memo", record.template_version, report)
+        # Without an environment, the version in effect is offered as before.
+        assert len(catalog.active_templates(registry, ["memo"])) == 1
+    warnings = [entry.getMessage() for entry in caplog.records if entry.name == "smythe.templates"]
+    assert len(warnings) == 2 and all(report.details[0] in text and "'memo'" in text
+                                      for text in warnings)
+
+
+def test_every_reason_is_reported_once_with_each_detail(tmp_path):
+    record = proven(tmp_path)
+    expected = [{"node": "draft", "description": "The memo",
+                 "validators": [ValidatorIdentity.for_config("length", "1").to_dict()]}]
+    record = replace(record, expected_outputs=expected)
+    after = environment(tmp_path, tools=False, validator="2", models=("other",), skills=False)
+
+    report = check_applicability(record, after)
+
+    assert report.reasons == ("model_changed", "skill_removed", "tool_removed",
+                              "validator_set_changed")
+    assert len(report.details) == 5 and not report.valid
+    assert tuple(sorted(APPLICABILITY_REASONS)) == APPLICABILITY_REASONS
+
+
+def test_proven_with_is_part_of_the_template_version(tmp_path):
+    record = proven(tmp_path)
+    data = record.to_dict()
+    other = dict(data, proven_with={**data["proven_with"], "models_sha256": sha256_hex(["other"])})
+    bare = {key: value for key, value in data.items() if key != "proven_with"}
+
+    assert len({TemplateRecord.from_dict(item).template_version
+                for item in (data, other, bare)}) == 3
+    for bad, error in (({**data["proven_with"], "models": [MODEL]}, "unknown keys"),
+                       ({"models_sha256": sha256_hex([MODEL])}, "missing keys"),
+                       ({**data["proven_with"], "models_sha256": MODEL}, "hexadecimal")):
+        with pytest.raises(TemplateRecordError, match=error):
+            TemplateRecord.from_dict(dict(data, proven_with=bad))
+    # A model key inside the section would grant authority and is refused.
+    with pytest.raises(TemplateValidationError, match="authority"):
+        validate_template_record(dict(data, proven_with={**data["proven_with"], "model": MODEL}))
+
+
+@pytest.mark.parametrize("changes, error", [
+    (dict(capabilities="writing"), TypeError),
+    (dict(capabilities=[""]), ValueError),
+    (dict(skills={"memo-style": None}), ValueError),
+    (dict(tools=[{"name": "search", "version": "1"}]), ValueError),
+    (dict(tools=[{"name": "search", "version": "1", "schema_sha256": "0" * 64}] * 2), ValueError),
+    (dict(mcp_allowlists={"fs": "read_file"}), TypeError),
+    (dict(validators=[{"name": "forbids"}]), TypeError),
+    (dict(models=[7]), ValueError),
+], ids=["capabilities-text", "blank-capability", "unversioned-skill", "tool-without-schema",
+        "duplicate-tool", "allowlist-text", "validator-data", "model-not-text"])
+def test_an_environment_refuses_malformed_parts(changes, error):
+    with pytest.raises(error):
+        TemplateEnvironment(**changes)
+
+
+def test_an_environment_is_read_only():
+    captured = TemplateEnvironment(skills={"memo-style": "sha256:" + "0" * 64},
+                                   mcp_allowlists={"fs": ["read_file"]})
+    with pytest.raises(TypeError):
+        captured.skills["other"] = "1"
+    with pytest.raises(AttributeError):
+        captured.models = frozenset({"other"})
+
+
+def test_applicability_takes_a_record_and_an_environment(tmp_path):
+    record = proven(tmp_path)
+    with pytest.raises(TypeError, match="TemplateEnvironment"):
+        check_applicability(record, {"models": [MODEL]})
+    with pytest.raises(TypeError, match="TemplateRecord"):
+        check_applicability(record.to_dict(), TemplateEnvironment())
+    with pytest.raises(TypeError, match="environment must be a TemplateEnvironment"):
+        candidate_from_graph(memo(None), rows=[outcome()], name="memo", require_success=False,
+                             environment={"models": [MODEL]})
+
+
+@pytest.mark.parametrize("member", [
+    repeated_structures, candidate_from_graph, check_applicability, TemplateRecord.as_architect,
+    TemplateArchitect.__init__, TemplateArchitect.plan, TemplateArchitect.local_only,
+    TemplateEnvironment, TemplateEnvironment.capture, ApplicabilityReport,
+    TemplateCatalog.active_templates, TemplateCatalog.active_local_templates,
+    PlannerMemory.iter_outcomes,
+], ids=lambda member: member.__qualname__)
+def test_public_type_hints_resolve(member):
+    typing.get_type_hints(getattr(member, "__func__", member))
+
+
+def test_applicability_names_are_exported():
+    for name in ("ApplicabilityReport", "TemplateApplicabilityError", "TemplateEnvironment",
+                 "check_applicability"):
+        assert name in smythe.__all__ and getattr(smythe, name) is getattr(smythe.templates, name)
