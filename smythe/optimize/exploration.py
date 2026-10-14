@@ -229,7 +229,8 @@ class SubprocessProposer:
         if len(stdout) <= _MAX_REPLY_BYTES:
             try:
                 reply = json.loads(stdout.decode("utf-8"))
-            except ValueError:
+            except (ValueError, RecursionError):
+                # Nesting too deep to decode is as invalid as malformed text.
                 pass
         if not isinstance(reply, dict):
             raise ProposerError("the proposer reply is not a JSON object of at most 1 MiB")

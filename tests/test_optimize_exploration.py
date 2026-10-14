@@ -331,6 +331,8 @@ def _assert_stopped_beating(folder) -> None:
     ("hang", "did not reply within 5 seconds and was killed"),
     ("fail", "exited with status 3"),
     ("not json", "is not a JSON object"),
+    # Nesting too deep to decode, under the size limit.
+    pytest.param("[" * 500_000 + "]" * 500_000, "is not a JSON object", id="deeply-nested"),
     ({"proposals": []}, "declares no whole spent_microusd"),
     ({"proposals": [], "spent_microusd": True}, "declares no whole spent_microusd"),
 ])
