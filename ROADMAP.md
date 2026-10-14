@@ -450,8 +450,15 @@ connector or paid run.
    [activates a template version](docs/learning.md#activate-and-roll-back-templates)
    for new runs, a rollback restores the previous one without changing
    running work, and a durable run pins the exact versions it started with.
-   A built-in evaluator that runs template candidates on held-out tasks is
-   not built yet
+   Structure that repeated accepted runs share becomes a
+   [candidate record](docs/learning.md#promote-repeated-accepted-structure),
+   never activated automatically. A record
+   [builds its graph without a planning call](docs/learning.md#build-a-template-without-planning)
+   as a deterministic architect that durable runs pin, and its
+   [applicability](docs/learning.md#applicability) is invalidated when the
+   tools, capabilities, skills, validators, models or MCP allowlists it was
+   proven with change. A built-in evaluator that runs template candidates on
+   held-out tasks is not built yet
 8. **Native Agent Skills support** — built for the next release.
    [Agent Skills directories](docs/skills.md#agent-skills-directories) are
    discovered directly, beside the OpenClaw and MCP skill providers, and lend

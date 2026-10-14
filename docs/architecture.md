@@ -480,7 +480,17 @@ in a durable run's recipe. A reviewed Autotune decision activates a template
 version under the [policy registry](optimize.md#policy-registry) target
 `planner.template.<name>`: `TemplateCatalog.active_templates()` builds the
 versions in effect for new runs, a rollback changes only new runs, and
-`pinned_templates()` rebuilds the versions a durable recipe pinned. See
+`pinned_templates()` rebuilds the versions a durable recipe pinned.
+`repeated_structures` finds the structure digests that repeated accepted runs
+in planner history share, and `candidate_from_graph` builds a
+[candidate record](learning.md#promote-repeated-accepted-structure) from a
+graph of one, keeping failure examples as digests only; nothing activates it
+automatically. `record.as_architect()` builds a record's graph with no
+planning call, and its `local_only()` form pins the version in a durable
+run. `check_applicability` reports when the tools, capabilities, skills,
+validators, models or MCP allowlists a record was proven with have changed,
+and `active_templates(..., environment=...)` then leaves that version out;
+see [applicability](learning.md#applicability) and
 [learning from runs](learning.md).
 
 This keeps learning reviewable: execution history informs future choices, and
