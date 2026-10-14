@@ -28,8 +28,8 @@ ambiguous after a connection failure.
 | `smythe.optimize.ledger` | Durable campaign, candidate, trial-event, cost-exposure, and decision history |
 | `smythe.optimize.engine` | Bounded development, confirmation, and holdout orchestration with conservative recovery |
 | `smythe.optimize.workflow_eval` | A trial evaluator that runs one durable text workflow per trial and reports its exact cost |
-| `smythe.optimize.inspection` and `smythe.optimize.report` | Read-only evidence collection and standalone HTML reports |
-| `smythe.optimize.registry` | Append-only reviews of terminal decisions and history of the policy version in effect for each target, with activation, rollback and retirement |
+| `smythe.optimize.inspection` and `smythe.optimize.report` | Read-only evidence collection, standalone HTML reports, and cross-campaign target reports |
+| `smythe.optimize.registry` | Append-only reviews of terminal decisions and history of the policy version in effect for each target, with activation, rollback and retirement, also from the CLI |
 
 These modules are deliberately separable from proposal generation. A human,
 an agent, or a deterministic grid can propose candidates, but every candidate
@@ -438,7 +438,9 @@ so a holdout an earlier release used stays used.
 campaign, a plan that conflicts with a saved campaign, a used holdout, work that
 needs attention) and for local SQLite or filesystem failures, and with code 9
 when a declared limit (wall time, trials, candidates or spend) stops or refuses
-it. With `--json`, `error.type`
+it. Invalid input exits with code 2. The policy registry commands use the same
+codes; see [review and change targets from the CLI](#review-and-change-targets-from-the-cli).
+With `--json`, `error.type`
 names the exact error, such as `HoldoutAlreadyUsedError`.
 
 Inspect a campaign without mutating the ledger:
@@ -1117,6 +1119,92 @@ file, and repeats that check and the file fingerprint check immediately after
 opening and at close, like ledger inspection. A read-only registry refuses
 `record_review`, `activate`, `rollback` and `retire`.
 
+### Review and change targets from the CLI
+
+The same operations run from the installed CLI. This sequence reviews the
+offline concurrency campaign, activates its policy for the `max_concurrency`
+target, reports the target, then rolls back and retires it:
+
+```bash
+smythe optimize review CAMPAIGN_ID --verdict approve --reviewer capacity-owner \
+    --evidence holdout-review.txt --note "gain holds on the holdout"
+smythe optimize activate max_concurrency REVIEW_ID --expected-seq 0 \
+    --actor release-operator --reason "approved for new runs"
+smythe optimize history max_concurrency
+smythe optimize rollback max_concurrency --to-seq 1 --expected-seq 2 \
+    --actor release-operator --reason "back to serial"
+smythe optimize retire max_concurrency --expected-seq 3 \
+    --actor release-operator --reason "paused"
+```
+
+Every command takes `--registry PATH` (default
+`~/.smythe/policy-registry.sqlite3`) and `--json`; `review` and `history` also
+read `--ledger PATH` (default `~/.smythe/optimize.sqlite3`).
+
+`review CAMPAIGN_ID --verdict approve|reject --reviewer NAME` records a review
+with `record_review()` and prints its ID. It opens the ledger read-only, so
+the ledger must be closed and checkpointed, and creates a missing registry.
+`--evidence FILE` records the plain hex SHA-256 of the file's bytes as
+`evidence_sha256`; neither its path nor its content is stored. `--note` adds
+one line. The reviewer is declared, not authenticated.
+
+`activate TARGET REVIEW_ID`, `rollback TARGET --to-seq SEQ` and
+`retire TARGET` call the matching `PolicyRegistry` methods. Each needs
+`--expected-seq`, the head the operator decided from (0 for a target without
+events; `history` shows it), and an `--actor` and `--reason` to record. They
+act only on an existing registry and never create one. Each prints the target
+and every event it appended, with its seq and policy, so a first activation
+also shows the baseline it recorded. No command edits application
+configuration: new work resolves the policy in effect from the registry.
+
+| Exit code | Meaning |
+|---|---|
+| 0 | The review or change was recorded, or the report was produced |
+| 2 | Invalid input: a malformed target, seq, campaign ID, name, reason or note, a verdict other than `approve` or `reject`, or an unreadable evidence file; checked before any file is opened or created |
+| 8 | A refused change (`RegistryError`, such as approving a decision that was not promoted, a review whose incumbent is not in effect, restoring the entry already in effect, or no registry), a stale `--expected-seq` (`RegistryConflictError`), a missing campaign, ledger or registry, or a file a writer still holds open |
+
+A command that exits with 2 or 8 records nothing.
+
+### Cross-campaign target report
+
+`smythe optimize history TARGET` reports everything recorded about one target
+across campaigns. It opens the ledger and the registry read-only and changes
+neither file; both must be closed and checkpointed, as for `inspect`.
+`collect_target_report(ledger, registry, target)` in
+`smythe.optimize.inspection` returns the same report from two read-only
+stores:
+
+- `active`, the `ActiveVersion` in effect or `null`, and `history`, every
+  event of the target;
+- `campaigns`: each ledger campaign whose sealed candidates set the target or
+  a path under it, oldest first, with its plan hash, holdout commitment,
+  incumbent policy hash, trial counts, `cost` (exactly its snapshot's `cost`),
+  `unknown_trials`, its terminal `decision` or `null`, and its `reviews`;
+- `campaigns_not_in_ledger`: campaigns whose reviews the target's activations
+  name but that this ledger does not hold, so their cost is missing;
+- `optimization_cost`: confirmed, reserved, unknown-exposure and
+  total-exposure micro-USD summed as exact integers over those campaigns,
+  with the number of `campaigns` and `unknown_trials`; and
+- `target_report_version` 1 and `evidence_sha256`, the SHA-256 of the
+  report's canonical JSON.
+
+A decision lists its ID, candidate and policy hash, `promoted`, its reason,
+and the three-way `verdict` it recorded, or `null` for a decision recorded
+before verdicts were saved. A review is listed under a campaign only when its
+campaign ID, plan hash and holdout commitment all match, so a campaign of the
+same ID in another ledger is never mixed in.
+
+`optimization_cost` is what evaluating candidates cost: confirmed cost of
+completed trials, reservations that prepared and dispatched trials still hold,
+and the full ceilings of unknown outcomes. It is never netted against
+inference savings, which the report does not estimate. Unknown exposure is
+shown apart from spend with its count of unknown trials, so an unknown outcome
+under a zero ceiling is still reported. The report validates each campaign's
+decision inventory; inconsistent evidence, or a recorded verdict that is not
+one of the three, stops it with `ExperimentLedgerError` (exit code 8).
+`ExperimentLedger.list_campaigns()` lists every campaign, oldest first, as
+`open_campaign()` returns it, without writing or returning holdout secrets.
+
 ## Current boundaries
 
 The following pieces remain future work:
@@ -1127,8 +1215,9 @@ The following pieces remain future work:
   per-trial price ceilings;
 - calibrated sample-size guidance and a multiple-comparison correction across
   development challengers; and
-- cross-campaign comparison, and authenticated reviewers for the
-  [policy registry](#policy-registry).
+- statistical comparison across campaigns, beyond the
+  [cross-campaign target report](#cross-campaign-target-report), and
+  authenticated reviewers for the [policy registry](#policy-registry).
 
 The runner bounds what a campaign may vary:
 [reserved fields](#experiment-contracts-and-budgets) such as acceptance,

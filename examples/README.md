@@ -77,6 +77,25 @@ decisions, comparison intervals, policies, trial details, and exact costs.
 Use a new output filename for each export.
 [Report limits and evidence scope](../docs/optimize.md#export-a-campaign-report).
 
+Review the decision, put its policy in effect in a local policy registry, and
+report the target across campaigns:
+
+```bash
+smythe optimize review CAMPAIGN_ID --ledger local-experiment.sqlite3 \
+    --registry local-registry.sqlite3 --verdict approve --reviewer NAME
+# Copy the printed review ID.
+smythe optimize activate max_concurrency REVIEW_ID --registry local-registry.sqlite3 \
+    --expected-seq 0 --actor NAME --reason "approved for new runs"
+smythe optimize history max_concurrency --ledger local-experiment.sqlite3 \
+    --registry local-registry.sqlite3
+```
+
+Activation never edits configuration; `rollback` and `retire` change the
+target the same way, each naming the head seq it expects. `history` changes
+neither file and sums what the campaigns cost apart from any inference
+savings.
+[Registry commands and exit codes](../docs/optimize.md#review-and-change-targets-from-the-cli).
+
 | Example | What it shows |
 |---|---|
 | [Packages and typing](../docs/distribution.md) | Build and test a slim source package and verify typed sync/async consumers against an installed wheel. |

@@ -230,6 +230,7 @@
     "tests/test_optimize_lease.py",
     "tests/test_optimize_ledger.py",
     "tests/test_optimize_registry.py",
+    "tests/test_optimize_registry_cli.py",
     "tests/test_optimize_report.py",
     "tests/test_optimize_report_cli.py",
     "tests/test_optimize_statistics.py",

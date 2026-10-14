@@ -467,7 +467,13 @@ connector or paid run.
    repeated-comparison guidance, cross-campaign reports, process-
    supervised evaluator isolation, and conservative live-evaluator adapters
    after the offline campaign. Optimizers cannot change acceptance criteria,
-   spend ceilings, permissions or held-out data
+   spend ceilings, permissions or held-out data. In progress:
+   `smythe optimize history` gives a read-only
+   [cross-campaign report](docs/optimize.md#cross-campaign-target-report) of
+   one policy target's campaigns, decisions, activations and optimization
+   cost, never netted against inference savings, and the CLI
+   [reviews, activates, rolls back and retires](docs/optimize.md#review-and-change-targets-from-the-cli)
+   policies. Statistical comparison across campaigns is not built yet
 
 ### Evidence and scale
 

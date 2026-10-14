@@ -690,6 +690,31 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   and a read-only open requires a closed, checkpointed file. The ledger
   schema and `smythe optimize inspect --json` output are unchanged. See
   [policy registry](docs/optimize.md#policy-registry).
+- Policy registry commands in the CLI. `smythe optimize review CAMPAIGN_ID
+  --verdict approve|reject --reviewer NAME` records a review of a campaign's
+  terminal decision, with `--evidence FILE` recorded only as the file's
+  SHA-256 in `evidence_sha256`. `smythe optimize activate TARGET REVIEW_ID`,
+  `rollback TARGET --to-seq SEQ` and `retire TARGET` each name the head they
+  expect with `--expected-seq` and record an `--actor` and `--reason`; they
+  print the target and each appended event's seq and policy, need an
+  existing registry and never edit configuration. `smythe optimize history
+  TARGET` opens the ledger and registry read-only and reports the target's
+  activations and every campaign whose candidates set the target, with its
+  decision and recorded three-way verdict, reviews and cost; confirmed,
+  reserved and unknown micro-USD are summed exactly across those campaigns
+  as optimization cost, never netted against inference savings, and unknown
+  trials are counted so a zero-ceiling unknown outcome still shows.
+  Campaigns an activation names that the ledger does not hold are listed.
+  `collect_target_report(ledger, registry, target)` in
+  `smythe.optimize.inspection` returns the same report, and
+  `ExperimentLedger.list_campaigns()` lists every campaign read-only. Each
+  command takes `--registry` (default `~/.smythe/policy-registry.sqlite3`)
+  and `--json`; invalid input exits with code 2 before any file is opened,
+  and a refused change or a stale `--expected-seq` exits with code 8 and
+  records nothing. The ledger schema, campaign report version 1 and
+  `smythe optimize inspect --json` output are unchanged. See
+  [review and change targets from the CLI](docs/optimize.md#review-and-change-targets-from-the-cli)
+  and [cross-campaign target report](docs/optimize.md#cross-campaign-target-report).
 - `smythe.optimize.workflow_eval.workflow_trial_evaluator(runtime_factory,
   task_for, measure)` runs each Autotune trial as one durable text workflow.
   The run's budget is the trial's ceiling, its id derives from the trial key
