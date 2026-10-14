@@ -2,16 +2,21 @@
 
 import asyncio
 import json
+import logging
 import os
 import stat
 import tempfile
+from contextlib import asynccontextmanager
 from copy import deepcopy
 from dataclasses import asdict
 from pathlib import Path
+from unittest.mock import Mock
 
 import pytest
 
 from fakes import Gate, ManualClock
+from smythe import _redact
+from smythe._failures import classify_failure
 from smythe.acceptance import AcceptancePolicy, DeliveryAcceptance, text_sha256
 from smythe.checkpoint import FileCheckpointStore
 from smythe.constrained_planner import ConstrainedArchitect, SubGraphTemplate
@@ -21,10 +26,14 @@ from smythe.graph import (
 from smythe.memory import ExecutionOutcome, PlannerMemory
 from smythe.planner import LLMArchitect
 from smythe.prompts import build_user_prompt
-from smythe.provider import CompletionResult, Provider
+from smythe.provider import (
+    CompletionResult, OutputTruncatedError, Provider, ProviderAccountingCancelledError,
+)
 from smythe.registry import Registry
 from smythe.swarm import Swarm, SwarmResult
+from smythe.synthesizer import MERGE_SYSTEM_PROMPT, SynthesisStrategy, Synthesizer
 from smythe.task import Task
+from smythe.tools import ToolCall, ToolResult, ToolRuntime, ToolSession, ToolSpec
 from smythe.tracer import Span, Tracer
 from smythe.validation import ValidationReport, ValidatorIdentity, hard_finding
 
@@ -39,6 +48,7 @@ _PREVIOUS_KEYS = frozenset({
     "task_done_when", *_OUTCOME_FIELDS,
 })
 _EVIDENCE_FIELDS = ("execution_id", "verification", "rejected_output_sha256", "structure_sha256")
+_FAILURE_FIELDS = ("failure_category", "failure_type", "failure_excerpt")
 _GATE = {"gate": "judge", "target": "draft", "state": "consumed", "passed": False,
          "regenerations_used": 1}
 
@@ -988,3 +998,415 @@ def test_runs_of_one_template_on_different_goals_share_a_structure_digest(tmp_pa
     assert first["execution_id"] == results[0].execution_id != second["execution_id"]
     assert first["structure_sha256"] == second["structure_sha256"]
     assert first["structure_sha256"] == structure_sha256(results[1].graph)
+
+
+# The keys of a failure row for a run without gates, whose error is not a provider's.
+_FAILURE_KEYS = _PREVIOUS_KEYS | {
+    "execution_id", "structure_sha256", "failure_category", "failure_type",
+}
+
+
+def _answer(text: str = "A draft.", **kwargs) -> CompletionResult:
+    return CompletionResult(text=text, prompt_tokens=1, completion_tokens=1, **kwargs)
+
+
+class _Answers(Provider):
+    """Answers every step with ``answer`` and an LLM_MERGE synthesis with ``merge``.
+
+    An exception is raised instead. When tools are offered, every reply asks
+    for another tool call.
+    """
+
+    def __init__(self, answer, merge=None) -> None:
+        self.answer, self.merge = answer, merge
+
+    async def complete(self, system, prompt, model):
+        answer = self.merge if system == MERGE_SYSTEM_PROMPT else self.answer
+        if isinstance(answer, BaseException):
+            raise answer
+        return answer
+
+    async def chat(self, system, messages, model, tools=None):
+        if tools:
+            return _answer("", tool_calls=[ToolCall(id="c1", name="calc.add", arguments={})],
+                           stop_reason="tool_use")
+        return await super().chat(system, messages, model, tools)
+
+
+class _AddSession(ToolSession):
+    @property
+    def tools(self):
+        return [ToolSpec(name="calc.add", description="Add numbers", input_schema={"type": "object"})]
+
+    async def call(self, tool_call):
+        return ToolResult(tool_call_id=tool_call.id, content="42")
+
+
+class _AddRuntime(ToolRuntime):
+    def open(self, agent):
+        @asynccontextmanager
+        async def session():
+            yield _AddSession()
+
+        return session()
+
+
+class RateLimitError(Exception):
+    """An SDK-style status error whose message quotes the provider's response."""
+
+    def __init__(self, message: str) -> None:
+        super().__init__(message)
+        self.status_code = 429
+
+
+def _draft(task: Task | None) -> ExecutionGraph:
+    return ExecutionGraph(topology=[Topology.SERIAL], task=task,
+                          nodes=[Node(id="draft", label="Draft the memo")])
+
+
+# Each failure: the Swarm's settings, the failure class and exception type that
+# history records, and whether every node completed.
+_FAILURES = {
+    "budget-overrun": (
+        lambda: dict(provider=_Answers(_answer(cost_usd=0.05)), max_budget_usd=0.01),
+        "terminal_accounting", "BudgetReconciliationError", False),
+    "provider-refusal": (
+        lambda: dict(provider=_Answers(_answer("", stop_reason="refusal"))),
+        "provider_rejected", "OutputRefusedError", False),
+    "tool-loop-limit": (
+        lambda: dict(provider=_Answers(_answer()), tool_runtime=_AddRuntime(),
+                     max_tool_iterations=1),
+        "quality_defect", "ToolLoopLimitError", False),
+    "halt-node-failure": (
+        lambda: dict(provider=_Answers(RuntimeError("the draft step failed"))),
+        "transient", "RuntimeError", False),
+    "synthesis-failure": (
+        lambda: dict(provider=_Answers(_answer(), merge=_answer("A half", stop_reason="max_tokens")),
+                     synthesizer=Synthesizer(SynthesisStrategy.LLM_MERGE)),
+        "provider_rejected", "OutputTruncatedError", True),
+}
+
+
+@pytest.mark.parametrize("parallel", [False, True], ids=["sync", "async"])
+@pytest.mark.parametrize("case", _FAILURES)
+def test_an_opted_in_memory_records_one_row_for_each_failed_run(tmp_path, case, parallel):
+    settings, category, failure_type, completed = _FAILURES[case]
+    path = tmp_path / "history.jsonl"
+    task = Task("Research signal that fails")
+    graph = _draft(task)
+    swarm = Swarm(model="m", memory=PlannerMemory(path, record_failures=True), artifact_dir=None,
+                  parallel=parallel, **settings())
+
+    with pytest.raises(Exception) as caught:
+        swarm.execute(graph)
+    [row] = _history_rows(path)
+    [outcome] = PlannerMemory(path).recall(task)
+
+    assert type(caught.value).__name__ == outcome.failure_type == failure_type
+    assert outcome.failure_category == classify_failure(caught.value) == category
+    # success keeps its meaning: every node completed, as when only synthesis failed.
+    assert outcome.success is completed
+    assert [node["status"] for node in outcome.node_outcomes] == [
+        "completed" if completed else "failed"
+    ]
+    assert outcome.acceptance == "not_evaluated"
+    assert (outcome.resumed, outcome.latency_complete) == (False, True)
+    assert outcome.elapsed_ms is not None
+    assert outcome.structure_sha256 == structure_sha256(graph)
+    assert outcome.execution_id
+    if case == "budget-overrun":
+        assert (outcome.total_cost_usd, outcome.cost_is_complete) == (0.05, True)
+    if case in ("provider-refusal", "synthesis-failure"):
+        # A provider's error keeps its message, which here holds nothing to redact.
+        assert outcome.failure_excerpt == str(caught.value)
+        assert set(row) == _FAILURE_KEYS | {"failure_excerpt"}
+    else:
+        assert set(row) == _FAILURE_KEYS
+
+
+@pytest.fixture
+def fake_home(tmp_path, monkeypatch):
+    home = tmp_path / "home" / "Example Person"
+    monkeypatch.setattr(Path, "home", classmethod(lambda cls: home))
+    return home
+
+
+@pytest.mark.parametrize("parallel", [False, True], ids=["sync", "async"])
+def test_a_provider_error_excerpt_is_redacted_and_capped(tmp_path, fake_home, parallel):
+    organization = "org-" + "A1b2" * 6
+    key_file, bundle = fake_home / "keys" / "service.json", tmp_path / "certs" / "bundle.pem"
+    message = (f"Rate limit reached for {organization} using {key_file} and {bundle}"
+               + " on requests per minute" * 20)
+    path = tmp_path / "history.jsonl"
+    task = Task("Research signal that is rate limited")
+    swarm = Swarm(model="m", provider=_Answers(RateLimitError(message)), artifact_dir=None,
+                  parallel=parallel, memory=PlannerMemory(path, record_failures=True))
+
+    with pytest.raises(RateLimitError):
+        swarm.execute(_draft(task))
+    [outcome] = PlannerMemory(path).recall(task)
+    stored = path.read_text(encoding="utf-8")
+
+    assert (outcome.failure_category, outcome.failure_type) == ("transient", "RateLimitError")
+    assert outcome.failure_excerpt.startswith(
+        f"Rate limit reached for org-[redacted] using {os.path.join('~', 'keys', 'service.json')}"
+        " and <path> on requests per minute on requests"
+    )
+    assert len(outcome.failure_excerpt) == 200 and outcome.failure_excerpt.endswith("…")
+    for private in (organization, str(fake_home), fake_home.as_posix(), str(tmp_path),
+                    tmp_path.as_posix(), "Example Person", tmp_path.name, "bundle.pem"):
+        assert private not in outcome.failure_excerpt
+    for private in (organization, "Example Person", tmp_path.name, "bundle.pem"):
+        assert private not in stored
+
+
+def test_an_error_that_is_not_a_providers_keeps_no_excerpt(tmp_path):
+    organization = "org-" + "A1b2" * 6
+    path = tmp_path / "history.jsonl"
+    swarm = Swarm(model="m", provider=_Answers(RuntimeError(f"tool failed for {organization}")),
+                  artifact_dir=None, memory=PlannerMemory(path, record_failures=True))
+
+    with pytest.raises(RuntimeError):
+        swarm.execute(_draft(Task("Research signal")))
+    [row] = _history_rows(path)
+
+    assert (row["failure_category"], row["failure_type"]) == ("transient", "RuntimeError")
+    assert "failure_excerpt" not in row
+    assert organization not in path.read_text(encoding="utf-8")
+
+
+def test_path_redaction_replaces_the_home_folder_and_other_absolute_paths(fake_home):
+    native = str(fake_home / "keys" / "service.json")
+    assert _redact.redact_paths(f"read {native}") == f"read {os.path.join('~', 'keys', 'service.json')}"
+    assert _redact.redact_paths(f"read {fake_home.as_posix()}/keys") == "read ~/keys"
+    backslash = "\\"
+    for absolute in (
+        "D:" + backslash + backslash.join(["data", "run", "bundle.pem"]),
+        "E:/cache/run/out.json",
+        backslash * 2 + backslash.join(["fileserver", "share", "run.txt"]),
+        "/srv/app/keys/service.json",
+        "file:///srv/app/key.json",
+    ):
+        assert _redact.redact_paths(f"open '{absolute}' failed") == "open '<path>' failed"
+        assert _redact.redact_paths(f"open {absolute} failed") == "open <path> failed"
+    for kept in ("see https://api.example.com/v1/models/list", "relative/dir/file.txt",
+                 "./local/file.txt", "~/project/out.json", "ratio 1/2/3", "org-chart"):
+        assert _redact.redact_paths(kept) == kept
+
+
+@pytest.mark.parametrize("parallel", [False, True], ids=["sync", "async"])
+def test_a_failed_history_write_is_logged_and_the_runs_own_exception_raised(
+    tmp_path, caplog, parallel,
+):
+    history = tmp_path / "history.jsonl"
+    history.mkdir()  # A directory: no row can be appended to it.
+    failure = RuntimeError("the draft step failed")
+    swarm = Swarm(model="m", provider=_Answers(failure), artifact_dir=None, parallel=parallel,
+                  memory=PlannerMemory(history, record_failures=True))
+
+    with caplog.at_level(logging.WARNING, logger="smythe.swarm"):
+        with pytest.raises(RuntimeError) as caught:
+            swarm.execute(_draft(Task("Research signal")))
+
+    assert caught.value is failure
+    [logged] = [record for record in caplog.records if "planner memory" in record.getMessage()]
+    assert (logged.name, logged.levelno) == ("smythe.swarm", logging.WARNING)
+    assert isinstance(logged.exc_info[1], OSError)
+    assert list(history.iterdir()) == []
+
+
+class _RecordOnly:
+    """A memory of the kind Swarm has always accepted: it implements only record()."""
+
+    def __init__(self) -> None:
+        self.recorded = []
+
+    def record(self, task, graph, result):
+        self.recorded.append(result)
+
+
+class _RecordsFailures(_RecordOnly):
+    def __init__(self, record_failures) -> None:
+        super().__init__()
+        self.record_failures = record_failures
+        self.failures = []
+
+    def record_failure(self, task, graph, exc, **evidence):
+        self.failures.append((exc, sorted(evidence)))
+
+
+@pytest.mark.parametrize("parallel", [False, True], ids=["sync", "async"])
+def test_only_a_memory_that_opts_in_records_a_failed_run(tmp_path, parallel):
+    path = tmp_path / "history.jsonl"
+    failure = RuntimeError("the draft step failed")
+    default, record_only, mock = PlannerMemory(path), _RecordOnly(), Mock()
+    truthy, opted = _RecordsFailures(record_failures=1), _RecordsFailures(record_failures=True)
+
+    def fail(memory, graph):
+        with pytest.raises(RuntimeError) as caught:
+            Swarm(model="m", provider=_Answers(failure), memory=memory, artifact_dir=None,
+                  parallel=parallel).execute(graph)
+        assert caught.value is failure
+
+    for memory in (default, record_only, mock, truthy, opted):
+        fail(memory, _draft(Task("Research signal")))
+    # A graph executed without a task is not recorded, as a finished one is not.
+    fail(opted, _draft(None))
+
+    assert default.record_failures is False and not path.exists()
+    assert record_only.recorded == [] and truthy.failures == []
+    mock.record.assert_not_called()
+    mock.record_failure.assert_not_called()
+    assert opted.recorded == []
+    assert opted.failures == [(failure, ["budget", "execution_id", "timing", "trace"])]
+
+
+@pytest.mark.parametrize("interrupt", [
+    KeyboardInterrupt, SystemExit, asyncio.CancelledError,
+    lambda: ProviderAccountingCancelledError("Native generation was cancelled after dispatch"),
+], ids=["keyboard-interrupt", "system-exit", "cancelled", "cancelled-after-dispatch"])
+def test_interrupts_exits_and_cancellation_are_not_recorded(tmp_path, interrupt):
+    path = tmp_path / "history.jsonl"
+    error = interrupt()
+    swarm = Swarm(model="m", provider=_Answers(error), artifact_dir=None,
+                  memory=PlannerMemory(path, record_failures=True))
+
+    with pytest.raises(BaseException) as caught:
+        swarm.execute(_draft(Task("Research signal")))
+
+    assert caught.value is error
+    assert not path.exists()
+
+
+def test_a_resumed_run_that_fails_records_that_it_resumed(tmp_path):
+    path, store = tmp_path / "history.jsonl", FileCheckpointStore(tmp_path / "checkpoints")
+    task = Task("Research signal after a crash")
+    graph = ExecutionGraph(topology=[Topology.SERIAL], task=task, nodes=[
+        Node(id="a", label="Research A"),
+        Node(id="b", label="Assemble findings", depends_on=["a"]),
+    ])
+    provider = _Steps({"Research": ["Found it."], "Assemble": [RuntimeError("process died")]})
+
+    def fail(call):
+        with pytest.raises(RuntimeError, match="process died"):
+            call(Swarm(model="m", provider=provider, checkpoint_store=store, artifact_dir=None,
+                       memory=PlannerMemory(path, record_failures=True)))
+
+    fail(lambda swarm: swarm.execute(graph))
+    [execution_id] = store.list_ids()
+    fail(lambda swarm: swarm.resume(execution_id))
+    first, resumed = _history_rows(path)
+    outcomes = PlannerMemory(path).recall(task, k=2)
+
+    assert first["execution_id"] == resumed["execution_id"] == execution_id
+    assert (first["resumed"], first["latency_complete"]) == (False, True)
+    assert (resumed["resumed"], resumed["latency_complete"]) == (True, False)
+    assert [node["status"] for node in resumed["node_outcomes"]] == ["completed", "failed"]
+    assert [(outcome.failure_type, outcome.resumed) for outcome in outcomes] == [
+        ("RuntimeError", False), ("RuntimeError", True),
+    ]
+
+
+def test_record_failure_writes_only_the_fields_it_has(tmp_path):
+    path = tmp_path / "history.jsonl"
+    task = Task("Research signal by hand")
+    graph = ExecutionGraph(topology=[Topology.SERIAL], nodes=[
+        Node(id="a", label="Research A", status=NodeStatus.FAILED),
+    ])
+
+    PlannerMemory(path).record_failure(task, graph, TimeoutError("Node 'a' timed out after 5s"))
+    [row] = _history_rows(path)
+
+    assert set(row) == _PREVIOUS_KEYS | {"structure_sha256", "failure_category", "failure_type"}
+    assert (row["failure_category"], row["failure_type"]) == ("transient", "TimeoutError")
+    assert (row["success"], row["total_cost_usd"], row["total_duration_ms"]) == (False, 0.0, 0)
+    assert [row[name] for name in _OUTCOME_FIELDS] == [None] * 5 + ["not_evaluated"]
+
+
+@pytest.mark.parametrize("value", [None, 1, "yes"])
+def test_record_failures_must_be_true_or_false(value):
+    with pytest.raises(TypeError, match="record_failures must be True or False"):
+        PlannerMemory("missing-history.jsonl", record_failures=value)
+
+
+def test_recall_returns_valid_failure_rows(tmp_path):
+    path = tmp_path / "history.jsonl"
+    outcome = _make_outcome(
+        "Research signal", success=False, acceptance="not_evaluated", execution_id="run-1",
+        structure_sha256="0" * 64, failure_category="provider_rejected",
+        failure_type="OutputRefusedError", failure_excerpt="the model refused to respond",
+    )
+    _write_outcome(path, outcome)
+
+    assert PlannerMemory(path).recall(Task("Research signal")) == [outcome]
+
+
+@pytest.mark.parametrize("field,value", [
+    ("failure_category", 1), ("failure_category", ""), ("failure_category", "Budget overrun"),
+    ("failure_category", ["transient"]), ("failure_type", 1), ("failure_type", ""),
+    ("failure_type", "Runtime Error"), ("failure_type", "1Error"), ("failure_excerpt", 1),
+    ("failure_excerpt", ""), ("failure_excerpt", "x" * 201), ("failure_excerpt", ["refused"]),
+])
+def test_recall_skips_malformed_failure_fields_before_ranking(tmp_path, field, value):
+    _assert_bad_row_is_skipped_without_changing_ranking(tmp_path, field, value)
+
+
+def test_failure_rows_leave_history_prompts_unchanged(tmp_path):
+    path, legacy_path = tmp_path / "history.jsonl", tmp_path / "legacy.jsonl"
+    task = Task("Research signal that fails")
+    with pytest.raises(RateLimitError):
+        Swarm(model="m", provider=_Answers(RateLimitError("Rate limit reached on requests")),
+              artifact_dir=None, memory=PlannerMemory(path, record_failures=True),
+              ).execute(_draft(task))
+    [row] = _history_rows(path)
+    previous = {key: value for key, value in row.items() if key in _PREVIOUS_KEYS}
+    legacy_path.write_text(json.dumps(previous) + "\n", encoding="utf-8")
+    before = path.read_bytes()
+
+    [outcome] = PlannerMemory(path).recall(task)
+    [legacy] = PlannerMemory(legacy_path).recall(task)
+    prompt = build_user_prompt(task, [asdict(outcome)])
+    planner_prompts = []
+    for history in (path, legacy_path):
+        provider = _HistoryPlanningProvider()
+        LLMArchitect(provider, planning_model="offline-test",
+                     memory=PlannerMemory(history)).plan(task)
+        planner_prompts.append(provider.prompts)
+
+    assert all(getattr(outcome, name) for name in _FAILURE_FIELDS)
+    assert prompt == build_user_prompt(task, [asdict(legacy)])
+    for value in ("transient", "RateLimitError", "Rate limit", outcome.execution_id):
+        assert value not in prompt
+    assert planner_prompts[0] == planner_prompts[1]
+    assert len(planner_prompts[0]) == 1 and "Outcome: failure" in planner_prompts[0][0]
+    assert path.read_bytes() == before
+
+
+def test_a_run_that_failed_after_every_node_completed_reaches_the_planner_as_a_failure(
+    tmp_path,
+):
+    path, legacy_path = tmp_path / "history.jsonl", tmp_path / "legacy.jsonl"
+    task = Task("Research signal that fails at synthesis")
+    settings = _FAILURES["synthesis-failure"][0]
+    with pytest.raises(OutputTruncatedError):
+        Swarm(model="m", memory=PlannerMemory(path, record_failures=True), artifact_dir=None,
+              **settings()).execute(_draft(task))
+    [row] = _history_rows(path)
+    # The same run as a row without failure fields, recorded as one that failed.
+    failed = {key: value for key, value in row.items() if key in _PREVIOUS_KEYS}
+    legacy_path.write_text(json.dumps({**failed, "success": False}) + "\n", encoding="utf-8")
+    before = path.read_bytes()
+
+    planner_prompts = []
+    for history in (path, legacy_path):
+        provider = _HistoryPlanningProvider()
+        LLMArchitect(provider, planning_model="offline-test",
+                     memory=PlannerMemory(history)).plan(task)
+        planner_prompts.extend(provider.prompts)
+
+    # success keeps its meaning in the row; the planner is told the run failed.
+    assert (row["success"], row["failure_category"]) == (True, "provider_rejected")
+    assert planner_prompts[0] == planner_prompts[1]
+    assert "Outcome: failure" in planner_prompts[0]
+    assert "Outcome: success" not in planner_prompts[0]
+    assert path.read_bytes() == before

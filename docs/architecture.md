@@ -449,6 +449,12 @@ with `passed` false while `success` keeps its meaning. Other runs write the
 same keys as before, and planner prompts do not show these fields. See
 [evidence in planner history](learning.md#evidence-in-planner-history).
 
+`PlannerMemory(record_failures=True)` also records runs that raise, with
+their failure class, exception type and, for a provider or service error, a
+capped excerpt with account identifiers and local paths redacted. Planner
+prompts show each of these runs as a failure. Recording failures is off by
+default; see [failed runs](learning.md#failed-runs).
+
 **Added in 0.8.0:** recalled topology, success, cost, and duration fields
 are validated before ranking. Malformed records are skipped without rewriting
 the history file; valid values, legacy keys, and relevance ordering remain

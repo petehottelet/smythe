@@ -1661,6 +1661,21 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   the same keys as before, recall skips rows whose new fields are malformed,
   and planning prompts are unchanged. See
   [evidence in planner history](docs/learning.md#evidence-in-planner-history).
+- Opt-in failure recording in planner history. With
+  `PlannerMemory(record_failures=True)`, a `Swarm` run that raises during
+  execution, synthesis or acceptance, including a resumed run, is recorded
+  before its exception propagates, with `failure_category` (its failure
+  class), `failure_type` (the exception's class name) and, for provider and
+  service errors only, a `failure_excerpt` of at most 200 characters with
+  account identifiers redacted, the home folder written `~` and other
+  absolute paths `<path>`. `success` keeps its meaning, and planning prompts
+  keep their format and show each failure row's outcome as `failure`, even
+  for a run whose nodes all completed before synthesis failed. Interrupts,
+  exits and cancellation are never recorded, and a history write that fails
+  is logged without replacing the run's exception.
+  `PlannerMemory.record_failure()` writes such a row directly. The default
+  `PlannerMemory`, and memory objects that implement only `record()`, record
+  nothing on failure. See [failed runs](docs/learning.md#failed-runs).
 - Agent Skills directories as a skill source.
   `AgentSkillsProvider({agent_id: [root, ...]})` reads each
   `<root>/<name>/SKILL.md` when it is built and lists each skill as a

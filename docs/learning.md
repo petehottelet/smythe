@@ -6,10 +6,11 @@ recalls the outcomes of earlier runs into later planning prompts (see the
 that ran into a template that `ConstrainedArchitect` can offer as a menu item,
 so a proven shape is selected instead of planned again.
 
-This page covers the evidence planner history keeps, distillation, template
-records, their versions, and the template catalog. A record is data: building
-a template from it, storing it and pinning it in a durable run never changes
-the base planner, and nothing is promoted or activated automatically.
+This page covers the evidence planner history keeps, failed runs,
+distillation, template records, their versions, and the template catalog. A
+record is data: building a template from it, storing it and pinning it in a
+durable run never changes the base planner, and nothing is promoted or
+activated automatically.
 
 ## Evidence in planner history
 
@@ -45,6 +46,51 @@ The execution id, structure digest and acceptance decision are what a
 template record's [`source_runs`](#template-records) name.
 [Durable runs](support-matrix.md#durable-text-workflow-components) still
 refuse `PlannerMemory`.
+
+## Failed runs
+
+By default `PlannerMemory` records only runs that finish. With
+`record_failures=True`, a `Swarm` also records a run that raises during
+execution, synthesis or acceptance, including a resumed run, before the
+exception reaches the caller:
+
+```python
+from smythe import PlannerMemory, Swarm
+
+swarm = Swarm(memory=PlannerMemory(record_failures=True))
+```
+
+A failure row records:
+
+| Field | Value |
+|---|---|
+| `failure_category` | the exception's [failure class](execution.md#failure-classes), such as `terminal_accounting` for a budget overrun, `provider_rejected` for a refusal or `quality_defect` for the tool-loop limit |
+| `failure_type` | the exception's class name, such as `OutputRefusedError` |
+| `failure_excerpt` | for a provider or service error only, such as an SDK status error or a refusal: at most 200 characters of its message, with account identifiers redacted, the home folder written `~` and any other absolute path `<path>` |
+
+- Other errors keep no message, because it can quote task text or local
+  data. No row holds a provider's raw response.
+- The row also records the run's `execution_id`, `structure_sha256`, any
+  gate `verification` entries, its cost and timing so far, and `acceptance`
+  `not_evaluated`. A resumed run records `resumed` true.
+- `success` keeps its meaning: a run whose synthesis failed after every node
+  completed records `success` true beside its `failure_category`. Planning
+  prompts keep their format and show every failure row's outcome as
+  `failure`, including such a run.
+- A keyboard interrupt, `SystemExit` or a cancellation is never recorded, nor
+  is a run that fails during planning or that executes a graph without a
+  task.
+- When the row cannot be written, the error is logged as a warning on the
+  `smythe.swarm` logger and the run's own exception is raised unchanged.
+- Recall returns failure rows and skips one whose failure fields are
+  malformed.
+
+`record_failure(task, graph, exc, *, execution_id=None, timing=None,
+trace=None, budget=None)` writes a failure row directly. `timing` and
+`trace` take the forms of `SwarmResult.timing` and `SwarmResult.trace`, and
+`budget` is the run's `Sentinel`. A memory object of your own is called on
+failure only when its `record_failures` is `True` and it has a
+`record_failure` method; one that implements only `record()` is unaffected.
 
 ## Distill a template
 
