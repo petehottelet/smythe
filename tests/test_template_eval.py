@@ -34,6 +34,7 @@ from smythe.optimize.ledger import holdout_identity
 ROOT = Path(__file__).resolve().parents[1]
 TESTS = Path(__file__).resolve().parent
 HARNESS = ROOT / "benchmarks" / "template_eval.py"
+RECORD = ROOT / "benchmarks" / "results" / "template_eval_offline.json"
 CANDIDATES = ("improvement", "harmful", "partial", "unexcluded")
 VERDICTS = {"improved", "inconclusive", "worse"}
 
@@ -358,3 +359,21 @@ def test_changing_a_pack_changes_the_evaluator_hash_and_the_holdout_identity(mon
     assert loosened.validators != base.validators
     assert holdout_identity(contract, loosened.evaluator_hash) != holdout_identity(
         contract, base.evaluator_hash)
+
+
+def test_the_committed_record_is_labeled_and_never_cited_as_a_claim():
+    record = json.loads(RECORD.read_text(encoding="utf-8"))
+    assert record["benchmark"] == "template-evaluation"
+    assert record["evidence_status"] == "offline-mechanics" and record["claimable"] is False
+    assert record["api_calls"] == 0 and record["default_change"] is False
+    assert record["promotion"]["eligible"] is False
+    assert record["environment"]["source_control"]["dirty"] is False
+    assert {split: pack["sha256"] for split, pack in record["packs"].items()} == {
+        split: pinned.sha256 for split, pinned in PACKS.items()}
+    decisions = {label: campaign["decision"] for label, campaign in record["campaigns"].items()}
+    assert {label: (decision["promoted"], decision["verdict"])
+            for label, decision in decisions.items()} == {
+        "improvement": (True, "improved"), "harmful": (False, "worse"),
+        "partial": (False, "improved"), "unexcluded": (False, "inconclusive")}
+    for name in ("README.md", "ROADMAP.md"):
+        assert "template_eval" not in (ROOT / name).read_text(encoding="utf-8")

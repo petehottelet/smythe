@@ -590,8 +590,8 @@ Is a new template version better than the version it replaces, and better
 than no template at all? [template_eval.py](template_eval.py) is the harness
 for that evaluation, run offline on fixtures. Every step answers with fixture
 content and declared usage, and each fixture version is designed for one
-outcome, so the record it writes establishes mechanics, never template
-quality, and changes no default.
+outcome, so the [record](results/template_eval_offline.json) establishes
+mechanics, never template quality, and changes no default.
 
 | Arm | What it is |
 |---|---|

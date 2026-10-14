@@ -1687,7 +1687,10 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   Fixture campaigns promote a version that recovers planted step failures and
   decline one that drops a section only the held-out family needs (verdict
   `worse`), one that loses to the single worker and one applied to an
-  excluded family. The harness is repository-only and not packaged. See
+  excluded family. The harness is repository-only and not packaged. The
+  committed record, `benchmarks/results/template_eval_offline.json`, is
+  labeled offline mechanics, not claimable, with zero API calls: fixtures
+  rank no template, activate nothing and change no default. See
   [template evaluation](benchmarks/README.md#template-evaluation-offline-mechanics).
 - `jobs review RUN_ID [--limit N] [--offset N]` lists only what in a Jobs
   run needs an operator's decision, and the command that carries each
