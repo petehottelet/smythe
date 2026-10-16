@@ -29,13 +29,16 @@ ACCOUNT_IDENTIFIER_PATTERNS: tuple[tuple[re.Pattern[str], str], ...] = (
 
 # Where an absolute path starts: a file URL, a drive root, a UNC root (whose
 # backslashes a repr or JSON text doubles) or a POSIX root of two or more
-# parts. No letter, digit or path character precedes one, so a URL's path and
-# relative paths stay, and a POSIX path after an HTTP method is a route. A
-# method is one only as a word of its own, at the start of the text or after
-# a space, an opening bracket or a quote: a path after OUTPUT is redacted.
+# parts. A UNC root starts after any character, as after a compiler flag, so
+# a repr of a relative path, whose separators it doubles, is redacted too. No
+# letter, digit or path character precedes a drive or POSIX root, so a URL's
+# path and relative paths stay, and a POSIX path after an HTTP method is a
+# route. A method is one only as a word of its own, at the start of the text
+# or after a space, an opening bracket or a quote: a path after OUTPUT is
+# redacted.
 _HTTP_METHODS = ("GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "CONNECT", "TRACE")
 _PATH_START = (
-    r"(?:\bfile:/|(?<![A-Za-z0-9])[A-Za-z]:[\\/]|(?<![\w.~-])\\{2,4}[^\s\\/'\"`]+[\\/]|"
+    r"(?:\bfile:/|(?<![A-Za-z0-9])[A-Za-z]:[\\/]|\\{2,4}[^\s\\/'\"`]+[\\/]|"
     + "".join(rf"(?<!(?<![^\s(\[{{'\"`]){method} )" for method in _HTTP_METHODS)
     + r"(?<![\w:/\\.~\]-])/[^\s/'\"`]+/)"
 )
@@ -80,22 +83,32 @@ def error_text(error: object) -> str:
     return redact_account_identifiers(str(error))
 
 
+def _redact_other_paths(text: str) -> str:
+    """*text* with every absolute path written ``<path>``."""
+    text = _QUOTED_PATH.sub(lambda match: f"{match[1]}<path>{match[1]}", text)
+    return _ABSOLUTE_PATH.sub(_path_mark, text)
+
+
 def redact_paths(text: str) -> str:
     """*text* with the home folder written ``~`` and every other absolute path ``<path>``.
 
     The home folder matches with any run of separators between its names,
     as a repr or JSON text doubles backslashes, and without case on
-    Windows, so a user name that holds a space is removed whole. A path that
-    starts a quoted string is removed up to the closing quote. Unquoted, a
-    name with a space, such as another user's folder, cannot be told from
-    the words after it, so they are removed with the path, in preference to
-    keeping part of it, up to the end of the line, a quote, a URL, or an HTTP
-    method and its route. A word that ends in a colon or a semicolon ends
-    the path and keeps its mark, as in ``<path>: access denied``; a comma
-    does not, as folder names hold commas. URL paths and a route after an
-    HTTP method written as a word of its own, as in
-    ``POST /v1/chat/completions``, are not local paths and stay; a path
-    after ``OUTPUT`` or ``TARGET`` is redacted.
+    Windows, so a user name that holds a space is removed whole. The names
+    below it stay, up to a character other than a letter, a digit, ``.``,
+    ``~``, ``-`` or ``_``. Elsewhere two backslashes start a UNC root after
+    any character, as in a compiler flag, so a repr of a relative path,
+    whose separators it doubles, is redacted too. A path that starts a
+    quoted string is removed up to the closing quote. Unquoted, a name with
+    a space, such as another user's folder, cannot be told from the words
+    after it, so they are removed with the path, in preference to keeping
+    part of it, up to the end of the line, a quote, a URL, or an HTTP method
+    and its route. A word that ends in a colon or a semicolon ends the path
+    and keeps its mark, as in ``<path>: access denied``; a comma does not,
+    as folder names hold commas. URL paths and a route after an HTTP method
+    written as a word of its own, as in ``POST /v1/chat/completions``, are
+    not local paths and stay; a path after ``OUTPUT`` or ``TARGET`` is
+    redacted.
     """
     try:
         home = str(Path.home())
@@ -104,10 +117,14 @@ def redact_paths(text: str) -> str:
     names = [name for name in re.split(r"[\\/]+", home) if name]
     lead = r"[\\/]+" if home[:1] in ("\\", "/") else ""
     # A home folder at a drive's root names no folder, so nothing is written ~.
-    if len(names) >= (1 if lead else 2):
-        pattern = lead + r"[\\/]+".join(re.escape(name) for name in names)
-        # Any character may come before it, as in a compiler flag or a URL.
-        text = re.sub(pattern + r"(?![\w.~-])", "~", text,
+    if len(names) < (1 if lead else 2):
+        return _redact_other_paths(text)
+    # Any character may come before it, as in a compiler flag or a URL. The
+    # names below it are split off with it, since a repr's doubled
+    # backslashes between them would read as a UNC root.
+    pattern = lead + r"[\\/]+".join(re.escape(name) for name in names)
+    pieces = re.split(pattern + r"(?![\w.~-])((?:[\\/]+[\w.~-]+)*)", text,
                       flags=re.IGNORECASE if os.name == "nt" else 0)
-    text = _QUOTED_PATH.sub(lambda match: f"{match[1]}<path>{match[1]}", text)
-    return _ABSOLUTE_PATH.sub(_path_mark, text)
+    # Every second piece holds the names below one appearance of the home folder.
+    return "".join("~" + piece if index % 2 else _redact_other_paths(piece)
+                   for index, piece in enumerate(pieces))

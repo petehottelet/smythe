@@ -81,6 +81,12 @@ def test_every_spelling_of_the_home_folder_is_written_as_home(home, value):
     }
     for text, expected in texts.items():
         assert redact_paths(text) == expected
+    # The names below it stay in every spelling, though elsewhere a repr's
+    # doubled backslashes start a UNC root.
+    deeper = str(value / "keys" / "team" / "service.json")
+    below = "~" + deeper[len(native):]
+    for spell in (repr, json.dumps, lambda text: repr(repr(text))):
+        assert redact_paths(spell(deeper)) == spell(below)
     # A folder whose name only begins with the home folder's is another absolute path.
     sibling = str(value.parent / (value.name + "ality") / "notes.txt")
     assert redact_paths(f"read {sibling}") == "read <path>"
@@ -97,7 +103,6 @@ def test_routes_and_url_paths_stay_readable(home):
         "see http://[::1]/v1/models/list",
         "relative/dir/file.txt",
         windows("relative", "dir", "file.txt"),
-        repr(windows("relative", "dir", "file.txt")),
         "./local/file.txt",
         "~/project/out.json",
         "ratio 1/2/3",
@@ -161,4 +166,23 @@ def test_the_home_folder_is_written_as_home_after_any_character(home, value):
         redacted = redact_paths(text)
         assert "Example" not in redacted and "Person" not in redacted
         assert redacted == kept
+
+
+@pytest.mark.parametrize("value", [WINDOWS_HOME, POSIX_HOME], ids=["windows", "posix"])
+def test_a_unc_path_is_redacted_after_any_character(home, value):
+    home(value)
+    paths = (windows("", "", "fileserver", "clients", "Acme Merger", "include"),
+             windows("", "", "fileserver", "jdoe", "include", "secret.h"))
+    # Compiler flags and elided paths put a character right before its root.
+    for path in paths:
+        for spelling in (path, path.replace(BACKSLASH, BACKSLASH * 2)):
+            for before in ("cc -I", "cl /I", "cl.exe /I", "mapped_", "path ...", "x", "~"):
+                redacted = redact_paths(f"{before}{spelling} failed: no such file")
+                assert redacted == f"{before}<path>: no such file"
+    # A repr doubles the separators of a path with no drive, and of a relative
+    # one, so each reads as a UNC root and is redacted, in preference to
+    # keeping a network path that follows a word.
+    rooted = windows("", "home", "Other Person", "include")
+    assert redact_paths(repr(f"-I{rooted}")) == "'-I<path>'"
+    assert redact_paths(repr(windows("relative", "dir", "file.txt"))) == "'relative<path>'"
 

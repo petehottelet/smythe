@@ -82,9 +82,12 @@ A failure row records:
   identifier in the task text stays in the history file, as it does for a
   run that finishes.
 - The home folder is found in any spelling of its separators, including the
-  doubled backslashes of a repr or JSON text. A path that starts a quoted
-  string is removed up to the closing quote, spaces included, as Python's
-  own error messages quote paths. Unquoted, the rest of a name with a space
+  doubled backslashes of a repr or JSON text, and the names below it stay.
+  Elsewhere two backslashes start a network path after any character, as
+  in the compiler flag `-I\\server\share\include`, so a relative path in a
+  repr, whose separators it doubles, is redacted too. A path that starts a
+  quoted string is removed up to the closing quote, spaces included, as
+  Python's own error messages quote paths. Unquoted, the rest of a name with a space
   cannot be told from the words after it, so they are removed with the
   path, in preference to keeping part of it, up to the end of the line, a
   quote, a URL, or an HTTP method and its route:
