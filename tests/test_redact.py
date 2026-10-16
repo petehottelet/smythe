@@ -186,3 +186,22 @@ def test_a_unc_path_is_redacted_after_any_character(home, value):
     assert redact_paths(repr(f"-I{rooted}")) == "'-I<path>'"
     assert redact_paths(repr(windows("relative", "dir", "file.txt"))) == "'relative<path>'"
 
+
+def test_a_path_after_a_closing_bracket_is_redacted(home):
+    home(WINDOWS_HOME)
+    # A log line's tag puts a ']' right before a path.
+    other_user = "/".join(["", "home", "other.user", ".ssh", "id_rsa"])
+    for tag in ("[worker-1]", "[ERR]", "[tag]", "]"):
+        for path in ("/srv/clients/acme-merger/notes.txt", other_user):
+            assert redact_paths(f"{tag}{path}: denied") == f"{tag}<path>: denied"
+            assert redact_paths(f"{tag}{path} missing") == f"{tag}<path>"
+    # Only a URL's bracketed IPv6 host is kept with the path after it, as any
+    # other URL's path is.
+    for url in ("http://[::1]/v1/models/list", "https://[2001:db8::7]/v1/files/upload-7",
+                "http://[fe80::1%25eth0]/status/check"):
+        assert redact_paths(f"see {url} now") == f"see {url} now"
+    assert redact_paths("see http://[::1]/v1/models for /srv/app/key.json") == (
+        "see http://[::1]/v1/models for <path>")
+    drive = "/".join(["C:", "Users", "Other Person", "key.json"])
+    assert redact_paths(f"get http://[::1]/{drive} failed") == "get http://[::1]/<path>"
+

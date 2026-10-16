@@ -40,10 +40,14 @@ _HTTP_METHODS = ("GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "CO
 _PATH_START = (
     r"(?:\bfile:/|(?<![A-Za-z0-9])[A-Za-z]:[\\/]|\\{2,4}[^\s\\/'\"`]+[\\/]|"
     + "".join(rf"(?<!(?<![^\s(\[{{'\"`]){method} )" for method in _HTTP_METHODS)
-    + r"(?<![\w:/\\.~\]-])/[^\s/'\"`]+/)"
+    + r"(?<![\w:/\\.~-])/[^\s/'\"`]+/)"
 )
 # A path that starts a quoted string runs to its closing quote, spaces included.
 _QUOTED_PATH = re.compile(r"(['\"`])" + _PATH_START + r"(?:(?!\1)[^\r\n])*\1")
+# A URL's bracketed IPv6 host ends in ']', as a log line's tag does, and a path
+# after a tag is redacted; the host and the slash after it are taken in and
+# kept, so the URL's path reads as any other URL's does.
+_IPV6_HOST = r"://\[[0-9A-Fa-f.]*:[0-9A-Fa-f:.]*(?:%[\w.~-]+)?\]/"
 # Any other path's last name cannot be told from the words after it, so it
 # runs on past each space to the end of the line, a quote, a URL, or an HTTP
 # method and its route, and ends after a word that ends in a colon or a
@@ -52,13 +56,19 @@ _QUOTED_PATH = re.compile(r"(['\"`])" + _PATH_START + r"(?:(?!\1)[^\r\n])*\1")
 _WORD = r"[^\s'\"`]"
 _ENDS_PATH = ":;"
 _ABSOLUTE_PATH = re.compile(
-    _PATH_START + _WORD + r"*(?:(?<![" + _ENDS_PATH + r"]) +(?![A-Za-z][\w+.-]*://|(?:"
+    "(" + _IPV6_HOST + ")|"
+    + _PATH_START + _WORD + r"*(?:(?<![" + _ENDS_PATH + r"]) +(?![A-Za-z][\w+.-]*://|(?:"
     + "|".join(_HTTP_METHODS) + r") /)" + _WORD + r"+)*"
 )
 
 
 def _path_mark(match: re.Match[str]) -> str:
-    """``<path>`` for an unquoted path, keeping the colon or semicolon that ended it."""
+    """``<path>`` for an unquoted path, keeping the colon or semicolon that ended it.
+
+    A URL's IPv6 host is kept as it is.
+    """
+    if match[1]:
+        return match[0]
     return "<path>" + match[0][-1] if match[0][-1] in _ENDS_PATH else "<path>"
 
 
@@ -105,10 +115,11 @@ def redact_paths(text: str) -> str:
     part of it, up to the end of the line, a quote, a URL, or an HTTP method
     and its route. A word that ends in a colon or a semicolon ends the path
     and keeps its mark, as in ``<path>: access denied``; a comma does not,
-    as folder names hold commas. URL paths and a route after an HTTP method
-    written as a word of its own, as in ``POST /v1/chat/completions``, are
-    not local paths and stay; a path after ``OUTPUT`` or ``TARGET`` is
-    redacted.
+    as folder names hold commas. URL paths, including one after a bracketed
+    IPv6 host, and a route after an HTTP method written as a word of its
+    own, as in ``POST /v1/chat/completions``, are not local paths and stay;
+    a path after ``OUTPUT``, ``TARGET`` or a log tag such as ``[worker-1]``
+    is redacted.
     """
     try:
         home = str(Path.home())
