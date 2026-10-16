@@ -169,6 +169,22 @@ def test_the_home_folder_is_written_as_home_after_any_character(home, value):
 
 
 @pytest.mark.parametrize("value", [WINDOWS_HOME, POSIX_HOME], ids=["windows", "posix"])
+def test_the_names_below_the_home_folder_never_take_in_another_path(home, value):
+    native = home(value)
+    spellings = (native, native.replace(BACKSLASH, "/"), native.replace(BACKSLASH, BACKSLASH * 2))
+    others = (*spellings, windows("D:", "Other Person", "notes.txt"),
+              "file:///srv/secret folder/key.json")
+    for first in spellings:
+        for separator in ("/", BACKSLASH, BACKSLASH * 2):
+            for other in others:
+                for text in (f"{first}{separator}{other}", f"{first}{separator}x{separator}{other}"):
+                    redacted = redact_paths(text)
+                    assert redacted.startswith("~")
+                    for name in ("Example", "Person", "Other", "secret"):
+                        assert name not in redacted
+
+
+@pytest.mark.parametrize("value", [WINDOWS_HOME, POSIX_HOME], ids=["windows", "posix"])
 def test_a_unc_path_is_redacted_after_any_character(home, value):
     home(value)
     paths = (windows("", "", "fileserver", "clients", "Acme Merger", "include"),

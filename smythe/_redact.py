@@ -136,9 +136,12 @@ def redact_paths(text: str) -> str:
         return _redact_other_paths(text)
     # Any character may come before it, as in a compiler flag or a URL. The
     # names below it are split off with it, since a repr's doubled
-    # backslashes between them would read as a UNC root.
+    # backslashes between them would read as a UNC root, but not the home
+    # folder again or a name before a colon, which can be a drive or a URL's
+    # scheme that starts another path.
     pattern = lead + r"[\\/]+".join(re.escape(name) for name in names)
-    pieces = re.split(pattern + r"(?![\w.~-])((?:[\\/]+[\w.~-]+)*)", text,
+    below = rf"(?:(?!{pattern})[\\/]+[\w.~-]+(?![\w.~:-]))*"
+    pieces = re.split(rf"{pattern}(?![\w.~-])({below})", text,
                       flags=re.IGNORECASE if os.name == "nt" else 0)
     # Every second piece holds the names below one appearance of the home folder.
     return "".join("~" + piece if index % 2 else _redact_other_paths(piece)
