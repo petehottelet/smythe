@@ -205,3 +205,17 @@ def test_a_path_after_a_closing_bracket_is_redacted(home):
     drive = "/".join(["C:", "Users", "Other Person", "key.json"])
     assert redact_paths(f"get http://[::1]/{drive} failed") == "get http://[::1]/<path>"
 
+
+
+def test_a_name_that_holds_a_quote_mark_is_redacted_whole(home):
+    home(WINDOWS_HOME)
+    # A backtick, which a name can hold, does not end an unquoted path.
+    for path in (windows("D:", "clients", "it`s here", "notes.txt"), "/srv/it`s/key.json"):
+        assert redact_paths(f"open {path} failed") == "open <path>"
+    redacted = redact_paths("cl /I`//fileserver/share/include` failed")
+    assert "fileserver" not in redacted and "share" not in redacted
+    # A quote mark with a letter or a digit after it, as in O'Brien, is part
+    # of a quoted name rather than its closing quote.
+    for quote, name in (("`", "it`s"), ("'", "O'Brien")):
+        quoted = f"{quote}/srv/{name}/key.json{quote}"
+        assert redact_paths(f"see {quoted} now") == f"see {quote}<path>{quote} now"

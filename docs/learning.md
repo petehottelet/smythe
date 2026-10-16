@@ -87,19 +87,20 @@ A failure row records:
   in the compiler flag `-I\\server\share\include`, so a relative path in a
   repr, whose separators it doubles, is redacted too. A path that starts a
   quoted string is removed up to the closing quote, spaces included, as
-  Python's own error messages quote paths. Unquoted, the rest of a name with a space
-  cannot be told from the words after it, so they are removed with the
-  path, in preference to keeping part of it, up to the end of the line, a
-  quote, a URL, or an HTTP method and its route:
+  Python's own error messages quote paths; a quote mark with a letter or a
+  digit after it, as in `O'Brien`, is part of a name. Unquoted, the rest of
+  a name with a space cannot be told from the words after it, so they are
+  removed with the path, in preference to keeping part of it, up to the end
+  of the line, a quote, a URL, or an HTTP method and its route:
   `open D:\data\my report failed` becomes `open <path>`. A word that ends
   in a colon or a semicolon ends the path and keeps its mark, so
   `open D:\data\my report: access denied` becomes
-  `open <path>: access denied`. A comma does not end a path, because folder
-  names hold commas. URL paths, including one after a bracketed IPv6 host
-  such as `http://[::1]/v1/models`, and routes after an HTTP method written
-  as a word of its own, such as `POST /v1/chat/completions`, are kept, while
-  `OUTPUT /srv/app/key.json` becomes `OUTPUT <path>`, as does a path after
-  a log tag, such as `[worker-1]/srv/app/key.json`.
+  `open <path>: access denied`. A comma or a backtick does not end a path,
+  because names hold them. URL paths, including one after a bracketed IPv6
+  host such as `http://[::1]/v1/models`, and routes after an HTTP method
+  written as a word of its own, such as `POST /v1/chat/completions`, are
+  kept, while `OUTPUT /srv/app/key.json` becomes `OUTPUT <path>`, as does a
+  path after a log tag, such as `[worker-1]/srv/app/key.json`.
 - The row also records the run's `execution_id`, `structure_sha256`, any
   gate `verification` entries, its cost and timing so far, and `acceptance`
   `not_evaluated`. A resumed run records `resumed` true.

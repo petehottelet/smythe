@@ -38,12 +38,14 @@ ACCOUNT_IDENTIFIER_PATTERNS: tuple[tuple[re.Pattern[str], str], ...] = (
 # redacted.
 _HTTP_METHODS = ("GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "CONNECT", "TRACE")
 _PATH_START = (
-    r"(?:\bfile:/|(?<![A-Za-z0-9])[A-Za-z]:[\\/]|\\{2,4}[^\s\\/'\"`]+[\\/]|"
+    r"(?:\bfile:/|(?<![A-Za-z0-9])[A-Za-z]:[\\/]|\\{2,4}[^\s\\/'\"]+[\\/]|"
     + "".join(rf"(?<!(?<![^\s(\[{{'\"`]){method} )" for method in _HTTP_METHODS)
-    + r"(?<![\w:/\\.~-])/[^\s/'\"`]+/)"
+    + r"(?<![\w:/\\.~-])/[^\s/'\"]+/)"
 )
 # A path that starts a quoted string runs to its closing quote, spaces included.
-_QUOTED_PATH = re.compile(r"(['\"`])" + _PATH_START + r"(?:(?!\1)[^\r\n])*\1")
+# A quote mark with a letter or a digit after it, as in O'Brien, is part of a
+# name rather than the closing quote.
+_QUOTED_PATH = re.compile(r"(['\"`])" + _PATH_START + r"(?:(?!\1(?!\w))[^\r\n])*\1(?!\w)")
 # A URL's bracketed IPv6 host ends in ']', as a log line's tag does, and a path
 # after a tag is redacted; the host and the slash after it are taken in and
 # kept, so the URL's path reads as any other URL's does.
@@ -51,9 +53,10 @@ _IPV6_HOST = r"://\[[0-9A-Fa-f.]*:[0-9A-Fa-f:.]*(?:%[\w.~-]+)?\]/"
 # Any other path's last name cannot be told from the words after it, so it
 # runs on past each space to the end of the line, a quote, a URL, or an HTTP
 # method and its route, and ends after a word that ends in a colon or a
-# semicolon, as a message after a path often starts; a comma, which folder
-# names hold, does not end it, nor does a method's name with no route after it.
-_WORD = r"[^\s'\"`]"
+# semicolon, as a message after a path often starts; a comma or a backtick,
+# which names hold, does not end it, nor does a method's name with no route
+# after it.
+_WORD = r"[^\s'\"]"
 _ENDS_PATH = ":;"
 _ABSOLUTE_PATH = re.compile(
     "(" + _IPV6_HOST + ")|"
@@ -109,17 +112,18 @@ def redact_paths(text: str) -> str:
     ``~``, ``-`` or ``_``. Elsewhere two backslashes start a UNC root after
     any character, as in a compiler flag, so a repr of a relative path,
     whose separators it doubles, is redacted too. A path that starts a
-    quoted string is removed up to the closing quote. Unquoted, a name with
-    a space, such as another user's folder, cannot be told from the words
+    quoted string is removed up to the closing quote, which no letter or
+    digit follows, as one in ``O'Brien`` does. Unquoted, a name with a
+    space, such as another user's folder, cannot be told from the words
     after it, so they are removed with the path, in preference to keeping
     part of it, up to the end of the line, a quote, a URL, or an HTTP method
     and its route. A word that ends in a colon or a semicolon ends the path
-    and keeps its mark, as in ``<path>: access denied``; a comma does not,
-    as folder names hold commas. URL paths, including one after a bracketed
-    IPv6 host, and a route after an HTTP method written as a word of its
-    own, as in ``POST /v1/chat/completions``, are not local paths and stay;
-    a path after ``OUTPUT``, ``TARGET`` or a log tag such as ``[worker-1]``
-    is redacted.
+    and keeps its mark, as in ``<path>: access denied``; a comma or a
+    backtick does not, as names hold them. URL paths, including one after a
+    bracketed IPv6 host, and a route after an HTTP method written as a word
+    of its own, as in ``POST /v1/chat/completions``, are not local paths and
+    stay; a path after ``OUTPUT``, ``TARGET`` or a log tag such as
+    ``[worker-1]`` is redacted.
     """
     try:
         home = str(Path.home())
