@@ -182,6 +182,17 @@ def test_the_names_below_the_home_folder_never_take_in_another_path(home, value)
                     assert redacted.startswith("~")
                     for name in ("Example", "Person", "Other", "secret"):
                         assert name not in redacted
+    # A path that runs into it, as a copy kept under another folder or an
+    # extended-length path does, is redacted whole.
+    tail = str(value / "x")[len(native):]
+    befores = [BACKSLASH * 2 + "?" + BACKSLASH]
+    befores += (["/backup", "/mnt/backup", BACKSLASH * 2 + "fileserver"]
+                if isinstance(value, PurePosixPath) else ["file:///"])
+    for before in befores:
+        assert redact_paths(f"cp {before}{native}{tail} failed") == "cp <path>"
+    if isinstance(value, PurePosixPath):
+        # The separator that ends the path before it stays with that path.
+        assert redact_paths(f"cp /backup/{native} failed") == "cp <path>"
 
 
 @pytest.mark.parametrize("value", [WINDOWS_HOME, POSIX_HOME], ids=["windows", "posix"])

@@ -96,12 +96,6 @@ def error_text(error: object) -> str:
     return redact_account_identifiers(str(error))
 
 
-def _redact_other_paths(text: str) -> str:
-    """*text* with every absolute path written ``<path>``."""
-    text = _QUOTED_PATH.sub(lambda match: f"{match[1]}<path>{match[1]}", text)
-    return _ABSOLUTE_PATH.sub(_path_mark, text)
-
-
 def redact_paths(text: str) -> str:
     """*text* with the home folder written ``~`` and every other absolute path ``<path>``.
 
@@ -130,19 +124,29 @@ def redact_paths(text: str) -> str:
     except (RuntimeError, KeyError, OSError):
         home = ""
     names = [name for name in re.split(r"[\\/]+", home) if name]
-    lead = r"[\\/]+" if home[:1] in ("\\", "/") else ""
+    # A POSIX home folder takes the one separator before it and leaves any
+    # other to the path that comes before it; a UNC one takes its whole root.
+    lead = ""
+    if home[:1] in ("\\", "/"):
+        lead = r"[\\/]+" if home[1:2] in ("\\", "/") else r"[\\/]"
+    stand_in = "\\"
     # A home folder at a drive's root names no folder, so nothing is written ~.
-    if len(names) < (1 if lead else 2):
-        return _redact_other_paths(text)
-    # Any character may come before it, as in a compiler flag or a URL. The
-    # names below it are split off with it, since a repr's doubled
-    # backslashes between them would read as a UNC root, but not the home
-    # folder again or a name before a colon, which can be a drive or a URL's
-    # scheme that starts another path.
-    pattern = lead + r"[\\/]+".join(re.escape(name) for name in names)
-    below = rf"(?:(?!{pattern})[\\/]+[\w.~-]+(?![\w.~:-]))*"
-    pieces = re.split(rf"{pattern}(?![\w.~-])({below})", text,
+    if len(names) >= (1 if lead else 2):
+        pattern = lead + r"[\\/]+".join(re.escape(name) for name in names)
+        # The names below it run up to the home folder again or to a name
+        # before a colon, which can be a drive or a URL's scheme.
+        below = rf"(?:(?![\\/]*{pattern})[\\/]+[\w.~-]+(?![\w.~:-]))*"
+        # A character the text does not hold stands in for each backslash
+        # there that another follows, so a repr's doubled backslashes between
+        # those names do not read as a UNC root. It is turned back at the end.
+        stand_in = next((chr(code) for code in range(0xE000, 0xF900) if chr(code) not in text),
+                        stand_in)
+
+        def home_folder(match: re.Match[str]) -> str:
+            return "~" + re.sub(r"\\(?=\\)", lambda _: stand_in, match[1])
+
+        # Any character may come before it, as in a compiler flag or a URL.
+        text = re.sub(rf"{pattern}(?![\w.~-])({below})", home_folder, text,
                       flags=re.IGNORECASE if os.name == "nt" else 0)
-    # Every second piece holds the names below one appearance of the home folder.
-    return "".join("~" + piece if index % 2 else _redact_other_paths(piece)
-                   for index, piece in enumerate(pieces))
+    text = _QUOTED_PATH.sub(lambda match: f"{match[1]}<path>{match[1]}", text)
+    return _ABSOLUTE_PATH.sub(_path_mark, text).replace(stand_in, "\\")
