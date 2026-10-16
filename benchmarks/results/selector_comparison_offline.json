@@ -173,8 +173,8 @@
           "cost_per_accepted_microusd": 3733.8,
           "elapsed_ms": {
             "runs": 5,
-            "p50": 2.2,
-            "p95": 3.3,
+            "p50": 3.0,
+            "p95": 3.6,
             "label": "small sample; not a tail estimate"
           }
         },
@@ -189,8 +189,8 @@
           "cost_per_accepted_microusd": 8220.6,
           "elapsed_ms": {
             "runs": 5,
-            "p50": 2.2,
-            "p95": 3.8,
+            "p50": 2.4,
+            "p95": 4.4,
             "label": "small sample; not a tail estimate"
           }
         },
@@ -205,13 +205,13 @@
           "cost_per_accepted_microusd": 4186.2,
           "elapsed_ms": {
             "runs": 5,
-            "p50": 2.4,
-            "p95": 5.6,
+            "p50": 2.3,
+            "p95": 6.6,
             "label": "small sample; not a tail estimate"
           },
           "selection": {
             "cost_microusd": 1020,
-            "latency_ms_total": 0.1,
+            "latency_ms_total": 0.2,
             "latency_measured": 6,
             "methods": {
               "classifier": 1,
@@ -239,7 +239,7 @@
           "attempt_allowance": 2,
           "failed_attempts": 1,
           "cost_microusd": 4668,
-          "elapsed_ms": 6.3,
+          "elapsed_ms": 7.5,
           "attempts": [
             {
               "attempt": 1,
@@ -277,17 +277,17 @@
               "cost_microusd": 0,
               "cost_known": true,
               "cost_is_estimate": false,
-              "elapsed_ms": 1.2,
+              "elapsed_ms": 1.4,
               "latency_source": "failed_checkpoint_timing",
               "phases_ms": {
                 "routing": 0.0,
                 "planning": 0.1,
                 "recovery": null,
-                "execution": 0.1,
+                "execution": 0.3,
                 "verification": 0.0,
                 "synthesis": null,
                 "supervision": 0.0,
-                "checkpoint": 0.4,
+                "checkpoint": 0.5,
                 "waiting": 0.0
               },
               "graph": {
@@ -341,18 +341,18 @@
               "cost_microusd": 4668,
               "cost_known": true,
               "cost_is_estimate": false,
-              "elapsed_ms": 5.1,
+              "elapsed_ms": 6.1,
               "latency_source": "swarm_timing",
               "phases_ms": {
                 "routing": 0.0,
-                "planning": 0.2,
+                "planning": 0.1,
                 "recovery": null,
-                "execution": 3.2,
-                "verification": 0.1,
+                "execution": 3.7,
+                "verification": 0.2,
                 "synthesis": 0.0,
                 "supervision": 0.0,
-                "checkpoint": 1.0,
-                "waiting": 0.0
+                "checkpoint": 1.3,
+                "waiting": 0.1
               },
               "graph": {
                 "topology": "serial",
@@ -379,7 +379,7 @@
           "attempt_allowance": 2,
           "failed_attempts": 1,
           "cost_microusd": 13107,
-          "elapsed_ms": 4.1,
+          "elapsed_ms": 4.6,
           "attempts": [
             {
               "attempt": 1,
@@ -405,13 +405,13 @@
               "cost_microusd": 5163,
               "cost_known": true,
               "cost_is_estimate": false,
-              "elapsed_ms": 1.7,
+              "elapsed_ms": 2.1,
               "latency_source": "failed_checkpoint_timing",
               "phases_ms": {
                 "routing": null,
                 "planning": 0.2,
                 "recovery": null,
-                "execution": 0.6,
+                "execution": 1.0,
                 "verification": 0.0,
                 "synthesis": null,
                 "supervision": 0.0,
@@ -458,18 +458,18 @@
               "cost_microusd": 7944,
               "cost_known": true,
               "cost_is_estimate": false,
-              "elapsed_ms": 2.4,
+              "elapsed_ms": 2.5,
               "latency_source": "swarm_timing",
               "phases_ms": {
                 "routing": null,
-                "planning": 0.1,
+                "planning": 0.2,
                 "recovery": null,
-                "execution": 1.5,
+                "execution": 1.6,
                 "verification": 0.1,
                 "synthesis": 0.0,
                 "supervision": 0.0,
                 "checkpoint": 0.9,
-                "waiting": 0.0
+                "waiting": 0.1
               },
               "graph": {
                 "topology": "fork_join",
@@ -520,7 +520,7 @@
               "cost_microusd": 0,
               "cost_known": true,
               "cost_is_estimate": false,
-              "elapsed_ms": 0.9,
+              "elapsed_ms": 0.7,
               "latency_source": "failed_checkpoint_timing",
               "phases_ms": {
                 "routing": null,
@@ -530,7 +530,7 @@
                 "verification": 0.0,
                 "synthesis": null,
                 "supervision": 0.0,
-                "checkpoint": 0.4,
+                "checkpoint": 0.3,
                 "waiting": 0.0
               },
               "graph": {
@@ -571,17 +571,17 @@
               "cost_microusd": 813,
               "cost_known": true,
               "cost_is_estimate": false,
-              "elapsed_ms": 1.4,
+              "elapsed_ms": 1.6,
               "latency_source": "swarm_timing",
               "phases_ms": {
                 "routing": null,
                 "planning": 0.1,
                 "recovery": null,
-                "execution": 0.5,
+                "execution": 0.6,
                 "verification": 0.1,
                 "synthesis": 0.0,
                 "supervision": 0.0,
-                "checkpoint": 0.4,
+                "checkpoint": 0.5,
                 "waiting": 0.0
               },
               "graph": {
@@ -607,7 +607,7 @@
           "attempt_allowance": 2,
           "failed_attempts": 1,
           "cost_microusd": 4668,
-          "elapsed_ms": 3.5,
+          "elapsed_ms": 3.1,
           "attempts": [
             {
               "attempt": 1,
@@ -633,7 +633,7 @@
               "cost_microusd": 0,
               "cost_known": true,
               "cost_is_estimate": false,
-              "elapsed_ms": 1.0,
+              "elapsed_ms": 0.8,
               "latency_source": "failed_checkpoint_timing",
               "phases_ms": {
                 "routing": null,
@@ -685,17 +685,17 @@
               "cost_microusd": 4668,
               "cost_known": true,
               "cost_is_estimate": false,
-              "elapsed_ms": 2.5,
+              "elapsed_ms": 2.3,
               "latency_source": "swarm_timing",
               "phases_ms": {
                 "routing": null,
-                "planning": 0.1,
+                "planning": 0.2,
                 "recovery": null,
-                "execution": 0.8,
+                "execution": 0.7,
                 "verification": 0.1,
                 "synthesis": 0.0,
                 "supervision": 0.0,
-                "checkpoint": 1.1,
+                "checkpoint": 0.9,
                 "waiting": 0.0
               },
               "graph": {
@@ -721,7 +721,7 @@
           "attempt_allowance": 2,
           "failed_attempts": 0,
           "cost_microusd": 7041,
-          "elapsed_ms": 2.1,
+          "elapsed_ms": 2.4,
           "attempts": [
             {
               "attempt": 1,
@@ -753,18 +753,18 @@
               "cost_microusd": 7041,
               "cost_known": true,
               "cost_is_estimate": false,
-              "elapsed_ms": 2.1,
+              "elapsed_ms": 2.4,
               "latency_source": "swarm_timing",
               "phases_ms": {
                 "routing": null,
-                "planning": 0.1,
+                "planning": 0.2,
                 "recovery": null,
-                "execution": 1.2,
+                "execution": 1.4,
                 "verification": 0.1,
                 "synthesis": 0.0,
                 "supervision": 0.0,
                 "checkpoint": 0.9,
-                "waiting": 0.0
+                "waiting": 0.1
               },
               "graph": {
                 "topology": "fork_join",
@@ -857,7 +857,7 @@
           "attempt_allowance": 2,
           "failed_attempts": 0,
           "cost_microusd": 7041,
-          "elapsed_ms": 2.1,
+          "elapsed_ms": 2.3,
           "attempts": [
             {
               "attempt": 1,
@@ -901,18 +901,18 @@
               "cost_microusd": 7041,
               "cost_known": true,
               "cost_is_estimate": false,
-              "elapsed_ms": 2.1,
+              "elapsed_ms": 2.3,
               "latency_source": "swarm_timing",
               "phases_ms": {
                 "routing": 0.0,
                 "planning": 0.2,
                 "recovery": null,
-                "execution": 1.1,
+                "execution": 1.4,
                 "verification": 0.1,
                 "synthesis": 0.0,
                 "supervision": 0.0,
-                "checkpoint": 0.9,
-                "waiting": 0.0
+                "checkpoint": 1.0,
+                "waiting": 0.1
               },
               "graph": {
                 "topology": "fork_join",
@@ -975,13 +975,13 @@
               "latency_source": "swarm_timing",
               "phases_ms": {
                 "routing": null,
-                "planning": 0.1,
+                "planning": 0.0,
                 "recovery": null,
-                "execution": 0.4,
-                "verification": 0.1,
+                "execution": 0.3,
+                "verification": 0.2,
                 "synthesis": 0.0,
                 "supervision": 0.0,
-                "checkpoint": 0.5,
+                "checkpoint": 0.6,
                 "waiting": 0.0
               },
               "graph": {
@@ -1007,7 +1007,7 @@
           "attempt_allowance": 2,
           "failed_attempts": 0,
           "cost_microusd": 2685,
-          "elapsed_ms": 2.0,
+          "elapsed_ms": 2.1,
           "attempts": [
             {
               "attempt": 1,
@@ -1039,13 +1039,13 @@
               "cost_microusd": 2685,
               "cost_known": true,
               "cost_is_estimate": false,
-              "elapsed_ms": 2.0,
+              "elapsed_ms": 2.1,
               "latency_source": "swarm_timing",
               "phases_ms": {
                 "routing": null,
                 "planning": 0.1,
                 "recovery": null,
-                "execution": 0.7,
+                "execution": 0.8,
                 "verification": 0.1,
                 "synthesis": 0.0,
                 "supervision": 0.0,
@@ -1075,7 +1075,7 @@
           "attempt_allowance": 2,
           "failed_attempts": 0,
           "cost_microusd": 432,
-          "elapsed_ms": 1.3,
+          "elapsed_ms": 1.2,
           "attempts": [
             {
               "attempt": 1,
@@ -1107,17 +1107,17 @@
               "cost_microusd": 432,
               "cost_known": true,
               "cost_is_estimate": false,
-              "elapsed_ms": 1.3,
+              "elapsed_ms": 1.2,
               "latency_source": "swarm_timing",
               "phases_ms": {
                 "routing": null,
                 "planning": 0.1,
                 "recovery": null,
-                "execution": 0.4,
+                "execution": 0.3,
                 "verification": 0.1,
                 "synthesis": 0.0,
                 "supervision": 0.0,
-                "checkpoint": 0.5,
+                "checkpoint": 0.4,
                 "waiting": 0.0
               },
               "graph": {
@@ -1143,7 +1143,7 @@
           "attempt_allowance": 2,
           "failed_attempts": 0,
           "cost_microusd": 6249,
-          "elapsed_ms": 2.1,
+          "elapsed_ms": 2.2,
           "attempts": [
             {
               "attempt": 1,
@@ -1175,18 +1175,18 @@
               "cost_microusd": 6249,
               "cost_known": true,
               "cost_is_estimate": false,
-              "elapsed_ms": 2.1,
+              "elapsed_ms": 2.2,
               "latency_source": "swarm_timing",
               "phases_ms": {
                 "routing": null,
-                "planning": 0.1,
+                "planning": 0.2,
                 "recovery": null,
-                "execution": 1.3,
+                "execution": 1.5,
                 "verification": 0.1,
                 "synthesis": 0.0,
                 "supervision": 0.0,
-                "checkpoint": 0.9,
-                "waiting": 0.0
+                "checkpoint": 0.8,
+                "waiting": 0.1
               },
               "graph": {
                 "topology": "fork_join",
@@ -1211,7 +1211,7 @@
           "attempt_allowance": 2,
           "failed_attempts": 0,
           "cost_microusd": 432,
-          "elapsed_ms": 1.3,
+          "elapsed_ms": 1.2,
           "attempts": [
             {
               "attempt": 1,
@@ -1255,13 +1255,13 @@
               "cost_microusd": 432,
               "cost_known": true,
               "cost_is_estimate": false,
-              "elapsed_ms": 1.3,
+              "elapsed_ms": 1.2,
               "latency_source": "swarm_timing",
               "phases_ms": {
                 "routing": 0.0,
                 "planning": 0.1,
                 "recovery": null,
-                "execution": 0.4,
+                "execution": 0.3,
                 "verification": 0.1,
                 "synthesis": 0.0,
                 "supervision": 0.0,
@@ -1293,7 +1293,7 @@
           "attempt_allowance": 2,
           "failed_attempts": 0,
           "cost_microusd": 543,
-          "elapsed_ms": 1.2,
+          "elapsed_ms": 1.3,
           "attempts": [
             {
               "attempt": 1,
@@ -1325,13 +1325,13 @@
               "cost_microusd": 543,
               "cost_known": true,
               "cost_is_estimate": false,
-              "elapsed_ms": 1.2,
+              "elapsed_ms": 1.3,
               "latency_source": "swarm_timing",
               "phases_ms": {
                 "routing": null,
-                "planning": 0.0,
+                "planning": 0.1,
                 "recovery": null,
-                "execution": 0.3,
+                "execution": 0.4,
                 "verification": 0.1,
                 "synthesis": 0.0,
                 "supervision": 0.0,
@@ -1361,7 +1361,7 @@
           "attempt_allowance": 2,
           "failed_attempts": 0,
           "cost_microusd": 3060,
-          "elapsed_ms": 2.4,
+          "elapsed_ms": 2.2,
           "attempts": [
             {
               "attempt": 1,
@@ -1405,13 +1405,13 @@
               "cost_microusd": 3060,
               "cost_known": true,
               "cost_is_estimate": false,
-              "elapsed_ms": 2.4,
+              "elapsed_ms": 2.2,
               "latency_source": "swarm_timing",
               "phases_ms": {
                 "routing": 0.0,
                 "planning": 0.1,
                 "recovery": null,
-                "execution": 0.8,
+                "execution": 0.6,
                 "verification": 0.1,
                 "synthesis": 0.0,
                 "supervision": 0.0,
@@ -1443,7 +1443,7 @@
           "attempt_allowance": 2,
           "failed_attempts": 0,
           "cost_microusd": 3060,
-          "elapsed_ms": 2.0,
+          "elapsed_ms": 3.0,
           "attempts": [
             {
               "attempt": 1,
@@ -1475,17 +1475,17 @@
               "cost_microusd": 3060,
               "cost_known": true,
               "cost_is_estimate": false,
-              "elapsed_ms": 2.0,
+              "elapsed_ms": 3.0,
               "latency_source": "swarm_timing",
               "phases_ms": {
                 "routing": null,
                 "planning": 0.1,
                 "recovery": null,
-                "execution": 0.6,
+                "execution": 1.5,
                 "verification": 0.1,
                 "synthesis": 0.0,
                 "supervision": 0.0,
-                "checkpoint": 0.9,
+                "checkpoint": 1.0,
                 "waiting": 0.0
               },
               "graph": {
@@ -1553,8 +1553,8 @@
                 "verification": 0.1,
                 "synthesis": 0.0,
                 "supervision": 0.0,
-                "checkpoint": 0.8,
-                "waiting": 0.1
+                "checkpoint": 0.9,
+                "waiting": 0.0
               },
               "graph": {
                 "topology": "fork_join",
@@ -1579,7 +1579,7 @@
           "attempt_allowance": 2,
           "failed_attempts": 0,
           "cost_microusd": 5730,
-          "elapsed_ms": 2.7,
+          "elapsed_ms": 2.8,
           "attempts": [
             {
               "attempt": 1,
@@ -1617,22 +1617,22 @@
                 "classifier_calls": 1,
                 "cost_microusd": 1020,
                 "cost_source": "declared classifier usage",
-                "latency_ms": 0.1
+                "latency_ms": 0.2
               },
               "cost_microusd": 5730,
               "cost_known": true,
               "cost_is_estimate": false,
-              "elapsed_ms": 2.7,
+              "elapsed_ms": 2.8,
               "latency_source": "swarm_timing",
               "phases_ms": {
-                "routing": 0.1,
+                "routing": 0.2,
                 "planning": 0.1,
                 "recovery": null,
-                "execution": 0.7,
+                "execution": 0.8,
                 "verification": 0.1,
                 "synthesis": 0.0,
                 "supervision": 0.0,
-                "checkpoint": 1.3,
+                "checkpoint": 1.2,
                 "waiting": 0.0
               },
               "graph": {
@@ -1645,7 +1645,7 @@
             }
           ],
           "selector_cost_microusd": 1020,
-          "selector_latency_ms": 0.1
+          "selector_latency_ms": 0.2
         },
         {
           "ordinal": 17,
@@ -1660,7 +1660,7 @@
           "attempt_allowance": 2,
           "failed_attempts": 0,
           "cost_microusd": 7995,
-          "elapsed_ms": 2.4,
+          "elapsed_ms": 3.4,
           "attempts": [
             {
               "attempt": 1,
@@ -1692,17 +1692,17 @@
               "cost_microusd": 7995,
               "cost_known": true,
               "cost_is_estimate": false,
-              "elapsed_ms": 2.4,
+              "elapsed_ms": 3.4,
               "latency_source": "swarm_timing",
               "phases_ms": {
                 "routing": null,
-                "planning": 0.2,
+                "planning": 0.5,
                 "recovery": null,
-                "execution": 1.5,
+                "execution": 1.6,
                 "verification": 0.1,
                 "synthesis": 0.0,
                 "supervision": 0.0,
-                "checkpoint": 0.9,
+                "checkpoint": 1.1,
                 "waiting": 0.1
               },
               "graph": {
@@ -1728,7 +1728,7 @@
           "attempt_allowance": 2,
           "failed_attempts": 0,
           "cost_microusd": 825,
-          "elapsed_ms": 1.1,
+          "elapsed_ms": 1.2,
           "attempts": [
             {
               "attempt": 1,
@@ -1760,17 +1760,17 @@
               "cost_microusd": 825,
               "cost_known": true,
               "cost_is_estimate": false,
-              "elapsed_ms": 1.1,
+              "elapsed_ms": 1.2,
               "latency_source": "swarm_timing",
               "phases_ms": {
                 "routing": null,
-                "planning": 0.0,
+                "planning": 0.1,
                 "recovery": null,
                 "execution": 0.3,
                 "verification": 0.1,
                 "synthesis": 0.0,
                 "supervision": 0.0,
-                "checkpoint": 0.4,
+                "checkpoint": 0.5,
                 "waiting": 0.0
               },
               "graph": {
@@ -1796,7 +1796,7 @@
           "attempt_allowance": 2,
           "failed_attempts": 0,
           "cost_microusd": 4710,
-          "elapsed_ms": 2.5,
+          "elapsed_ms": 3.7,
           "attempts": [
             {
               "attempt": 1,
@@ -1828,17 +1828,17 @@
               "cost_microusd": 4710,
               "cost_known": true,
               "cost_is_estimate": false,
-              "elapsed_ms": 2.5,
+              "elapsed_ms": 3.7,
               "latency_source": "swarm_timing",
               "phases_ms": {
                 "routing": null,
                 "planning": 0.1,
                 "recovery": null,
-                "execution": 0.9,
-                "verification": 0.1,
+                "execution": 1.5,
+                "verification": 0.2,
                 "synthesis": 0.0,
                 "supervision": 0.0,
-                "checkpoint": 1.0,
+                "checkpoint": 1.6,
                 "waiting": 0.0
               },
               "graph": {
@@ -1897,17 +1897,17 @@
                     "cost_microusd": 432,
                     "cost_known": true,
                     "cost_is_estimate": false,
-                    "elapsed_ms": 1.3,
+                    "elapsed_ms": 1.2,
                     "latency_source": "swarm_timing",
                     "phases_ms": {
                       "routing": null,
                       "planning": 0.1,
                       "recovery": null,
-                      "execution": 0.4,
+                      "execution": 0.3,
                       "verification": 0.1,
                       "synthesis": 0.0,
                       "supervision": 0.0,
-                      "checkpoint": 0.5,
+                      "checkpoint": 0.4,
                       "waiting": 0.0
                     },
                     "graph": {
@@ -1964,11 +1964,11 @@
                       "routing": null,
                       "planning": 0.1,
                       "recovery": null,
-                      "execution": 0.4,
+                      "execution": 0.3,
                       "verification": 0.1,
                       "synthesis": 0.0,
                       "supervision": 0.0,
-                      "checkpoint": 0.5,
+                      "checkpoint": 0.6,
                       "waiting": 0.0
                     },
                     "graph": {
@@ -2024,18 +2024,18 @@
                     "cost_microusd": 2685,
                     "cost_known": true,
                     "cost_is_estimate": false,
-                    "elapsed_ms": 2.2,
+                    "elapsed_ms": 2.4,
                     "latency_source": "swarm_timing",
                     "phases_ms": {
                       "routing": null,
                       "planning": 0.1,
                       "recovery": null,
-                      "execution": 0.7,
+                      "execution": 0.8,
                       "verification": 0.1,
                       "synthesis": 0.0,
                       "supervision": 0.0,
-                      "checkpoint": 0.9,
-                      "waiting": 0.0
+                      "checkpoint": 1.1,
+                      "waiting": 0.2
                     },
                     "graph": {
                       "topology": "serial",
@@ -2091,7 +2091,7 @@
                       "routing": null,
                       "planning": 0.1,
                       "recovery": null,
-                      "execution": 0.9,
+                      "execution": 1.0,
                       "verification": 0.1,
                       "synthesis": 0.0,
                       "supervision": 0.0,
@@ -2151,18 +2151,18 @@
                     "cost_microusd": 6249,
                     "cost_known": true,
                     "cost_is_estimate": false,
-                    "elapsed_ms": 2.0,
+                    "elapsed_ms": 2.4,
                     "latency_source": "swarm_timing",
                     "phases_ms": {
                       "routing": null,
                       "planning": 0.1,
                       "recovery": null,
-                      "execution": 1.4,
+                      "execution": 1.6,
                       "verification": 0.1,
                       "synthesis": 0.0,
                       "supervision": 0.0,
-                      "checkpoint": 0.8,
-                      "waiting": 0.0
+                      "checkpoint": 0.9,
+                      "waiting": 0.1
                     },
                     "graph": {
                       "topology": "fork_join",
@@ -2212,18 +2212,18 @@
                     "cost_microusd": 5391,
                     "cost_known": true,
                     "cost_is_estimate": false,
-                    "elapsed_ms": 2.3,
+                    "elapsed_ms": 2.7,
                     "latency_source": "swarm_timing",
                     "phases_ms": {
                       "routing": null,
-                      "planning": 0.2,
+                      "planning": 0.1,
                       "recovery": null,
-                      "execution": 1.4,
+                      "execution": 1.6,
                       "verification": 0.1,
                       "synthesis": 0.0,
                       "supervision": 0.0,
-                      "checkpoint": 0.8,
-                      "waiting": 0.1
+                      "checkpoint": 1.1,
+                      "waiting": 0.0
                     },
                     "graph": {
                       "topology": "fork_join",
@@ -2300,7 +2300,7 @@
                       "verification": 0.1,
                       "synthesis": 0.0,
                       "supervision": 0.0,
-                      "checkpoint": 0.4,
+                      "checkpoint": 0.5,
                       "waiting": 0.0
                     },
                     "graph": {
@@ -2358,7 +2358,7 @@
                       "classifier_calls": 0,
                       "cost_microusd": 0,
                       "cost_source": "no classifier call",
-                      "latency_ms": 0.1
+                      "latency_ms": 0.0
                     },
                     "cost_microusd": 261,
                     "cost_known": true,
@@ -2366,14 +2366,14 @@
                     "elapsed_ms": 1.4,
                     "latency_source": "swarm_timing",
                     "phases_ms": {
-                      "routing": 0.1,
+                      "routing": 0.0,
                       "planning": 0.1,
                       "recovery": null,
-                      "execution": 0.4,
+                      "execution": 0.3,
                       "verification": 0.1,
                       "synthesis": 0.0,
                       "supervision": 0.0,
-                      "checkpoint": 0.5,
+                      "checkpoint": 0.7,
                       "waiting": 0.0
                     },
                     "graph": {
@@ -2473,7 +2473,7 @@
         "thresholds": "placeholders for offline mechanics; promotion thresholds are not decided",
         "evaluator_manifest": {
           "version": 1,
-          "code_digest": "sha256:ee18f90c1d8926a61d22434f5c82e0827596df966833a37603e73e61f7d6fe82",
+          "code_digest": "sha256:899b685d34cba4a40e1fe26259a4e8f4f73615bcc09dff740e53354da752dca2",
           "split_manifests": {
             "development": "sha256:97488fadb42fc322818bb0ee2340663ebb91753e1d449bcf0d659775dcddb31a",
             "confirmation": "sha256:97488fadb42fc322818bb0ee2340663ebb91753e1d449bcf0d659775dcddb31a",
@@ -2488,7 +2488,7 @@
           ],
           "price_snapshot_version": "offline-fixture-3-microusd-per-token-v1"
         },
-        "evaluator_hash": "sha256:d18bfea040c5327cc1ce115353092f1f65149c029b10ab278685395d8044b257",
+        "evaluator_hash": "sha256:2baa5fa6ad75ddab9a1577bd0731060c36c37fb7644efa22cff60d8551feed75",
         "split_manifests": {
           "development": {
             "family": "task-shapes",
@@ -2553,15 +2553,15 @@
           "note": "no held-out pack was supplied, so the holdout split reuses the development tasks and its verdict shows mechanics only"
         },
         "decision": {
-          "campaign_id": "optimization_v4_d840554462f101304d137916e8b0bfa3f3a37c3deeebd1468f486e199fb49218",
-          "optimization_plan_hash": "sha256:d840554462f101304d137916e8b0bfa3f3a37c3deeebd1468f486e199fb49218",
-          "holdout_seed_commitment": "sha256:fc769d47fa042d7e1bfb895e331940cbbcd0b0f918a24c2d303d9e8477691515",
+          "campaign_id": "optimization_v4_b955cec707555c545934da406a865b3dc5f843f26d45fe1e91d3fb1ae98b7f68",
+          "optimization_plan_hash": "sha256:b955cec707555c545934da406a865b3dc5f843f26d45fe1e91d3fb1ae98b7f68",
+          "holdout_seed_commitment": "sha256:03c6a6b1f23ae0c6f6a1ee203bd23e755c02d243bf9ab0086363ca38806a53ab",
           "incumbent_candidate_id": "cand_87acee2ee8da955551643911af723f7b0de2894854f25f062060a37c58f14718",
           "selected_candidate_id": "cand_c30d44bbdd384c6e49fa345edf5a2d12369e50e427955054d587285372c3c21c",
           "promoted": false,
           "verdict": "inconclusive",
           "reason": "confirmation rejected candidate: primary lower confidence bound -577.486468299 does not exceed 0",
-          "decision_id": "decision_v1_221c7b3431a7c6d2f732187b2d849bffe3b0115f40ab9b4fc9fc53edac2f4673",
+          "decision_id": "decision_v1_1c1a3ca62242d977cc0f5cd74db659ab3bf1f03697581e8e7f40c356995fbe22",
           "development_scores": [
             {
               "candidate_id": "cand_c30d44bbdd384c6e49fa345edf5a2d12369e50e427955054d587285372c3c21c",
@@ -2583,17 +2583,17 @@
               "incumbent_metric_means": {
                 "accepted_outcome_rate": 1.0,
                 "cost_microusd": 13107.0,
-                "elapsed_ms": 3.9
+                "elapsed_ms": 5.8
               },
               "mean_improvements": {
                 "accepted_outcome_rate": 0.0,
                 "cost_microusd": 8439.0,
-                "elapsed_ms": 0.6000000000000001
+                "elapsed_ms": 2.1999999999999997
               },
               "metric_means": {
                 "accepted_outcome_rate": 1.0,
                 "cost_microusd": 4668.0,
-                "elapsed_ms": 3.3
+                "elapsed_ms": 3.6
               },
               "policy_hash": "sha256:2702753e2665cbc5f02e99ad3103c252dd10d70bf678fe15d6758dd4cd432bfd",
               "primary_direction": "minimize",
@@ -2606,8 +2606,8 @@
                 "elapsed_ms": true
               },
               "trial_keys": [
-                "trial_v1_3d1f7a80a7eb3bf7ad0ddfbce9e57dc250a4bec0651aa04a11469c01537a8704",
-                "trial_v1_5e4e0f3258047a63d585107e7c53bc2165c69b2d18299c55ae91f53216e6c8dd"
+                "trial_v1_216af14303d2d44a2cedd50e4baf4d1d13e7e22928bc6ddccc86774975860a61",
+                "trial_v1_05ec1c12db07909f23065ca9514b45f3e61b9437c38e18cb06ee12a8d4c29fc9"
               ],
               "viable": true,
               "arm": "adaptive_selection"
@@ -2629,7 +2629,7 @@
               "mean_improvement": 4030.0,
               "confidence_level": 0.8,
               "bootstrap_resamples": 2000,
-              "bootstrap_seed": 814925567212438001,
+              "bootstrap_seed": 6156561345447503732,
               "confidence_interval": [
                 -577.4864682986927,
                 8637.486468298692
@@ -2661,7 +2661,7 @@
                 "mean_improvement": 0.0,
                 "confidence_level": 0.8,
                 "bootstrap_resamples": 2000,
-                "bootstrap_seed": 814925567212438001,
+                "bootstrap_seed": 6156561345447503732,
                 "confidence_interval": [
                   0.0,
                   0.0
@@ -2687,26 +2687,26 @@
                   4372261516479428902,
                   1684368556283962073
                 ],
-                "baseline_mean": 3.5666666666666664,
-                "candidate_mean": 3.466666666666667,
-                "mean_improvement": 0.10000000000000009,
+                "baseline_mean": 3.0666666666666664,
+                "candidate_mean": 2.8000000000000003,
+                "mean_improvement": 0.2666666666666666,
                 "confidence_level": 0.8,
                 "bootstrap_resamples": 2000,
-                "bootstrap_seed": 814925567212438001,
+                "bootstrap_seed": 6156561345447503732,
                 "confidence_interval": [
-                  -0.506141408754927,
-                  0.7061414087549271
+                  -0.04760301386068805,
+                  0.5809363471940212
                 ],
-                "lower_confidence_bound": -0.506141408754927,
+                "lower_confidence_bound": -0.04760301386068805,
                 "hard_bounds_passed": true,
                 "non_regression_passed": true,
                 "method": "paired_student_t",
                 "degrees_of_freedom": 2,
-                "standard_error": 0.32145502536643183,
+                "standard_error": 0.16666666666666674,
                 "critical_value": 1.8856180831641272,
                 "descriptive_bootstrap_interval": [
-                  -0.2666666666666666,
-                  0.4666666666666668
+                  0.09999999999999978,
+                  0.4333333333333334
                 ]
               }
             ],
@@ -2750,7 +2750,7 @@
                 "primary": {
                   "baseline_mean": 656.0,
                   "bootstrap_resamples": 2000,
-                  "bootstrap_seed": 814925567212438001,
+                  "bootstrap_seed": 6156561345447503732,
                   "candidate_mean": 4923.0,
                   "confidence_interval": [
                     -6431.561438772811,
@@ -2786,7 +2786,7 @@
                   {
                     "baseline_mean": 1.0,
                     "bootstrap_resamples": 2000,
-                    "bootstrap_seed": 814925567212438001,
+                    "bootstrap_seed": 6156561345447503732,
                     "candidate_mean": 1.0,
                     "confidence_interval": [
                       0.0,
@@ -2815,25 +2815,25 @@
                     "standard_error": 0.0
                   },
                   {
-                    "baseline_mean": 1.8,
+                    "baseline_mean": 1.6333333333333335,
                     "bootstrap_resamples": 2000,
-                    "bootstrap_seed": 814925567212438001,
-                    "candidate_mean": 3.466666666666667,
+                    "bootstrap_seed": 6156561345447503732,
+                    "candidate_mean": 2.8000000000000003,
                     "confidence_interval": [
-                      -1.8329625505232863,
-                      -1.5003707828100472
+                      -1.6694981555104338,
+                      -0.6638351778228997
                     ],
                     "confidence_level": 0.8,
                     "critical_value": 1.8856180831641272,
                     "degrees_of_freedom": 2,
                     "descriptive_bootstrap_interval": [
-                      -1.7666666666666666,
-                      -1.5666666666666667
+                      -1.4333333333333333,
+                      -0.9
                     ],
                     "direction": "minimize",
                     "hard_bounds_passed": true,
-                    "lower_confidence_bound": -1.8329625505232863,
-                    "mean_improvement": -1.6666666666666667,
+                    "lower_confidence_bound": -1.6694981555104338,
+                    "mean_improvement": -1.1666666666666667,
                     "method": "paired_student_t",
                     "non_regression_passed": true,
                     "objective_name": "elapsed_ms",
@@ -2843,7 +2843,7 @@
                       4372261516479428902,
                       1684368556283962073
                     ],
-                    "standard_error": 0.08819171036881963
+                    "standard_error": 0.26666666666666655
                   }
                 ],
                 "secondary_non_regression_passed": true,
@@ -2873,7 +2873,7 @@
                 "primary": {
                   "baseline_mean": 3758.0,
                   "bootstrap_resamples": 2000,
-                  "bootstrap_seed": 814925567212438001,
+                  "bootstrap_seed": 6156561345447503732,
                   "candidate_mean": 4923.0,
                   "confidence_interval": [
                     -3361.745066886208,
@@ -2909,7 +2909,7 @@
                   {
                     "baseline_mean": 1.0,
                     "bootstrap_resamples": 2000,
-                    "bootstrap_seed": 814925567212438001,
+                    "bootstrap_seed": 6156561345447503732,
                     "candidate_mean": 1.0,
                     "confidence_interval": [
                       0.0,
@@ -2938,25 +2938,25 @@
                     "standard_error": 0.0
                   },
                   {
-                    "baseline_mean": 3.1999999999999997,
+                    "baseline_mean": 2.733333333333333,
                     "bootstrap_resamples": 2000,
-                    "bootstrap_seed": 814925567212438001,
-                    "candidate_mean": 3.466666666666667,
+                    "bootstrap_seed": 6156561345447503732,
+                    "candidate_mean": 2.8000000000000003,
                     "confidence_interval": [
-                      -0.7811483067906766,
-                      0.2478149734573431
+                      -0.3180824110885499,
+                      0.1847490777552167
                     ],
                     "confidence_level": 0.8,
                     "critical_value": 1.8856180831641272,
                     "degrees_of_freedom": 2,
                     "descriptive_bootstrap_interval": [
-                      -0.5666666666666665,
-                      0.03333333333333307
+                      -0.19999999999999973,
+                      0.06666666666666658
                     ],
                     "direction": "minimize",
                     "hard_bounds_passed": true,
-                    "lower_confidence_bound": -0.7811483067906766,
-                    "mean_improvement": -0.2666666666666668,
+                    "lower_confidence_bound": -0.3180824110885499,
+                    "mean_improvement": -0.06666666666666658,
                     "method": "paired_student_t",
                     "non_regression_passed": true,
                     "objective_name": "elapsed_ms",
@@ -2966,7 +2966,7 @@
                       4372261516479428902,
                       1684368556283962073
                     ],
-                    "standard_error": 0.27284509239574817
+                    "standard_error": 0.13333333333333316
                   }
                 ],
                 "secondary_non_regression_passed": true,
@@ -2983,7 +2983,7 @@
         },
         "trials": [
           {
-            "trial_key": "trial_v1_3d1f7a80a7eb3bf7ad0ddfbce9e57dc250a4bec0651aa04a11469c01537a8704",
+            "trial_key": "trial_v1_216af14303d2d44a2cedd50e4baf4d1d13e7e22928bc6ddccc86774975860a61",
             "split": "development",
             "role": "incumbent",
             "task_index": 1,
@@ -3002,7 +3002,7 @@
             "attempt_allowance": 2,
             "failed_attempts": 1,
             "cost_microusd": 13107,
-            "elapsed_ms": 3.9,
+            "elapsed_ms": 5.8,
             "attempts": [
               {
                 "attempt": 1,
@@ -3028,7 +3028,7 @@
                 "cost_microusd": 5163,
                 "cost_known": true,
                 "cost_is_estimate": false,
-                "elapsed_ms": 1.5,
+                "elapsed_ms": 1.8,
                 "latency_source": "failed_checkpoint_timing",
                 "phases_ms": {
                   "routing": null,
@@ -3039,7 +3039,7 @@
                   "synthesis": null,
                   "supervision": 0.0,
                   "checkpoint": 0.6,
-                  "waiting": 0.0
+                  "waiting": 0.1
                 },
                 "graph": {
                   "topology": "fork_join",
@@ -3081,18 +3081,18 @@
                 "cost_microusd": 7944,
                 "cost_known": true,
                 "cost_is_estimate": false,
-                "elapsed_ms": 2.4,
+                "elapsed_ms": 4.0,
                 "latency_source": "swarm_timing",
                 "phases_ms": {
                   "routing": null,
                   "planning": 0.2,
                   "recovery": null,
-                  "execution": 1.6,
+                  "execution": 2.2,
                   "verification": 0.1,
                   "synthesis": 0.0,
                   "supervision": 0.0,
-                  "checkpoint": 0.9,
-                  "waiting": 0.0
+                  "checkpoint": 1.6,
+                  "waiting": 0.6
                 },
                 "graph": {
                   "topology": "fork_join",
@@ -3105,7 +3105,7 @@
             ]
           },
           {
-            "trial_key": "trial_v1_5e4e0f3258047a63d585107e7c53bc2165c69b2d18299c55ae91f53216e6c8dd",
+            "trial_key": "trial_v1_05ec1c12db07909f23065ca9514b45f3e61b9437c38e18cb06ee12a8d4c29fc9",
             "split": "development",
             "role": "challenger",
             "task_index": 1,
@@ -3124,604 +3124,7 @@
             "attempt_allowance": 2,
             "failed_attempts": 1,
             "cost_microusd": 4668,
-            "elapsed_ms": 3.3,
-            "attempts": [
-              {
-                "attempt": 1,
-                "planted": "fault",
-                "outcome": "error",
-                "decision": "not_evaluated",
-                "reasons": [],
-                "policy_sha256": "5bbbe8a8ed08746617cebf336bce95200ffeaa04be4cd6e0f54c3724d772e6d5",
-                "validators": [],
-                "output_sha256": null,
-                "output_bytes": null,
-                "adjudication": null,
-                "error": {
-                  "type": "FixtureFault",
-                  "message": "planted transient failure of this attempt's first answer"
-                },
-                "provider_calls": 1,
-                "provider_calls_failed": 1,
-                "planning_calls": 0,
-                "tokens": 0,
-                "model_cost_microusd": 0,
-                "selector": {
-                  "method": "rule",
-                  "tier": "deterministic:pipeline",
-                  "reasons": [
-                    "the rule 'stepwise-analysis' chose deterministic:pipeline",
-                    "a stepwise analysis fits the fixed research, analysis and writing pipeline"
-                  ],
-                  "policy_version": 2,
-                  "classifier_calls": 0,
-                  "cost_microusd": 0,
-                  "cost_source": "no classifier call",
-                  "latency_ms": 0.0
-                },
-                "cost_microusd": 0,
-                "cost_known": true,
-                "cost_is_estimate": false,
-                "elapsed_ms": 0.9,
-                "latency_source": "failed_checkpoint_timing",
-                "phases_ms": {
-                  "routing": 0.0,
-                  "planning": 0.1,
-                  "recovery": null,
-                  "execution": 0.1,
-                  "verification": 0.0,
-                  "synthesis": null,
-                  "supervision": 0.0,
-                  "checkpoint": 0.4,
-                  "waiting": 0.0
-                },
-                "graph": {
-                  "topology": "serial",
-                  "nodes": 3,
-                  "node_statuses": {
-                    "failed": 1,
-                    "pending": 2
-                  }
-                }
-              },
-              {
-                "attempt": 2,
-                "planted": null,
-                "outcome": "accepted",
-                "decision": "accepted",
-                "reasons": [
-                  "every final validator passed"
-                ],
-                "policy_sha256": "5bbbe8a8ed08746617cebf336bce95200ffeaa04be4cd6e0f54c3724d772e6d5",
-                "validators": [
-                  {
-                    "name": "smythe.text-spec",
-                    "version": "1",
-                    "config_sha256": "6c0f8196fcef150736e948f729477ac758f44857987bd086f34f3115d1ad1760",
-                    "outcome": "passed"
-                  }
-                ],
-                "output_sha256": "199cd331bf1bb2eb73291f1268d2b1c75cc6f8d2534e42c75f8d7c7dafad258e",
-                "output_bytes": 454,
-                "adjudication": null,
-                "error": null,
-                "provider_calls": 3,
-                "provider_calls_failed": 0,
-                "planning_calls": 0,
-                "tokens": 1556,
-                "model_cost_microusd": 4668,
-                "selector": {
-                  "method": "rule",
-                  "tier": "deterministic:pipeline",
-                  "reasons": [
-                    "the rule 'stepwise-analysis' chose deterministic:pipeline",
-                    "a stepwise analysis fits the fixed research, analysis and writing pipeline"
-                  ],
-                  "policy_version": 2,
-                  "classifier_calls": 0,
-                  "cost_microusd": 0,
-                  "cost_source": "no classifier call",
-                  "latency_ms": 0.0
-                },
-                "cost_microusd": 4668,
-                "cost_known": true,
-                "cost_is_estimate": false,
-                "elapsed_ms": 2.4,
-                "latency_source": "swarm_timing",
-                "phases_ms": {
-                  "routing": 0.0,
-                  "planning": 0.1,
-                  "recovery": null,
-                  "execution": 0.8,
-                  "verification": 0.1,
-                  "synthesis": 0.0,
-                  "supervision": 0.0,
-                  "checkpoint": 1.0,
-                  "waiting": 0.0
-                },
-                "graph": {
-                  "topology": "serial",
-                  "nodes": 3,
-                  "node_statuses": {
-                    "completed": 3
-                  }
-                }
-              }
-            ],
-            "selector_cost_microusd": 0,
-            "selector_latency_ms": 0.0
-          },
-          {
-            "trial_key": "trial_v1_38c2c103df2ecf6b2391362c97cb0f03e105e1c63a3bad888eabdc928ef6b9a8",
-            "split": "confirmation",
-            "role": "incumbent",
-            "task_index": 0,
-            "gates": {
-              "accepted.nonzero": true,
-              "acceptance.policy_unchanged": true,
-              "accounting.complete": true,
-              "regression.no_new_failures": true
-            },
-            "family": "task-shapes",
-            "task_id": "adversarial-claim",
-            "task_sha256": "89daa963eb6433e3ceb61a8396dc43b766873d03a932d4ee53e873af429b3058",
-            "arm": "generated_plan",
-            "repetition": 1,
-            "accepted": true,
-            "attempt_allowance": 2,
-            "failed_attempts": 0,
-            "cost_microusd": 6711,
-            "elapsed_ms": 3.4,
-            "attempts": [
-              {
-                "attempt": 1,
-                "planted": null,
-                "outcome": "accepted",
-                "decision": "accepted",
-                "reasons": [
-                  "every final validator passed"
-                ],
-                "policy_sha256": "5bbbe8a8ed08746617cebf336bce95200ffeaa04be4cd6e0f54c3724d772e6d5",
-                "validators": [
-                  {
-                    "name": "smythe.text-spec",
-                    "version": "1",
-                    "config_sha256": "6c0f8196fcef150736e948f729477ac758f44857987bd086f34f3115d1ad1760",
-                    "outcome": "passed"
-                  }
-                ],
-                "output_sha256": "537bb18a44d8d82c779960ceafaa50a45da69873648b2aaa258da973fad20556",
-                "output_bytes": 244,
-                "adjudication": null,
-                "error": null,
-                "provider_calls": 4,
-                "provider_calls_failed": 0,
-                "planning_calls": 1,
-                "tokens": 2237,
-                "model_cost_microusd": 6711,
-                "selector": null,
-                "cost_microusd": 6711,
-                "cost_known": true,
-                "cost_is_estimate": false,
-                "elapsed_ms": 3.4,
-                "latency_source": "swarm_timing",
-                "phases_ms": {
-                  "routing": null,
-                  "planning": 0.6,
-                  "recovery": null,
-                  "execution": 1.7,
-                  "verification": 0.2,
-                  "synthesis": 0.0,
-                  "supervision": 0.0,
-                  "checkpoint": 1.2,
-                  "waiting": 0.1
-                },
-                "graph": {
-                  "topology": "fork_join",
-                  "nodes": 3,
-                  "node_statuses": {
-                    "completed": 3
-                  }
-                }
-              }
-            ]
-          },
-          {
-            "trial_key": "trial_v1_4d364fe1044a3d5907b3841382a27df87871036e4cac862eea2420dce494ff1a",
-            "split": "confirmation",
-            "role": "incumbent",
-            "task_index": 3,
-            "gates": {
-              "accepted.nonzero": true,
-              "acceptance.policy_unchanged": true,
-              "accounting.complete": true,
-              "regression.no_new_failures": true
-            },
-            "family": "task-shapes",
-            "task_id": "parallel-profiles",
-            "task_sha256": "76185c3589165a1990aef39903563c340d557dc973487a9681f2ce25b98e8172",
-            "arm": "generated_plan",
-            "repetition": 1,
-            "accepted": true,
-            "attempt_allowance": 2,
-            "failed_attempts": 0,
-            "cost_microusd": 7041,
-            "elapsed_ms": 2.6,
-            "attempts": [
-              {
-                "attempt": 1,
-                "planted": null,
-                "outcome": "accepted",
-                "decision": "accepted",
-                "reasons": [
-                  "every final validator passed"
-                ],
-                "policy_sha256": "5bbbe8a8ed08746617cebf336bce95200ffeaa04be4cd6e0f54c3724d772e6d5",
-                "validators": [
-                  {
-                    "name": "smythe.text-spec",
-                    "version": "1",
-                    "config_sha256": "6c0f8196fcef150736e948f729477ac758f44857987bd086f34f3115d1ad1760",
-                    "outcome": "passed"
-                  }
-                ],
-                "output_sha256": "269b4f2fb65e8b3ec08945b4bb828d8c99a89ff1590718b3e873c717560e58b1",
-                "output_bytes": 318,
-                "adjudication": null,
-                "error": null,
-                "provider_calls": 4,
-                "provider_calls_failed": 0,
-                "planning_calls": 1,
-                "tokens": 2347,
-                "model_cost_microusd": 7041,
-                "selector": null,
-                "cost_microusd": 7041,
-                "cost_known": true,
-                "cost_is_estimate": false,
-                "elapsed_ms": 2.6,
-                "latency_source": "swarm_timing",
-                "phases_ms": {
-                  "routing": null,
-                  "planning": 0.2,
-                  "recovery": null,
-                  "execution": 1.5,
-                  "verification": 0.1,
-                  "synthesis": 0.0,
-                  "supervision": 0.0,
-                  "checkpoint": 1.0,
-                  "waiting": 0.1
-                },
-                "graph": {
-                  "topology": "fork_join",
-                  "nodes": 3,
-                  "node_statuses": {
-                    "completed": 3
-                  }
-                }
-              }
-            ]
-          },
-          {
-            "trial_key": "trial_v1_2b74345b68993b0cf8c9c2587307a93bdebac71521cf27182f38f6c5d6934caa",
-            "split": "confirmation",
-            "role": "incumbent",
-            "task_index": 1,
-            "gates": {
-              "accepted.nonzero": true,
-              "acceptance.policy_unchanged": true,
-              "accounting.complete": true,
-              "regression.no_new_failures": true
-            },
-            "family": "task-shapes",
-            "task_id": "deep-serial",
-            "task_sha256": "d6ddc6f3bd94fa9ba2a18c298f16fc92634911fc8155652c5219468965dd3dae",
-            "arm": "generated_plan",
-            "repetition": 1,
-            "accepted": true,
-            "attempt_allowance": 2,
-            "failed_attempts": 1,
-            "cost_microusd": 13107,
-            "elapsed_ms": 4.7,
-            "attempts": [
-              {
-                "attempt": 1,
-                "planted": "fault",
-                "outcome": "error",
-                "decision": "not_evaluated",
-                "reasons": [],
-                "policy_sha256": "5bbbe8a8ed08746617cebf336bce95200ffeaa04be4cd6e0f54c3724d772e6d5",
-                "validators": [],
-                "output_sha256": null,
-                "output_bytes": null,
-                "adjudication": null,
-                "error": {
-                  "type": "FixtureFault",
-                  "message": "planted transient failure of this attempt's first answer"
-                },
-                "provider_calls": 3,
-                "provider_calls_failed": 1,
-                "planning_calls": 1,
-                "tokens": 1721,
-                "model_cost_microusd": 5163,
-                "selector": null,
-                "cost_microusd": 5163,
-                "cost_known": true,
-                "cost_is_estimate": false,
-                "elapsed_ms": 1.5,
-                "latency_source": "failed_checkpoint_timing",
-                "phases_ms": {
-                  "routing": null,
-                  "planning": 0.1,
-                  "recovery": null,
-                  "execution": 0.4,
-                  "verification": 0.0,
-                  "synthesis": null,
-                  "supervision": 0.0,
-                  "checkpoint": 0.6,
-                  "waiting": 0.0
-                },
-                "graph": {
-                  "topology": "fork_join",
-                  "nodes": 3,
-                  "node_statuses": {
-                    "completed": 1,
-                    "failed": 1,
-                    "pending": 1
-                  }
-                }
-              },
-              {
-                "attempt": 2,
-                "planted": null,
-                "outcome": "accepted",
-                "decision": "accepted",
-                "reasons": [
-                  "every final validator passed"
-                ],
-                "policy_sha256": "5bbbe8a8ed08746617cebf336bce95200ffeaa04be4cd6e0f54c3724d772e6d5",
-                "validators": [
-                  {
-                    "name": "smythe.text-spec",
-                    "version": "1",
-                    "config_sha256": "6c0f8196fcef150736e948f729477ac758f44857987bd086f34f3115d1ad1760",
-                    "outcome": "passed"
-                  }
-                ],
-                "output_sha256": "199cd331bf1bb2eb73291f1268d2b1c75cc6f8d2534e42c75f8d7c7dafad258e",
-                "output_bytes": 454,
-                "adjudication": null,
-                "error": null,
-                "provider_calls": 4,
-                "provider_calls_failed": 0,
-                "planning_calls": 1,
-                "tokens": 2648,
-                "model_cost_microusd": 7944,
-                "selector": null,
-                "cost_microusd": 7944,
-                "cost_known": true,
-                "cost_is_estimate": false,
-                "elapsed_ms": 3.2,
-                "latency_source": "swarm_timing",
-                "phases_ms": {
-                  "routing": null,
-                  "planning": 0.2,
-                  "recovery": null,
-                  "execution": 1.5,
-                  "verification": 0.2,
-                  "synthesis": 0.0,
-                  "supervision": 0.0,
-                  "checkpoint": 1.1,
-                  "waiting": 0.1
-                },
-                "graph": {
-                  "topology": "fork_join",
-                  "nodes": 3,
-                  "node_statuses": {
-                    "completed": 3
-                  }
-                }
-              }
-            ]
-          },
-          {
-            "trial_key": "trial_v1_41f1421756c37605165afa367990fcc474ce002bcaa5f8e8fb2b09cb46b12c30",
-            "split": "confirmation",
-            "role": "challenger",
-            "task_index": 0,
-            "gates": {
-              "accepted.nonzero": true,
-              "acceptance.policy_unchanged": true,
-              "accounting.complete": true,
-              "regression.no_new_failures": true
-            },
-            "family": "task-shapes",
-            "task_id": "adversarial-claim",
-            "task_sha256": "89daa963eb6433e3ceb61a8396dc43b766873d03a932d4ee53e873af429b3058",
-            "arm": "adaptive_selection",
-            "repetition": 1,
-            "accepted": true,
-            "attempt_allowance": 2,
-            "failed_attempts": 0,
-            "cost_microusd": 3060,
-            "elapsed_ms": 3.4,
-            "attempts": [
-              {
-                "attempt": 1,
-                "planted": null,
-                "outcome": "accepted",
-                "decision": "accepted",
-                "reasons": [
-                  "every final validator passed"
-                ],
-                "policy_sha256": "5bbbe8a8ed08746617cebf336bce95200ffeaa04be4cd6e0f54c3724d772e6d5",
-                "validators": [
-                  {
-                    "name": "smythe.text-spec",
-                    "version": "1",
-                    "config_sha256": "6c0f8196fcef150736e948f729477ac758f44857987bd086f34f3115d1ad1760",
-                    "outcome": "passed"
-                  }
-                ],
-                "output_sha256": "537bb18a44d8d82c779960ceafaa50a45da69873648b2aaa258da973fad20556",
-                "output_bytes": 244,
-                "adjudication": null,
-                "error": null,
-                "provider_calls": 3,
-                "provider_calls_failed": 0,
-                "planning_calls": 0,
-                "tokens": 1020,
-                "model_cost_microusd": 3060,
-                "selector": {
-                  "method": "rule",
-                  "tier": "deterministic:pipeline",
-                  "reasons": [
-                    "the rule 'stepwise-analysis' chose deterministic:pipeline",
-                    "a stepwise analysis fits the fixed research, analysis and writing pipeline"
-                  ],
-                  "policy_version": 2,
-                  "classifier_calls": 0,
-                  "cost_microusd": 0,
-                  "cost_source": "no classifier call",
-                  "latency_ms": 0.0
-                },
-                "cost_microusd": 3060,
-                "cost_known": true,
-                "cost_is_estimate": false,
-                "elapsed_ms": 3.4,
-                "latency_source": "swarm_timing",
-                "phases_ms": {
-                  "routing": 0.0,
-                  "planning": 0.1,
-                  "recovery": null,
-                  "execution": 1.2,
-                  "verification": 0.2,
-                  "synthesis": 0.0,
-                  "supervision": 0.0,
-                  "checkpoint": 1.5,
-                  "waiting": 0.0
-                },
-                "graph": {
-                  "topology": "serial",
-                  "nodes": 3,
-                  "node_statuses": {
-                    "completed": 3
-                  }
-                }
-              }
-            ],
-            "selector_cost_microusd": 0,
-            "selector_latency_ms": 0.0
-          },
-          {
-            "trial_key": "trial_v1_41d22da9a6d9907e08d91e3e2760af51f594286801c3275a9b9282e25d23564e",
-            "split": "confirmation",
-            "role": "challenger",
-            "task_index": 3,
-            "gates": {
-              "accepted.nonzero": true,
-              "acceptance.policy_unchanged": true,
-              "accounting.complete": true,
-              "regression.no_new_failures": true
-            },
-            "family": "task-shapes",
-            "task_id": "parallel-profiles",
-            "task_sha256": "76185c3589165a1990aef39903563c340d557dc973487a9681f2ce25b98e8172",
-            "arm": "adaptive_selection",
-            "repetition": 1,
-            "accepted": true,
-            "attempt_allowance": 2,
-            "failed_attempts": 0,
-            "cost_microusd": 7041,
-            "elapsed_ms": 3.0,
-            "attempts": [
-              {
-                "attempt": 1,
-                "planted": null,
-                "outcome": "accepted",
-                "decision": "accepted",
-                "reasons": [
-                  "every final validator passed"
-                ],
-                "policy_sha256": "5bbbe8a8ed08746617cebf336bce95200ffeaa04be4cd6e0f54c3724d772e6d5",
-                "validators": [
-                  {
-                    "name": "smythe.text-spec",
-                    "version": "1",
-                    "config_sha256": "6c0f8196fcef150736e948f729477ac758f44857987bd086f34f3115d1ad1760",
-                    "outcome": "passed"
-                  }
-                ],
-                "output_sha256": "269b4f2fb65e8b3ec08945b4bb828d8c99a89ff1590718b3e873c717560e58b1",
-                "output_bytes": 318,
-                "adjudication": null,
-                "error": null,
-                "provider_calls": 4,
-                "provider_calls_failed": 0,
-                "planning_calls": 1,
-                "tokens": 2347,
-                "model_cost_microusd": 7041,
-                "selector": {
-                  "method": "rule",
-                  "tier": "autonomous",
-                  "reasons": [
-                    "the rule 'separable-work' chose autonomous",
-                    "independent parts suit a generated parallel plan"
-                  ],
-                  "policy_version": 2,
-                  "classifier_calls": 0,
-                  "cost_microusd": 0,
-                  "cost_source": "no classifier call",
-                  "latency_ms": 0.0
-                },
-                "cost_microusd": 7041,
-                "cost_known": true,
-                "cost_is_estimate": false,
-                "elapsed_ms": 3.0,
-                "latency_source": "swarm_timing",
-                "phases_ms": {
-                  "routing": 0.0,
-                  "planning": 0.2,
-                  "recovery": null,
-                  "execution": 1.5,
-                  "verification": 0.1,
-                  "synthesis": 0.0,
-                  "supervision": 0.0,
-                  "checkpoint": 1.1,
-                  "waiting": 0.1
-                },
-                "graph": {
-                  "topology": "fork_join",
-                  "nodes": 3,
-                  "node_statuses": {
-                    "completed": 3
-                  }
-                }
-              }
-            ],
-            "selector_cost_microusd": 0,
-            "selector_latency_ms": 0.0
-          },
-          {
-            "trial_key": "trial_v1_c7e17b433192c8db752e9f38bd330f87802bd4ab36f98c6d71ad64537633322e",
-            "split": "confirmation",
-            "role": "challenger",
-            "task_index": 1,
-            "gates": {
-              "accepted.nonzero": true,
-              "acceptance.policy_unchanged": true,
-              "accounting.complete": true,
-              "regression.no_new_failures": true
-            },
-            "family": "task-shapes",
-            "task_id": "deep-serial",
-            "task_sha256": "d6ddc6f3bd94fa9ba2a18c298f16fc92634911fc8155652c5219468965dd3dae",
-            "arm": "adaptive_selection",
-            "repetition": 1,
-            "accepted": true,
-            "attempt_allowance": 2,
-            "failed_attempts": 1,
-            "cost_microusd": 4668,
-            "elapsed_ms": 4.0,
+            "elapsed_ms": 3.6,
             "attempts": [
               {
                 "attempt": 1,
@@ -3823,17 +3226,17 @@
                 "cost_microusd": 4668,
                 "cost_known": true,
                 "cost_is_estimate": false,
-                "elapsed_ms": 3.0,
+                "elapsed_ms": 2.6,
                 "latency_source": "swarm_timing",
                 "phases_ms": {
                   "routing": 0.0,
                   "planning": 0.1,
                   "recovery": null,
-                  "execution": 0.8,
+                  "execution": 0.9,
                   "verification": 0.1,
                   "synthesis": 0.0,
                   "supervision": 0.0,
-                  "checkpoint": 1.3,
+                  "checkpoint": 1.0,
                   "waiting": 0.0
                 },
                 "graph": {
@@ -3849,7 +3252,604 @@
             "selector_latency_ms": 0.0
           },
           {
-            "trial_key": "trial_v1_5127bbc664f02c79271a857b8faa317489551fcda55a23a811dcb91883bd4c78",
+            "trial_key": "trial_v1_880119c97b3f4308bf347be1aea3efa7e643deeab1fcf1dae3e2d9202fddfc37",
+            "split": "confirmation",
+            "role": "incumbent",
+            "task_index": 0,
+            "gates": {
+              "accepted.nonzero": true,
+              "acceptance.policy_unchanged": true,
+              "accounting.complete": true,
+              "regression.no_new_failures": true
+            },
+            "family": "task-shapes",
+            "task_id": "adversarial-claim",
+            "task_sha256": "89daa963eb6433e3ceb61a8396dc43b766873d03a932d4ee53e873af429b3058",
+            "arm": "generated_plan",
+            "repetition": 1,
+            "accepted": true,
+            "attempt_allowance": 2,
+            "failed_attempts": 0,
+            "cost_microusd": 6711,
+            "elapsed_ms": 2.9,
+            "attempts": [
+              {
+                "attempt": 1,
+                "planted": null,
+                "outcome": "accepted",
+                "decision": "accepted",
+                "reasons": [
+                  "every final validator passed"
+                ],
+                "policy_sha256": "5bbbe8a8ed08746617cebf336bce95200ffeaa04be4cd6e0f54c3724d772e6d5",
+                "validators": [
+                  {
+                    "name": "smythe.text-spec",
+                    "version": "1",
+                    "config_sha256": "6c0f8196fcef150736e948f729477ac758f44857987bd086f34f3115d1ad1760",
+                    "outcome": "passed"
+                  }
+                ],
+                "output_sha256": "537bb18a44d8d82c779960ceafaa50a45da69873648b2aaa258da973fad20556",
+                "output_bytes": 244,
+                "adjudication": null,
+                "error": null,
+                "provider_calls": 4,
+                "provider_calls_failed": 0,
+                "planning_calls": 1,
+                "tokens": 2237,
+                "model_cost_microusd": 6711,
+                "selector": null,
+                "cost_microusd": 6711,
+                "cost_known": true,
+                "cost_is_estimate": false,
+                "elapsed_ms": 2.9,
+                "latency_source": "swarm_timing",
+                "phases_ms": {
+                  "routing": null,
+                  "planning": 0.2,
+                  "recovery": null,
+                  "execution": 1.4,
+                  "verification": 0.1,
+                  "synthesis": 0.0,
+                  "supervision": 0.0,
+                  "checkpoint": 1.4,
+                  "waiting": 0.1
+                },
+                "graph": {
+                  "topology": "fork_join",
+                  "nodes": 3,
+                  "node_statuses": {
+                    "completed": 3
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "trial_key": "trial_v1_31c0d086acd664c7341e40cc725fa1248f6548b66f8c294306fc35ef6cf77751",
+            "split": "confirmation",
+            "role": "incumbent",
+            "task_index": 3,
+            "gates": {
+              "accepted.nonzero": true,
+              "acceptance.policy_unchanged": true,
+              "accounting.complete": true,
+              "regression.no_new_failures": true
+            },
+            "family": "task-shapes",
+            "task_id": "parallel-profiles",
+            "task_sha256": "76185c3589165a1990aef39903563c340d557dc973487a9681f2ce25b98e8172",
+            "arm": "generated_plan",
+            "repetition": 1,
+            "accepted": true,
+            "attempt_allowance": 2,
+            "failed_attempts": 0,
+            "cost_microusd": 7041,
+            "elapsed_ms": 2.3,
+            "attempts": [
+              {
+                "attempt": 1,
+                "planted": null,
+                "outcome": "accepted",
+                "decision": "accepted",
+                "reasons": [
+                  "every final validator passed"
+                ],
+                "policy_sha256": "5bbbe8a8ed08746617cebf336bce95200ffeaa04be4cd6e0f54c3724d772e6d5",
+                "validators": [
+                  {
+                    "name": "smythe.text-spec",
+                    "version": "1",
+                    "config_sha256": "6c0f8196fcef150736e948f729477ac758f44857987bd086f34f3115d1ad1760",
+                    "outcome": "passed"
+                  }
+                ],
+                "output_sha256": "269b4f2fb65e8b3ec08945b4bb828d8c99a89ff1590718b3e873c717560e58b1",
+                "output_bytes": 318,
+                "adjudication": null,
+                "error": null,
+                "provider_calls": 4,
+                "provider_calls_failed": 0,
+                "planning_calls": 1,
+                "tokens": 2347,
+                "model_cost_microusd": 7041,
+                "selector": null,
+                "cost_microusd": 7041,
+                "cost_known": true,
+                "cost_is_estimate": false,
+                "elapsed_ms": 2.3,
+                "latency_source": "swarm_timing",
+                "phases_ms": {
+                  "routing": null,
+                  "planning": 0.2,
+                  "recovery": null,
+                  "execution": 1.3,
+                  "verification": 0.1,
+                  "synthesis": 0.0,
+                  "supervision": 0.0,
+                  "checkpoint": 0.9,
+                  "waiting": 0.1
+                },
+                "graph": {
+                  "topology": "fork_join",
+                  "nodes": 3,
+                  "node_statuses": {
+                    "completed": 3
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "trial_key": "trial_v1_79236e30fd630d5ca097b7b5982db7f77756550b1e8fe3aa8712e813a9e32ca3",
+            "split": "confirmation",
+            "role": "incumbent",
+            "task_index": 1,
+            "gates": {
+              "accepted.nonzero": true,
+              "acceptance.policy_unchanged": true,
+              "accounting.complete": true,
+              "regression.no_new_failures": true
+            },
+            "family": "task-shapes",
+            "task_id": "deep-serial",
+            "task_sha256": "d6ddc6f3bd94fa9ba2a18c298f16fc92634911fc8155652c5219468965dd3dae",
+            "arm": "generated_plan",
+            "repetition": 1,
+            "accepted": true,
+            "attempt_allowance": 2,
+            "failed_attempts": 1,
+            "cost_microusd": 13107,
+            "elapsed_ms": 4.0,
+            "attempts": [
+              {
+                "attempt": 1,
+                "planted": "fault",
+                "outcome": "error",
+                "decision": "not_evaluated",
+                "reasons": [],
+                "policy_sha256": "5bbbe8a8ed08746617cebf336bce95200ffeaa04be4cd6e0f54c3724d772e6d5",
+                "validators": [],
+                "output_sha256": null,
+                "output_bytes": null,
+                "adjudication": null,
+                "error": {
+                  "type": "FixtureFault",
+                  "message": "planted transient failure of this attempt's first answer"
+                },
+                "provider_calls": 3,
+                "provider_calls_failed": 1,
+                "planning_calls": 1,
+                "tokens": 1721,
+                "model_cost_microusd": 5163,
+                "selector": null,
+                "cost_microusd": 5163,
+                "cost_known": true,
+                "cost_is_estimate": false,
+                "elapsed_ms": 1.5,
+                "latency_source": "failed_checkpoint_timing",
+                "phases_ms": {
+                  "routing": null,
+                  "planning": 0.2,
+                  "recovery": null,
+                  "execution": 0.5,
+                  "verification": 0.0,
+                  "synthesis": null,
+                  "supervision": 0.0,
+                  "checkpoint": 0.6,
+                  "waiting": 0.0
+                },
+                "graph": {
+                  "topology": "fork_join",
+                  "nodes": 3,
+                  "node_statuses": {
+                    "completed": 1,
+                    "failed": 1,
+                    "pending": 1
+                  }
+                }
+              },
+              {
+                "attempt": 2,
+                "planted": null,
+                "outcome": "accepted",
+                "decision": "accepted",
+                "reasons": [
+                  "every final validator passed"
+                ],
+                "policy_sha256": "5bbbe8a8ed08746617cebf336bce95200ffeaa04be4cd6e0f54c3724d772e6d5",
+                "validators": [
+                  {
+                    "name": "smythe.text-spec",
+                    "version": "1",
+                    "config_sha256": "6c0f8196fcef150736e948f729477ac758f44857987bd086f34f3115d1ad1760",
+                    "outcome": "passed"
+                  }
+                ],
+                "output_sha256": "199cd331bf1bb2eb73291f1268d2b1c75cc6f8d2534e42c75f8d7c7dafad258e",
+                "output_bytes": 454,
+                "adjudication": null,
+                "error": null,
+                "provider_calls": 4,
+                "provider_calls_failed": 0,
+                "planning_calls": 1,
+                "tokens": 2648,
+                "model_cost_microusd": 7944,
+                "selector": null,
+                "cost_microusd": 7944,
+                "cost_known": true,
+                "cost_is_estimate": false,
+                "elapsed_ms": 2.5,
+                "latency_source": "swarm_timing",
+                "phases_ms": {
+                  "routing": null,
+                  "planning": 0.2,
+                  "recovery": null,
+                  "execution": 1.3,
+                  "verification": 0.2,
+                  "synthesis": 0.0,
+                  "supervision": 0.0,
+                  "checkpoint": 0.9,
+                  "waiting": 0.1
+                },
+                "graph": {
+                  "topology": "fork_join",
+                  "nodes": 3,
+                  "node_statuses": {
+                    "completed": 3
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "trial_key": "trial_v1_c85a40c73789959af1eaf5ba24f43a7e5e505501b2f387d02c4f807735a48b0e",
+            "split": "confirmation",
+            "role": "challenger",
+            "task_index": 0,
+            "gates": {
+              "accepted.nonzero": true,
+              "acceptance.policy_unchanged": true,
+              "accounting.complete": true,
+              "regression.no_new_failures": true
+            },
+            "family": "task-shapes",
+            "task_id": "adversarial-claim",
+            "task_sha256": "89daa963eb6433e3ceb61a8396dc43b766873d03a932d4ee53e873af429b3058",
+            "arm": "adaptive_selection",
+            "repetition": 1,
+            "accepted": true,
+            "attempt_allowance": 2,
+            "failed_attempts": 0,
+            "cost_microusd": 3060,
+            "elapsed_ms": 2.3,
+            "attempts": [
+              {
+                "attempt": 1,
+                "planted": null,
+                "outcome": "accepted",
+                "decision": "accepted",
+                "reasons": [
+                  "every final validator passed"
+                ],
+                "policy_sha256": "5bbbe8a8ed08746617cebf336bce95200ffeaa04be4cd6e0f54c3724d772e6d5",
+                "validators": [
+                  {
+                    "name": "smythe.text-spec",
+                    "version": "1",
+                    "config_sha256": "6c0f8196fcef150736e948f729477ac758f44857987bd086f34f3115d1ad1760",
+                    "outcome": "passed"
+                  }
+                ],
+                "output_sha256": "537bb18a44d8d82c779960ceafaa50a45da69873648b2aaa258da973fad20556",
+                "output_bytes": 244,
+                "adjudication": null,
+                "error": null,
+                "provider_calls": 3,
+                "provider_calls_failed": 0,
+                "planning_calls": 0,
+                "tokens": 1020,
+                "model_cost_microusd": 3060,
+                "selector": {
+                  "method": "rule",
+                  "tier": "deterministic:pipeline",
+                  "reasons": [
+                    "the rule 'stepwise-analysis' chose deterministic:pipeline",
+                    "a stepwise analysis fits the fixed research, analysis and writing pipeline"
+                  ],
+                  "policy_version": 2,
+                  "classifier_calls": 0,
+                  "cost_microusd": 0,
+                  "cost_source": "no classifier call",
+                  "latency_ms": 0.0
+                },
+                "cost_microusd": 3060,
+                "cost_known": true,
+                "cost_is_estimate": false,
+                "elapsed_ms": 2.3,
+                "latency_source": "swarm_timing",
+                "phases_ms": {
+                  "routing": 0.0,
+                  "planning": 0.1,
+                  "recovery": null,
+                  "execution": 0.6,
+                  "verification": 0.1,
+                  "synthesis": 0.0,
+                  "supervision": 0.0,
+                  "checkpoint": 0.9,
+                  "waiting": 0.0
+                },
+                "graph": {
+                  "topology": "serial",
+                  "nodes": 3,
+                  "node_statuses": {
+                    "completed": 3
+                  }
+                }
+              }
+            ],
+            "selector_cost_microusd": 0,
+            "selector_latency_ms": 0.0
+          },
+          {
+            "trial_key": "trial_v1_791cb4af27655319b9d0df3ff3ae69a1d38cf44366526aaa8fd7ac3715c9baa4",
+            "split": "confirmation",
+            "role": "challenger",
+            "task_index": 3,
+            "gates": {
+              "accepted.nonzero": true,
+              "acceptance.policy_unchanged": true,
+              "accounting.complete": true,
+              "regression.no_new_failures": true
+            },
+            "family": "task-shapes",
+            "task_id": "parallel-profiles",
+            "task_sha256": "76185c3589165a1990aef39903563c340d557dc973487a9681f2ce25b98e8172",
+            "arm": "adaptive_selection",
+            "repetition": 1,
+            "accepted": true,
+            "attempt_allowance": 2,
+            "failed_attempts": 0,
+            "cost_microusd": 7041,
+            "elapsed_ms": 2.2,
+            "attempts": [
+              {
+                "attempt": 1,
+                "planted": null,
+                "outcome": "accepted",
+                "decision": "accepted",
+                "reasons": [
+                  "every final validator passed"
+                ],
+                "policy_sha256": "5bbbe8a8ed08746617cebf336bce95200ffeaa04be4cd6e0f54c3724d772e6d5",
+                "validators": [
+                  {
+                    "name": "smythe.text-spec",
+                    "version": "1",
+                    "config_sha256": "6c0f8196fcef150736e948f729477ac758f44857987bd086f34f3115d1ad1760",
+                    "outcome": "passed"
+                  }
+                ],
+                "output_sha256": "269b4f2fb65e8b3ec08945b4bb828d8c99a89ff1590718b3e873c717560e58b1",
+                "output_bytes": 318,
+                "adjudication": null,
+                "error": null,
+                "provider_calls": 4,
+                "provider_calls_failed": 0,
+                "planning_calls": 1,
+                "tokens": 2347,
+                "model_cost_microusd": 7041,
+                "selector": {
+                  "method": "rule",
+                  "tier": "autonomous",
+                  "reasons": [
+                    "the rule 'separable-work' chose autonomous",
+                    "independent parts suit a generated parallel plan"
+                  ],
+                  "policy_version": 2,
+                  "classifier_calls": 0,
+                  "cost_microusd": 0,
+                  "cost_source": "no classifier call",
+                  "latency_ms": 0.0
+                },
+                "cost_microusd": 7041,
+                "cost_known": true,
+                "cost_is_estimate": false,
+                "elapsed_ms": 2.2,
+                "latency_source": "swarm_timing",
+                "phases_ms": {
+                  "routing": 0.0,
+                  "planning": 0.2,
+                  "recovery": null,
+                  "execution": 1.2,
+                  "verification": 0.1,
+                  "synthesis": 0.0,
+                  "supervision": 0.0,
+                  "checkpoint": 0.9,
+                  "waiting": 0.1
+                },
+                "graph": {
+                  "topology": "fork_join",
+                  "nodes": 3,
+                  "node_statuses": {
+                    "completed": 3
+                  }
+                }
+              }
+            ],
+            "selector_cost_microusd": 0,
+            "selector_latency_ms": 0.0
+          },
+          {
+            "trial_key": "trial_v1_856568e3b077f8393d0649fd471d7e01eff7eb52951f368dae9b3243fc7cb4d4",
+            "split": "confirmation",
+            "role": "challenger",
+            "task_index": 1,
+            "gates": {
+              "accepted.nonzero": true,
+              "acceptance.policy_unchanged": true,
+              "accounting.complete": true,
+              "regression.no_new_failures": true
+            },
+            "family": "task-shapes",
+            "task_id": "deep-serial",
+            "task_sha256": "d6ddc6f3bd94fa9ba2a18c298f16fc92634911fc8155652c5219468965dd3dae",
+            "arm": "adaptive_selection",
+            "repetition": 1,
+            "accepted": true,
+            "attempt_allowance": 2,
+            "failed_attempts": 1,
+            "cost_microusd": 4668,
+            "elapsed_ms": 3.9,
+            "attempts": [
+              {
+                "attempt": 1,
+                "planted": "fault",
+                "outcome": "error",
+                "decision": "not_evaluated",
+                "reasons": [],
+                "policy_sha256": "5bbbe8a8ed08746617cebf336bce95200ffeaa04be4cd6e0f54c3724d772e6d5",
+                "validators": [],
+                "output_sha256": null,
+                "output_bytes": null,
+                "adjudication": null,
+                "error": {
+                  "type": "FixtureFault",
+                  "message": "planted transient failure of this attempt's first answer"
+                },
+                "provider_calls": 1,
+                "provider_calls_failed": 1,
+                "planning_calls": 0,
+                "tokens": 0,
+                "model_cost_microusd": 0,
+                "selector": {
+                  "method": "rule",
+                  "tier": "deterministic:pipeline",
+                  "reasons": [
+                    "the rule 'stepwise-analysis' chose deterministic:pipeline",
+                    "a stepwise analysis fits the fixed research, analysis and writing pipeline"
+                  ],
+                  "policy_version": 2,
+                  "classifier_calls": 0,
+                  "cost_microusd": 0,
+                  "cost_source": "no classifier call",
+                  "latency_ms": 0.0
+                },
+                "cost_microusd": 0,
+                "cost_known": true,
+                "cost_is_estimate": false,
+                "elapsed_ms": 0.9,
+                "latency_source": "failed_checkpoint_timing",
+                "phases_ms": {
+                  "routing": 0.0,
+                  "planning": 0.1,
+                  "recovery": null,
+                  "execution": 0.1,
+                  "verification": 0.0,
+                  "synthesis": null,
+                  "supervision": 0.0,
+                  "checkpoint": 0.4,
+                  "waiting": 0.0
+                },
+                "graph": {
+                  "topology": "serial",
+                  "nodes": 3,
+                  "node_statuses": {
+                    "failed": 1,
+                    "pending": 2
+                  }
+                }
+              },
+              {
+                "attempt": 2,
+                "planted": null,
+                "outcome": "accepted",
+                "decision": "accepted",
+                "reasons": [
+                  "every final validator passed"
+                ],
+                "policy_sha256": "5bbbe8a8ed08746617cebf336bce95200ffeaa04be4cd6e0f54c3724d772e6d5",
+                "validators": [
+                  {
+                    "name": "smythe.text-spec",
+                    "version": "1",
+                    "config_sha256": "6c0f8196fcef150736e948f729477ac758f44857987bd086f34f3115d1ad1760",
+                    "outcome": "passed"
+                  }
+                ],
+                "output_sha256": "199cd331bf1bb2eb73291f1268d2b1c75cc6f8d2534e42c75f8d7c7dafad258e",
+                "output_bytes": 454,
+                "adjudication": null,
+                "error": null,
+                "provider_calls": 3,
+                "provider_calls_failed": 0,
+                "planning_calls": 0,
+                "tokens": 1556,
+                "model_cost_microusd": 4668,
+                "selector": {
+                  "method": "rule",
+                  "tier": "deterministic:pipeline",
+                  "reasons": [
+                    "the rule 'stepwise-analysis' chose deterministic:pipeline",
+                    "a stepwise analysis fits the fixed research, analysis and writing pipeline"
+                  ],
+                  "policy_version": 2,
+                  "classifier_calls": 0,
+                  "cost_microusd": 0,
+                  "cost_source": "no classifier call",
+                  "latency_ms": 0.0
+                },
+                "cost_microusd": 4668,
+                "cost_known": true,
+                "cost_is_estimate": false,
+                "elapsed_ms": 3.0,
+                "latency_source": "swarm_timing",
+                "phases_ms": {
+                  "routing": 0.0,
+                  "planning": 0.1,
+                  "recovery": null,
+                  "execution": 1.2,
+                  "verification": 0.1,
+                  "synthesis": 0.0,
+                  "supervision": 0.0,
+                  "checkpoint": 1.1,
+                  "waiting": 0.0
+                },
+                "graph": {
+                  "topology": "serial",
+                  "nodes": 3,
+                  "node_statuses": {
+                    "completed": 3
+                  }
+                }
+              }
+            ],
+            "selector_cost_microusd": 0,
+            "selector_latency_ms": 0.0
+          },
+          {
+            "trial_key": "trial_v1_21647b40e97102e3e2ea3d96ea37eba141f4d8202b6f9d8810cf6470ab55e79b",
             "split": "confirmation",
             "role": "reference",
             "task_index": 0,
@@ -3868,7 +3868,7 @@
             "attempt_allowance": 2,
             "failed_attempts": 0,
             "cost_microusd": 543,
-            "elapsed_ms": 1.9,
+            "elapsed_ms": 1.4,
             "attempts": [
               {
                 "attempt": 1,
@@ -3900,17 +3900,17 @@
                 "cost_microusd": 543,
                 "cost_known": true,
                 "cost_is_estimate": false,
-                "elapsed_ms": 1.9,
+                "elapsed_ms": 1.4,
                 "latency_source": "swarm_timing",
                 "phases_ms": {
                   "routing": null,
                   "planning": 0.1,
                   "recovery": null,
-                  "execution": 0.5,
-                  "verification": 0.1,
+                  "execution": 0.4,
+                  "verification": 0.2,
                   "synthesis": 0.0,
                   "supervision": 0.0,
-                  "checkpoint": 0.9,
+                  "checkpoint": 0.5,
                   "waiting": 0.0
                 },
                 "graph": {
@@ -3924,7 +3924,7 @@
             ]
           },
           {
-            "trial_key": "trial_v1_c67ed3fc1a592b4ee00ab1e4bd25ae5c2cff66dd5394d16cf19b60cc82bbbd7c",
+            "trial_key": "trial_v1_9e89f3a73b9badb7ca7d8c7e94ceb0fffccf20da84b77067e429e4611fd903f1",
             "split": "confirmation",
             "role": "reference",
             "task_index": 3,
@@ -3999,7 +3999,7 @@
             ]
           },
           {
-            "trial_key": "trial_v1_c5e354ddbe255e188f2ad455a6df2fdd4d2932c653703f5b337716a4b418d9ed",
+            "trial_key": "trial_v1_447ed0ff13ef0b0892d58d87b97b19a9003a33d2067968933a7ec7ec8667e3f2",
             "split": "confirmation",
             "role": "reference",
             "task_index": 1,
@@ -4044,7 +4044,7 @@
                 "cost_microusd": 0,
                 "cost_known": true,
                 "cost_is_estimate": false,
-                "elapsed_ms": 0.8,
+                "elapsed_ms": 0.9,
                 "latency_source": "failed_checkpoint_timing",
                 "phases_ms": {
                   "routing": null,
@@ -4054,7 +4054,7 @@
                   "verification": 0.0,
                   "synthesis": null,
                   "supervision": 0.0,
-                  "checkpoint": 0.3,
+                  "checkpoint": 0.4,
                   "waiting": 0.0
                 },
                 "graph": {
@@ -4095,7 +4095,7 @@
                 "cost_microusd": 813,
                 "cost_known": true,
                 "cost_is_estimate": false,
-                "elapsed_ms": 1.4,
+                "elapsed_ms": 1.3,
                 "latency_source": "swarm_timing",
                 "phases_ms": {
                   "routing": null,
@@ -4105,7 +4105,7 @@
                   "verification": 0.1,
                   "synthesis": 0.0,
                   "supervision": 0.0,
-                  "checkpoint": 0.6,
+                  "checkpoint": 0.5,
                   "waiting": 0.0
                 },
                 "graph": {
@@ -4119,7 +4119,7 @@
             ]
           },
           {
-            "trial_key": "trial_v1_eb9b22ab0ff313abc9c019fd8efcd7a80a895deb3ac39b21e4d949a08fa049a0",
+            "trial_key": "trial_v1_b6b9d0cedfc1dc13c5835e1b4b290635f82c6428a61495dea91bf0e1f759662b",
             "split": "confirmation",
             "role": "reference",
             "task_index": 0,
@@ -4138,7 +4138,7 @@
             "attempt_allowance": 2,
             "failed_attempts": 0,
             "cost_microusd": 3060,
-            "elapsed_ms": 2.6,
+            "elapsed_ms": 2.1,
             "attempts": [
               {
                 "attempt": 1,
@@ -4170,17 +4170,17 @@
                 "cost_microusd": 3060,
                 "cost_known": true,
                 "cost_is_estimate": false,
-                "elapsed_ms": 2.6,
+                "elapsed_ms": 2.1,
                 "latency_source": "swarm_timing",
                 "phases_ms": {
                   "routing": null,
                   "planning": 0.1,
                   "recovery": null,
-                  "execution": 0.9,
+                  "execution": 0.7,
                   "verification": 0.1,
                   "synthesis": 0.0,
                   "supervision": 0.0,
-                  "checkpoint": 1.0,
+                  "checkpoint": 0.9,
                   "waiting": 0.0
                 },
                 "graph": {
@@ -4194,7 +4194,7 @@
             ]
           },
           {
-            "trial_key": "trial_v1_921bbea6aa669f28a06c81f700710a179d68551d79a5bd0ad2610aab0159803d",
+            "trial_key": "trial_v1_b8190176214ab28b54bb0370732a7f4c8f7c22dc5c2732717c3c1170d095fdb1",
             "split": "confirmation",
             "role": "reference",
             "task_index": 3,
@@ -4213,7 +4213,7 @@
             "attempt_allowance": 2,
             "failed_attempts": 0,
             "cost_microusd": 3546,
-            "elapsed_ms": 2.9,
+            "elapsed_ms": 2.4,
             "attempts": [
               {
                 "attempt": 1,
@@ -4245,17 +4245,17 @@
                 "cost_microusd": 3546,
                 "cost_known": true,
                 "cost_is_estimate": false,
-                "elapsed_ms": 2.9,
+                "elapsed_ms": 2.4,
                 "latency_source": "swarm_timing",
                 "phases_ms": {
                   "routing": null,
                   "planning": 0.1,
                   "recovery": null,
                   "execution": 0.9,
-                  "verification": 0.2,
+                  "verification": 0.1,
                   "synthesis": 0.0,
                   "supervision": 0.0,
-                  "checkpoint": 1.3,
+                  "checkpoint": 0.9,
                   "waiting": 0.0
                 },
                 "graph": {
@@ -4269,7 +4269,7 @@
             ]
           },
           {
-            "trial_key": "trial_v1_0facfef07f15c7a829a9bcaf1bba4cea18d7a896d0e740272606d0352119b91f",
+            "trial_key": "trial_v1_6272dccabe0d40f2f2c3393c2afd16c25b843140cf950ffee72c6e4042633336",
             "split": "confirmation",
             "role": "reference",
             "task_index": 1,
@@ -4288,7 +4288,7 @@
             "attempt_allowance": 2,
             "failed_attempts": 1,
             "cost_microusd": 4668,
-            "elapsed_ms": 4.1,
+            "elapsed_ms": 3.7,
             "attempts": [
               {
                 "attempt": 1,
@@ -4314,13 +4314,13 @@
                 "cost_microusd": 0,
                 "cost_known": true,
                 "cost_is_estimate": false,
-                "elapsed_ms": 0.9,
+                "elapsed_ms": 1.0,
                 "latency_source": "failed_checkpoint_timing",
                 "phases_ms": {
                   "routing": null,
                   "planning": 0.1,
                   "recovery": null,
-                  "execution": 0.1,
+                  "execution": 0.2,
                   "verification": 0.0,
                   "synthesis": null,
                   "supervision": 0.0,
@@ -4366,14 +4366,14 @@
                 "cost_microusd": 4668,
                 "cost_known": true,
                 "cost_is_estimate": false,
-                "elapsed_ms": 3.2,
+                "elapsed_ms": 2.7,
                 "latency_source": "swarm_timing",
                 "phases_ms": {
                   "routing": null,
-                  "planning": 0.3,
+                  "planning": 0.1,
                   "recovery": null,
-                  "execution": 1.0,
-                  "verification": 0.1,
+                  "execution": 0.8,
+                  "verification": 0.2,
                   "synthesis": 0.0,
                   "supervision": 0.0,
                   "checkpoint": 1.1,
@@ -4439,8 +4439,8 @@
           "cost_per_accepted_microusd": 1829.0,
           "elapsed_ms": {
             "runs": 3,
-            "p50": 1.8,
-            "p95": 3.5,
+            "p50": 1.7,
+            "p95": 3.4,
             "label": "small sample; not a tail estimate"
           }
         },
@@ -4455,8 +4455,8 @@
           "cost_per_accepted_microusd": 7209.0,
           "elapsed_ms": {
             "runs": 3,
-            "p50": 3.0,
-            "p95": 6.1,
+            "p50": 2.7,
+            "p95": 6.2,
             "label": "small sample; not a tail estimate"
           }
         },
@@ -4471,8 +4471,8 @@
           "cost_per_accepted_microusd": 13409.0,
           "elapsed_ms": {
             "runs": 3,
-            "p50": 3.9,
-            "p95": 7.0,
+            "p50": 2.8,
+            "p95": 6.3,
             "label": "small sample; not a tail estimate"
           }
         },
@@ -4487,8 +4487,8 @@
           "cost_per_accepted_microusd": 10254.0,
           "elapsed_ms": {
             "runs": 3,
-            "p50": 3.3,
-            "p95": 7.3,
+            "p50": 3.1,
+            "p95": 6.1,
             "label": "small sample; not a tail estimate"
           },
           "selection": {
@@ -4521,7 +4521,7 @@
           "attempt_allowance": 2,
           "failed_attempts": 1,
           "cost_microusd": 23289,
-          "elapsed_ms": 7.3,
+          "elapsed_ms": 6.7,
           "attempts": [
             {
               "attempt": 1,
@@ -4566,11 +4566,11 @@
                 "routing": null,
                 "planning": 0.3,
                 "recovery": null,
-                "execution": 1.4,
+                "execution": 1.5,
                 "verification": 0.2,
                 "synthesis": 0.0,
                 "supervision": 0.0,
-                "checkpoint": 1.5,
+                "checkpoint": 1.4,
                 "waiting": 0.1
               },
               "graph": {
@@ -4616,17 +4616,17 @@
               "cost_microusd": 11622,
               "cost_known": true,
               "cost_is_estimate": false,
-              "elapsed_ms": 4.1,
+              "elapsed_ms": 3.5,
               "latency_source": "swarm_timing",
               "phases_ms": {
                 "routing": null,
                 "planning": 0.3,
                 "recovery": null,
-                "execution": 2.0,
-                "verification": 0.2,
+                "execution": 1.3,
+                "verification": 0.1,
                 "synthesis": 0.0,
                 "supervision": 0.0,
-                "checkpoint": 1.7,
+                "checkpoint": 1.4,
                 "waiting": 0.1
               },
               "graph": {
@@ -4652,7 +4652,7 @@
           "attempt_allowance": 2,
           "failed_attempts": 1,
           "cost_microusd": 23289,
-          "elapsed_ms": 7.8,
+          "elapsed_ms": 6.4,
           "attempts": [
             {
               "attempt": 1,
@@ -4703,18 +4703,18 @@
               "cost_microusd": 11667,
               "cost_known": true,
               "cost_is_estimate": false,
-              "elapsed_ms": 3.9,
+              "elapsed_ms": 3.2,
               "latency_source": "swarm_timing",
               "phases_ms": {
                 "routing": 0.0,
-                "planning": 0.5,
+                "planning": 0.3,
                 "recovery": null,
-                "execution": 1.8,
-                "verification": 0.2,
+                "execution": 1.3,
+                "verification": 0.1,
                 "synthesis": 0.0,
                 "supervision": 0.0,
-                "checkpoint": 1.8,
-                "waiting": 0.1
+                "checkpoint": 1.5,
+                "waiting": 0.0
               },
               "graph": {
                 "topology": "fork_join",
@@ -4771,18 +4771,18 @@
               "cost_microusd": 11622,
               "cost_known": true,
               "cost_is_estimate": false,
-              "elapsed_ms": 3.9,
+              "elapsed_ms": 3.2,
               "latency_source": "swarm_timing",
               "phases_ms": {
                 "routing": 0.0,
-                "planning": 0.4,
+                "planning": 0.3,
                 "recovery": null,
-                "execution": 1.8,
+                "execution": 1.3,
                 "verification": 0.1,
                 "synthesis": 0.0,
                 "supervision": 0.0,
-                "checkpoint": 1.8,
-                "waiting": 0.0
+                "checkpoint": 1.4,
+                "waiting": 0.1
               },
               "graph": {
                 "topology": "fork_join",
@@ -4809,7 +4809,7 @@
           "attempt_allowance": 2,
           "failed_attempts": 1,
           "cost_microusd": 13467,
-          "elapsed_ms": 6.5,
+          "elapsed_ms": 6.6,
           "attempts": [
             {
               "attempt": 1,
@@ -4848,17 +4848,17 @@
               "cost_microusd": 6756,
               "cost_known": true,
               "cost_is_estimate": false,
-              "elapsed_ms": 3.3,
+              "elapsed_ms": 3.2,
               "latency_source": "swarm_timing",
               "phases_ms": {
                 "routing": null,
                 "planning": 0.2,
                 "recovery": null,
-                "execution": 0.9,
+                "execution": 0.8,
                 "verification": 0.2,
                 "synthesis": 0.0,
                 "supervision": 0.0,
-                "checkpoint": 1.4,
+                "checkpoint": 1.5,
                 "waiting": 0.0
               },
               "graph": {
@@ -4904,18 +4904,18 @@
               "cost_microusd": 6711,
               "cost_known": true,
               "cost_is_estimate": false,
-              "elapsed_ms": 3.2,
+              "elapsed_ms": 3.4,
               "latency_source": "swarm_timing",
               "phases_ms": {
                 "routing": null,
                 "planning": 0.2,
                 "recovery": null,
-                "execution": 0.8,
-                "verification": 0.1,
-                "synthesis": 0.0,
+                "execution": 0.9,
+                "verification": 0.2,
+                "synthesis": 0.1,
                 "supervision": 0.0,
-                "checkpoint": 1.5,
-                "waiting": 0.0
+                "checkpoint": 1.6,
+                "waiting": 0.1
               },
               "graph": {
                 "topology": "serial",
@@ -4940,7 +4940,7 @@
           "attempt_allowance": 2,
           "failed_attempts": 1,
           "cost_microusd": 3483,
-          "elapsed_ms": 3.7,
+          "elapsed_ms": 3.6,
           "attempts": [
             {
               "attempt": 1,
@@ -4979,7 +4979,7 @@
               "cost_microusd": 1746,
               "cost_known": true,
               "cost_is_estimate": false,
-              "elapsed_ms": 1.7,
+              "elapsed_ms": 1.8,
               "latency_source": "swarm_timing",
               "phases_ms": {
                 "routing": null,
@@ -4989,7 +4989,7 @@
                 "verification": 0.1,
                 "synthesis": 0.0,
                 "supervision": 0.0,
-                "checkpoint": 0.7,
+                "checkpoint": 0.8,
                 "waiting": 0.0
               },
               "graph": {
@@ -5035,17 +5035,17 @@
               "cost_microusd": 1737,
               "cost_known": true,
               "cost_is_estimate": false,
-              "elapsed_ms": 2.0,
+              "elapsed_ms": 1.8,
               "latency_source": "swarm_timing",
               "phases_ms": {
                 "routing": null,
                 "planning": 0.2,
                 "recovery": null,
-                "execution": 0.4,
+                "execution": 0.3,
                 "verification": 0.1,
                 "synthesis": 0.0,
                 "supervision": 0.0,
-                "checkpoint": 0.8,
+                "checkpoint": 0.7,
                 "waiting": 0.0
               },
               "graph": {
@@ -5071,7 +5071,7 @@
           "attempt_allowance": 2,
           "failed_attempts": 0,
           "cost_microusd": 6822,
-          "elapsed_ms": 3.3,
+          "elapsed_ms": 3.1,
           "attempts": [
             {
               "attempt": 1,
@@ -5119,7 +5119,7 @@
               "cost_microusd": 6822,
               "cost_known": true,
               "cost_is_estimate": false,
-              "elapsed_ms": 3.3,
+              "elapsed_ms": 3.1,
               "latency_source": "swarm_timing",
               "phases_ms": {
                 "routing": 0.1,
@@ -5129,8 +5129,8 @@
                 "verification": 0.1,
                 "synthesis": 0.0,
                 "supervision": 0.0,
-                "checkpoint": 1.5,
-                "waiting": 0.1
+                "checkpoint": 1.3,
+                "waiting": 0.0
               },
               "graph": {
                 "topology": "serial",
@@ -5157,7 +5157,7 @@
           "attempt_allowance": 2,
           "failed_attempts": 0,
           "cost_microusd": 1353,
-          "elapsed_ms": 1.8,
+          "elapsed_ms": 1.7,
           "attempts": [
             {
               "attempt": 1,
@@ -5194,13 +5194,13 @@
               "cost_microusd": 1353,
               "cost_known": true,
               "cost_is_estimate": false,
-              "elapsed_ms": 1.8,
+              "elapsed_ms": 1.7,
               "latency_source": "swarm_timing",
               "phases_ms": {
                 "routing": null,
                 "planning": 0.1,
                 "recovery": null,
-                "execution": 0.4,
+                "execution": 0.3,
                 "verification": 0.1,
                 "synthesis": 0.0,
                 "supervision": 0.0,
@@ -5230,7 +5230,7 @@
           "attempt_allowance": 2,
           "failed_attempts": 0,
           "cost_microusd": 9939,
-          "elapsed_ms": 3.9,
+          "elapsed_ms": 2.8,
           "attempts": [
             {
               "attempt": 1,
@@ -5267,18 +5267,18 @@
               "cost_microusd": 9939,
               "cost_known": true,
               "cost_is_estimate": false,
-              "elapsed_ms": 3.9,
+              "elapsed_ms": 2.8,
               "latency_source": "swarm_timing",
               "phases_ms": {
                 "routing": null,
-                "planning": 0.4,
+                "planning": 0.3,
                 "recovery": null,
-                "execution": 1.7,
-                "verification": 0.2,
+                "execution": 1.4,
+                "verification": 0.1,
                 "synthesis": 0.0,
                 "supervision": 0.0,
-                "checkpoint": 1.7,
-                "waiting": 0.1
+                "checkpoint": 1.2,
+                "waiting": 0.0
               },
               "graph": {
                 "topology": "fork_join",
@@ -5303,7 +5303,7 @@
           "attempt_allowance": 2,
           "failed_attempts": 0,
           "cost_microusd": 5337,
-          "elapsed_ms": 3.0,
+          "elapsed_ms": 2.7,
           "attempts": [
             {
               "attempt": 1,
@@ -5340,17 +5340,17 @@
               "cost_microusd": 5337,
               "cost_known": true,
               "cost_is_estimate": false,
-              "elapsed_ms": 3.0,
+              "elapsed_ms": 2.7,
               "latency_source": "swarm_timing",
               "phases_ms": {
                 "routing": null,
                 "planning": 0.1,
                 "recovery": null,
-                "execution": 0.8,
-                "verification": 0.2,
+                "execution": 0.7,
+                "verification": 0.1,
                 "synthesis": 0.0,
                 "supervision": 0.0,
-                "checkpoint": 1.4,
+                "checkpoint": 1.2,
                 "waiting": 0.0
               },
               "graph": {
@@ -5376,7 +5376,7 @@
           "attempt_allowance": 2,
           "failed_attempts": 0,
           "cost_microusd": 651,
-          "elapsed_ms": 1.4,
+          "elapsed_ms": 1.5,
           "attempts": [
             {
               "attempt": 1,
@@ -5413,13 +5413,13 @@
               "cost_microusd": 651,
               "cost_known": true,
               "cost_is_estimate": false,
-              "elapsed_ms": 1.4,
+              "elapsed_ms": 1.5,
               "latency_source": "swarm_timing",
               "phases_ms": {
                 "routing": null,
                 "planning": 0.1,
                 "recovery": null,
-                "execution": 0.3,
+                "execution": 0.4,
                 "verification": 0.1,
                 "synthesis": 0.0,
                 "supervision": 0.0,
@@ -5449,7 +5449,7 @@
           "attempt_allowance": 2,
           "failed_attempts": 0,
           "cost_microusd": 2823,
-          "elapsed_ms": 2.8,
+          "elapsed_ms": 2.6,
           "attempts": [
             {
               "attempt": 1,
@@ -5486,17 +5486,17 @@
               "cost_microusd": 2823,
               "cost_known": true,
               "cost_is_estimate": false,
-              "elapsed_ms": 2.8,
+              "elapsed_ms": 2.6,
               "latency_source": "swarm_timing",
               "phases_ms": {
                 "routing": null,
-                "planning": 0.3,
+                "planning": 0.1,
                 "recovery": null,
-                "execution": 0.7,
+                "execution": 0.8,
                 "verification": 0.1,
                 "synthesis": 0.0,
                 "supervision": 0.0,
-                "checkpoint": 1.2,
+                "checkpoint": 1.1,
                 "waiting": 0.0
               },
               "graph": {
@@ -5522,7 +5522,7 @@
           "attempt_allowance": 2,
           "failed_attempts": 0,
           "cost_microusd": 651,
-          "elapsed_ms": 1.7,
+          "elapsed_ms": 1.4,
           "attempts": [
             {
               "attempt": 1,
@@ -5571,13 +5571,13 @@
               "cost_microusd": 651,
               "cost_known": true,
               "cost_is_estimate": false,
-              "elapsed_ms": 1.7,
+              "elapsed_ms": 1.4,
               "latency_source": "swarm_timing",
               "phases_ms": {
                 "routing": 0.0,
                 "planning": 0.1,
                 "recovery": null,
-                "execution": 0.4,
+                "execution": 0.3,
                 "verification": 0.1,
                 "synthesis": 0.0,
                 "supervision": 0.0,
@@ -5609,7 +5609,7 @@
           "attempt_allowance": 2,
           "failed_attempts": 0,
           "cost_microusd": 6999,
-          "elapsed_ms": 2.8,
+          "elapsed_ms": 2.6,
           "attempts": [
             {
               "attempt": 1,
@@ -5646,13 +5646,13 @@
               "cost_microusd": 6999,
               "cost_known": true,
               "cost_is_estimate": false,
-              "elapsed_ms": 2.8,
+              "elapsed_ms": 2.6,
               "latency_source": "swarm_timing",
               "phases_ms": {
                 "routing": null,
-                "planning": 0.2,
+                "planning": 0.4,
                 "recovery": null,
-                "execution": 1.5,
+                "execution": 1.4,
                 "verification": 0.1,
                 "synthesis": 0.0,
                 "supervision": 0.0,
@@ -5720,14 +5720,14 @@
                     "cost_microusd": 651,
                     "cost_known": true,
                     "cost_is_estimate": false,
-                    "elapsed_ms": 1.3,
+                    "elapsed_ms": 1.6,
                     "latency_source": "swarm_timing",
                     "phases_ms": {
                       "routing": null,
                       "planning": 0.1,
                       "recovery": null,
                       "execution": 0.3,
-                      "verification": 0.1,
+                      "verification": 0.3,
                       "synthesis": 0.0,
                       "supervision": 0.0,
                       "checkpoint": 0.5,
@@ -5795,7 +5795,7 @@
                       "planning": 0.1,
                       "recovery": null,
                       "execution": 0.3,
-                      "verification": 0.2,
+                      "verification": 0.1,
                       "synthesis": 0.0,
                       "supervision": 0.0,
                       "checkpoint": 0.6,
@@ -5859,17 +5859,17 @@
                     "cost_microusd": 2823,
                     "cost_known": true,
                     "cost_is_estimate": false,
-                    "elapsed_ms": 2.6,
+                    "elapsed_ms": 3.0,
                     "latency_source": "swarm_timing",
                     "phases_ms": {
                       "routing": null,
-                      "planning": 0.2,
+                      "planning": 0.1,
                       "recovery": null,
-                      "execution": 0.7,
+                      "execution": 0.8,
                       "verification": 0.1,
                       "synthesis": 0.0,
                       "supervision": 0.0,
-                      "checkpoint": 1.1,
+                      "checkpoint": 1.5,
                       "waiting": 0.0
                     },
                     "graph": {
@@ -5927,17 +5927,17 @@
                     "cost_microusd": 2868,
                     "cost_known": true,
                     "cost_is_estimate": false,
-                    "elapsed_ms": 3.0,
+                    "elapsed_ms": 2.6,
                     "latency_source": "swarm_timing",
                     "phases_ms": {
                       "routing": null,
-                      "planning": 0.2,
+                      "planning": 0.1,
                       "recovery": null,
                       "execution": 0.8,
                       "verification": 0.1,
                       "synthesis": 0.0,
                       "supervision": 0.0,
-                      "checkpoint": 1.3,
+                      "checkpoint": 1.1,
                       "waiting": 0.0
                     },
                     "graph": {
@@ -5998,18 +5998,18 @@
                     "cost_microusd": 6999,
                     "cost_known": true,
                     "cost_is_estimate": false,
-                    "elapsed_ms": 3.5,
+                    "elapsed_ms": 2.5,
                     "latency_source": "swarm_timing",
                     "phases_ms": {
                       "routing": null,
-                      "planning": 0.3,
+                      "planning": 0.2,
                       "recovery": null,
-                      "execution": 2.0,
+                      "execution": 1.3,
                       "verification": 0.1,
                       "synthesis": 0.0,
                       "supervision": 0.0,
-                      "checkpoint": 1.3,
-                      "waiting": 0.1
+                      "checkpoint": 1.1,
+                      "waiting": 0.0
                     },
                     "graph": {
                       "topology": "fork_join",
@@ -6066,13 +6066,13 @@
                     "cost_microusd": 7044,
                     "cost_known": true,
                     "cost_is_estimate": false,
-                    "elapsed_ms": 2.5,
+                    "elapsed_ms": 2.7,
                     "latency_source": "swarm_timing",
                     "phases_ms": {
                       "routing": null,
                       "planning": 0.2,
                       "recovery": null,
-                      "execution": 1.4,
+                      "execution": 1.7,
                       "verification": 0.1,
                       "synthesis": 0.0,
                       "supervision": 0.0,
@@ -6149,13 +6149,13 @@
                     "cost_microusd": 651,
                     "cost_known": true,
                     "cost_is_estimate": false,
-                    "elapsed_ms": 1.8,
+                    "elapsed_ms": 1.4,
                     "latency_source": "swarm_timing",
                     "phases_ms": {
                       "routing": 0.0,
                       "planning": 0.1,
                       "recovery": null,
-                      "execution": 0.5,
+                      "execution": 0.3,
                       "verification": 0.1,
                       "synthesis": 0.0,
                       "supervision": 0.0,
@@ -6229,7 +6229,7 @@
                     "cost_microusd": 660,
                     "cost_known": true,
                     "cost_is_estimate": false,
-                    "elapsed_ms": 1.5,
+                    "elapsed_ms": 1.6,
                     "latency_source": "swarm_timing",
                     "phases_ms": {
                       "routing": 0.0,
@@ -6239,7 +6239,7 @@
                       "verification": 0.1,
                       "synthesis": 0.0,
                       "supervision": 0.0,
-                      "checkpoint": 0.5,
+                      "checkpoint": 0.6,
                       "waiting": 0.0
                     },
                     "graph": {
@@ -6339,7 +6339,7 @@
         "thresholds": "placeholders for offline mechanics; promotion thresholds are not decided",
         "evaluator_manifest": {
           "version": 1,
-          "code_digest": "sha256:ee18f90c1d8926a61d22434f5c82e0827596df966833a37603e73e61f7d6fe82",
+          "code_digest": "sha256:899b685d34cba4a40e1fe26259a4e8f4f73615bcc09dff740e53354da752dca2",
           "split_manifests": {
             "development": "sha256:819daf9f5d9c093bf4bc0fd2697364612d17aa7802e8461f0e2bf40f337a08e4",
             "confirmation": "sha256:819daf9f5d9c093bf4bc0fd2697364612d17aa7802e8461f0e2bf40f337a08e4",
@@ -6354,7 +6354,7 @@
           ],
           "price_snapshot_version": "offline-fixture-3-microusd-per-token-v1"
         },
-        "evaluator_hash": "sha256:e6030a59425e4d3a1a7997fcc1800cd87e356249ae8fcc3b962b621a271ab73f",
+        "evaluator_hash": "sha256:c760c8942bf835504bd7f75c557c6f5a311c5397ee0cce0e229f8cb8d2d0f0bb",
         "split_manifests": {
           "development": {
             "family": "supplied-source",
@@ -6440,15 +6440,15 @@
           "note": "no held-out pack was supplied, so the holdout split reuses the development tasks and its verdict shows mechanics only"
         },
         "decision": {
-          "campaign_id": "optimization_v4_5584182643371dfabb6bc404a9aeb27f237d4a04ae0c7aa75d705b78c6055516",
-          "optimization_plan_hash": "sha256:5584182643371dfabb6bc404a9aeb27f237d4a04ae0c7aa75d705b78c6055516",
-          "holdout_seed_commitment": "sha256:e509d90a72ba8fb036728269595f8ea5ab597d27822df79059b4a68377f26c07",
+          "campaign_id": "optimization_v4_acea2cc2c94ee734658a19d008f1dced7da44fe4857b35b382ed746a775ce76d",
+          "optimization_plan_hash": "sha256:acea2cc2c94ee734658a19d008f1dced7da44fe4857b35b382ed746a775ce76d",
+          "holdout_seed_commitment": "sha256:f36a9dc4220fde2fab5d4dd7ec0468e4e516dd0378abf839d9215d97c00dfb88",
           "incumbent_candidate_id": "cand_2dfc52c993da76827562d362d940fe73e3905e8aa3105254b27009995cbb82d0",
           "selected_candidate_id": "cand_0690eead4a7ae28196f48f72c9e2d79b0f2d3dfd8623aa96485d2b5eeb11c107",
           "promoted": false,
           "verdict": "inconclusive",
           "reason": "confirmation rejected candidate: primary lower confidence bound -300.599256601 does not exceed 0",
-          "decision_id": "decision_v1_9d48b32fc1f3435f59c8493564bfcc09f23d0469424484cf9fd276bad8bdc447",
+          "decision_id": "decision_v1_4f2bc4a0748cddf9d9e675fcc604c0cb9e5a777f0e71bc84c7f862b0ebc35053",
           "development_scores": [
             {
               "candidate_id": "cand_0690eead4a7ae28196f48f72c9e2d79b0f2d3dfd8623aa96485d2b5eeb11c107",
@@ -6470,17 +6470,17 @@
               "incumbent_metric_means": {
                 "accepted_outcome_rate": 1.0,
                 "cost_microusd": 9939.0,
-                "elapsed_ms": 2.8
+                "elapsed_ms": 2.9
               },
               "mean_improvements": {
                 "accepted_outcome_rate": 0.0,
                 "cost_microusd": 3117.0,
-                "elapsed_ms": 0.0
+                "elapsed_ms": -0.3999999999999999
               },
               "metric_means": {
                 "accepted_outcome_rate": 1.0,
                 "cost_microusd": 6822.0,
-                "elapsed_ms": 2.8
+                "elapsed_ms": 3.3
               },
               "policy_hash": "sha256:2702753e2665cbc5f02e99ad3103c252dd10d70bf678fe15d6758dd4cd432bfd",
               "primary_direction": "minimize",
@@ -6493,8 +6493,8 @@
                 "elapsed_ms": true
               },
               "trial_keys": [
-                "trial_v1_3f8e90a57d27dc2e696c736c4812a82c54a1435f94fcc6814150dac96b3cfb07",
-                "trial_v1_d8c42c83f40bc02148525b852deaa6f754f7892b00cd9692510672cc62351678"
+                "trial_v1_41aab74c5c0fb85cdaa6e6920d25bc6e2864d4c5651edb0ed2399fb47c5571ae",
+                "trial_v1_e402190a11cb4dec18941eed83e7736f89272b01c93bb2043680792dae7f4607"
               ],
               "viable": true,
               "arm": "adaptive_selection"
@@ -6516,7 +6516,7 @@
               "mean_improvement": 3155.0,
               "confidence_level": 0.8,
               "bootstrap_resamples": 2000,
-              "bootstrap_seed": 3408668312047878794,
+              "bootstrap_seed": 210577875645768766,
               "confidence_interval": [
                 -300.5992566011223,
                 6610.599256601123
@@ -6548,7 +6548,7 @@
                 "mean_improvement": 0.0,
                 "confidence_level": 0.8,
                 "bootstrap_resamples": 2000,
-                "bootstrap_seed": 3408668312047878794,
+                "bootstrap_seed": 210577875645768766,
                 "confidence_interval": [
                   0.0,
                   0.0
@@ -6574,26 +6574,26 @@
                   182364964171955673,
                   1007793492454401383
                 ],
-                "baseline_mean": 4.1000000000000005,
-                "candidate_mean": 4.133333333333334,
-                "mean_improvement": -0.03333333333333329,
+                "baseline_mean": 4.2,
+                "candidate_mean": 3.8000000000000003,
+                "mean_improvement": 0.4000000000000001,
                 "confidence_level": 0.8,
                 "bootstrap_resamples": 2000,
-                "bootstrap_seed": 3408668312047878794,
+                "bootstrap_seed": 210577875645768766,
                 "confidence_interval": [
-                  -1.3637004041862903,
-                  1.297033737519624
+                  -0.4709296863229075,
+                  1.2709296863229076
                 ],
-                "lower_confidence_bound": -1.3637004041862903,
+                "lower_confidence_bound": -0.4709296863229075,
                 "hard_bounds_passed": true,
                 "non_regression_passed": true,
                 "method": "paired_student_t",
                 "degrees_of_freedom": 2,
-                "standard_error": 0.7055336829505574,
+                "standard_error": 0.4618802153517004,
                 "critical_value": 1.8856180831641272,
                 "descriptive_bootstrap_interval": [
-                  -0.8333333333333333,
-                  0.7666666666666666
+                  -0.133333333333333,
+                  0.9333333333333331
                 ]
               }
             ],
@@ -6637,7 +6637,7 @@
                 "primary": {
                   "baseline_mean": 1829.0,
                   "bootstrap_resamples": 2000,
-                  "bootstrap_seed": 3408668312047878794,
+                  "bootstrap_seed": 210577875645768766,
                   "candidate_mean": 10254.0,
                   "confidence_interval": [
                     -19560.41489522905,
@@ -6673,7 +6673,7 @@
                   {
                     "baseline_mean": 1.0,
                     "bootstrap_resamples": 2000,
-                    "bootstrap_seed": 3408668312047878794,
+                    "bootstrap_seed": 210577875645768766,
                     "candidate_mean": 1.0,
                     "confidence_interval": [
                       0.0,
@@ -6702,25 +6702,25 @@
                     "standard_error": 0.0
                   },
                   {
-                    "baseline_mean": 2.6,
+                    "baseline_mean": 2.3000000000000003,
                     "bootstrap_resamples": 2000,
-                    "bootstrap_seed": 3408668312047878794,
-                    "candidate_mean": 4.133333333333334,
+                    "bootstrap_seed": 210577875645768766,
+                    "candidate_mean": 3.8000000000000003,
                     "confidence_interval": [
-                      -3.3463180492774347,
-                      0.27965138261076805
+                      -3.0813730555250842,
+                      0.08137305552508423
                     ],
                     "confidence_level": 0.8,
                     "critical_value": 1.8856180831641272,
                     "degrees_of_freedom": 2,
                     "descriptive_bootstrap_interval": [
-                      -2.5999999999999996,
-                      -0.4666666666666666
+                      -2.4666666666666663,
+                      -0.5333333333333334
                     ],
                     "direction": "minimize",
                     "hard_bounds_passed": true,
-                    "lower_confidence_bound": -3.3463180492774347,
-                    "mean_improvement": -1.5333333333333332,
+                    "lower_confidence_bound": -3.0813730555250842,
+                    "mean_improvement": -1.5,
                     "method": "paired_student_t",
                     "non_regression_passed": true,
                     "objective_name": "elapsed_ms",
@@ -6730,7 +6730,7 @@
                       182364964171955673,
                       1007793492454401383
                     ],
-                    "standard_error": 0.9614803401237303
+                    "standard_error": 0.8386497083606081
                   }
                 ],
                 "secondary_non_regression_passed": true,
@@ -6760,7 +6760,7 @@
                 "primary": {
                   "baseline_mean": 7209.0,
                   "bootstrap_resamples": 2000,
-                  "bootstrap_seed": 3408668312047878794,
+                  "bootstrap_seed": 210577875645768766,
                   "candidate_mean": 10254.0,
                   "confidence_interval": [
                     -9737.324758009483,
@@ -6796,7 +6796,7 @@
                   {
                     "baseline_mean": 1.0,
                     "bootstrap_resamples": 2000,
-                    "bootstrap_seed": 3408668312047878794,
+                    "bootstrap_seed": 210577875645768766,
                     "candidate_mean": 1.0,
                     "confidence_interval": [
                       0.0,
@@ -6825,25 +6825,25 @@
                     "standard_error": 0.0
                   },
                   {
-                    "baseline_mean": 4.2,
+                    "baseline_mean": 3.8333333333333335,
                     "bootstrap_resamples": 2000,
-                    "bootstrap_seed": 3408668312047878794,
-                    "candidate_mean": 4.133333333333334,
+                    "bootstrap_seed": 210577875645768766,
+                    "candidate_mean": 3.8000000000000003,
                     "confidence_interval": [
-                      -0.9680397090509169,
-                      1.1013730423842507
+                      -1.0679565949656769,
+                      1.1346232616323437
                     ],
                     "confidence_level": 0.8,
                     "critical_value": 1.8856180831641272,
                     "degrees_of_freedom": 2,
                     "descriptive_bootstrap_interval": [
-                      -0.5666666666666663,
-                      0.7000000000000002
+                      -0.5666666666666664,
+                      0.6333333333333332
                     ],
                     "direction": "minimize",
                     "hard_bounds_passed": true,
-                    "lower_confidence_bound": -0.9680397090509169,
-                    "mean_improvement": 0.06666666666666694,
+                    "lower_confidence_bound": -1.0679565949656769,
+                    "mean_improvement": 0.03333333333333336,
                     "method": "paired_student_t",
                     "non_regression_passed": true,
                     "objective_name": "elapsed_ms",
@@ -6853,7 +6853,7 @@
                       182364964171955673,
                       1007793492454401383
                     ],
-                    "standard_error": 0.5487359211051442
+                    "standard_error": 0.5840471822645076
                   }
                 ],
                 "secondary_non_regression_passed": true,
@@ -6870,7 +6870,7 @@
         },
         "trials": [
           {
-            "trial_key": "trial_v1_3f8e90a57d27dc2e696c736c4812a82c54a1435f94fcc6814150dac96b3cfb07",
+            "trial_key": "trial_v1_41aab74c5c0fb85cdaa6e6920d25bc6e2864d4c5651edb0ed2399fb47c5571ae",
             "split": "development",
             "role": "incumbent",
             "task_index": 1,
@@ -6889,7 +6889,7 @@
             "attempt_allowance": 2,
             "failed_attempts": 0,
             "cost_microusd": 9939,
-            "elapsed_ms": 2.8,
+            "elapsed_ms": 2.9,
             "attempts": [
               {
                 "attempt": 1,
@@ -6926,11 +6926,11 @@
                 "cost_microusd": 9939,
                 "cost_known": true,
                 "cost_is_estimate": false,
-                "elapsed_ms": 2.8,
+                "elapsed_ms": 2.9,
                 "latency_source": "swarm_timing",
                 "phases_ms": {
                   "routing": null,
-                  "planning": 0.4,
+                  "planning": 0.3,
                   "recovery": null,
                   "execution": 1.4,
                   "verification": 0.1,
@@ -6950,7 +6950,7 @@
             ]
           },
           {
-            "trial_key": "trial_v1_d8c42c83f40bc02148525b852deaa6f754f7892b00cd9692510672cc62351678",
+            "trial_key": "trial_v1_e402190a11cb4dec18941eed83e7736f89272b01c93bb2043680792dae7f4607",
             "split": "development",
             "role": "challenger",
             "task_index": 1,
@@ -6969,7 +6969,7 @@
             "attempt_allowance": 2,
             "failed_attempts": 0,
             "cost_microusd": 6822,
-            "elapsed_ms": 2.8,
+            "elapsed_ms": 3.3,
             "attempts": [
               {
                 "attempt": 1,
@@ -7012,22 +7012,22 @@
                   "classifier_calls": 1,
                   "cost_microusd": 1485,
                   "cost_source": "declared classifier usage",
-                  "latency_ms": 0.1
+                  "latency_ms": 0.2
                 },
                 "cost_microusd": 6822,
                 "cost_known": true,
                 "cost_is_estimate": false,
-                "elapsed_ms": 2.8,
+                "elapsed_ms": 3.3,
                 "latency_source": "swarm_timing",
                 "phases_ms": {
-                  "routing": 0.1,
+                  "routing": 0.2,
                   "planning": 0.2,
                   "recovery": null,
-                  "execution": 0.8,
-                  "verification": 0.1,
+                  "execution": 0.9,
+                  "verification": 0.2,
                   "synthesis": 0.0,
                   "supervision": 0.0,
-                  "checkpoint": 1.2,
+                  "checkpoint": 1.4,
                   "waiting": 0.0
                 },
                 "graph": {
@@ -7040,10 +7040,10 @@
               }
             ],
             "selector_cost_microusd": 1485,
-            "selector_latency_ms": 0.1
+            "selector_latency_ms": 0.2
           },
           {
-            "trial_key": "trial_v1_b93a8af83dc33ed49c4913a495cadcc47bd371076c76c885ad9aec12bfac5afd",
+            "trial_key": "trial_v1_4e151b8976ee3a8ec371ded33c41723fbc707ae9645a32cc5b98dabc253f3f10",
             "split": "confirmation",
             "role": "incumbent",
             "task_index": 1,
@@ -7062,7 +7062,7 @@
             "attempt_allowance": 2,
             "failed_attempts": 0,
             "cost_microusd": 9939,
-            "elapsed_ms": 2.8,
+            "elapsed_ms": 3.6,
             "attempts": [
               {
                 "attempt": 1,
@@ -7099,18 +7099,18 @@
                 "cost_microusd": 9939,
                 "cost_known": true,
                 "cost_is_estimate": false,
-                "elapsed_ms": 2.8,
+                "elapsed_ms": 3.6,
                 "latency_source": "swarm_timing",
                 "phases_ms": {
                   "routing": null,
-                  "planning": 0.2,
+                  "planning": 0.3,
                   "recovery": null,
-                  "execution": 1.6,
+                  "execution": 1.9,
                   "verification": 0.1,
                   "synthesis": 0.0,
                   "supervision": 0.0,
-                  "checkpoint": 1.2,
-                  "waiting": 0.0
+                  "checkpoint": 1.4,
+                  "waiting": 0.1
                 },
                 "graph": {
                   "topology": "fork_join",
@@ -7123,7 +7123,7 @@
             ]
           },
           {
-            "trial_key": "trial_v1_b0f688396fd9876955285f5034f4a80977b9693e6a3a35c1f2e43ba81f3c6cb1",
+            "trial_key": "trial_v1_2f41db3dba7d16db3ef672897e030f7b8b761a37c3082cdf84010b930c8a2fd6",
             "split": "confirmation",
             "role": "incumbent",
             "task_index": 0,
@@ -7142,7 +7142,7 @@
             "attempt_allowance": 2,
             "failed_attempts": 0,
             "cost_microusd": 6999,
-            "elapsed_ms": 3.0,
+            "elapsed_ms": 2.8,
             "attempts": [
               {
                 "attempt": 1,
@@ -7179,18 +7179,18 @@
                 "cost_microusd": 6999,
                 "cost_known": true,
                 "cost_is_estimate": false,
-                "elapsed_ms": 3.0,
+                "elapsed_ms": 2.8,
                 "latency_source": "swarm_timing",
                 "phases_ms": {
                   "routing": null,
-                  "planning": 0.3,
+                  "planning": 0.2,
                   "recovery": null,
-                  "execution": 1.5,
+                  "execution": 1.4,
                   "verification": 0.1,
                   "synthesis": 0.0,
                   "supervision": 0.0,
                   "checkpoint": 1.2,
-                  "waiting": 0.1
+                  "waiting": 0.0
                 },
                 "graph": {
                   "topology": "fork_join",
@@ -7203,7 +7203,7 @@
             ]
           },
           {
-            "trial_key": "trial_v1_de6e2791adde53a334113db0e5cf707b89512c8c108bc45b6f1411609128e9f7",
+            "trial_key": "trial_v1_636deb2df2abd95079c620956a3eaec7e595781fba6911ce6b22c6e7a88ba11c",
             "split": "confirmation",
             "role": "incumbent",
             "task_index": 2,
@@ -7222,7 +7222,7 @@
             "attempt_allowance": 2,
             "failed_attempts": 1,
             "cost_microusd": 23289,
-            "elapsed_ms": 6.5,
+            "elapsed_ms": 6.2,
             "attempts": [
               {
                 "attempt": 1,
@@ -7261,17 +7261,17 @@
                 "cost_microusd": 11667,
                 "cost_known": true,
                 "cost_is_estimate": false,
-                "elapsed_ms": 3.4,
+                "elapsed_ms": 3.2,
                 "latency_source": "swarm_timing",
                 "phases_ms": {
                   "routing": null,
-                  "planning": 0.4,
+                  "planning": 0.3,
                   "recovery": null,
-                  "execution": 1.5,
-                  "verification": 0.2,
+                  "execution": 1.4,
+                  "verification": 0.1,
                   "synthesis": 0.0,
                   "supervision": 0.0,
-                  "checkpoint": 1.5,
+                  "checkpoint": 1.4,
                   "waiting": 0.1
                 },
                 "graph": {
@@ -7317,17 +7317,17 @@
                 "cost_microusd": 11622,
                 "cost_known": true,
                 "cost_is_estimate": false,
-                "elapsed_ms": 3.1,
+                "elapsed_ms": 3.0,
                 "latency_source": "swarm_timing",
                 "phases_ms": {
                   "routing": null,
                   "planning": 0.3,
                   "recovery": null,
-                  "execution": 1.5,
+                  "execution": 1.4,
                   "verification": 0.1,
                   "synthesis": 0.0,
                   "supervision": 0.0,
-                  "checkpoint": 1.3,
+                  "checkpoint": 1.4,
                   "waiting": 0.0
                 },
                 "graph": {
@@ -7341,7 +7341,7 @@
             ]
           },
           {
-            "trial_key": "trial_v1_86622a7de828023f0d30d42837cc86f446196370069be02a2a1f2fea1c591683",
+            "trial_key": "trial_v1_1d1bbca35e0ef28225b7b6df0c375cbcf94a91c34c9b062b232cee926db113b3",
             "split": "confirmation",
             "role": "challenger",
             "task_index": 1,
@@ -7360,7 +7360,7 @@
             "attempt_allowance": 2,
             "failed_attempts": 0,
             "cost_microusd": 6822,
-            "elapsed_ms": 3.1,
+            "elapsed_ms": 3.2,
             "attempts": [
               {
                 "attempt": 1,
@@ -7408,17 +7408,17 @@
                 "cost_microusd": 6822,
                 "cost_known": true,
                 "cost_is_estimate": false,
-                "elapsed_ms": 3.1,
+                "elapsed_ms": 3.2,
                 "latency_source": "swarm_timing",
                 "phases_ms": {
                   "routing": 0.1,
                   "planning": 0.2,
                   "recovery": null,
-                  "execution": 0.9,
+                  "execution": 0.7,
                   "verification": 0.1,
                   "synthesis": 0.0,
                   "supervision": 0.0,
-                  "checkpoint": 1.3,
+                  "checkpoint": 1.5,
                   "waiting": 0.0
                 },
                 "graph": {
@@ -7434,7 +7434,7 @@
             "selector_latency_ms": 0.1
           },
           {
-            "trial_key": "trial_v1_0dbc67bc74712b30196a2c985821011202eb2a656e7d2e0bf2437047f8dfcce8",
+            "trial_key": "trial_v1_215d0483c2bfe0e2be5b0e27d04d20fc4cf1a9fd1b41131050447bac326b30db",
             "split": "confirmation",
             "role": "challenger",
             "task_index": 0,
@@ -7453,7 +7453,7 @@
             "attempt_allowance": 2,
             "failed_attempts": 0,
             "cost_microusd": 651,
-            "elapsed_ms": 1.7,
+            "elapsed_ms": 1.6,
             "attempts": [
               {
                 "attempt": 1,
@@ -7502,17 +7502,17 @@
                 "cost_microusd": 651,
                 "cost_known": true,
                 "cost_is_estimate": false,
-                "elapsed_ms": 1.7,
+                "elapsed_ms": 1.6,
                 "latency_source": "swarm_timing",
                 "phases_ms": {
                   "routing": 0.0,
                   "planning": 0.1,
                   "recovery": null,
-                  "execution": 0.4,
+                  "execution": 0.3,
                   "verification": 0.1,
                   "synthesis": 0.0,
                   "supervision": 0.0,
-                  "checkpoint": 0.8,
+                  "checkpoint": 0.6,
                   "waiting": 0.0
                 },
                 "graph": {
@@ -7528,7 +7528,7 @@
             "selector_latency_ms": 0.0
           },
           {
-            "trial_key": "trial_v1_c4578fa9e47ca8454126d449ead338ba1f3f93bcce1da7fcdde42bd91bc7fca1",
+            "trial_key": "trial_v1_bc582cd95b5d1c5bea4974c691f9483e7122a3a95e76d17e7a3a76bd45873655",
             "split": "confirmation",
             "role": "challenger",
             "task_index": 2,
@@ -7547,7 +7547,7 @@
             "attempt_allowance": 2,
             "failed_attempts": 1,
             "cost_microusd": 23289,
-            "elapsed_ms": 7.6,
+            "elapsed_ms": 6.6,
             "attempts": [
               {
                 "attempt": 1,
@@ -7598,17 +7598,17 @@
                 "cost_microusd": 11667,
                 "cost_known": true,
                 "cost_is_estimate": false,
-                "elapsed_ms": 3.7,
+                "elapsed_ms": 3.3,
                 "latency_source": "swarm_timing",
                 "phases_ms": {
                   "routing": 0.0,
-                  "planning": 0.4,
+                  "planning": 0.3,
                   "recovery": null,
-                  "execution": 1.4,
-                  "verification": 0.2,
+                  "execution": 1.3,
+                  "verification": 0.1,
                   "synthesis": 0.0,
                   "supervision": 0.0,
-                  "checkpoint": 1.9,
+                  "checkpoint": 1.5,
                   "waiting": 0.1
                 },
                 "graph": {
@@ -7666,17 +7666,17 @@
                 "cost_microusd": 11622,
                 "cost_known": true,
                 "cost_is_estimate": false,
-                "elapsed_ms": 3.9,
+                "elapsed_ms": 3.3,
                 "latency_source": "swarm_timing",
                 "phases_ms": {
                   "routing": 0.1,
                   "planning": 0.4,
                   "recovery": null,
-                  "execution": 1.7,
+                  "execution": 1.5,
                   "verification": 0.1,
                   "synthesis": 0.0,
                   "supervision": 0.0,
-                  "checkpoint": 1.7,
+                  "checkpoint": 1.5,
                   "waiting": 0.1
                 },
                 "graph": {
@@ -7692,7 +7692,7 @@
             "selector_latency_ms": 0.1
           },
           {
-            "trial_key": "trial_v1_c0dce22d2d51b883a82a99590abda5764c87d140bddd4f0377cfad1e46e5ac61",
+            "trial_key": "trial_v1_2c1ecd43a7b15dbbeaa8430dc8f33e4a3b8eaf941dfab0dbdb280d3af7ac9705",
             "split": "confirmation",
             "role": "reference",
             "task_index": 1,
@@ -7711,7 +7711,7 @@
             "attempt_allowance": 2,
             "failed_attempts": 0,
             "cost_microusd": 1353,
-            "elapsed_ms": 2.1,
+            "elapsed_ms": 1.8,
             "attempts": [
               {
                 "attempt": 1,
@@ -7748,17 +7748,17 @@
                 "cost_microusd": 1353,
                 "cost_known": true,
                 "cost_is_estimate": false,
-                "elapsed_ms": 2.1,
+                "elapsed_ms": 1.8,
                 "latency_source": "swarm_timing",
                 "phases_ms": {
                   "routing": null,
-                  "planning": 0.2,
+                  "planning": 0.1,
                   "recovery": null,
-                  "execution": 0.5,
+                  "execution": 0.4,
                   "verification": 0.2,
                   "synthesis": 0.0,
                   "supervision": 0.0,
-                  "checkpoint": 0.9,
+                  "checkpoint": 0.7,
                   "waiting": 0.0
                 },
                 "graph": {
@@ -7772,7 +7772,7 @@
             ]
           },
           {
-            "trial_key": "trial_v1_d2bec9d94e0ea33bb1691af93784eb442f23506d68eb54a6f42545798fe922d6",
+            "trial_key": "trial_v1_6dee822cfa3e87441a6174a09c9d68f5c936a8112480e206108d93b19f5c953c",
             "split": "confirmation",
             "role": "reference",
             "task_index": 0,
@@ -7834,8 +7834,8 @@
                   "routing": null,
                   "planning": 0.1,
                   "recovery": null,
-                  "execution": 0.4,
-                  "verification": 0.1,
+                  "execution": 0.3,
+                  "verification": 0.2,
                   "synthesis": 0.0,
                   "supervision": 0.0,
                   "checkpoint": 0.5,
@@ -7852,7 +7852,7 @@
             ]
           },
           {
-            "trial_key": "trial_v1_ab1aa6d85b3d8a4822dd856d72adfa03292e0025f543347fcb087515d557eff4",
+            "trial_key": "trial_v1_4106c7fed524b1b79672f77a191f5eed9885265fe535dccbc5845e315252fd63",
             "split": "confirmation",
             "role": "reference",
             "task_index": 2,
@@ -7871,7 +7871,7 @@
             "attempt_allowance": 2,
             "failed_attempts": 1,
             "cost_microusd": 3483,
-            "elapsed_ms": 4.2,
+            "elapsed_ms": 3.6,
             "attempts": [
               {
                 "attempt": 1,
@@ -7910,17 +7910,17 @@
                 "cost_microusd": 1746,
                 "cost_known": true,
                 "cost_is_estimate": false,
-                "elapsed_ms": 2.4,
+                "elapsed_ms": 1.9,
                 "latency_source": "swarm_timing",
                 "phases_ms": {
                   "routing": null,
-                  "planning": 0.4,
+                  "planning": 0.2,
                   "recovery": null,
-                  "execution": 0.4,
+                  "execution": 0.3,
                   "verification": 0.1,
                   "synthesis": 0.0,
                   "supervision": 0.0,
-                  "checkpoint": 1.0,
+                  "checkpoint": 0.8,
                   "waiting": 0.0
                 },
                 "graph": {
@@ -7966,13 +7966,13 @@
                 "cost_microusd": 1737,
                 "cost_known": true,
                 "cost_is_estimate": false,
-                "elapsed_ms": 1.8,
+                "elapsed_ms": 1.7,
                 "latency_source": "swarm_timing",
                 "phases_ms": {
                   "routing": null,
-                  "planning": 0.2,
+                  "planning": 0.1,
                   "recovery": null,
-                  "execution": 0.4,
+                  "execution": 0.3,
                   "verification": 0.1,
                   "synthesis": 0.0,
                   "supervision": 0.0,
@@ -7990,7 +7990,7 @@
             ]
           },
           {
-            "trial_key": "trial_v1_6111f1a6d0958a21acd2e0fa6b1bfddf0a0ed76afb2a0a2c43622b5697e46da7",
+            "trial_key": "trial_v1_c19e152ab65351d7cea51cc692fa443f03687558fa803dc614f9ea090a0a4d0f",
             "split": "confirmation",
             "role": "reference",
             "task_index": 1,
@@ -8009,7 +8009,7 @@
             "attempt_allowance": 2,
             "failed_attempts": 0,
             "cost_microusd": 5337,
-            "elapsed_ms": 3.2,
+            "elapsed_ms": 2.7,
             "attempts": [
               {
                 "attempt": 1,
@@ -8046,13 +8046,13 @@
                 "cost_microusd": 5337,
                 "cost_known": true,
                 "cost_is_estimate": false,
-                "elapsed_ms": 3.2,
+                "elapsed_ms": 2.7,
                 "latency_source": "swarm_timing",
                 "phases_ms": {
                   "routing": null,
-                  "planning": 0.2,
+                  "planning": 0.1,
                   "recovery": null,
-                  "execution": 0.8,
+                  "execution": 0.7,
                   "verification": 0.1,
                   "synthesis": 0.0,
                   "supervision": 0.0,
@@ -8070,7 +8070,7 @@
             ]
           },
           {
-            "trial_key": "trial_v1_73da0202ab9a5284835fa4027ed3a97b5824e8a35cd49660e398f5dd34c55206",
+            "trial_key": "trial_v1_5db62c7e3bcba648e41ea48568d4fbfdb2d97946aab6295893932c8262e5d15b",
             "split": "confirmation",
             "role": "reference",
             "task_index": 0,
@@ -8089,7 +8089,7 @@
             "attempt_allowance": 2,
             "failed_attempts": 0,
             "cost_microusd": 2823,
-            "elapsed_ms": 2.7,
+            "elapsed_ms": 2.8,
             "attempts": [
               {
                 "attempt": 1,
@@ -8126,14 +8126,14 @@
                 "cost_microusd": 2823,
                 "cost_known": true,
                 "cost_is_estimate": false,
-                "elapsed_ms": 2.7,
+                "elapsed_ms": 2.8,
                 "latency_source": "swarm_timing",
                 "phases_ms": {
                   "routing": null,
-                  "planning": 0.1,
+                  "planning": 0.2,
                   "recovery": null,
-                  "execution": 0.8,
-                  "verification": 0.1,
+                  "execution": 0.7,
+                  "verification": 0.2,
                   "synthesis": 0.0,
                   "supervision": 0.0,
                   "checkpoint": 1.2,
@@ -8150,7 +8150,7 @@
             ]
           },
           {
-            "trial_key": "trial_v1_e653e844076d3bde95acbebeee571baf3c1442e9548c86c44f82e45b52ec8d6a",
+            "trial_key": "trial_v1_c000e88794c293945f5ad7dae36f0baeb938140f46cf758d4d51d38d5d8afa56",
             "split": "confirmation",
             "role": "reference",
             "task_index": 2,
@@ -8169,7 +8169,7 @@
             "attempt_allowance": 2,
             "failed_attempts": 1,
             "cost_microusd": 13467,
-            "elapsed_ms": 6.7,
+            "elapsed_ms": 6.0,
             "attempts": [
               {
                 "attempt": 1,
@@ -8208,17 +8208,17 @@
                 "cost_microusd": 6756,
                 "cost_known": true,
                 "cost_is_estimate": false,
-                "elapsed_ms": 3.4,
+                "elapsed_ms": 3.0,
                 "latency_source": "swarm_timing",
                 "phases_ms": {
                   "routing": null,
                   "planning": 0.2,
                   "recovery": null,
-                  "execution": 0.9,
-                  "verification": 0.2,
+                  "execution": 0.7,
+                  "verification": 0.1,
                   "synthesis": 0.0,
                   "supervision": 0.0,
-                  "checkpoint": 1.6,
+                  "checkpoint": 1.4,
                   "waiting": 0.0
                 },
                 "graph": {
@@ -8264,17 +8264,17 @@
                 "cost_microusd": 6711,
                 "cost_known": true,
                 "cost_is_estimate": false,
-                "elapsed_ms": 3.3,
+                "elapsed_ms": 3.0,
                 "latency_source": "swarm_timing",
                 "phases_ms": {
                   "routing": null,
                   "planning": 0.2,
                   "recovery": null,
-                  "execution": 0.8,
+                  "execution": 0.7,
                   "verification": 0.1,
                   "synthesis": 0.0,
                   "supervision": 0.0,
-                  "checkpoint": 1.7,
+                  "checkpoint": 1.4,
                   "waiting": 0.0
                 },
                 "graph": {
@@ -8305,8 +8305,8 @@
       "module": "smythe/__init__.py"
     },
     "source_control": {
-      "revision": "bbb960f7fdaae854b057eff05066dfb85476b799",
-      "dirty": true,
+      "revision": "9db826a37a9b3154b02c5d8f00efbcbc9403415f",
+      "dirty": false,
       "untracked_files": 0
     }
   }

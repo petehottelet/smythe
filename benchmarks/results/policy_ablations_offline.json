@@ -3001,7 +3001,7 @@
               "attempt_allowance": 2,
               "failed_attempts": 2,
               "cost_microusd": 4098,
-              "elapsed_ms": 4.4,
+              "elapsed_ms": 3.2,
               "attempts": [
                 {
                   "attempt": 1,
@@ -3040,17 +3040,17 @@
                   "cost_microusd": 2049,
                   "cost_known": true,
                   "cost_is_estimate": false,
-                  "elapsed_ms": 2.2,
+                  "elapsed_ms": 1.6,
                   "latency_source": "swarm_timing",
                   "phases_ms": {
                     "routing": null,
                     "planning": 0.1,
                     "recovery": null,
-                    "execution": 0.5,
-                    "verification": 0.5,
+                    "execution": 0.3,
+                    "verification": 0.4,
                     "synthesis": 0.0,
                     "supervision": 0.0,
-                    "checkpoint": 0.7,
+                    "checkpoint": 0.5,
                     "waiting": 0.0
                   },
                   "graph": {
@@ -3098,17 +3098,17 @@
                   "cost_microusd": 2049,
                   "cost_known": true,
                   "cost_is_estimate": false,
-                  "elapsed_ms": 2.2,
+                  "elapsed_ms": 1.6,
                   "latency_source": "swarm_timing",
                   "phases_ms": {
                     "routing": null,
                     "planning": 0.1,
                     "recovery": null,
-                    "execution": 0.6,
-                    "verification": 0.5,
+                    "execution": 0.4,
+                    "verification": 0.4,
                     "synthesis": 0.0,
                     "supervision": 0.0,
-                    "checkpoint": 0.7,
+                    "checkpoint": 0.5,
                     "waiting": 0.0
                   },
                   "graph": {
@@ -3177,7 +3177,7 @@
               "attempt_allowance": 2,
               "failed_attempts": 0,
               "cost_microusd": 2049,
-              "elapsed_ms": 2.0,
+              "elapsed_ms": 1.7,
               "attempts": [
                 {
                   "attempt": 1,
@@ -3213,13 +3213,13 @@
                   "cost_microusd": 2049,
                   "cost_known": true,
                   "cost_is_estimate": false,
-                  "elapsed_ms": 2.0,
+                  "elapsed_ms": 1.7,
                   "latency_source": "swarm_timing",
                   "phases_ms": {
                     "routing": null,
-                    "planning": 0.1,
+                    "planning": 0.0,
                     "recovery": null,
-                    "execution": 0.4,
+                    "execution": 0.3,
                     "verification": 0.3,
                     "synthesis": 0.3,
                     "supervision": 0.0,
@@ -3334,11 +3334,11 @@
                   "cost_microusd": 2088,
                   "cost_known": true,
                   "cost_is_estimate": false,
-                  "elapsed_ms": 1.5,
+                  "elapsed_ms": 1.6,
                   "latency_source": "swarm_timing",
                   "phases_ms": {
                     "routing": null,
-                    "planning": 0.0,
+                    "planning": 0.1,
                     "recovery": null,
                     "execution": 0.4,
                     "verification": 0.3,
@@ -3391,17 +3391,17 @@
                   "cost_microusd": 2088,
                   "cost_known": true,
                   "cost_is_estimate": false,
-                  "elapsed_ms": 1.6,
+                  "elapsed_ms": 1.5,
                   "latency_source": "swarm_timing",
                   "phases_ms": {
                     "routing": null,
-                    "planning": 0.1,
+                    "planning": 0.0,
                     "recovery": null,
-                    "execution": 0.4,
+                    "execution": 0.3,
                     "verification": 0.3,
                     "synthesis": 0.0,
                     "supervision": 0.0,
-                    "checkpoint": 0.5,
+                    "checkpoint": 0.4,
                     "waiting": 0.0
                   },
                   "graph": {
@@ -3470,7 +3470,7 @@
               "attempt_allowance": 2,
               "failed_attempts": 0,
               "cost_microusd": 2088,
-              "elapsed_ms": 1.8,
+              "elapsed_ms": 1.7,
               "attempts": [
                 {
                   "attempt": 1,
@@ -3506,7 +3506,7 @@
                   "cost_microusd": 2088,
                   "cost_known": true,
                   "cost_is_estimate": false,
-                  "elapsed_ms": 1.8,
+                  "elapsed_ms": 1.7,
                   "latency_source": "swarm_timing",
                   "phases_ms": {
                     "routing": null,
@@ -3514,7 +3514,7 @@
                     "recovery": null,
                     "execution": 0.4,
                     "verification": 0.3,
-                    "synthesis": 0.3,
+                    "synthesis": 0.2,
                     "supervision": 0.0,
                     "checkpoint": 0.5,
                     "waiting": 0.0
@@ -3589,7 +3589,7 @@
               "attempt_allowance": 2,
               "failed_attempts": 0,
               "cost_microusd": 2181,
-              "elapsed_ms": 1.5,
+              "elapsed_ms": 1.4,
               "attempts": [
                 {
                   "attempt": 1,
@@ -3625,14 +3625,14 @@
                   "cost_microusd": 2181,
                   "cost_known": true,
                   "cost_is_estimate": false,
-                  "elapsed_ms": 1.5,
+                  "elapsed_ms": 1.4,
                   "latency_source": "swarm_timing",
                   "phases_ms": {
                     "routing": null,
-                    "planning": 0.1,
+                    "planning": 0.0,
                     "recovery": null,
                     "execution": 0.3,
-                    "verification": 0.4,
+                    "verification": 0.3,
                     "synthesis": 0.0,
                     "supervision": 0.0,
                     "checkpoint": 0.5,
@@ -3660,7 +3660,7 @@
               "attempt_allowance": 2,
               "failed_attempts": 0,
               "cost_microusd": 2181,
-              "elapsed_ms": 2.0,
+              "elapsed_ms": 1.8,
               "attempts": [
                 {
                   "attempt": 1,
@@ -3696,15 +3696,15 @@
                   "cost_microusd": 2181,
                   "cost_known": true,
                   "cost_is_estimate": false,
-                  "elapsed_ms": 2.0,
+                  "elapsed_ms": 1.8,
                   "latency_source": "swarm_timing",
                   "phases_ms": {
                     "routing": null,
-                    "planning": 0.0,
+                    "planning": 0.1,
                     "recovery": null,
                     "execution": 0.4,
-                    "verification": 0.4,
-                    "synthesis": 0.4,
+                    "verification": 0.3,
+                    "synthesis": 0.2,
                     "supervision": 0.0,
                     "checkpoint": 0.5,
                     "waiting": 0.0
@@ -3779,7 +3779,7 @@
               "attempt_allowance": 2,
               "failed_attempts": 0,
               "cost_microusd": 1137,
-              "elapsed_ms": 1.5,
+              "elapsed_ms": 1.4,
               "attempts": [
                 {
                   "attempt": 1,
@@ -3815,17 +3815,17 @@
                   "cost_microusd": 1137,
                   "cost_known": true,
                   "cost_is_estimate": false,
-                  "elapsed_ms": 1.5,
+                  "elapsed_ms": 1.4,
                   "latency_source": "swarm_timing",
                   "phases_ms": {
                     "routing": null,
                     "planning": 0.1,
                     "recovery": null,
-                    "execution": 0.5,
+                    "execution": 0.4,
                     "verification": 0.2,
                     "synthesis": 0.0,
                     "supervision": 0.0,
-                    "checkpoint": 0.5,
+                    "checkpoint": 0.4,
                     "waiting": 0.0
                   },
                   "graph": {
@@ -3850,7 +3850,7 @@
               "attempt_allowance": 2,
               "failed_attempts": 0,
               "cost_microusd": 1137,
-              "elapsed_ms": 1.5,
+              "elapsed_ms": 1.7,
               "attempts": [
                 {
                   "attempt": 1,
@@ -3886,17 +3886,17 @@
                   "cost_microusd": 1137,
                   "cost_known": true,
                   "cost_is_estimate": false,
-                  "elapsed_ms": 1.5,
+                  "elapsed_ms": 1.7,
                   "latency_source": "swarm_timing",
                   "phases_ms": {
                     "routing": null,
                     "planning": 0.1,
                     "recovery": null,
-                    "execution": 0.3,
+                    "execution": 0.5,
                     "verification": 0.2,
-                    "synthesis": 0.1,
+                    "synthesis": 0.2,
                     "supervision": 0.0,
-                    "checkpoint": 0.4,
+                    "checkpoint": 0.5,
                     "waiting": 0.0
                   },
                   "graph": {
@@ -3969,7 +3969,7 @@
               "attempt_allowance": 2,
               "failed_attempts": 2,
               "cost_microusd": 20790,
-              "elapsed_ms": 4.2,
+              "elapsed_ms": 3.9,
               "attempts": [
                 {
                   "attempt": 1,
@@ -4008,13 +4008,13 @@
                   "cost_microusd": 10395,
                   "cost_known": true,
                   "cost_is_estimate": false,
-                  "elapsed_ms": 2.1,
+                  "elapsed_ms": 2.0,
                   "latency_source": "swarm_timing",
                   "phases_ms": {
                     "routing": null,
                     "planning": 0.1,
                     "recovery": null,
-                    "execution": 1.2,
+                    "execution": 1.1,
                     "verification": 0.3,
                     "synthesis": 0.0,
                     "supervision": 0.0,
@@ -4066,14 +4066,14 @@
                   "cost_microusd": 10395,
                   "cost_known": true,
                   "cost_is_estimate": false,
-                  "elapsed_ms": 2.1,
+                  "elapsed_ms": 1.9,
                   "latency_source": "swarm_timing",
                   "phases_ms": {
                     "routing": null,
                     "planning": 0.1,
                     "recovery": null,
                     "execution": 1.1,
-                    "verification": 0.4,
+                    "verification": 0.3,
                     "synthesis": 0.0,
                     "supervision": 0.0,
                     "checkpoint": 0.7,
@@ -4145,7 +4145,7 @@
               "attempt_allowance": 2,
               "failed_attempts": 2,
               "cost_microusd": 21372,
-              "elapsed_ms": 5.2,
+              "elapsed_ms": 4.2,
               "attempts": [
                 {
                   "attempt": 1,
@@ -4184,13 +4184,13 @@
                   "cost_microusd": 10686,
                   "cost_known": true,
                   "cost_is_estimate": false,
-                  "elapsed_ms": 2.7,
+                  "elapsed_ms": 2.1,
                   "latency_source": "swarm_timing",
                   "phases_ms": {
                     "routing": null,
-                    "planning": 0.1,
+                    "planning": 0.0,
                     "recovery": null,
-                    "execution": 1.8,
+                    "execution": 1.5,
                     "verification": 0.3,
                     "synthesis": 0.0,
                     "supervision": 0.0,
@@ -4242,17 +4242,17 @@
                   "cost_microusd": 10686,
                   "cost_known": true,
                   "cost_is_estimate": false,
-                  "elapsed_ms": 2.5,
+                  "elapsed_ms": 2.1,
                   "latency_source": "swarm_timing",
                   "phases_ms": {
                     "routing": null,
-                    "planning": 0.0,
+                    "planning": 0.1,
                     "recovery": null,
-                    "execution": 1.2,
-                    "verification": 0.5,
-                    "synthesis": 0.1,
+                    "execution": 1.3,
+                    "verification": 0.3,
+                    "synthesis": 0.0,
                     "supervision": 0.0,
-                    "checkpoint": 1.0,
+                    "checkpoint": 0.7,
                     "waiting": 0.0
                   },
                   "graph": {
@@ -4345,7 +4345,7 @@
           "elapsed_ms": {
             "runs": 5,
             "p50": 3.1,
-            "p95": 4.4,
+            "p95": 3.8,
             "label": "small sample; not a tail estimate"
           }
         },
@@ -4360,8 +4360,8 @@
           "cost_per_accepted_microusd": 7206.75,
           "elapsed_ms": {
             "runs": 5,
-            "p50": 2.0,
-            "p95": 4.6,
+            "p50": 1.7,
+            "p95": 3.7,
             "label": "small sample; not a tail estimate"
           }
         }
@@ -4409,7 +4409,7 @@
         "position": 0,
         "executor": "reference",
         "latency_ms": 0,
-        "elapsed_ms": 4.148,
+        "elapsed_ms": 2.892,
         "store_ms": {
           "checkpoint": 0.0,
           "journal": 0.0
@@ -4420,9 +4420,9 @@
           "input_tokens": 0
         },
         "nodes_ms": {
-          "research": 1.377,
-          "analyze": 0.863,
-          "write": 0.674
+          "research": 0.866,
+          "analyze": 0.594,
+          "write": 0.608
         },
         "output_sha256": "885b9fd3a5594a1fbbc7c800197cdd12717581c6c6cfec298bb5cd17724a44f3"
       },
@@ -4431,9 +4431,9 @@
         "position": 1,
         "executor": "ordinary",
         "latency_ms": 0,
-        "elapsed_ms": 5528.726,
+        "elapsed_ms": 401.396,
         "store_ms": {
-          "checkpoint": 5519.21,
+          "checkpoint": 394.485,
           "journal": 0.0
         },
         "store_calls": {
@@ -4444,9 +4444,9 @@
           "input_tokens": 0
         },
         "nodes_ms": {
-          "research": 2.1,
-          "analyze": 1.8,
-          "write": 1.4
+          "research": 1.4,
+          "analyze": 1.2,
+          "write": 1.1
         },
         "output_sha256": "885b9fd3a5594a1fbbc7c800197cdd12717581c6c6cfec298bb5cd17724a44f3"
       },
@@ -4455,13 +4455,13 @@
         "position": 2,
         "executor": "durable",
         "latency_ms": 0,
-        "elapsed_ms": 21039.683,
+        "elapsed_ms": 814.908,
         "store_ms": {
-          "checkpoint": 5143.325,
-          "journal": 15878.494
+          "checkpoint": 277.483,
+          "journal": 526.61
         },
         "store_calls": {
-          "journal": 66,
+          "journal": 65,
           "checkpoint": 6
         },
         "wire_calls": {
@@ -4469,9 +4469,9 @@
           "input_tokens": 3
         },
         "nodes_ms": {
-          "research": 4656.2,
-          "analyze": 3778.0,
-          "write": 3482.5
+          "research": 51.9,
+          "analyze": 40.0,
+          "write": 130.9
         },
         "output_sha256": "885b9fd3a5594a1fbbc7c800197cdd12717581c6c6cfec298bb5cd17724a44f3"
       },
@@ -4480,9 +4480,9 @@
         "position": 0,
         "executor": "ordinary",
         "latency_ms": 0,
-        "elapsed_ms": 5750.469,
+        "elapsed_ms": 495.222,
         "store_ms": {
-          "checkpoint": 5712.998,
+          "checkpoint": 488.067,
           "journal": 0.0
         },
         "store_calls": {
@@ -4493,9 +4493,9 @@
           "input_tokens": 0
         },
         "nodes_ms": {
-          "research": 2.4,
-          "analyze": 1.5,
-          "write": 27.9
+          "research": 1.4,
+          "analyze": 1.1,
+          "write": 1.2
         },
         "output_sha256": "885b9fd3a5594a1fbbc7c800197cdd12717581c6c6cfec298bb5cd17724a44f3"
       },
@@ -4504,13 +4504,13 @@
         "position": 1,
         "executor": "durable",
         "latency_ms": 0,
-        "elapsed_ms": 20291.823,
+        "elapsed_ms": 5664.5,
         "store_ms": {
-          "checkpoint": 3194.385,
-          "journal": 17079.768
+          "checkpoint": 816.959,
+          "journal": 4834.94
         },
         "store_calls": {
-          "journal": 66,
+          "journal": 65,
           "checkpoint": 6
         },
         "wire_calls": {
@@ -4518,9 +4518,9 @@
           "input_tokens": 3
         },
         "nodes_ms": {
-          "research": 3993.7,
-          "analyze": 4110.7,
-          "write": 5127.1
+          "research": 1141.5,
+          "analyze": 1870.3,
+          "write": 1155.0
         },
         "output_sha256": "885b9fd3a5594a1fbbc7c800197cdd12717581c6c6cfec298bb5cd17724a44f3"
       },
@@ -4529,7 +4529,7 @@
         "position": 2,
         "executor": "reference",
         "latency_ms": 0,
-        "elapsed_ms": 4.967,
+        "elapsed_ms": 4.127,
         "store_ms": {
           "checkpoint": 0.0,
           "journal": 0.0
@@ -4540,9 +4540,9 @@
           "input_tokens": 0
         },
         "nodes_ms": {
-          "research": 1.466,
-          "analyze": 1.002,
-          "write": 0.982
+          "research": 0.87,
+          "analyze": 1.266,
+          "write": 0.717
         },
         "output_sha256": "885b9fd3a5594a1fbbc7c800197cdd12717581c6c6cfec298bb5cd17724a44f3"
       },
@@ -4551,13 +4551,13 @@
         "position": 0,
         "executor": "durable",
         "latency_ms": 0,
-        "elapsed_ms": 20248.85,
+        "elapsed_ms": 914.095,
         "store_ms": {
-          "checkpoint": 2977.087,
-          "journal": 17250.701
+          "checkpoint": 241.212,
+          "journal": 661.976
         },
         "store_calls": {
-          "journal": 66,
+          "journal": 65,
           "checkpoint": 6
         },
         "wire_calls": {
@@ -4565,9 +4565,9 @@
           "input_tokens": 3
         },
         "nodes_ms": {
-          "research": 5575.5,
-          "analyze": 4019.5,
-          "write": 4270.4
+          "research": 47.0,
+          "analyze": 39.7,
+          "write": 245.8
         },
         "output_sha256": "885b9fd3a5594a1fbbc7c800197cdd12717581c6c6cfec298bb5cd17724a44f3"
       },
@@ -4576,7 +4576,7 @@
         "position": 1,
         "executor": "reference",
         "latency_ms": 0,
-        "elapsed_ms": 5.166,
+        "elapsed_ms": 3.587,
         "store_ms": {
           "checkpoint": 0.0,
           "journal": 0.0
@@ -4587,9 +4587,9 @@
           "input_tokens": 0
         },
         "nodes_ms": {
-          "research": 1.357,
-          "analyze": 1.243,
-          "write": 1.042
+          "research": 0.868,
+          "analyze": 0.695,
+          "write": 0.939
         },
         "output_sha256": "885b9fd3a5594a1fbbc7c800197cdd12717581c6c6cfec298bb5cd17724a44f3"
       },
@@ -4598,9 +4598,9 @@
         "position": 2,
         "executor": "ordinary",
         "latency_ms": 0,
-        "elapsed_ms": 5960.1,
+        "elapsed_ms": 600.92,
         "store_ms": {
-          "checkpoint": 5949.773,
+          "checkpoint": 593.062,
           "journal": 0.0
         },
         "store_calls": {
@@ -4611,9 +4611,9 @@
           "input_tokens": 0
         },
         "nodes_ms": {
-          "research": 1.9,
-          "analyze": 1.7,
-          "write": 1.7
+          "research": 1.3,
+          "analyze": 1.2,
+          "write": 1.8
         },
         "output_sha256": "885b9fd3a5594a1fbbc7c800197cdd12717581c6c6cfec298bb5cd17724a44f3"
       },
@@ -4622,7 +4622,7 @@
         "position": 0,
         "executor": "reference",
         "latency_ms": 20,
-        "elapsed_ms": 98.44,
+        "elapsed_ms": 84.949,
         "store_ms": {
           "checkpoint": 0.0,
           "journal": 0.0
@@ -4633,9 +4633,9 @@
           "input_tokens": 0
         },
         "nodes_ms": {
-          "research": 35.978,
-          "analyze": 30.584,
-          "write": 30.331
+          "research": 21.818,
+          "analyze": 30.623,
+          "write": 31.332
         },
         "output_sha256": "885b9fd3a5594a1fbbc7c800197cdd12717581c6c6cfec298bb5cd17724a44f3"
       },
@@ -4644,9 +4644,9 @@
         "position": 1,
         "executor": "ordinary",
         "latency_ms": 20,
-        "elapsed_ms": 13466.11,
+        "elapsed_ms": 912.475,
         "store_ms": {
-          "checkpoint": 13357.544,
+          "checkpoint": 811.118,
           "journal": 0.0
         },
         "store_calls": {
@@ -4657,9 +4657,9 @@
           "input_tokens": 0
         },
         "nodes_ms": {
-          "research": 30.6,
-          "analyze": 36.9,
-          "write": 36.2
+          "research": 37.3,
+          "analyze": 34.9,
+          "write": 25.5
         },
         "output_sha256": "885b9fd3a5594a1fbbc7c800197cdd12717581c6c6cfec298bb5cd17724a44f3"
       },
@@ -4668,13 +4668,13 @@
         "position": 2,
         "executor": "durable",
         "latency_ms": 20,
-        "elapsed_ms": 21322.015,
+        "elapsed_ms": 7173.829,
         "store_ms": {
-          "checkpoint": 4329.689,
-          "journal": 16813.645
+          "checkpoint": 1113.687,
+          "journal": 5890.1
         },
         "store_calls": {
-          "journal": 66,
+          "journal": 65,
           "checkpoint": 6
         },
         "wire_calls": {
@@ -4682,9 +4682,9 @@
           "input_tokens": 3
         },
         "nodes_ms": {
-          "research": 4096.2,
-          "analyze": 4519.6,
-          "write": 4706.7
+          "research": 3646.9,
+          "analyze": 916.4,
+          "write": 427.2
         },
         "output_sha256": "885b9fd3a5594a1fbbc7c800197cdd12717581c6c6cfec298bb5cd17724a44f3"
       },
@@ -4693,9 +4693,9 @@
         "position": 0,
         "executor": "ordinary",
         "latency_ms": 20,
-        "elapsed_ms": 9637.096,
+        "elapsed_ms": 109.151,
         "store_ms": {
-          "checkpoint": 9536.279,
+          "checkpoint": 24.132,
           "journal": 0.0
         },
         "store_calls": {
@@ -4706,9 +4706,9 @@
           "input_tokens": 0
         },
         "nodes_ms": {
-          "research": 31.3,
-          "analyze": 29.3,
-          "write": 35.3
+          "research": 28.8,
+          "analyze": 25.4,
+          "write": 27.3
         },
         "output_sha256": "885b9fd3a5594a1fbbc7c800197cdd12717581c6c6cfec298bb5cd17724a44f3"
       },
@@ -4717,13 +4717,13 @@
         "position": 1,
         "executor": "durable",
         "latency_ms": 20,
-        "elapsed_ms": 23378.469,
+        "elapsed_ms": 5798.143,
         "store_ms": {
-          "checkpoint": 4513.834,
-          "journal": 18699.804
+          "checkpoint": 853.909,
+          "journal": 4754.763
         },
         "store_calls": {
-          "journal": 66,
+          "journal": 65,
           "checkpoint": 6
         },
         "wire_calls": {
@@ -4731,9 +4731,9 @@
           "input_tokens": 3
         },
         "nodes_ms": {
-          "research": 4341.9,
-          "analyze": 7542.4,
-          "write": 4178.2
+          "research": 1754.0,
+          "analyze": 1542.0,
+          "write": 982.7
         },
         "output_sha256": "885b9fd3a5594a1fbbc7c800197cdd12717581c6c6cfec298bb5cd17724a44f3"
       },
@@ -4742,7 +4742,7 @@
         "position": 2,
         "executor": "reference",
         "latency_ms": 20,
-        "elapsed_ms": 91.375,
+        "elapsed_ms": 99.84,
         "store_ms": {
           "checkpoint": 0.0,
           "journal": 0.0
@@ -4753,9 +4753,9 @@
           "input_tokens": 0
         },
         "nodes_ms": {
-          "research": 27.796,
-          "analyze": 31.24,
-          "write": 30.963
+          "research": 36.393,
+          "analyze": 31.328,
+          "write": 30.911
         },
         "output_sha256": "885b9fd3a5594a1fbbc7c800197cdd12717581c6c6cfec298bb5cd17724a44f3"
       },
@@ -4764,13 +4764,13 @@
         "position": 0,
         "executor": "durable",
         "latency_ms": 20,
-        "elapsed_ms": 20194.53,
+        "elapsed_ms": 1193.938,
         "store_ms": {
-          "checkpoint": 915.43,
-          "journal": 19115.879
+          "checkpoint": 220.924,
+          "journal": 801.909
         },
         "store_calls": {
-          "journal": 66,
+          "journal": 65,
           "checkpoint": 6
         },
         "wire_calls": {
@@ -4778,9 +4778,9 @@
           "input_tokens": 3
         },
         "nodes_ms": {
-          "research": 6463.0,
-          "analyze": 7204.1,
-          "write": 4652.8
+          "research": 440.9,
+          "analyze": 102.0,
+          "write": 98.9
         },
         "output_sha256": "885b9fd3a5594a1fbbc7c800197cdd12717581c6c6cfec298bb5cd17724a44f3"
       },
@@ -4789,7 +4789,7 @@
         "position": 1,
         "executor": "reference",
         "latency_ms": 20,
-        "elapsed_ms": 92.524,
+        "elapsed_ms": 88.181,
         "store_ms": {
           "checkpoint": 0.0,
           "journal": 0.0
@@ -4800,9 +4800,9 @@
           "input_tokens": 0
         },
         "nodes_ms": {
-          "research": 27.342,
-          "analyze": 31.023,
-          "write": 32.193
+          "research": 25.184,
+          "analyze": 30.606,
+          "write": 31.177
         },
         "output_sha256": "885b9fd3a5594a1fbbc7c800197cdd12717581c6c6cfec298bb5cd17724a44f3"
       },
@@ -4811,9 +4811,9 @@
         "position": 2,
         "executor": "ordinary",
         "latency_ms": 20,
-        "elapsed_ms": 5373.77,
+        "elapsed_ms": 425.424,
         "store_ms": {
-          "checkpoint": 5285.621,
+          "checkpoint": 339.746,
           "journal": 0.0
         },
         "store_calls": {
@@ -4824,9 +4824,9 @@
           "input_tokens": 0
         },
         "nodes_ms": {
-          "research": 28.1,
-          "analyze": 30.2,
-          "write": 25.3
+          "research": 24.1,
+          "analyze": 29.2,
+          "write": 28.9
         },
         "output_sha256": "885b9fd3a5594a1fbbc7c800197cdd12717581c6c6cfec298bb5cd17724a44f3"
       }
@@ -4835,7 +4835,7 @@
       "0": {
         "reference": {
           "runs": 3,
-          "median_elapsed_ms": 4.967,
+          "median_elapsed_ms": 3.587,
           "median_overhead_ms": 0.0,
           "median_store_ms": {
             "checkpoint": 0.0,
@@ -4855,17 +4855,17 @@
         },
         "ordinary": {
           "runs": 3,
-          "median_elapsed_ms": 5750.469,
-          "median_overhead_ms": 5745.502,
+          "median_elapsed_ms": 495.222,
+          "median_overhead_ms": 491.095,
           "median_store_ms": {
-            "checkpoint": 5712.998,
+            "checkpoint": 488.067,
             "journal": 0.0
           },
-          "median_overhead_excluding_store_ms": 5.368,
+          "median_overhead_excluding_store_ms": 4.019,
           "median_node_overhead_ms": {
-            "research": 0.723,
-            "analyze": 0.498,
-            "write": 0.726
+            "research": 0.53,
+            "analyze": 0.505,
+            "write": 0.492
           },
           "wire_calls": {
             "response": 3,
@@ -4875,17 +4875,17 @@
         },
         "durable": {
           "runs": 3,
-          "median_elapsed_ms": 20291.823,
-          "median_overhead_ms": 20286.856,
+          "median_elapsed_ms": 914.095,
+          "median_overhead_ms": 910.508,
           "median_store_ms": {
-            "checkpoint": 3194.385,
-            "journal": 17079.768
+            "checkpoint": 277.483,
+            "journal": 661.976
           },
-          "median_overhead_excluding_store_ms": 13.716,
+          "median_overhead_excluding_store_ms": 7.923,
           "median_node_overhead_ms": {
-            "research": 4654.823,
-            "analyze": 4018.257,
-            "write": 4269.358
+            "research": 51.034,
+            "analyze": 39.406,
+            "write": 244.861
           },
           "wire_calls": {
             "response": 3,
@@ -4897,7 +4897,7 @@
       "20": {
         "reference": {
           "runs": 3,
-          "median_elapsed_ms": 92.524,
+          "median_elapsed_ms": 88.181,
           "median_overhead_ms": 0.0,
           "median_store_ms": {
             "checkpoint": 0.0,
@@ -4917,17 +4917,17 @@
         },
         "ordinary": {
           "runs": 3,
-          "median_elapsed_ms": 9637.096,
-          "median_overhead_ms": 9545.721,
+          "median_elapsed_ms": 425.424,
+          "median_overhead_ms": 337.243,
           "median_store_ms": {
-            "checkpoint": 9536.279,
+            "checkpoint": 339.746,
             "journal": 0.0
           },
-          "median_overhead_excluding_store_ms": 9.442,
+          "median_overhead_excluding_store_ms": -2.503,
           "median_node_overhead_ms": {
-            "research": 0.758,
-            "analyze": -0.823,
-            "write": 4.337
+            "research": -1.084,
+            "analyze": -1.406,
+            "write": -3.611
           },
           "wire_calls": {
             "response": 3,
@@ -4937,17 +4937,17 @@
         },
         "durable": {
           "runs": 3,
-          "median_elapsed_ms": 21322.015,
-          "median_overhead_ms": 21223.575,
+          "median_elapsed_ms": 5798.143,
+          "median_overhead_ms": 5698.303,
           "median_store_ms": {
-            "checkpoint": 4329.689,
-            "journal": 18699.804
+            "checkpoint": 853.909,
+            "journal": 4754.763
           },
-          "median_overhead_excluding_store_ms": 73.456,
+          "median_overhead_excluding_store_ms": 85.093,
           "median_node_overhead_ms": {
-            "research": 4314.104,
-            "analyze": 7173.077,
-            "write": 4620.607
+            "research": 1717.607,
+            "analyze": 885.777,
+            "write": 395.868
           },
           "wire_calls": {
             "response": 3,
@@ -4972,8 +4972,8 @@
       "module": "smythe/__init__.py"
     },
     "source_control": {
-      "revision": "fc214aeaf382e85fdf1d5defadb8d636e026ae3e",
-      "dirty": true,
+      "revision": "9db826a37a9b3154b02c5d8f00efbcbc9403415f",
+      "dirty": false,
       "untracked_files": 0
     }
   }

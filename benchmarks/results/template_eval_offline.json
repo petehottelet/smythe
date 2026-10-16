@@ -95,7 +95,8 @@
           "excluded_task_families": [
             "code-change"
           ]
-        }
+        },
+        "parent_version": "4abea958e23ca3b2e13d6964253ea676a7a6cddcbbc55de22c9b8e42a0a5732a"
       }
     },
     "improvement": {
@@ -376,8 +377,7 @@
             "attach_dep_artifacts": false,
             "metadata": {}
           }
-        ],
-        "parent_version": "2a87d714e65f20fe6e62c394189028811f098a609b68030d3b888ab3c8128f9c"
+        ]
       }
     }
   },
@@ -658,7 +658,7 @@
       },
       "evaluator_manifest": {
         "version": 1,
-        "code_digest": "sha256:03a28cc7cd7217e20a13ffd40a3bd32a13df0b4c48510c7c4e17bed5b0459524",
+        "code_digest": "sha256:85549898715d722471093c12e2f1398b44e7d6d0d755d6e06bdd24cce0a6d888",
         "split_manifests": {
           "development": "sha256:c3beaf2de273294268c6908eda40a3824914c7f4fd156947caffb69cdd3b0390",
           "confirmation": "sha256:94fcbc0e03100cccc04b99f881516d035336ece34b7696a88fd02f8d9d7d509d",
@@ -683,7 +683,7 @@
         ],
         "price_snapshot_version": "offline-fixture-3000-nanousd-per-token-v1"
       },
-      "evaluator_hash": "sha256:3cbfeb4d4f3ff89c7e4bc6d522a7a1358f96a5df44b4ddcc134b9e8492edaeff",
+      "evaluator_hash": "sha256:dd3bbd0e576e8d361f705d6dc97e307e3967f2cdedc8e34bbc3c11a727ad7aa4",
       "split_manifests": {
         "development": {
           "pack": "template-eval-development",
@@ -713,7 +713,7 @@
           }
         }
       },
-      "holdout_identity": "sha256:a0b0cc50a41cf6df592621a5203f9faf6427b37b772b92e74654bbe410472d01",
+      "holdout_identity": "sha256:316b0d478ef9dd3e20793211d91ea5b4f7a61d2e24237fe71f5f3b3d26a25377",
       "holdout": {
         "pack": "template-eval-holdout",
         "held_out": "a task family development and confirmation do not contain",
@@ -721,15 +721,15 @@
         "first_holdout_trial": 11
       },
       "decision": {
-        "campaign_id": "optimization_v4_c9c6c51c3641305c2808cfb9a5e21226984954d1d660d6fe7d0c3b1631607503",
-        "optimization_plan_hash": "sha256:c9c6c51c3641305c2808cfb9a5e21226984954d1d660d6fe7d0c3b1631607503",
-        "holdout_seed_commitment": "sha256:9dae9e591ef6d8b208e128d7ba0d9cb42f227c0bd9ba590fc4d17e23b30ce154",
+        "campaign_id": "optimization_v4_8ea2f961c784150cd1f5d119dd05e81656097888a94cb4df1bfe8462f4e399bf",
+        "optimization_plan_hash": "sha256:8ea2f961c784150cd1f5d119dd05e81656097888a94cb4df1bfe8462f4e399bf",
+        "holdout_seed_commitment": "sha256:86080d778301d319916ae6fc8989d96824d31f11ee31cd4ec12659fc7853577f",
         "incumbent_candidate_id": "cand_f87805347f44b6f10cd030ce081fb1f9981f5f4681266098b2ac2ca506fee479",
         "selected_candidate_id": "cand_02b657aeb8eb690b7f4064e5ad70a95bc46faa24562779d3692ccfceaf19a81d",
         "promoted": true,
         "verdict": "improved",
         "reason": "confirmation and untouched holdout both passed promotion policy",
-        "decision_id": "decision_v1_1774163e9b83b006900f60ca66f9d8999cebd7a1ab41bfd82401d739f5a3a828",
+        "decision_id": "decision_v1_8739a9772a24e944c110782f9fb926275ed10ba6f57c7d561ced2d67bf489af8",
         "development_scores": [
           {
             "candidate_id": "cand_02b657aeb8eb690b7f4064e5ad70a95bc46faa24562779d3692ccfceaf19a81d",
@@ -779,8 +779,8 @@
               "node_count": true
             },
             "trial_keys": [
-              "trial_v1_25a07646777b9cab503455c3549d3d18fca6558d26367fc68f81bf6c927029f8",
-              "trial_v1_312ec9dd588d9a94e9cf3df64e0261b487fb18fc8ab78999404aeceedd8ebf49"
+              "trial_v1_3cd3a33801c45d5196b372e98de425897e7f47dc6333f35f650af32afb2ed6f1",
+              "trial_v1_315d8fe136a759e8ef35cc8436c5f63bd183b26f6fa64724a7d268d59a976a7a"
             ],
             "viable": true
           }
@@ -801,7 +801,7 @@
             "mean_improvement": 2.0,
             "confidence_level": 0.8,
             "bootstrap_resamples": 2000,
-            "bootstrap_seed": 4299160370488790602,
+            "bootstrap_seed": 4110562869260676756,
             "confidence_interval": [
               2.0,
               2.0
@@ -833,7 +833,7 @@
               "mean_improvement": -573.0,
               "confidence_level": 0.8,
               "bootstrap_resamples": 2000,
-              "bootstrap_seed": 4299160370488790602,
+              "bootstrap_seed": 4110562869260676756,
               "confidence_interval": [
                 -573.0,
                 -573.0
@@ -864,7 +864,7 @@
               "mean_improvement": 0.0,
               "confidence_level": 0.8,
               "bootstrap_resamples": 2000,
-              "bootstrap_seed": 4299160370488790602,
+              "bootstrap_seed": 4110562869260676756,
               "confidence_interval": [
                 0.0,
                 0.0
@@ -895,7 +895,7 @@
               "mean_improvement": 0.0,
               "confidence_level": 0.8,
               "bootstrap_resamples": 2000,
-              "bootstrap_seed": 4299160370488790602,
+              "bootstrap_seed": 4110562869260676756,
               "confidence_interval": [
                 0.0,
                 0.0
@@ -937,16 +937,16 @@
             "direction": "maximize",
             "sample_count": 3,
             "sample_seeds": [
-              7151910942485708548,
-              4762801533809612322,
-              1899092433688421665
+              2753555241151421048,
+              1925046584326559099,
+              2787602835436633662
             ],
             "baseline_mean": 2.0,
             "candidate_mean": 4.0,
             "mean_improvement": 2.0,
             "confidence_level": 0.8,
             "bootstrap_resamples": 2000,
-            "bootstrap_seed": 3926612177664133924,
+            "bootstrap_seed": 278377532790580968,
             "confidence_interval": [
               2.0,
               2.0
@@ -969,16 +969,16 @@
               "direction": "minimize",
               "sample_count": 3,
               "sample_seeds": [
-                7151910942485708548,
-                4762801533809612322,
-                1899092433688421665
+                2753555241151421048,
+                1925046584326559099,
+                2787602835436633662
               ],
               "baseline_mean": 4137.0,
               "candidate_mean": 4746.0,
               "mean_improvement": -609.0,
               "confidence_level": 0.8,
               "bootstrap_resamples": 2000,
-              "bootstrap_seed": 3926612177664133924,
+              "bootstrap_seed": 278377532790580968,
               "confidence_interval": [
                 -609.0,
                 -609.0
@@ -1000,16 +1000,16 @@
               "direction": "minimize",
               "sample_count": 3,
               "sample_seeds": [
-                7151910942485708548,
-                4762801533809612322,
-                1899092433688421665
+                2753555241151421048,
+                1925046584326559099,
+                2787602835436633662
               ],
               "baseline_mean": 13.0,
               "candidate_mean": 13.0,
               "mean_improvement": 0.0,
               "confidence_level": 0.8,
               "bootstrap_resamples": 2000,
-              "bootstrap_seed": 3926612177664133924,
+              "bootstrap_seed": 278377532790580968,
               "confidence_interval": [
                 0.0,
                 0.0
@@ -1031,16 +1031,16 @@
               "direction": "maximize",
               "sample_count": 3,
               "sample_seeds": [
-                7151910942485708548,
-                4762801533809612322,
-                1899092433688421665
+                2753555241151421048,
+                1925046584326559099,
+                2787602835436633662
               ],
               "baseline_mean": 4.0,
               "candidate_mean": 4.0,
               "mean_improvement": 0.0,
               "confidence_level": 0.8,
               "bootstrap_resamples": 2000,
-              "bootstrap_seed": 3926612177664133924,
+              "bootstrap_seed": 278377532790580968,
               "confidence_interval": [
                 0.0,
                 0.0
@@ -1095,7 +1095,7 @@
               "primary": {
                 "baseline_mean": 4.0,
                 "bootstrap_resamples": 2000,
-                "bootstrap_seed": 4299160370488790602,
+                "bootstrap_seed": 4110562869260676756,
                 "candidate_mean": 4.0,
                 "confidence_interval": [
                   0.0,
@@ -1131,7 +1131,7 @@
                 {
                   "baseline_mean": 888.0,
                   "bootstrap_resamples": 2000,
-                  "bootstrap_seed": 4299160370488790602,
+                  "bootstrap_seed": 4110562869260676756,
                   "candidate_mean": 4521.0,
                   "confidence_interval": [
                     -3633.0,
@@ -1162,7 +1162,7 @@
                 {
                   "baseline_mean": 4.0,
                   "bootstrap_resamples": 2000,
-                  "bootstrap_seed": 4299160370488790602,
+                  "bootstrap_seed": 4110562869260676756,
                   "candidate_mean": 13.0,
                   "confidence_interval": [
                     -9.0,
@@ -1193,7 +1193,7 @@
                 {
                   "baseline_mean": 4.0,
                   "bootstrap_resamples": 2000,
-                  "bootstrap_seed": 4299160370488790602,
+                  "bootstrap_seed": 4110562869260676756,
                   "candidate_mean": 4.0,
                   "confidence_interval": [
                     0.0,
@@ -1242,7 +1242,7 @@
               "primary": {
                 "baseline_mean": 4.0,
                 "bootstrap_resamples": 2000,
-                "bootstrap_seed": 3926612177664133924,
+                "bootstrap_seed": 278377532790580968,
                 "candidate_mean": 4.0,
                 "confidence_interval": [
                   0.0,
@@ -1264,9 +1264,9 @@
                 "objective_name": "accepted_count",
                 "sample_count": 3,
                 "sample_seeds": [
-                  7151910942485708548,
-                  4762801533809612322,
-                  1899092433688421665
+                  2753555241151421048,
+                  1925046584326559099,
+                  2787602835436633662
                 ],
                 "standard_error": 0.0
               },
@@ -1278,7 +1278,7 @@
                 {
                   "baseline_mean": 927.0,
                   "bootstrap_resamples": 2000,
-                  "bootstrap_seed": 3926612177664133924,
+                  "bootstrap_seed": 278377532790580968,
                   "candidate_mean": 4746.0,
                   "confidence_interval": [
                     -3819.0,
@@ -1300,16 +1300,16 @@
                   "objective_name": "attributable_cost_microusd",
                   "sample_count": 3,
                   "sample_seeds": [
-                    7151910942485708548,
-                    4762801533809612322,
-                    1899092433688421665
+                    2753555241151421048,
+                    1925046584326559099,
+                    2787602835436633662
                   ],
                   "standard_error": 0.0
                 },
                 {
                   "baseline_mean": 4.0,
                   "bootstrap_resamples": 2000,
-                  "bootstrap_seed": 3926612177664133924,
+                  "bootstrap_seed": 278377532790580968,
                   "candidate_mean": 13.0,
                   "confidence_interval": [
                     -9.0,
@@ -1331,16 +1331,16 @@
                   "objective_name": "node_count",
                   "sample_count": 3,
                   "sample_seeds": [
-                    7151910942485708548,
-                    4762801533809612322,
-                    1899092433688421665
+                    2753555241151421048,
+                    1925046584326559099,
+                    2787602835436633662
                   ],
                   "standard_error": 0.0
                 },
                 {
                   "baseline_mean": 4.0,
                   "bootstrap_resamples": 2000,
-                  "bootstrap_seed": 3926612177664133924,
+                  "bootstrap_seed": 278377532790580968,
                   "candidate_mean": 4.0,
                   "confidence_interval": [
                     0.0,
@@ -1362,9 +1362,9 @@
                   "objective_name": "attempted_count",
                   "sample_count": 3,
                   "sample_seeds": [
-                    7151910942485708548,
-                    4762801533809612322,
-                    1899092433688421665
+                    2753555241151421048,
+                    1925046584326559099,
+                    2787602835436633662
                   ],
                   "standard_error": 0.0
                 }
@@ -1452,7 +1452,7 @@
       },
       "trials": [
         {
-          "trial_key": "trial_v1_25a07646777b9cab503455c3549d3d18fca6558d26367fc68f81bf6c927029f8",
+          "trial_key": "trial_v1_3cd3a33801c45d5196b372e98de425897e7f47dc6333f35f650af32afb2ed6f1",
           "split": "development",
           "role": "incumbent",
           "candidate_id": "cand_f87805347f44b6f10cd030ce081fb1f9981f5f4681266098b2ac2ca506fee479",
@@ -1543,7 +1543,7 @@
           "arm": "predecessor"
         },
         {
-          "trial_key": "trial_v1_312ec9dd588d9a94e9cf3df64e0261b487fb18fc8ab78999404aeceedd8ebf49",
+          "trial_key": "trial_v1_315d8fe136a759e8ef35cc8436c5f63bd183b26f6fa64724a7d268d59a976a7a",
           "split": "development",
           "role": "challenger",
           "candidate_id": "cand_02b657aeb8eb690b7f4064e5ad70a95bc46faa24562779d3692ccfceaf19a81d",
@@ -1628,7 +1628,7 @@
           "arm": "improvement"
         },
         {
-          "trial_key": "trial_v1_24dbacb8521f8d69de9906c8d3a4750856c4ce6498da28fc201bd4b5a28e5f08",
+          "trial_key": "trial_v1_7e217dd5da30453059bcfad7c147579cd2e543019e3806a3a68a1364748a8a22",
           "split": "confirmation",
           "role": "incumbent",
           "candidate_id": "cand_f87805347f44b6f10cd030ce081fb1f9981f5f4681266098b2ac2ca506fee479",
@@ -1719,7 +1719,7 @@
           "arm": "predecessor"
         },
         {
-          "trial_key": "trial_v1_2e87cb4ad29f2b3098b2df16d04f46ad3bfec6cbdaba15b977da49f8114c18a4",
+          "trial_key": "trial_v1_9aeb636bbcf3554a397337b9a05e52b782c2ed7e2b22f9c994de6a2bcbf5d6ca",
           "split": "confirmation",
           "role": "incumbent",
           "candidate_id": "cand_f87805347f44b6f10cd030ce081fb1f9981f5f4681266098b2ac2ca506fee479",
@@ -1810,7 +1810,7 @@
           "arm": "predecessor"
         },
         {
-          "trial_key": "trial_v1_6aeb0f4fd646b3c308ac04329b300e42db081747c22ea4f01dab6e1a74f3b751",
+          "trial_key": "trial_v1_a3a4d672a5ec6d55bcb59c2106e33a0070cf905403731151806b7fbcadd5e6f2",
           "split": "confirmation",
           "role": "incumbent",
           "candidate_id": "cand_f87805347f44b6f10cd030ce081fb1f9981f5f4681266098b2ac2ca506fee479",
@@ -1901,7 +1901,7 @@
           "arm": "predecessor"
         },
         {
-          "trial_key": "trial_v1_f586aa8cd5e72a35e319544dd9aea6aad54d31502ccccf7d963c0cebd62cec9a",
+          "trial_key": "trial_v1_2d1558cb2d055c593c4d5b555c716c8509a953145b40a115f0e022afb9430803",
           "split": "confirmation",
           "role": "challenger",
           "candidate_id": "cand_02b657aeb8eb690b7f4064e5ad70a95bc46faa24562779d3692ccfceaf19a81d",
@@ -1986,7 +1986,7 @@
           "arm": "improvement"
         },
         {
-          "trial_key": "trial_v1_2498ac6bd1d8f283dcb6b001d81b8aa5c0f430b7c10f2d68215581507469921b",
+          "trial_key": "trial_v1_193e629912990b0cfd67e795a6273c352d26b11150e98b5969196fe184fcf061",
           "split": "confirmation",
           "role": "challenger",
           "candidate_id": "cand_02b657aeb8eb690b7f4064e5ad70a95bc46faa24562779d3692ccfceaf19a81d",
@@ -2071,7 +2071,7 @@
           "arm": "improvement"
         },
         {
-          "trial_key": "trial_v1_5ce89a96d18e43daf3664b075d11643250e76b622b800e6d7131b990ad959e8d",
+          "trial_key": "trial_v1_7385be257412012c4a44c4c01c4df4a5c2382350388aea637fe47612ab376b66",
           "split": "confirmation",
           "role": "challenger",
           "candidate_id": "cand_02b657aeb8eb690b7f4064e5ad70a95bc46faa24562779d3692ccfceaf19a81d",
@@ -2156,7 +2156,7 @@
           "arm": "improvement"
         },
         {
-          "trial_key": "trial_v1_fa5d7f43ec0fae94d549e3331d7bf958c191df17816a6ebcc543ee7ee9cde90f",
+          "trial_key": "trial_v1_af0407ad433fafa8d9e6775eb73a745fd05405a6c5842918d08142bcfc5b2dce",
           "split": "confirmation",
           "role": "reference",
           "candidate_id": "cand_4fdbb490a83e8f4ec31139d50de886d3e275b6662657fca1261fcbadbe96fcd4",
@@ -2241,7 +2241,7 @@
           "arm": "single_agent"
         },
         {
-          "trial_key": "trial_v1_8667a71a41cffd88d646e9246fa55872cac714a3666690948ea34a517977d8cc",
+          "trial_key": "trial_v1_4f1b8c78720d6c5079a70cbec51c5717b1787439d20ca32e58f8ad920d5ec711",
           "split": "confirmation",
           "role": "reference",
           "candidate_id": "cand_4fdbb490a83e8f4ec31139d50de886d3e275b6662657fca1261fcbadbe96fcd4",
@@ -2326,7 +2326,7 @@
           "arm": "single_agent"
         },
         {
-          "trial_key": "trial_v1_a411c781ce50837e9b9620f89bbafea723d56dbb1c63e08c1280837ce22bab3c",
+          "trial_key": "trial_v1_3988443bc368fd1949f4f2db6c26065b7f35f569d1c5ad6af2e11404eb433198",
           "split": "confirmation",
           "role": "reference",
           "candidate_id": "cand_4fdbb490a83e8f4ec31139d50de886d3e275b6662657fca1261fcbadbe96fcd4",
@@ -2411,194 +2411,12 @@
           "arm": "single_agent"
         },
         {
-          "trial_key": "trial_v1_6f7ee7b428f19b8d0ccb11b545011aca460db910db6a1b0e64444c85a208ab3f",
+          "trial_key": "trial_v1_7e7d27b5ebfbe95ce865d245d98b17d071fcf031ab25cd1ae3eccbe6564d9e5f",
           "split": "holdout",
           "role": "incumbent",
           "candidate_id": "cand_f87805347f44b6f10cd030ce081fb1f9981f5f4681266098b2ac2ca506fee479",
           "value": "2a87d714e65f20fe6e62c394189028811f098a609b68030d3b888ab3c8128f9c",
-          "seed": 7151910942485708548,
-          "pack": "template-eval-holdout",
-          "pack_sha256": "sha256:f74ee7702e30ecd426b2b221dd6b00c91151aaf05dbca8d241a4a042405fc831",
-          "metrics": {
-            "accepted_count": 2,
-            "attempted_count": 4,
-            "attributable_cost_microusd": 4137,
-            "node_count": 13
-          },
-          "gates": {
-            "acceptance.policy_unchanged": true,
-            "accounting.complete": true,
-            "applicability.excluded_untouched": true,
-            "accepted.nonzero": true
-          },
-          "tasks": [
-            {
-              "task_id": "incident-cert",
-              "family": "incident-review",
-              "outcome": "rejected",
-              "reasons": [
-                "final validator 'smythe.text-spec' rejected the output: section_missing: required section 'Sources' is missing"
-              ],
-              "template_built": true,
-              "selection_calls": 1,
-              "step_calls": 4,
-              "failed_calls": 1,
-              "tokens": 411,
-              "node_count": 4,
-              "node_statuses": {
-                "completed": 3,
-                "skipped": 1
-              }
-            },
-            {
-              "task_id": "incident-queue",
-              "family": "incident-review",
-              "outcome": "rejected",
-              "reasons": [
-                "final validator 'smythe.text-spec' rejected the output: section_missing: required section 'Timeline' is missing"
-              ],
-              "template_built": true,
-              "selection_calls": 1,
-              "step_calls": 4,
-              "failed_calls": 1,
-              "tokens": 396,
-              "node_count": 4,
-              "node_statuses": {
-                "completed": 3,
-                "skipped": 1
-              }
-            },
-            {
-              "task_id": "incident-dns",
-              "family": "incident-review",
-              "outcome": "accepted",
-              "reasons": [],
-              "template_built": true,
-              "selection_calls": 1,
-              "step_calls": 4,
-              "failed_calls": 0,
-              "tokens": 510,
-              "node_count": 4,
-              "node_statuses": {
-                "completed": 4
-              }
-            },
-            {
-              "task_id": "change-cache",
-              "family": "code-change",
-              "outcome": "accepted",
-              "reasons": [],
-              "template_built": false,
-              "selection_calls": 0,
-              "step_calls": 1,
-              "failed_calls": 0,
-              "tokens": 62,
-              "node_count": 1,
-              "node_statuses": {
-                "completed": 1
-              }
-            }
-          ],
-          "arm": "predecessor"
-        },
-        {
-          "trial_key": "trial_v1_97a521e07648e97bb2b565ddace25c96926a2840083b2cc2a302276f58557e80",
-          "split": "holdout",
-          "role": "incumbent",
-          "candidate_id": "cand_f87805347f44b6f10cd030ce081fb1f9981f5f4681266098b2ac2ca506fee479",
-          "value": "2a87d714e65f20fe6e62c394189028811f098a609b68030d3b888ab3c8128f9c",
-          "seed": 4762801533809612322,
-          "pack": "template-eval-holdout",
-          "pack_sha256": "sha256:f74ee7702e30ecd426b2b221dd6b00c91151aaf05dbca8d241a4a042405fc831",
-          "metrics": {
-            "accepted_count": 2,
-            "attempted_count": 4,
-            "attributable_cost_microusd": 4137,
-            "node_count": 13
-          },
-          "gates": {
-            "acceptance.policy_unchanged": true,
-            "accounting.complete": true,
-            "applicability.excluded_untouched": true,
-            "accepted.nonzero": true
-          },
-          "tasks": [
-            {
-              "task_id": "change-cache",
-              "family": "code-change",
-              "outcome": "accepted",
-              "reasons": [],
-              "template_built": false,
-              "selection_calls": 0,
-              "step_calls": 1,
-              "failed_calls": 0,
-              "tokens": 62,
-              "node_count": 1,
-              "node_statuses": {
-                "completed": 1
-              }
-            },
-            {
-              "task_id": "incident-queue",
-              "family": "incident-review",
-              "outcome": "rejected",
-              "reasons": [
-                "final validator 'smythe.text-spec' rejected the output: section_missing: required section 'Timeline' is missing"
-              ],
-              "template_built": true,
-              "selection_calls": 1,
-              "step_calls": 4,
-              "failed_calls": 1,
-              "tokens": 396,
-              "node_count": 4,
-              "node_statuses": {
-                "completed": 3,
-                "skipped": 1
-              }
-            },
-            {
-              "task_id": "incident-cert",
-              "family": "incident-review",
-              "outcome": "rejected",
-              "reasons": [
-                "final validator 'smythe.text-spec' rejected the output: section_missing: required section 'Sources' is missing"
-              ],
-              "template_built": true,
-              "selection_calls": 1,
-              "step_calls": 4,
-              "failed_calls": 1,
-              "tokens": 411,
-              "node_count": 4,
-              "node_statuses": {
-                "completed": 3,
-                "skipped": 1
-              }
-            },
-            {
-              "task_id": "incident-dns",
-              "family": "incident-review",
-              "outcome": "accepted",
-              "reasons": [],
-              "template_built": true,
-              "selection_calls": 1,
-              "step_calls": 4,
-              "failed_calls": 0,
-              "tokens": 510,
-              "node_count": 4,
-              "node_statuses": {
-                "completed": 4
-              }
-            }
-          ],
-          "arm": "predecessor"
-        },
-        {
-          "trial_key": "trial_v1_a838e208e6ef402cd14843b52257c308046baf6de9accbc4131128fa9d9d1831",
-          "split": "holdout",
-          "role": "incumbent",
-          "candidate_id": "cand_f87805347f44b6f10cd030ce081fb1f9981f5f4681266098b2ac2ca506fee479",
-          "value": "2a87d714e65f20fe6e62c394189028811f098a609b68030d3b888ab3c8128f9c",
-          "seed": 1899092433688421665,
+          "seed": 2753555241151421048,
           "pack": "template-eval-holdout",
           "pack_sha256": "sha256:f74ee7702e30ecd426b2b221dd6b00c91151aaf05dbca8d241a4a042405fc831",
           "metrics": {
@@ -2684,12 +2502,194 @@
           "arm": "predecessor"
         },
         {
-          "trial_key": "trial_v1_9d012cb964f60b8250d332651c3bcced9c21ea2ae39bd1190c14eaed8ae8633f",
+          "trial_key": "trial_v1_d954709b807155b701b515a73565c04907191ec7a172f42a2bd5d7fc2ff06915",
+          "split": "holdout",
+          "role": "incumbent",
+          "candidate_id": "cand_f87805347f44b6f10cd030ce081fb1f9981f5f4681266098b2ac2ca506fee479",
+          "value": "2a87d714e65f20fe6e62c394189028811f098a609b68030d3b888ab3c8128f9c",
+          "seed": 1925046584326559099,
+          "pack": "template-eval-holdout",
+          "pack_sha256": "sha256:f74ee7702e30ecd426b2b221dd6b00c91151aaf05dbca8d241a4a042405fc831",
+          "metrics": {
+            "accepted_count": 2,
+            "attempted_count": 4,
+            "attributable_cost_microusd": 4137,
+            "node_count": 13
+          },
+          "gates": {
+            "acceptance.policy_unchanged": true,
+            "accounting.complete": true,
+            "applicability.excluded_untouched": true,
+            "accepted.nonzero": true
+          },
+          "tasks": [
+            {
+              "task_id": "incident-dns",
+              "family": "incident-review",
+              "outcome": "accepted",
+              "reasons": [],
+              "template_built": true,
+              "selection_calls": 1,
+              "step_calls": 4,
+              "failed_calls": 0,
+              "tokens": 510,
+              "node_count": 4,
+              "node_statuses": {
+                "completed": 4
+              }
+            },
+            {
+              "task_id": "change-cache",
+              "family": "code-change",
+              "outcome": "accepted",
+              "reasons": [],
+              "template_built": false,
+              "selection_calls": 0,
+              "step_calls": 1,
+              "failed_calls": 0,
+              "tokens": 62,
+              "node_count": 1,
+              "node_statuses": {
+                "completed": 1
+              }
+            },
+            {
+              "task_id": "incident-queue",
+              "family": "incident-review",
+              "outcome": "rejected",
+              "reasons": [
+                "final validator 'smythe.text-spec' rejected the output: section_missing: required section 'Timeline' is missing"
+              ],
+              "template_built": true,
+              "selection_calls": 1,
+              "step_calls": 4,
+              "failed_calls": 1,
+              "tokens": 396,
+              "node_count": 4,
+              "node_statuses": {
+                "completed": 3,
+                "skipped": 1
+              }
+            },
+            {
+              "task_id": "incident-cert",
+              "family": "incident-review",
+              "outcome": "rejected",
+              "reasons": [
+                "final validator 'smythe.text-spec' rejected the output: section_missing: required section 'Sources' is missing"
+              ],
+              "template_built": true,
+              "selection_calls": 1,
+              "step_calls": 4,
+              "failed_calls": 1,
+              "tokens": 411,
+              "node_count": 4,
+              "node_statuses": {
+                "completed": 3,
+                "skipped": 1
+              }
+            }
+          ],
+          "arm": "predecessor"
+        },
+        {
+          "trial_key": "trial_v1_843d5344eb78a067c481afc8386f791d992600336603ab8a0b8242920e23a500",
+          "split": "holdout",
+          "role": "incumbent",
+          "candidate_id": "cand_f87805347f44b6f10cd030ce081fb1f9981f5f4681266098b2ac2ca506fee479",
+          "value": "2a87d714e65f20fe6e62c394189028811f098a609b68030d3b888ab3c8128f9c",
+          "seed": 2787602835436633662,
+          "pack": "template-eval-holdout",
+          "pack_sha256": "sha256:f74ee7702e30ecd426b2b221dd6b00c91151aaf05dbca8d241a4a042405fc831",
+          "metrics": {
+            "accepted_count": 2,
+            "attempted_count": 4,
+            "attributable_cost_microusd": 4137,
+            "node_count": 13
+          },
+          "gates": {
+            "acceptance.policy_unchanged": true,
+            "accounting.complete": true,
+            "applicability.excluded_untouched": true,
+            "accepted.nonzero": true
+          },
+          "tasks": [
+            {
+              "task_id": "change-cache",
+              "family": "code-change",
+              "outcome": "accepted",
+              "reasons": [],
+              "template_built": false,
+              "selection_calls": 0,
+              "step_calls": 1,
+              "failed_calls": 0,
+              "tokens": 62,
+              "node_count": 1,
+              "node_statuses": {
+                "completed": 1
+              }
+            },
+            {
+              "task_id": "incident-dns",
+              "family": "incident-review",
+              "outcome": "accepted",
+              "reasons": [],
+              "template_built": true,
+              "selection_calls": 1,
+              "step_calls": 4,
+              "failed_calls": 0,
+              "tokens": 510,
+              "node_count": 4,
+              "node_statuses": {
+                "completed": 4
+              }
+            },
+            {
+              "task_id": "incident-cert",
+              "family": "incident-review",
+              "outcome": "rejected",
+              "reasons": [
+                "final validator 'smythe.text-spec' rejected the output: section_missing: required section 'Sources' is missing"
+              ],
+              "template_built": true,
+              "selection_calls": 1,
+              "step_calls": 4,
+              "failed_calls": 1,
+              "tokens": 411,
+              "node_count": 4,
+              "node_statuses": {
+                "completed": 3,
+                "skipped": 1
+              }
+            },
+            {
+              "task_id": "incident-queue",
+              "family": "incident-review",
+              "outcome": "rejected",
+              "reasons": [
+                "final validator 'smythe.text-spec' rejected the output: section_missing: required section 'Timeline' is missing"
+              ],
+              "template_built": true,
+              "selection_calls": 1,
+              "step_calls": 4,
+              "failed_calls": 1,
+              "tokens": 396,
+              "node_count": 4,
+              "node_statuses": {
+                "completed": 3,
+                "skipped": 1
+              }
+            }
+          ],
+          "arm": "predecessor"
+        },
+        {
+          "trial_key": "trial_v1_1e7f79aec17d8b84569b34d6865d6307e0d298e552e2ca73e07ed6c701f4df3f",
           "split": "holdout",
           "role": "challenger",
           "candidate_id": "cand_02b657aeb8eb690b7f4064e5ad70a95bc46faa24562779d3692ccfceaf19a81d",
           "value": "826039f89f647a04dc5f67c2206f9a56e54c5778347fbfa40f41923f3d9769d3",
-          "seed": 7151910942485708548,
+          "seed": 2753555241151421048,
           "pack": "template-eval-holdout",
           "pack_sha256": "sha256:f74ee7702e30ecd426b2b221dd6b00c91151aaf05dbca8d241a4a042405fc831",
           "metrics": {
@@ -2721,21 +2721,6 @@
               }
             },
             {
-              "task_id": "incident-queue",
-              "family": "incident-review",
-              "outcome": "accepted",
-              "reasons": [],
-              "template_built": true,
-              "selection_calls": 1,
-              "step_calls": 5,
-              "failed_calls": 1,
-              "tokens": 495,
-              "node_count": 4,
-              "node_statuses": {
-                "completed": 4
-              }
-            },
-            {
               "task_id": "incident-dns",
               "family": "incident-review",
               "outcome": "accepted",
@@ -2745,6 +2730,21 @@
               "step_calls": 4,
               "failed_calls": 0,
               "tokens": 510,
+              "node_count": 4,
+              "node_statuses": {
+                "completed": 4
+              }
+            },
+            {
+              "task_id": "incident-queue",
+              "family": "incident-review",
+              "outcome": "accepted",
+              "reasons": [],
+              "template_built": true,
+              "selection_calls": 1,
+              "step_calls": 5,
+              "failed_calls": 1,
+              "tokens": 495,
               "node_count": 4,
               "node_statuses": {
                 "completed": 4
@@ -2769,12 +2769,12 @@
           "arm": "improvement"
         },
         {
-          "trial_key": "trial_v1_e2e1ed3b24408b99cd08c6d7f38149356466ed9c800e214cc7eec3d0d8909bdf",
+          "trial_key": "trial_v1_4932f2f5987bf115ec9695918808e794bb1b9f16ab5ccefa189884dc5016ed07",
           "split": "holdout",
           "role": "challenger",
           "candidate_id": "cand_02b657aeb8eb690b7f4064e5ad70a95bc46faa24562779d3692ccfceaf19a81d",
           "value": "826039f89f647a04dc5f67c2206f9a56e54c5778347fbfa40f41923f3d9769d3",
-          "seed": 4762801533809612322,
+          "seed": 1925046584326559099,
           "pack": "template-eval-holdout",
           "pack_sha256": "sha256:f74ee7702e30ecd426b2b221dd6b00c91151aaf05dbca8d241a4a042405fc831",
           "metrics": {
@@ -2790,6 +2790,21 @@
             "accepted.nonzero": true
           },
           "tasks": [
+            {
+              "task_id": "incident-dns",
+              "family": "incident-review",
+              "outcome": "accepted",
+              "reasons": [],
+              "template_built": true,
+              "selection_calls": 1,
+              "step_calls": 4,
+              "failed_calls": 0,
+              "tokens": 510,
+              "node_count": 4,
+              "node_statuses": {
+                "completed": 4
+              }
+            },
             {
               "task_id": "change-cache",
               "family": "code-change",
@@ -2834,32 +2849,17 @@
               "node_statuses": {
                 "completed": 4
               }
-            },
-            {
-              "task_id": "incident-dns",
-              "family": "incident-review",
-              "outcome": "accepted",
-              "reasons": [],
-              "template_built": true,
-              "selection_calls": 1,
-              "step_calls": 4,
-              "failed_calls": 0,
-              "tokens": 510,
-              "node_count": 4,
-              "node_statuses": {
-                "completed": 4
-              }
             }
           ],
           "arm": "improvement"
         },
         {
-          "trial_key": "trial_v1_61bcd8ddf5e06e5d16152dcf729b6ff733655a6d742059d10727bce32369eed9",
+          "trial_key": "trial_v1_76d65dd58ac6aeff1bb7cab6243ac13dbca7f3b31b0b280bddb5806682db793e",
           "split": "holdout",
           "role": "challenger",
           "candidate_id": "cand_02b657aeb8eb690b7f4064e5ad70a95bc46faa24562779d3692ccfceaf19a81d",
           "value": "826039f89f647a04dc5f67c2206f9a56e54c5778347fbfa40f41923f3d9769d3",
-          "seed": 1899092433688421665,
+          "seed": 2787602835436633662,
           "pack": "template-eval-holdout",
           "pack_sha256": "sha256:f74ee7702e30ecd426b2b221dd6b00c91151aaf05dbca8d241a4a042405fc831",
           "metrics": {
@@ -2876,18 +2876,18 @@
           },
           "tasks": [
             {
-              "task_id": "incident-cert",
-              "family": "incident-review",
+              "task_id": "change-cache",
+              "family": "code-change",
               "outcome": "accepted",
               "reasons": [],
-              "template_built": true,
-              "selection_calls": 1,
-              "step_calls": 5,
-              "failed_calls": 1,
-              "tokens": 515,
-              "node_count": 4,
+              "template_built": false,
+              "selection_calls": 0,
+              "step_calls": 1,
+              "failed_calls": 0,
+              "tokens": 62,
+              "node_count": 1,
               "node_statuses": {
-                "completed": 4
+                "completed": 1
               }
             },
             {
@@ -2900,6 +2900,21 @@
               "step_calls": 4,
               "failed_calls": 0,
               "tokens": 510,
+              "node_count": 4,
+              "node_statuses": {
+                "completed": 4
+              }
+            },
+            {
+              "task_id": "incident-cert",
+              "family": "incident-review",
+              "outcome": "accepted",
+              "reasons": [],
+              "template_built": true,
+              "selection_calls": 1,
+              "step_calls": 5,
+              "failed_calls": 1,
+              "tokens": 515,
               "node_count": 4,
               "node_statuses": {
                 "completed": 4
@@ -2919,32 +2934,17 @@
               "node_statuses": {
                 "completed": 4
               }
-            },
-            {
-              "task_id": "change-cache",
-              "family": "code-change",
-              "outcome": "accepted",
-              "reasons": [],
-              "template_built": false,
-              "selection_calls": 0,
-              "step_calls": 1,
-              "failed_calls": 0,
-              "tokens": 62,
-              "node_count": 1,
-              "node_statuses": {
-                "completed": 1
-              }
             }
           ],
           "arm": "improvement"
         },
         {
-          "trial_key": "trial_v1_72df8488af843094895f0b77add6609281466cfe1ceb184a7aaffbbe3ff2cf85",
+          "trial_key": "trial_v1_11f19cf987c87e3b2d92824abd2de842f5089bf90bda0a8400d8277cc07e957d",
           "split": "holdout",
           "role": "reference",
           "candidate_id": "cand_4fdbb490a83e8f4ec31139d50de886d3e275b6662657fca1261fcbadbe96fcd4",
           "value": "single_agent",
-          "seed": 7151910942485708548,
+          "seed": 2753555241151421048,
           "pack": "template-eval-holdout",
           "pack_sha256": "sha256:f74ee7702e30ecd426b2b221dd6b00c91151aaf05dbca8d241a4a042405fc831",
           "metrics": {
@@ -2976,21 +2976,6 @@
               }
             },
             {
-              "task_id": "incident-queue",
-              "family": "incident-review",
-              "outcome": "accepted",
-              "reasons": [],
-              "template_built": false,
-              "selection_calls": 0,
-              "step_calls": 1,
-              "failed_calls": 0,
-              "tokens": 81,
-              "node_count": 1,
-              "node_statuses": {
-                "completed": 1
-              }
-            },
-            {
               "task_id": "incident-dns",
               "family": "incident-review",
               "outcome": "accepted",
@@ -3000,6 +2985,21 @@
               "step_calls": 1,
               "failed_calls": 0,
               "tokens": 83,
+              "node_count": 1,
+              "node_statuses": {
+                "completed": 1
+              }
+            },
+            {
+              "task_id": "incident-queue",
+              "family": "incident-review",
+              "outcome": "accepted",
+              "reasons": [],
+              "template_built": false,
+              "selection_calls": 0,
+              "step_calls": 1,
+              "failed_calls": 0,
+              "tokens": 81,
               "node_count": 1,
               "node_statuses": {
                 "completed": 1
@@ -3024,12 +3024,12 @@
           "arm": "single_agent"
         },
         {
-          "trial_key": "trial_v1_3d061eebaa3b85993d11d850915787dd4ddbbb72d18177bfa66f617f8fc3fe31",
+          "trial_key": "trial_v1_a4cabf621e9f5702ba97e0bce12bc36bd8f55ac33f3a5c688706c2e35af61306",
           "split": "holdout",
           "role": "reference",
           "candidate_id": "cand_4fdbb490a83e8f4ec31139d50de886d3e275b6662657fca1261fcbadbe96fcd4",
           "value": "single_agent",
-          "seed": 4762801533809612322,
+          "seed": 1925046584326559099,
           "pack": "template-eval-holdout",
           "pack_sha256": "sha256:f74ee7702e30ecd426b2b221dd6b00c91151aaf05dbca8d241a4a042405fc831",
           "metrics": {
@@ -3045,6 +3045,21 @@
             "accepted.nonzero": true
           },
           "tasks": [
+            {
+              "task_id": "incident-dns",
+              "family": "incident-review",
+              "outcome": "accepted",
+              "reasons": [],
+              "template_built": false,
+              "selection_calls": 0,
+              "step_calls": 1,
+              "failed_calls": 0,
+              "tokens": 83,
+              "node_count": 1,
+              "node_statuses": {
+                "completed": 1
+              }
+            },
             {
               "task_id": "change-cache",
               "family": "code-change",
@@ -3077,21 +3092,6 @@
             },
             {
               "task_id": "incident-cert",
-              "family": "incident-review",
-              "outcome": "accepted",
-              "reasons": [],
-              "template_built": false,
-              "selection_calls": 0,
-              "step_calls": 1,
-              "failed_calls": 0,
-              "tokens": 83,
-              "node_count": 1,
-              "node_statuses": {
-                "completed": 1
-              }
-            },
-            {
-              "task_id": "incident-dns",
               "family": "incident-review",
               "outcome": "accepted",
               "reasons": [],
@@ -3109,12 +3109,12 @@
           "arm": "single_agent"
         },
         {
-          "trial_key": "trial_v1_bb397ca948eba40d33115fab3ce311075231de67ee777a14736d3199b1b09d6b",
+          "trial_key": "trial_v1_2c5e6f6ebc38437abaa8fc2467d0228297481cb61ac1de9c8450f29638fd691f",
           "split": "holdout",
           "role": "reference",
           "candidate_id": "cand_4fdbb490a83e8f4ec31139d50de886d3e275b6662657fca1261fcbadbe96fcd4",
           "value": "single_agent",
-          "seed": 1899092433688421665,
+          "seed": 2787602835436633662,
           "pack": "template-eval-holdout",
           "pack_sha256": "sha256:f74ee7702e30ecd426b2b221dd6b00c91151aaf05dbca8d241a4a042405fc831",
           "metrics": {
@@ -3131,7 +3131,22 @@
           },
           "tasks": [
             {
-              "task_id": "incident-cert",
+              "task_id": "change-cache",
+              "family": "code-change",
+              "outcome": "accepted",
+              "reasons": [],
+              "template_built": false,
+              "selection_calls": 0,
+              "step_calls": 1,
+              "failed_calls": 0,
+              "tokens": 62,
+              "node_count": 1,
+              "node_statuses": {
+                "completed": 1
+              }
+            },
+            {
+              "task_id": "incident-dns",
               "family": "incident-review",
               "outcome": "accepted",
               "reasons": [],
@@ -3146,7 +3161,7 @@
               }
             },
             {
-              "task_id": "incident-dns",
+              "task_id": "incident-cert",
               "family": "incident-review",
               "outcome": "accepted",
               "reasons": [],
@@ -3170,21 +3185,6 @@
               "step_calls": 1,
               "failed_calls": 0,
               "tokens": 81,
-              "node_count": 1,
-              "node_statuses": {
-                "completed": 1
-              }
-            },
-            {
-              "task_id": "change-cache",
-              "family": "code-change",
-              "outcome": "accepted",
-              "reasons": [],
-              "template_built": false,
-              "selection_calls": 0,
-              "step_calls": 1,
-              "failed_calls": 0,
-              "tokens": 62,
               "node_count": 1,
               "node_statuses": {
                 "completed": 1
@@ -3300,7 +3300,7 @@
       },
       "evaluator_manifest": {
         "version": 1,
-        "code_digest": "sha256:03a28cc7cd7217e20a13ffd40a3bd32a13df0b4c48510c7c4e17bed5b0459524",
+        "code_digest": "sha256:85549898715d722471093c12e2f1398b44e7d6d0d755d6e06bdd24cce0a6d888",
         "split_manifests": {
           "development": "sha256:c3beaf2de273294268c6908eda40a3824914c7f4fd156947caffb69cdd3b0390",
           "confirmation": "sha256:94fcbc0e03100cccc04b99f881516d035336ece34b7696a88fd02f8d9d7d509d",
@@ -3325,7 +3325,7 @@
         ],
         "price_snapshot_version": "offline-fixture-3000-nanousd-per-token-v1"
       },
-      "evaluator_hash": "sha256:3cbfeb4d4f3ff89c7e4bc6d522a7a1358f96a5df44b4ddcc134b9e8492edaeff",
+      "evaluator_hash": "sha256:dd3bbd0e576e8d361f705d6dc97e307e3967f2cdedc8e34bbc3c11a727ad7aa4",
       "split_manifests": {
         "development": {
           "pack": "template-eval-development",
@@ -3355,7 +3355,7 @@
           }
         }
       },
-      "holdout_identity": "sha256:a0b0cc50a41cf6df592621a5203f9faf6427b37b772b92e74654bbe410472d01",
+      "holdout_identity": "sha256:316b0d478ef9dd3e20793211d91ea5b4f7a61d2e24237fe71f5f3b3d26a25377",
       "holdout": {
         "pack": "template-eval-holdout",
         "held_out": "a task family development and confirmation do not contain",
@@ -3363,15 +3363,15 @@
         "first_holdout_trial": 11
       },
       "decision": {
-        "campaign_id": "optimization_v4_256de911e2d6a2bd91a33279b830cc14a60e0ff401bb512a0a64cc68e6e01ed7",
-        "optimization_plan_hash": "sha256:256de911e2d6a2bd91a33279b830cc14a60e0ff401bb512a0a64cc68e6e01ed7",
-        "holdout_seed_commitment": "sha256:b57104c4e17d24b19dc7db87c4213337a993ce9d06ba8676a59fdb86b33fa154",
+        "campaign_id": "optimization_v4_af56b13b83001156b8258e3938f1f92b6187c7e0b7692013eca90a5d271ff1b5",
+        "optimization_plan_hash": "sha256:af56b13b83001156b8258e3938f1f92b6187c7e0b7692013eca90a5d271ff1b5",
+        "holdout_seed_commitment": "sha256:afd28673b9fad942bad6880a7a86ed08fd87252d23bf896e0c58a6d94d843ab2",
         "incumbent_candidate_id": "cand_f9da80e06bf79b6869cd15ba181f7851174dda22e213f34ef8148708fad2e51b",
         "selected_candidate_id": "cand_149ba9fd1cb5b9973493bae608abf0ea2a3427f7c650cca9f61ead1ee3706544",
         "promoted": false,
         "verdict": "worse",
         "reason": "holdout rejected candidate: primary lower confidence bound -1 does not exceed 0; reference cand_c67e52bb5b6aa28a444b679cab11d89034a5b839f4c8532415e6907acefb94dd is better on the primary objective",
-        "decision_id": "decision_v1_204abc3b06411434243ae91d73b96e6c767c252d06ccaa638f165bd100de7096",
+        "decision_id": "decision_v1_49a9d96c1b0f655aa979100d36351c8e523323641f9e576c563196a7c0c42ede",
         "development_scores": [
           {
             "candidate_id": "cand_149ba9fd1cb5b9973493bae608abf0ea2a3427f7c650cca9f61ead1ee3706544",
@@ -3421,8 +3421,8 @@
               "node_count": true
             },
             "trial_keys": [
-              "trial_v1_dfac5eaad09e7a3a338539412772013af16e1c872a4c4bf5d30ee6c40b9362d2",
-              "trial_v1_992575b430013926e28c4a65eac8917cd64add7852535b36e7d75a300ca58f17"
+              "trial_v1_dd4dc811d0c66981023bc3ec18e5b8acdcdb53f9c47cb02fdcceed1ba2a04bdb",
+              "trial_v1_c83ee3af6298d273691575188af5f3616f18c6947520f615871cdf50561ce98d"
             ],
             "viable": true
           }
@@ -3443,7 +3443,7 @@
             "mean_improvement": 2.0,
             "confidence_level": 0.8,
             "bootstrap_resamples": 2000,
-            "bootstrap_seed": 6582616110511547977,
+            "bootstrap_seed": 8896762367711885093,
             "confidence_interval": [
               2.0,
               2.0
@@ -3475,7 +3475,7 @@
               "mean_improvement": 291.0,
               "confidence_level": 0.8,
               "bootstrap_resamples": 2000,
-              "bootstrap_seed": 6582616110511547977,
+              "bootstrap_seed": 8896762367711885093,
               "confidence_interval": [
                 291.0,
                 291.0
@@ -3506,7 +3506,7 @@
               "mean_improvement": 3.0,
               "confidence_level": 0.8,
               "bootstrap_resamples": 2000,
-              "bootstrap_seed": 6582616110511547977,
+              "bootstrap_seed": 8896762367711885093,
               "confidence_interval": [
                 3.0,
                 3.0
@@ -3537,7 +3537,7 @@
               "mean_improvement": 0.0,
               "confidence_level": 0.8,
               "bootstrap_resamples": 2000,
-              "bootstrap_seed": 6582616110511547977,
+              "bootstrap_seed": 8896762367711885093,
               "confidence_interval": [
                 0.0,
                 0.0
@@ -3579,16 +3579,16 @@
             "direction": "maximize",
             "sample_count": 3,
             "sample_seeds": [
-              886640775487578488,
-              4714709410726210164,
-              3022711348837536559
+              6115008762571099645,
+              7128975427893778370,
+              594168688089583831
             ],
             "baseline_mean": 2.0,
             "candidate_mean": 1.0,
             "mean_improvement": -1.0,
             "confidence_level": 0.8,
             "bootstrap_resamples": 2000,
-            "bootstrap_seed": 5613070006902193891,
+            "bootstrap_seed": 2359578651211213846,
             "confidence_interval": [
               -1.0,
               -1.0
@@ -3611,16 +3611,16 @@
               "direction": "minimize",
               "sample_count": 3,
               "sample_seeds": [
-                886640775487578488,
-                4714709410726210164,
-                3022711348837536559
+                6115008762571099645,
+                7128975427893778370,
+                594168688089583831
               ],
               "baseline_mean": 4137.0,
               "candidate_mean": 3828.0,
               "mean_improvement": 309.0,
               "confidence_level": 0.8,
               "bootstrap_resamples": 2000,
-              "bootstrap_seed": 5613070006902193891,
+              "bootstrap_seed": 2359578651211213846,
               "confidence_interval": [
                 309.0,
                 309.0
@@ -3642,16 +3642,16 @@
               "direction": "minimize",
               "sample_count": 3,
               "sample_seeds": [
-                886640775487578488,
-                4714709410726210164,
-                3022711348837536559
+                6115008762571099645,
+                7128975427893778370,
+                594168688089583831
               ],
               "baseline_mean": 13.0,
               "candidate_mean": 10.0,
               "mean_improvement": 3.0,
               "confidence_level": 0.8,
               "bootstrap_resamples": 2000,
-              "bootstrap_seed": 5613070006902193891,
+              "bootstrap_seed": 2359578651211213846,
               "confidence_interval": [
                 3.0,
                 3.0
@@ -3673,16 +3673,16 @@
               "direction": "maximize",
               "sample_count": 3,
               "sample_seeds": [
-                886640775487578488,
-                4714709410726210164,
-                3022711348837536559
+                6115008762571099645,
+                7128975427893778370,
+                594168688089583831
               ],
               "baseline_mean": 4.0,
               "candidate_mean": 4.0,
               "mean_improvement": 0.0,
               "confidence_level": 0.8,
               "bootstrap_resamples": 2000,
-              "bootstrap_seed": 5613070006902193891,
+              "bootstrap_seed": 2359578651211213846,
               "confidence_interval": [
                 0.0,
                 0.0
@@ -3739,7 +3739,7 @@
               "primary": {
                 "baseline_mean": 4.0,
                 "bootstrap_resamples": 2000,
-                "bootstrap_seed": 6582616110511547977,
+                "bootstrap_seed": 8896762367711885093,
                 "candidate_mean": 4.0,
                 "confidence_interval": [
                   0.0,
@@ -3775,7 +3775,7 @@
                 {
                   "baseline_mean": 888.0,
                   "bootstrap_resamples": 2000,
-                  "bootstrap_seed": 6582616110511547977,
+                  "bootstrap_seed": 8896762367711885093,
                   "candidate_mean": 3657.0,
                   "confidence_interval": [
                     -2769.0,
@@ -3806,7 +3806,7 @@
                 {
                   "baseline_mean": 4.0,
                   "bootstrap_resamples": 2000,
-                  "bootstrap_seed": 6582616110511547977,
+                  "bootstrap_seed": 8896762367711885093,
                   "candidate_mean": 10.0,
                   "confidence_interval": [
                     -6.0,
@@ -3837,7 +3837,7 @@
                 {
                   "baseline_mean": 4.0,
                   "bootstrap_resamples": 2000,
-                  "bootstrap_seed": 6582616110511547977,
+                  "bootstrap_seed": 8896762367711885093,
                   "candidate_mean": 4.0,
                   "confidence_interval": [
                     0.0,
@@ -3886,7 +3886,7 @@
               "primary": {
                 "baseline_mean": 4.0,
                 "bootstrap_resamples": 2000,
-                "bootstrap_seed": 5613070006902193891,
+                "bootstrap_seed": 2359578651211213846,
                 "candidate_mean": 1.0,
                 "confidence_interval": [
                   -3.0,
@@ -3908,9 +3908,9 @@
                 "objective_name": "accepted_count",
                 "sample_count": 3,
                 "sample_seeds": [
-                  886640775487578488,
-                  4714709410726210164,
-                  3022711348837536559
+                  6115008762571099645,
+                  7128975427893778370,
+                  594168688089583831
                 ],
                 "standard_error": 0.0
               },
@@ -3922,7 +3922,7 @@
                 {
                   "baseline_mean": 927.0,
                   "bootstrap_resamples": 2000,
-                  "bootstrap_seed": 5613070006902193891,
+                  "bootstrap_seed": 2359578651211213846,
                   "candidate_mean": 3828.0,
                   "confidence_interval": [
                     -2901.0,
@@ -3944,16 +3944,16 @@
                   "objective_name": "attributable_cost_microusd",
                   "sample_count": 3,
                   "sample_seeds": [
-                    886640775487578488,
-                    4714709410726210164,
-                    3022711348837536559
+                    6115008762571099645,
+                    7128975427893778370,
+                    594168688089583831
                   ],
                   "standard_error": 0.0
                 },
                 {
                   "baseline_mean": 4.0,
                   "bootstrap_resamples": 2000,
-                  "bootstrap_seed": 5613070006902193891,
+                  "bootstrap_seed": 2359578651211213846,
                   "candidate_mean": 10.0,
                   "confidence_interval": [
                     -6.0,
@@ -3975,16 +3975,16 @@
                   "objective_name": "node_count",
                   "sample_count": 3,
                   "sample_seeds": [
-                    886640775487578488,
-                    4714709410726210164,
-                    3022711348837536559
+                    6115008762571099645,
+                    7128975427893778370,
+                    594168688089583831
                   ],
                   "standard_error": 0.0
                 },
                 {
                   "baseline_mean": 4.0,
                   "bootstrap_resamples": 2000,
-                  "bootstrap_seed": 5613070006902193891,
+                  "bootstrap_seed": 2359578651211213846,
                   "candidate_mean": 4.0,
                   "confidence_interval": [
                     0.0,
@@ -4006,9 +4006,9 @@
                   "objective_name": "attempted_count",
                   "sample_count": 3,
                   "sample_seeds": [
-                    886640775487578488,
-                    4714709410726210164,
-                    3022711348837536559
+                    6115008762571099645,
+                    7128975427893778370,
+                    594168688089583831
                   ],
                   "standard_error": 0.0
                 }
@@ -4096,7 +4096,7 @@
       },
       "trials": [
         {
-          "trial_key": "trial_v1_dfac5eaad09e7a3a338539412772013af16e1c872a4c4bf5d30ee6c40b9362d2",
+          "trial_key": "trial_v1_dd4dc811d0c66981023bc3ec18e5b8acdcdb53f9c47cb02fdcceed1ba2a04bdb",
           "split": "development",
           "role": "incumbent",
           "candidate_id": "cand_f9da80e06bf79b6869cd15ba181f7851174dda22e213f34ef8148708fad2e51b",
@@ -4187,7 +4187,7 @@
           "arm": "predecessor"
         },
         {
-          "trial_key": "trial_v1_992575b430013926e28c4a65eac8917cd64add7852535b36e7d75a300ca58f17",
+          "trial_key": "trial_v1_c83ee3af6298d273691575188af5f3616f18c6947520f615871cdf50561ce98d",
           "split": "development",
           "role": "challenger",
           "candidate_id": "cand_149ba9fd1cb5b9973493bae608abf0ea2a3427f7c650cca9f61ead1ee3706544",
@@ -4272,7 +4272,7 @@
           "arm": "harmful"
         },
         {
-          "trial_key": "trial_v1_46f138898655a4fe6eb465b26dc3fceec3ef3ae32a9e243a7eb113ef9eb5a3b4",
+          "trial_key": "trial_v1_f23e79ab6cbbfe6a42d636028a3875e586ab2c6499a8cc32dc7dc78df6bca6c3",
           "split": "confirmation",
           "role": "incumbent",
           "candidate_id": "cand_f9da80e06bf79b6869cd15ba181f7851174dda22e213f34ef8148708fad2e51b",
@@ -4363,7 +4363,7 @@
           "arm": "predecessor"
         },
         {
-          "trial_key": "trial_v1_4da3da4a4338d3c7d1decf3a0d3df3060f0e64c3440878a3132ba6f6cac619ad",
+          "trial_key": "trial_v1_0306c0f8337c42e815fe3d6c1f7ce1149c63252f8b9eba2875365c05881b9d30",
           "split": "confirmation",
           "role": "incumbent",
           "candidate_id": "cand_f9da80e06bf79b6869cd15ba181f7851174dda22e213f34ef8148708fad2e51b",
@@ -4454,7 +4454,7 @@
           "arm": "predecessor"
         },
         {
-          "trial_key": "trial_v1_daab9913eee87c5e4ac45d40709c5a72e5779813d79d5494290706f114c83e4b",
+          "trial_key": "trial_v1_555f5d5edc7f1b2719eec7c311b695ee8418abdd131f5566f66fe363324a47af",
           "split": "confirmation",
           "role": "incumbent",
           "candidate_id": "cand_f9da80e06bf79b6869cd15ba181f7851174dda22e213f34ef8148708fad2e51b",
@@ -4545,7 +4545,7 @@
           "arm": "predecessor"
         },
         {
-          "trial_key": "trial_v1_1e670fa7fb7f7f43d98e215c035d2686f4358dd89f7174359f85124c19ce693e",
+          "trial_key": "trial_v1_91cdb8d3d4ba1e6ed8725c4328ecb378d3a50178eac2c7282ea71480a2fc2a07",
           "split": "confirmation",
           "role": "challenger",
           "candidate_id": "cand_149ba9fd1cb5b9973493bae608abf0ea2a3427f7c650cca9f61ead1ee3706544",
@@ -4630,7 +4630,7 @@
           "arm": "harmful"
         },
         {
-          "trial_key": "trial_v1_ec2e678ce1968119ac4e61abecbf9bd4789b545c0edbd3dc5ccffdada1876b77",
+          "trial_key": "trial_v1_9d30497119fe01466c1c31613ae55cbde0b906ea166db6d4082bb73dfb1228e0",
           "split": "confirmation",
           "role": "challenger",
           "candidate_id": "cand_149ba9fd1cb5b9973493bae608abf0ea2a3427f7c650cca9f61ead1ee3706544",
@@ -4715,7 +4715,7 @@
           "arm": "harmful"
         },
         {
-          "trial_key": "trial_v1_fd95a91551102d16cf307220e05e0b80fe6eaa09e4ef502bd0e153085bfdc540",
+          "trial_key": "trial_v1_d503905d12e076e691a8242d726c74762f1fb4a94d285c5667409e66a5198b0e",
           "split": "confirmation",
           "role": "challenger",
           "candidate_id": "cand_149ba9fd1cb5b9973493bae608abf0ea2a3427f7c650cca9f61ead1ee3706544",
@@ -4800,7 +4800,7 @@
           "arm": "harmful"
         },
         {
-          "trial_key": "trial_v1_5f5772790ebad2c144c92096aec41e495a1eb55cd80dba489ff38ad7256fd70e",
+          "trial_key": "trial_v1_5e5e02f8c81a659b59303d705803eab607290dc3c505abf4720cf5cf0471d77a",
           "split": "confirmation",
           "role": "reference",
           "candidate_id": "cand_c67e52bb5b6aa28a444b679cab11d89034a5b839f4c8532415e6907acefb94dd",
@@ -4885,7 +4885,7 @@
           "arm": "single_agent"
         },
         {
-          "trial_key": "trial_v1_b3d1b941c7aa7e45c2d2fb7e0e4fc2518442eb90a7fe625309f724fdedc803bb",
+          "trial_key": "trial_v1_7c5e208ae95c5cb52c8fbc501d080403ea0ff764c72163c4fd468116d5a0fba7",
           "split": "confirmation",
           "role": "reference",
           "candidate_id": "cand_c67e52bb5b6aa28a444b679cab11d89034a5b839f4c8532415e6907acefb94dd",
@@ -4970,7 +4970,7 @@
           "arm": "single_agent"
         },
         {
-          "trial_key": "trial_v1_66bd8fceeb7bdfe3e62d7b40204a712949ae31a71023aa43a01d6d12d7904fb2",
+          "trial_key": "trial_v1_96132b999b5dc23414aab5d82994bd95840da1a39543da9b97045a882fc0b176",
           "split": "confirmation",
           "role": "reference",
           "candidate_id": "cand_c67e52bb5b6aa28a444b679cab11d89034a5b839f4c8532415e6907acefb94dd",
@@ -5055,12 +5055,12 @@
           "arm": "single_agent"
         },
         {
-          "trial_key": "trial_v1_ff130ffaa5a15e990c2cf94ae52bb6ab28945f9dc6f88dffea3212572cb18c50",
+          "trial_key": "trial_v1_670173a4cf12ca368c7fac3f1951880bc6b323dfbf84b75617932a5e21b6d573",
           "split": "holdout",
           "role": "incumbent",
           "candidate_id": "cand_f9da80e06bf79b6869cd15ba181f7851174dda22e213f34ef8148708fad2e51b",
           "value": "2a87d714e65f20fe6e62c394189028811f098a609b68030d3b888ab3c8128f9c",
-          "seed": 886640775487578488,
+          "seed": 6115008762571099645,
           "pack": "template-eval-holdout",
           "pack_sha256": "sha256:f74ee7702e30ecd426b2b221dd6b00c91151aaf05dbca8d241a4a042405fc831",
           "metrics": {
@@ -5077,18 +5077,21 @@
           },
           "tasks": [
             {
-              "task_id": "incident-dns",
+              "task_id": "incident-queue",
               "family": "incident-review",
-              "outcome": "accepted",
-              "reasons": [],
+              "outcome": "rejected",
+              "reasons": [
+                "final validator 'smythe.text-spec' rejected the output: section_missing: required section 'Timeline' is missing"
+              ],
               "template_built": true,
               "selection_calls": 1,
               "step_calls": 4,
-              "failed_calls": 0,
-              "tokens": 510,
+              "failed_calls": 1,
+              "tokens": 396,
               "node_count": 4,
               "node_statuses": {
-                "completed": 4
+                "completed": 3,
+                "skipped": 1
               }
             },
             {
@@ -5103,97 +5106,6 @@
               "step_calls": 4,
               "failed_calls": 1,
               "tokens": 411,
-              "node_count": 4,
-              "node_statuses": {
-                "completed": 3,
-                "skipped": 1
-              }
-            },
-            {
-              "task_id": "incident-queue",
-              "family": "incident-review",
-              "outcome": "rejected",
-              "reasons": [
-                "final validator 'smythe.text-spec' rejected the output: section_missing: required section 'Timeline' is missing"
-              ],
-              "template_built": true,
-              "selection_calls": 1,
-              "step_calls": 4,
-              "failed_calls": 1,
-              "tokens": 396,
-              "node_count": 4,
-              "node_statuses": {
-                "completed": 3,
-                "skipped": 1
-              }
-            },
-            {
-              "task_id": "change-cache",
-              "family": "code-change",
-              "outcome": "accepted",
-              "reasons": [],
-              "template_built": false,
-              "selection_calls": 0,
-              "step_calls": 1,
-              "failed_calls": 0,
-              "tokens": 62,
-              "node_count": 1,
-              "node_statuses": {
-                "completed": 1
-              }
-            }
-          ],
-          "arm": "predecessor"
-        },
-        {
-          "trial_key": "trial_v1_d71662fba075db58a55db19a1efa2b19aead90615c187c14a9c6489accbada67",
-          "split": "holdout",
-          "role": "incumbent",
-          "candidate_id": "cand_f9da80e06bf79b6869cd15ba181f7851174dda22e213f34ef8148708fad2e51b",
-          "value": "2a87d714e65f20fe6e62c394189028811f098a609b68030d3b888ab3c8128f9c",
-          "seed": 4714709410726210164,
-          "pack": "template-eval-holdout",
-          "pack_sha256": "sha256:f74ee7702e30ecd426b2b221dd6b00c91151aaf05dbca8d241a4a042405fc831",
-          "metrics": {
-            "accepted_count": 2,
-            "attempted_count": 4,
-            "attributable_cost_microusd": 4137,
-            "node_count": 13
-          },
-          "gates": {
-            "acceptance.policy_unchanged": true,
-            "accounting.complete": true,
-            "applicability.excluded_untouched": true,
-            "accepted.nonzero": true
-          },
-          "tasks": [
-            {
-              "task_id": "change-cache",
-              "family": "code-change",
-              "outcome": "accepted",
-              "reasons": [],
-              "template_built": false,
-              "selection_calls": 0,
-              "step_calls": 1,
-              "failed_calls": 0,
-              "tokens": 62,
-              "node_count": 1,
-              "node_statuses": {
-                "completed": 1
-              }
-            },
-            {
-              "task_id": "incident-queue",
-              "family": "incident-review",
-              "outcome": "rejected",
-              "reasons": [
-                "final validator 'smythe.text-spec' rejected the output: section_missing: required section 'Timeline' is missing"
-              ],
-              "template_built": true,
-              "selection_calls": 1,
-              "step_calls": 4,
-              "failed_calls": 1,
-              "tokens": 396,
               "node_count": 4,
               "node_statuses": {
                 "completed": 3,
@@ -5216,33 +5128,30 @@
               }
             },
             {
-              "task_id": "incident-cert",
-              "family": "incident-review",
-              "outcome": "rejected",
-              "reasons": [
-                "final validator 'smythe.text-spec' rejected the output: section_missing: required section 'Sources' is missing"
-              ],
-              "template_built": true,
-              "selection_calls": 1,
-              "step_calls": 4,
-              "failed_calls": 1,
-              "tokens": 411,
-              "node_count": 4,
+              "task_id": "change-cache",
+              "family": "code-change",
+              "outcome": "accepted",
+              "reasons": [],
+              "template_built": false,
+              "selection_calls": 0,
+              "step_calls": 1,
+              "failed_calls": 0,
+              "tokens": 62,
+              "node_count": 1,
               "node_statuses": {
-                "completed": 3,
-                "skipped": 1
+                "completed": 1
               }
             }
           ],
           "arm": "predecessor"
         },
         {
-          "trial_key": "trial_v1_d67b46863406c88738101f3158fec00597819211b2f3ccd9dc322aefa42da6ce",
+          "trial_key": "trial_v1_cfc6eb35dfe288fc9425c1ab3ad327c6307a8e66736323b00da4d578ea5fa40b",
           "split": "holdout",
           "role": "incumbent",
           "candidate_id": "cand_f9da80e06bf79b6869cd15ba181f7851174dda22e213f34ef8148708fad2e51b",
           "value": "2a87d714e65f20fe6e62c394189028811f098a609b68030d3b888ab3c8128f9c",
-          "seed": 3022711348837536559,
+          "seed": 7128975427893778370,
           "pack": "template-eval-holdout",
           "pack_sha256": "sha256:f74ee7702e30ecd426b2b221dd6b00c91151aaf05dbca8d241a4a042405fc831",
           "metrics": {
@@ -5328,19 +5237,19 @@
           "arm": "predecessor"
         },
         {
-          "trial_key": "trial_v1_e9f3ee4cd8c1cbe2d6176df614aec9046e9b26fc25fbfb924134a7e6be09fd08",
+          "trial_key": "trial_v1_70f520747d8ce32e5636060c50190d9c36ee190366a5626b479be9bd57781e55",
           "split": "holdout",
-          "role": "challenger",
-          "candidate_id": "cand_149ba9fd1cb5b9973493bae608abf0ea2a3427f7c650cca9f61ead1ee3706544",
-          "value": "bf95156668bfe1d2b888c643c409ddfc8bc575544e3f9c2d20c6ba79b03bbc8d",
-          "seed": 886640775487578488,
+          "role": "incumbent",
+          "candidate_id": "cand_f9da80e06bf79b6869cd15ba181f7851174dda22e213f34ef8148708fad2e51b",
+          "value": "2a87d714e65f20fe6e62c394189028811f098a609b68030d3b888ab3c8128f9c",
+          "seed": 594168688089583831,
           "pack": "template-eval-holdout",
           "pack_sha256": "sha256:f74ee7702e30ecd426b2b221dd6b00c91151aaf05dbca8d241a4a042405fc831",
           "metrics": {
-            "accepted_count": 1,
+            "accepted_count": 2,
             "attempted_count": 4,
-            "attributable_cost_microusd": 3828,
-            "node_count": 10
+            "attributable_cost_microusd": 4137,
+            "node_count": 13
           },
           "gates": {
             "acceptance.policy_unchanged": true,
@@ -5350,24 +5259,7 @@
           },
           "tasks": [
             {
-              "task_id": "incident-dns",
-              "family": "incident-review",
-              "outcome": "rejected",
-              "reasons": [
-                "final validator 'smythe.text-spec' rejected the output: section_missing: required section 'Timeline' is missing"
-              ],
-              "template_built": true,
-              "selection_calls": 1,
-              "step_calls": 3,
-              "failed_calls": 0,
-              "tokens": 407,
-              "node_count": 3,
-              "node_statuses": {
-                "completed": 3
-              }
-            },
-            {
-              "task_id": "incident-cert",
+              "task_id": "incident-queue",
               "family": "incident-review",
               "outcome": "rejected",
               "reasons": [
@@ -5377,27 +5269,11 @@
               "selection_calls": 1,
               "step_calls": 4,
               "failed_calls": 1,
-              "tokens": 411,
-              "node_count": 3,
-              "node_statuses": {
-                "completed": 3
-              }
-            },
-            {
-              "task_id": "incident-queue",
-              "family": "incident-review",
-              "outcome": "rejected",
-              "reasons": [
-                "final validator 'smythe.text-spec' rejected the output: section_missing: required section 'Timeline' is missing"
-              ],
-              "template_built": true,
-              "selection_calls": 1,
-              "step_calls": 3,
-              "failed_calls": 0,
               "tokens": 396,
-              "node_count": 3,
+              "node_count": 4,
               "node_statuses": {
-                "completed": 3
+                "completed": 3,
+                "skipped": 1
               }
             },
             {
@@ -5414,108 +5290,50 @@
               "node_statuses": {
                 "completed": 1
               }
-            }
-          ],
-          "arm": "harmful"
-        },
-        {
-          "trial_key": "trial_v1_512618ea04c985b2769c591f4a738b82c25ca6072688b9cc789c8cfe943a192e",
-          "split": "holdout",
-          "role": "challenger",
-          "candidate_id": "cand_149ba9fd1cb5b9973493bae608abf0ea2a3427f7c650cca9f61ead1ee3706544",
-          "value": "bf95156668bfe1d2b888c643c409ddfc8bc575544e3f9c2d20c6ba79b03bbc8d",
-          "seed": 4714709410726210164,
-          "pack": "template-eval-holdout",
-          "pack_sha256": "sha256:f74ee7702e30ecd426b2b221dd6b00c91151aaf05dbca8d241a4a042405fc831",
-          "metrics": {
-            "accepted_count": 1,
-            "attempted_count": 4,
-            "attributable_cost_microusd": 3828,
-            "node_count": 10
-          },
-          "gates": {
-            "acceptance.policy_unchanged": true,
-            "accounting.complete": true,
-            "applicability.excluded_untouched": true,
-            "accepted.nonzero": true
-          },
-          "tasks": [
-            {
-              "task_id": "change-cache",
-              "family": "code-change",
-              "outcome": "accepted",
-              "reasons": [],
-              "template_built": false,
-              "selection_calls": 0,
-              "step_calls": 1,
-              "failed_calls": 0,
-              "tokens": 62,
-              "node_count": 1,
-              "node_statuses": {
-                "completed": 1
-              }
-            },
-            {
-              "task_id": "incident-queue",
-              "family": "incident-review",
-              "outcome": "rejected",
-              "reasons": [
-                "final validator 'smythe.text-spec' rejected the output: section_missing: required section 'Timeline' is missing"
-              ],
-              "template_built": true,
-              "selection_calls": 1,
-              "step_calls": 3,
-              "failed_calls": 0,
-              "tokens": 396,
-              "node_count": 3,
-              "node_statuses": {
-                "completed": 3
-              }
-            },
-            {
-              "task_id": "incident-dns",
-              "family": "incident-review",
-              "outcome": "rejected",
-              "reasons": [
-                "final validator 'smythe.text-spec' rejected the output: section_missing: required section 'Timeline' is missing"
-              ],
-              "template_built": true,
-              "selection_calls": 1,
-              "step_calls": 3,
-              "failed_calls": 0,
-              "tokens": 407,
-              "node_count": 3,
-              "node_statuses": {
-                "completed": 3
-              }
             },
             {
               "task_id": "incident-cert",
               "family": "incident-review",
               "outcome": "rejected",
               "reasons": [
-                "final validator 'smythe.text-spec' rejected the output: section_missing: required section 'Timeline' is missing"
+                "final validator 'smythe.text-spec' rejected the output: section_missing: required section 'Sources' is missing"
               ],
               "template_built": true,
               "selection_calls": 1,
               "step_calls": 4,
               "failed_calls": 1,
               "tokens": 411,
-              "node_count": 3,
+              "node_count": 4,
               "node_statuses": {
-                "completed": 3
+                "completed": 3,
+                "skipped": 1
+              }
+            },
+            {
+              "task_id": "incident-dns",
+              "family": "incident-review",
+              "outcome": "accepted",
+              "reasons": [],
+              "template_built": true,
+              "selection_calls": 1,
+              "step_calls": 4,
+              "failed_calls": 0,
+              "tokens": 510,
+              "node_count": 4,
+              "node_statuses": {
+                "completed": 4
               }
             }
           ],
-          "arm": "harmful"
+          "arm": "predecessor"
         },
         {
-          "trial_key": "trial_v1_e0cc221f815d5f3baf561a499bb035e599fdfe00df41ad98d6b433bcf1c5c706",
+          "trial_key": "trial_v1_8f18f3416d2b482a6f3faf34c514fe817843f34359145811e7f6882a6678b05e",
           "split": "holdout",
           "role": "challenger",
           "candidate_id": "cand_149ba9fd1cb5b9973493bae608abf0ea2a3427f7c650cca9f61ead1ee3706544",
           "value": "bf95156668bfe1d2b888c643c409ddfc8bc575544e3f9c2d20c6ba79b03bbc8d",
-          "seed": 3022711348837536559,
+          "seed": 6115008762571099645,
           "pack": "template-eval-holdout",
           "pack_sha256": "sha256:f74ee7702e30ecd426b2b221dd6b00c91151aaf05dbca8d241a4a042405fc831",
           "metrics": {
@@ -5549,6 +5367,97 @@
               }
             },
             {
+              "task_id": "incident-cert",
+              "family": "incident-review",
+              "outcome": "rejected",
+              "reasons": [
+                "final validator 'smythe.text-spec' rejected the output: section_missing: required section 'Timeline' is missing"
+              ],
+              "template_built": true,
+              "selection_calls": 1,
+              "step_calls": 4,
+              "failed_calls": 1,
+              "tokens": 411,
+              "node_count": 3,
+              "node_statuses": {
+                "completed": 3
+              }
+            },
+            {
+              "task_id": "incident-dns",
+              "family": "incident-review",
+              "outcome": "rejected",
+              "reasons": [
+                "final validator 'smythe.text-spec' rejected the output: section_missing: required section 'Timeline' is missing"
+              ],
+              "template_built": true,
+              "selection_calls": 1,
+              "step_calls": 3,
+              "failed_calls": 0,
+              "tokens": 407,
+              "node_count": 3,
+              "node_statuses": {
+                "completed": 3
+              }
+            },
+            {
+              "task_id": "change-cache",
+              "family": "code-change",
+              "outcome": "accepted",
+              "reasons": [],
+              "template_built": false,
+              "selection_calls": 0,
+              "step_calls": 1,
+              "failed_calls": 0,
+              "tokens": 62,
+              "node_count": 1,
+              "node_statuses": {
+                "completed": 1
+              }
+            }
+          ],
+          "arm": "harmful"
+        },
+        {
+          "trial_key": "trial_v1_6b62b08913b6100b077e878f4c14851451e50d1032cf8eada1d5ae36698e8693",
+          "split": "holdout",
+          "role": "challenger",
+          "candidate_id": "cand_149ba9fd1cb5b9973493bae608abf0ea2a3427f7c650cca9f61ead1ee3706544",
+          "value": "bf95156668bfe1d2b888c643c409ddfc8bc575544e3f9c2d20c6ba79b03bbc8d",
+          "seed": 7128975427893778370,
+          "pack": "template-eval-holdout",
+          "pack_sha256": "sha256:f74ee7702e30ecd426b2b221dd6b00c91151aaf05dbca8d241a4a042405fc831",
+          "metrics": {
+            "accepted_count": 1,
+            "attempted_count": 4,
+            "attributable_cost_microusd": 3828,
+            "node_count": 10
+          },
+          "gates": {
+            "acceptance.policy_unchanged": true,
+            "accounting.complete": true,
+            "applicability.excluded_untouched": true,
+            "accepted.nonzero": true
+          },
+          "tasks": [
+            {
+              "task_id": "incident-queue",
+              "family": "incident-review",
+              "outcome": "rejected",
+              "reasons": [
+                "final validator 'smythe.text-spec' rejected the output: section_missing: required section 'Timeline' is missing"
+              ],
+              "template_built": true,
+              "selection_calls": 1,
+              "step_calls": 3,
+              "failed_calls": 0,
+              "tokens": 396,
+              "node_count": 3,
+              "node_statuses": {
+                "completed": 3
+              }
+            },
+            {
               "task_id": "change-cache",
               "family": "code-change",
               "outcome": "accepted",
@@ -5601,12 +5510,103 @@
           "arm": "harmful"
         },
         {
-          "trial_key": "trial_v1_1171414578d9496b4414e0d79f53189c12c76772fa6cbbc2c41f6e365aaa5013",
+          "trial_key": "trial_v1_c250f5f6b34f88f25176813facf7c7662c07da0dc78ee6030f792b3aee668306",
+          "split": "holdout",
+          "role": "challenger",
+          "candidate_id": "cand_149ba9fd1cb5b9973493bae608abf0ea2a3427f7c650cca9f61ead1ee3706544",
+          "value": "bf95156668bfe1d2b888c643c409ddfc8bc575544e3f9c2d20c6ba79b03bbc8d",
+          "seed": 594168688089583831,
+          "pack": "template-eval-holdout",
+          "pack_sha256": "sha256:f74ee7702e30ecd426b2b221dd6b00c91151aaf05dbca8d241a4a042405fc831",
+          "metrics": {
+            "accepted_count": 1,
+            "attempted_count": 4,
+            "attributable_cost_microusd": 3828,
+            "node_count": 10
+          },
+          "gates": {
+            "acceptance.policy_unchanged": true,
+            "accounting.complete": true,
+            "applicability.excluded_untouched": true,
+            "accepted.nonzero": true
+          },
+          "tasks": [
+            {
+              "task_id": "incident-queue",
+              "family": "incident-review",
+              "outcome": "rejected",
+              "reasons": [
+                "final validator 'smythe.text-spec' rejected the output: section_missing: required section 'Timeline' is missing"
+              ],
+              "template_built": true,
+              "selection_calls": 1,
+              "step_calls": 3,
+              "failed_calls": 0,
+              "tokens": 396,
+              "node_count": 3,
+              "node_statuses": {
+                "completed": 3
+              }
+            },
+            {
+              "task_id": "change-cache",
+              "family": "code-change",
+              "outcome": "accepted",
+              "reasons": [],
+              "template_built": false,
+              "selection_calls": 0,
+              "step_calls": 1,
+              "failed_calls": 0,
+              "tokens": 62,
+              "node_count": 1,
+              "node_statuses": {
+                "completed": 1
+              }
+            },
+            {
+              "task_id": "incident-cert",
+              "family": "incident-review",
+              "outcome": "rejected",
+              "reasons": [
+                "final validator 'smythe.text-spec' rejected the output: section_missing: required section 'Timeline' is missing"
+              ],
+              "template_built": true,
+              "selection_calls": 1,
+              "step_calls": 4,
+              "failed_calls": 1,
+              "tokens": 411,
+              "node_count": 3,
+              "node_statuses": {
+                "completed": 3
+              }
+            },
+            {
+              "task_id": "incident-dns",
+              "family": "incident-review",
+              "outcome": "rejected",
+              "reasons": [
+                "final validator 'smythe.text-spec' rejected the output: section_missing: required section 'Timeline' is missing"
+              ],
+              "template_built": true,
+              "selection_calls": 1,
+              "step_calls": 3,
+              "failed_calls": 0,
+              "tokens": 407,
+              "node_count": 3,
+              "node_statuses": {
+                "completed": 3
+              }
+            }
+          ],
+          "arm": "harmful"
+        },
+        {
+          "trial_key": "trial_v1_b6280a1ec8ae0fb5d9aa7ba9177dfd89a27b1663e1ecde7a8f950df02179f507",
           "split": "holdout",
           "role": "reference",
           "candidate_id": "cand_c67e52bb5b6aa28a444b679cab11d89034a5b839f4c8532415e6907acefb94dd",
           "value": "single_agent",
-          "seed": 886640775487578488,
+          "seed": 6115008762571099645,
           "pack": "template-eval-holdout",
           "pack_sha256": "sha256:f74ee7702e30ecd426b2b221dd6b00c91151aaf05dbca8d241a4a042405fc831",
           "metrics": {
@@ -5623,7 +5623,7 @@
           },
           "tasks": [
             {
-              "task_id": "incident-dns",
+              "task_id": "incident-queue",
               "family": "incident-review",
               "outcome": "accepted",
               "reasons": [],
@@ -5631,7 +5631,7 @@
               "selection_calls": 0,
               "step_calls": 1,
               "failed_calls": 0,
-              "tokens": 83,
+              "tokens": 81,
               "node_count": 1,
               "node_statuses": {
                 "completed": 1
@@ -5653,7 +5653,7 @@
               }
             },
             {
-              "task_id": "incident-queue",
+              "task_id": "incident-dns",
               "family": "incident-review",
               "outcome": "accepted",
               "reasons": [],
@@ -5661,7 +5661,7 @@
               "selection_calls": 0,
               "step_calls": 1,
               "failed_calls": 0,
-              "tokens": 81,
+              "tokens": 83,
               "node_count": 1,
               "node_statuses": {
                 "completed": 1
@@ -5686,12 +5686,12 @@
           "arm": "single_agent"
         },
         {
-          "trial_key": "trial_v1_73715569f751fcb407162429f44b2c2e96ee08bfb09d4d207b20f787767edbe0",
+          "trial_key": "trial_v1_56b2590afce0280ff904145b13e7218c32ea360efb16cf318a679dd56e9b35d3",
           "split": "holdout",
           "role": "reference",
           "candidate_id": "cand_c67e52bb5b6aa28a444b679cab11d89034a5b839f4c8532415e6907acefb94dd",
           "value": "single_agent",
-          "seed": 4714709410726210164,
+          "seed": 7128975427893778370,
           "pack": "template-eval-holdout",
           "pack_sha256": "sha256:f74ee7702e30ecd426b2b221dd6b00c91151aaf05dbca8d241a4a042405fc831",
           "metrics": {
@@ -5708,21 +5708,6 @@
           },
           "tasks": [
             {
-              "task_id": "change-cache",
-              "family": "code-change",
-              "outcome": "accepted",
-              "reasons": [],
-              "template_built": false,
-              "selection_calls": 0,
-              "step_calls": 1,
-              "failed_calls": 0,
-              "tokens": 62,
-              "node_count": 1,
-              "node_statuses": {
-                "completed": 1
-              }
-            },
-            {
               "task_id": "incident-queue",
               "family": "incident-review",
               "outcome": "accepted",
@@ -5732,6 +5717,21 @@
               "step_calls": 1,
               "failed_calls": 0,
               "tokens": 81,
+              "node_count": 1,
+              "node_statuses": {
+                "completed": 1
+              }
+            },
+            {
+              "task_id": "change-cache",
+              "family": "code-change",
+              "outcome": "accepted",
+              "reasons": [],
+              "template_built": false,
+              "selection_calls": 0,
+              "step_calls": 1,
+              "failed_calls": 0,
+              "tokens": 62,
               "node_count": 1,
               "node_statuses": {
                 "completed": 1
@@ -5771,12 +5771,12 @@
           "arm": "single_agent"
         },
         {
-          "trial_key": "trial_v1_cb2dfe0b7cf06b848ec1665a9ec6528e96285151329ccc8a51dd12a0c1ea727a",
+          "trial_key": "trial_v1_8d75c49d0ac38ff6bc8ab1aad0d3924b62568b4b978ab37f04af59cc6a5b7f76",
           "split": "holdout",
           "role": "reference",
           "candidate_id": "cand_c67e52bb5b6aa28a444b679cab11d89034a5b839f4c8532415e6907acefb94dd",
           "value": "single_agent",
-          "seed": 3022711348837536559,
+          "seed": 594168688089583831,
           "pack": "template-eval-holdout",
           "pack_sha256": "sha256:f74ee7702e30ecd426b2b221dd6b00c91151aaf05dbca8d241a4a042405fc831",
           "metrics": {
@@ -5823,7 +5823,7 @@
               }
             },
             {
-              "task_id": "incident-dns",
+              "task_id": "incident-cert",
               "family": "incident-review",
               "outcome": "accepted",
               "reasons": [],
@@ -5838,7 +5838,7 @@
               }
             },
             {
-              "task_id": "incident-cert",
+              "task_id": "incident-dns",
               "family": "incident-review",
               "outcome": "accepted",
               "reasons": [],
@@ -5962,7 +5962,7 @@
       },
       "evaluator_manifest": {
         "version": 1,
-        "code_digest": "sha256:03a28cc7cd7217e20a13ffd40a3bd32a13df0b4c48510c7c4e17bed5b0459524",
+        "code_digest": "sha256:85549898715d722471093c12e2f1398b44e7d6d0d755d6e06bdd24cce0a6d888",
         "split_manifests": {
           "development": "sha256:c3beaf2de273294268c6908eda40a3824914c7f4fd156947caffb69cdd3b0390",
           "confirmation": "sha256:94fcbc0e03100cccc04b99f881516d035336ece34b7696a88fd02f8d9d7d509d",
@@ -5987,7 +5987,7 @@
         ],
         "price_snapshot_version": "offline-fixture-3000-nanousd-per-token-v1"
       },
-      "evaluator_hash": "sha256:3cbfeb4d4f3ff89c7e4bc6d522a7a1358f96a5df44b4ddcc134b9e8492edaeff",
+      "evaluator_hash": "sha256:dd3bbd0e576e8d361f705d6dc97e307e3967f2cdedc8e34bbc3c11a727ad7aa4",
       "split_manifests": {
         "development": {
           "pack": "template-eval-development",
@@ -6017,7 +6017,7 @@
           }
         }
       },
-      "holdout_identity": "sha256:a0b0cc50a41cf6df592621a5203f9faf6427b37b772b92e74654bbe410472d01",
+      "holdout_identity": "sha256:316b0d478ef9dd3e20793211d91ea5b4f7a61d2e24237fe71f5f3b3d26a25377",
       "holdout": {
         "pack": "template-eval-holdout",
         "held_out": "a task family development and confirmation do not contain",
@@ -6025,15 +6025,15 @@
         "first_holdout_trial": null
       },
       "decision": {
-        "campaign_id": "optimization_v4_cd7d348cacd629e1f0a22b85dacdc2873f34618d7892841cc624c372f0d4982c",
-        "optimization_plan_hash": "sha256:cd7d348cacd629e1f0a22b85dacdc2873f34618d7892841cc624c372f0d4982c",
-        "holdout_seed_commitment": "sha256:461b9c9f570b952728c574a72a8ee9fd46c3f313043ae6eff615e78dcad661bd",
+        "campaign_id": "optimization_v4_a6a77ec60efd9d132003524946d2b44784b29a1faafa8c44b1becaf2c062bba9",
+        "optimization_plan_hash": "sha256:a6a77ec60efd9d132003524946d2b44784b29a1faafa8c44b1becaf2c062bba9",
+        "holdout_seed_commitment": "sha256:6d85e5a9633ecf8e1abaa2817d43de00980f57a04e8e0d4621d0f43b37660039",
         "incumbent_candidate_id": "cand_840e379e1c55a3e35d2a4941783a933d763573ffedee3bed98223415028a68d2",
         "selected_candidate_id": "cand_cfc070d1c7e6138011c5f3cb080c37f03afe295017871a158836b69cd013d18b",
         "promoted": false,
         "verdict": "improved",
         "reason": "confirmation rejected candidate: reference cand_236ea9f4f4b4cac54bb70283c0f76f12828f7cf114901390161e3f0edcf9fb60 is better on the primary objective",
-        "decision_id": "decision_v1_5c2d952be3aabd85bf75c96d07d6f2beeb09e6699eca4333d303e47412326302",
+        "decision_id": "decision_v1_26c6590d1797fc6697d8eeb343c5b71966f3ecfd0fa7cd08ec71f0301e52cfc6",
         "development_scores": [
           {
             "candidate_id": "cand_cfc070d1c7e6138011c5f3cb080c37f03afe295017871a158836b69cd013d18b",
@@ -6083,8 +6083,8 @@
               "node_count": true
             },
             "trial_keys": [
-              "trial_v1_e0cd1b8e370478fdeeaea9fc3c4f8331fc56b1780a2df71184bdf71f44d4e478",
-              "trial_v1_cf13b2e49df0c772e2351a37aeb4239a4ff4b4f7b0a0bbc6a70b413954bd5fa3"
+              "trial_v1_d0497e3b81f985cd4e41e169db252a02697946288adfda4ffcc04dae58ee1f62",
+              "trial_v1_506a6ae4298b10648b091c9a6ca5f386f3270843c99e0f84f23b9fc7ae58a0cf"
             ],
             "viable": true
           }
@@ -6105,7 +6105,7 @@
             "mean_improvement": 1.0,
             "confidence_level": 0.8,
             "bootstrap_resamples": 2000,
-            "bootstrap_seed": 6373700862545431535,
+            "bootstrap_seed": 7720329684082195557,
             "confidence_interval": [
               1.0,
               1.0
@@ -6137,7 +6137,7 @@
               "mean_improvement": -279.0,
               "confidence_level": 0.8,
               "bootstrap_resamples": 2000,
-              "bootstrap_seed": 6373700862545431535,
+              "bootstrap_seed": 7720329684082195557,
               "confidence_interval": [
                 -279.0,
                 -279.0
@@ -6168,7 +6168,7 @@
               "mean_improvement": 0.0,
               "confidence_level": 0.8,
               "bootstrap_resamples": 2000,
-              "bootstrap_seed": 6373700862545431535,
+              "bootstrap_seed": 7720329684082195557,
               "confidence_interval": [
                 0.0,
                 0.0
@@ -6199,7 +6199,7 @@
               "mean_improvement": 0.0,
               "confidence_level": 0.8,
               "bootstrap_resamples": 2000,
-              "bootstrap_seed": 6373700862545431535,
+              "bootstrap_seed": 7720329684082195557,
               "confidence_interval": [
                 0.0,
                 0.0
@@ -6255,7 +6255,7 @@
               "primary": {
                 "baseline_mean": 4.0,
                 "bootstrap_resamples": 2000,
-                "bootstrap_seed": 6373700862545431535,
+                "bootstrap_seed": 7720329684082195557,
                 "candidate_mean": 3.0,
                 "confidence_interval": [
                   -1.0,
@@ -6291,7 +6291,7 @@
                 {
                   "baseline_mean": 888.0,
                   "bootstrap_resamples": 2000,
-                  "bootstrap_seed": 6373700862545431535,
+                  "bootstrap_seed": 7720329684082195557,
                   "candidate_mean": 4227.0,
                   "confidence_interval": [
                     -3339.0,
@@ -6322,7 +6322,7 @@
                 {
                   "baseline_mean": 4.0,
                   "bootstrap_resamples": 2000,
-                  "bootstrap_seed": 6373700862545431535,
+                  "bootstrap_seed": 7720329684082195557,
                   "candidate_mean": 13.0,
                   "confidence_interval": [
                     -9.0,
@@ -6353,7 +6353,7 @@
                 {
                   "baseline_mean": 4.0,
                   "bootstrap_resamples": 2000,
-                  "bootstrap_seed": 6373700862545431535,
+                  "bootstrap_seed": 7720329684082195557,
                   "candidate_mean": 4.0,
                   "confidence_interval": [
                     0.0,
@@ -6445,7 +6445,7 @@
       },
       "trials": [
         {
-          "trial_key": "trial_v1_e0cd1b8e370478fdeeaea9fc3c4f8331fc56b1780a2df71184bdf71f44d4e478",
+          "trial_key": "trial_v1_d0497e3b81f985cd4e41e169db252a02697946288adfda4ffcc04dae58ee1f62",
           "split": "development",
           "role": "incumbent",
           "candidate_id": "cand_840e379e1c55a3e35d2a4941783a933d763573ffedee3bed98223415028a68d2",
@@ -6536,7 +6536,7 @@
           "arm": "predecessor"
         },
         {
-          "trial_key": "trial_v1_cf13b2e49df0c772e2351a37aeb4239a4ff4b4f7b0a0bbc6a70b413954bd5fa3",
+          "trial_key": "trial_v1_506a6ae4298b10648b091c9a6ca5f386f3270843c99e0f84f23b9fc7ae58a0cf",
           "split": "development",
           "role": "challenger",
           "candidate_id": "cand_cfc070d1c7e6138011c5f3cb080c37f03afe295017871a158836b69cd013d18b",
@@ -6624,7 +6624,7 @@
           "arm": "partial"
         },
         {
-          "trial_key": "trial_v1_799de147889a8272a7a336b5fb4a3006ff259218d19c26569ffa4db1af0de02c",
+          "trial_key": "trial_v1_1ed7d0f822ec618041d3c0a8cacb7635da4044a9720796d4c5953df1d603e497",
           "split": "confirmation",
           "role": "incumbent",
           "candidate_id": "cand_840e379e1c55a3e35d2a4941783a933d763573ffedee3bed98223415028a68d2",
@@ -6715,7 +6715,7 @@
           "arm": "predecessor"
         },
         {
-          "trial_key": "trial_v1_52f0a48ddd234f028efc412dd35a3500f14732c2221bf2c878a0518136ba45fb",
+          "trial_key": "trial_v1_0055e4de211dfa251fa55b8373a7aeb348777eb66ef030d4acd4b9c1de9a8a40",
           "split": "confirmation",
           "role": "incumbent",
           "candidate_id": "cand_840e379e1c55a3e35d2a4941783a933d763573ffedee3bed98223415028a68d2",
@@ -6806,7 +6806,7 @@
           "arm": "predecessor"
         },
         {
-          "trial_key": "trial_v1_75783af7fc845ded318cd9ac50172fb012222c8358aa66ca9446dc29a8892a4c",
+          "trial_key": "trial_v1_f006fbd5c82b0e3804bab94c2e0ea7f2d01f65f5d3c88bdfb536282f09ab4020",
           "split": "confirmation",
           "role": "incumbent",
           "candidate_id": "cand_840e379e1c55a3e35d2a4941783a933d763573ffedee3bed98223415028a68d2",
@@ -6897,7 +6897,7 @@
           "arm": "predecessor"
         },
         {
-          "trial_key": "trial_v1_a43ae265feb8140db13f5b04bf4a9f23d8a8a2969afe2a9093fa7e9f49e3532e",
+          "trial_key": "trial_v1_e05cb951fdf6136ec48cfff10b496a4d7b6f28cfac98d68328e96e628dadb131",
           "split": "confirmation",
           "role": "challenger",
           "candidate_id": "cand_cfc070d1c7e6138011c5f3cb080c37f03afe295017871a158836b69cd013d18b",
@@ -6985,7 +6985,7 @@
           "arm": "partial"
         },
         {
-          "trial_key": "trial_v1_f6c24c9e230ce62a693b273f1929d8e20ebb3acf3ce288c1915bdaf033fbbc53",
+          "trial_key": "trial_v1_a53db2faa6eefd82700109124f5ba0e233bb5500d3ce124ba67aefe10c01fc7c",
           "split": "confirmation",
           "role": "challenger",
           "candidate_id": "cand_cfc070d1c7e6138011c5f3cb080c37f03afe295017871a158836b69cd013d18b",
@@ -7073,7 +7073,7 @@
           "arm": "partial"
         },
         {
-          "trial_key": "trial_v1_b46f8b683dc9d7146733d1008c9a447e2407973f6a26238ec329d4de7c0a9fda",
+          "trial_key": "trial_v1_1cced7d0bf0a1fc329bfeae20400fb20d71319bfb6f54c9b2385c7dce7340701",
           "split": "confirmation",
           "role": "challenger",
           "candidate_id": "cand_cfc070d1c7e6138011c5f3cb080c37f03afe295017871a158836b69cd013d18b",
@@ -7161,7 +7161,7 @@
           "arm": "partial"
         },
         {
-          "trial_key": "trial_v1_982f34703d477b3303973e84c79dd9c2fc57e30a9b214932fec3c436ff28d9c5",
+          "trial_key": "trial_v1_e866a0eece5daf06a63500e5830364c4c37251e1ea83c13ac01128e722859f23",
           "split": "confirmation",
           "role": "reference",
           "candidate_id": "cand_236ea9f4f4b4cac54bb70283c0f76f12828f7cf114901390161e3f0edcf9fb60",
@@ -7246,7 +7246,7 @@
           "arm": "single_agent"
         },
         {
-          "trial_key": "trial_v1_ee8f8d2f3be480978f61dfd009750ed7c8d61d71891653d744c9dbefaf5faaaf",
+          "trial_key": "trial_v1_8bd5581ba5e8e92df19a39f0f95c62546512071c9cbd1e3868c614f73865101a",
           "split": "confirmation",
           "role": "reference",
           "candidate_id": "cand_236ea9f4f4b4cac54bb70283c0f76f12828f7cf114901390161e3f0edcf9fb60",
@@ -7331,7 +7331,7 @@
           "arm": "single_agent"
         },
         {
-          "trial_key": "trial_v1_4083dd955cce5d47ab73e274b7d11e2f7a029a6dce8643df6aaab693cffd3120",
+          "trial_key": "trial_v1_afc06216ade581f7229fb6d6aed28e18b5fa646051a0c079b0a9a714718a598a",
           "split": "confirmation",
           "role": "reference",
           "candidate_id": "cand_236ea9f4f4b4cac54bb70283c0f76f12828f7cf114901390161e3f0edcf9fb60",
@@ -7522,7 +7522,7 @@
       },
       "evaluator_manifest": {
         "version": 1,
-        "code_digest": "sha256:03a28cc7cd7217e20a13ffd40a3bd32a13df0b4c48510c7c4e17bed5b0459524",
+        "code_digest": "sha256:85549898715d722471093c12e2f1398b44e7d6d0d755d6e06bdd24cce0a6d888",
         "split_manifests": {
           "development": "sha256:c3beaf2de273294268c6908eda40a3824914c7f4fd156947caffb69cdd3b0390",
           "confirmation": "sha256:94fcbc0e03100cccc04b99f881516d035336ece34b7696a88fd02f8d9d7d509d",
@@ -7547,7 +7547,7 @@
         ],
         "price_snapshot_version": "offline-fixture-3000-nanousd-per-token-v1"
       },
-      "evaluator_hash": "sha256:3cbfeb4d4f3ff89c7e4bc6d522a7a1358f96a5df44b4ddcc134b9e8492edaeff",
+      "evaluator_hash": "sha256:dd3bbd0e576e8d361f705d6dc97e307e3967f2cdedc8e34bbc3c11a727ad7aa4",
       "split_manifests": {
         "development": {
           "pack": "template-eval-development",
@@ -7577,7 +7577,7 @@
           }
         }
       },
-      "holdout_identity": "sha256:a0b0cc50a41cf6df592621a5203f9faf6427b37b772b92e74654bbe410472d01",
+      "holdout_identity": "sha256:316b0d478ef9dd3e20793211d91ea5b4f7a61d2e24237fe71f5f3b3d26a25377",
       "holdout": {
         "pack": "template-eval-holdout",
         "held_out": "a task family development and confirmation do not contain",
@@ -7585,15 +7585,15 @@
         "first_holdout_trial": null
       },
       "decision": {
-        "campaign_id": "optimization_v4_a19cf1715e164c483950fdfeaabc44552fc2a025e89aee7bca1ce7dd62cf4132",
-        "optimization_plan_hash": "sha256:a19cf1715e164c483950fdfeaabc44552fc2a025e89aee7bca1ce7dd62cf4132",
-        "holdout_seed_commitment": "sha256:fe027e80ae649040cd0f558e75a14de0beec3f70664e393d38840fa68eba61c1",
+        "campaign_id": "optimization_v4_28c718fe1f5fdd4cf9972850df3810a22d53bf5228a65aa6d0cd774c9b1ec31e",
+        "optimization_plan_hash": "sha256:28c718fe1f5fdd4cf9972850df3810a22d53bf5228a65aa6d0cd774c9b1ec31e",
+        "holdout_seed_commitment": "sha256:03d1af65ecee938e107c29aca361563d298d4c0c8b517e2202f279e62128e077",
         "incumbent_candidate_id": "cand_a3661646c4e92bf6aa5276fafeb0aba6e9103da2e11168f9767de9e7fde15dcc",
         "selected_candidate_id": null,
         "promoted": false,
         "verdict": "inconclusive",
         "reason": "no candidate passed development gates and hard bounds",
-        "decision_id": "decision_v1_a374120c0c6df2708f42d3c6ddd8a54f5b57091c310d7e5f518e9c25b6ce7025",
+        "decision_id": "decision_v1_b5de1f195a7d33cd0307bc713e82b7172ed513999e16e0f31260ed50f74317a6",
         "development_scores": [
           {
             "candidate_id": "cand_af3f3ca0d226d7f05ba3890852dd646239254b0f0a3ced63e42b694afa45cc60",
@@ -7645,8 +7645,8 @@
               "node_count": true
             },
             "trial_keys": [
-              "trial_v1_2460057b53c0348bb169ed5dcf4442623ef55dba6c87f4ed688d6b9c4d0c6f1c",
-              "trial_v1_f19cfffc0c14be9644638b736e12be81fab86f00e5365cf40d5f28b955c41d34"
+              "trial_v1_7f2dc4809f376185204766bc96a489774e24e8bf3c10439e6623f69fcd26eb24",
+              "trial_v1_043f02a43eae1185649881fc054080b84e83cdd304d2c3576f20b6f70609abf3"
             ],
             "viable": false
           }
@@ -7691,7 +7691,7 @@
       },
       "trials": [
         {
-          "trial_key": "trial_v1_2460057b53c0348bb169ed5dcf4442623ef55dba6c87f4ed688d6b9c4d0c6f1c",
+          "trial_key": "trial_v1_7f2dc4809f376185204766bc96a489774e24e8bf3c10439e6623f69fcd26eb24",
           "split": "development",
           "role": "incumbent",
           "candidate_id": "cand_a3661646c4e92bf6aa5276fafeb0aba6e9103da2e11168f9767de9e7fde15dcc",
@@ -7782,7 +7782,7 @@
           "arm": "predecessor"
         },
         {
-          "trial_key": "trial_v1_f19cfffc0c14be9644638b736e12be81fab86f00e5365cf40d5f28b955c41d34",
+          "trial_key": "trial_v1_043f02a43eae1185649881fc054080b84e83cdd304d2c3576f20b6f70609abf3",
           "split": "development",
           "role": "challenger",
           "candidate_id": "cand_af3f3ca0d226d7f05ba3890852dd646239254b0f0a3ced63e42b694afa45cc60",
@@ -7885,7 +7885,7 @@
       "module": "smythe/__init__.py"
     },
     "source_control": {
-      "revision": "afd01d480a8477bc1ae3fdc42626af4e57c63211",
+      "revision": "9db826a37a9b3154b02c5d8f00efbcbc9403415f",
       "dirty": false,
       "untracked_files": 0
     }
