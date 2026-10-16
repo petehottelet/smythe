@@ -7,6 +7,7 @@ folder.
 from __future__ import annotations
 
 import json
+import time
 from pathlib import Path, PurePosixPath, PureWindowsPath
 
 import pytest
@@ -246,3 +247,22 @@ def test_a_name_that_holds_a_quote_mark_is_redacted_whole(home):
     for quote, name in (("`", "it`s"), ("'", "O'Brien")):
         quoted = f"{quote}/srv/{name}/key.json{quote}"
         assert redact_paths(f"see {quoted} now") == f"see {quote}<path>{quote} now"
+    # Where every later quote mark of its kind has a letter or a digit after
+    # it, the first one closes the string, and a backtick's word goes with it.
+    for path in (windows("D:", "clients", "O'Brien", "docs"), "/srv/O'Brien/key.json"):
+        assert redact_paths(f'open "{path}"x') == 'open "<path>"x'
+        assert redact_paths(f"open `{path}`x") == "open `<path>`"
+    for path in (windows("", "", "fileserver", "it`s", "docs"), "/srv/it`s/key.json"):
+        assert redact_paths(f"open `{path}`x") == "open `<path>`"
+        assert redact_paths(f"open `{path}") == "open `<path>`"
+
+
+def test_a_long_line_of_quoted_paths_is_redacted_in_linear_time(home):
+    home(WINDOWS_HOME)
+    # Every quote mark here has a letter after it, so none can close a string
+    # by itself; looking past each one to the end of the line took seconds.
+    unit = "'" + windows("C:", "data") + "'x"
+    started = time.perf_counter()
+    redacted = redact_paths(unit * 8_000)
+    assert time.perf_counter() - started < 2.0
+    assert redacted == "'<path>'x" * 8_000

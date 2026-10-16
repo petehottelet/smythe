@@ -42,10 +42,26 @@ _PATH_START = (
     + "".join(rf"(?<!(?<![^\s(\[{{'\"`]){method} )" for method in _HTTP_METHODS)
     + r"(?<![\w:/\\.~-])/[^\s/'\"]+/)"
 )
+
+
+def _quoted_path(quote: str) -> str:
+    """A path that starts a string quoted with *quote*, up to its closing quote.
+
+    The closing quote is the first of the next four quote marks of its kind
+    that no letter or digit follows; one that a letter follows, as in
+    O'Brien, is part of a name. Looking no further keeps a long line's cost
+    linear. Failing that, the string ends at the first quote mark of its
+    kind, and, as names hold backticks, a backtick's word is taken in to its
+    end.
+    """
+    rest = rf"[^{quote}\r\n]*"
+    closed = rf"{rest}(?:{quote}(?=\w){rest}){{0,3}}{quote}(?!\w)"
+    first = rf"{rest}{quote}" + (r"[^\s'\"]*" if quote == "`" else "")
+    return rf"{quote}{_PATH_START}(?:{closed}|{first})"
+
+
 # A path that starts a quoted string runs to its closing quote, spaces included.
-# A quote mark with a letter or a digit after it, as in O'Brien, is part of a
-# name rather than the closing quote.
-_QUOTED_PATH = re.compile(r"(['\"`])" + _PATH_START + r"(?:(?!\1(?!\w))[^\r\n])*\1(?!\w)")
+_QUOTED_PATH = re.compile("|".join(_quoted_path(quote) for quote in ("'", '"', "`")))
 # A URL's bracketed IPv6 host ends in ']', as a log line's tag does, and a path
 # after a tag is redacted; the host and the slash after it are taken in and
 # kept, so the URL's path reads as any other URL's does.
@@ -148,5 +164,5 @@ def redact_paths(text: str) -> str:
         # Any character may come before it, as in a compiler flag or a URL.
         text = re.sub(rf"{pattern}(?![\w.~-])({below})", home_folder, text,
                       flags=re.IGNORECASE if os.name == "nt" else 0)
-    text = _QUOTED_PATH.sub(lambda match: f"{match[1]}<path>{match[1]}", text)
+    text = _QUOTED_PATH.sub(lambda match: f"{match[0][0]}<path>{match[0][0]}", text)
     return _ABSOLUTE_PATH.sub(_path_mark, text).replace(stand_in, "\\")
