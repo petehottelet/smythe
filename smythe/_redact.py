@@ -117,9 +117,8 @@ def redact_paths(text: str) -> str:
 
     The home folder matches with any run of separators between its names,
     as a repr or JSON text doubles backslashes, and without case on
-    Windows, so a user name that holds a space is removed whole. The names
-    below it stay, up to a character other than a letter, a digit, ``.``,
-    ``~``, ``-`` or ``_``. Elsewhere two backslashes start a UNC root after
+    Windows, so a user name that holds a space is removed whole, and the
+    names below it stay. Elsewhere two backslashes start a UNC root after
     any character, as in a compiler flag, so a repr of a relative path,
     whose separators it doubles, is redacted too. A path that starts a
     quoted string is removed up to the closing quote, which no letter or

@@ -88,7 +88,8 @@ A failure row records:
   repr, whose separators it doubles, is redacted too. A path that starts a
   quoted string is removed up to the closing quote, spaces included, as
   Python's own error messages quote paths; a quote mark with a letter or a
-  digit after it, as in `O'Brien`, is part of a name. Unquoted, the rest of
+  digit after it, as in `O'Brien`, is part of a name when one of the next
+  few quote marks of its kind can close the string. Unquoted, the rest of
   a name with a space cannot be told from the words after it, so they are
   removed with the path, in preference to keeping part of it, up to the end
   of the line, a quote, a URL, or an HTTP method and its route:
