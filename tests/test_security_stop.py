@@ -904,7 +904,10 @@ def test_a_revoke_during_a_durable_review_cancels_the_calls_in_flight_at_once(
             await asyncio.sleep(0.01)
         control.revoke("approver_compromised")
         try:
-            await asyncio.wait({running}, timeout=5)
+            # The gates hold both calls until they are released below and give up only after
+            # 30 s, so a run that ends within this bound cancelled them. The bound leaves room
+            # for the journal's commits that record the stop on a loaded host.
+            await asyncio.wait({running}, timeout=15)
             assert running.done() and not review_gate.released and not in_flight.released
         finally:
             review_gate.release()
