@@ -12,7 +12,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from smythe._failures import classify_failure
-from smythe._redact import error_text, redact_account_identifiers
+from smythe._redact import error_text
 from smythe.graph import REVISION_ADDED_KEY, ExecutionGraph, Node, NodeStatus, _deliverable_ids
 
 logger = logging.getLogger("smythe.tracer")
@@ -469,7 +469,7 @@ def _log_text(value: Any) -> str | None:
     """Model or error text as the log keeps it: redacted, then cut short; None when empty."""
     if not value:
         return None
-    return redact_account_identifiers(str(value))[:REVISION_LOG_TEXT_CHARS]
+    return error_text(value)[:REVISION_LOG_TEXT_CHARS]
 
 
 def revision_log_entry(
