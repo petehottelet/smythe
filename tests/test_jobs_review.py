@@ -50,11 +50,16 @@ def reviewed(capsys, path, run_id, *options):
     return payload["review"]
 
 
+def parsed(argv):
+    """*argv* parsed as ``smythe`` parses it, with a reroll's keys after its options on Python 3.11."""
+    return cli._parse_arguments(build_parser(), list(argv))
+
+
 def commands_parse(packet, *local):
     """Every suggested command is a jobs command line that parses, with no store or local path."""
     for item in packet["items"]:
         for argv in item["resolve_with"]:
-            args = build_parser().parse_args(argv)
+            args = parsed(argv)
             assert args.root_command == "jobs" and args.jobs_command == argv[1]
             assert args.run_id == packet["run_id"]
             assert "--store" not in argv
@@ -392,7 +397,7 @@ def test_a_key_that_looks_like_an_option_still_parses(tmp_path, capsys, monkeypa
     packet = reviewed(capsys, job.path, job.run_id)
     [argv] = commands_parse(packet, tmp_path)
     assert argv == ["jobs", "reroll", job.run_id, "--reason", "REASON", "--", "-glyph"]
-    assert build_parser().parse_args(argv).operation_keys == ["-glyph"]
+    assert parsed(argv).operation_keys == ["-glyph"]
 
 
 def test_operations_are_paged_and_items_are_ordered(tmp_path, capsys, monkeypatch):
