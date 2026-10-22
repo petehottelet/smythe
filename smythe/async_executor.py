@@ -342,6 +342,11 @@ class AsyncExecutor(ExecutorBase):
                 just_completed: list[Node] = []
                 for task in sorted(done, key=lambda item: order[active[item].id]):
                     node = active.pop(task)
+                    if capacity is not None:
+                        # Its done callback may not have given back its slot
+                        # yet, and a node passed over for that slot must find
+                        # it free at the next admission.
+                        capacity.give_back(node.id)
                     try:
                         task.result()
                     except asyncio.CancelledError:

@@ -169,6 +169,40 @@ async def test_a_deferred_node_waits_for_capacity_and_never_stops_the_run():
     assert tracer.timing()["waiting_ms"] == dict(NO_WAITS, capacity=3000)
 
 
+class Turns(Provider):
+    """Ends each call after as many turns of the event loop as its node's label names."""
+
+    def __init__(self, turns: dict[str, int]) -> None:
+        self.turns = turns
+        self.calls: list[str] = []
+
+    async def complete(self, system, prompt, model):
+        label = label_of(system, prompt)
+        self.calls.append(label)
+        for _ in range(self.turns.get(label, 0)):
+            await asyncio.sleep(0)
+        return CompletionResult(text="ok", prompt_tokens=1, completion_tokens=1)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("other,holder", [(other, holder) for other in range(4)
+                                          for holder in range(6)])
+async def test_a_slot_freed_as_other_work_ends_admits_the_node_passed_over_for_it(other, holder):
+    # Where the holder of the model's one slot ends in the same turn of the loop
+    # as other work, or just after it, the run sees both ends before the
+    # holder's done callback gives the slot back. Which turns those are varies
+    # between runs, so the test covers a range of them.
+    provider = Turns({"other": other, "holder": holder})
+    executor = async_executor(provider, max_concurrency=3,
+                              capacity_policy=limits("slow", max_in_flight=1))
+    work = graph(node("other"), node("holder", "slow"), node("waiting", "slow"))
+
+    await executor.run(work)
+
+    assert [item.status for item in work.nodes] == [NodeStatus.COMPLETED] * 3
+    assert provider.calls == ["other", "holder", "waiting"]
+
+
 @pytest.mark.asyncio
 async def test_a_wait_for_a_free_slot_before_deferral_stays_an_admission_wait(monkeypatch):
     """c waits 1s for a slot under max_concurrency, then 2s more for a's slot on "m"."""
