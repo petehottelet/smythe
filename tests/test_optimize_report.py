@@ -386,6 +386,181 @@ def test_malformed_paired_t_fields_are_refused(field, value):
         render_optimization_report(bind(data))
 
 
+def runner_up():
+    score = development()
+    score.update(candidate_id='runner-up', policy_hash='sha256:' + '9' * 64, primary_mean=11.5,
+                 metric_means={'quality': 11.5}, mean_improvements={'quality': 1.375},
+                 trial_keys=['t2'])
+    return score
+
+
+def verdict_payload(verdict='improved'):
+    data = payload()
+    saved = data['ledger_snapshot']['decisions'][0]['assessment']
+    saved.update(development_scores=[development(), runner_up()], verdict=verdict)
+    for stage in ('confirmation', 'holdout'):
+        saved[stage]['primary'] = paired_t_comparison()
+        saved[stage]['secondary'] = [paired_t_comparison('latency', 'minimize')]
+        saved[stage]['verdict'] = verdict
+    return data
+
+
+def overview_text(output):
+    return visible(output.split('<section aria-labelledby="comparisons">', 1)[0])
+
+
+def stage_text(output, stage):
+    body = output.split(f'<h3>{stage}</h3>', 1)[1]
+    return visible(re.split('<h3>|</section>', body, maxsplit=1)[0])
+
+
+def test_every_retained_development_score_is_rendered():
+    output = render_optimization_report(bind(verdict_payload()))
+    text = stage_text(output, 'Development')
+    assert 'Candidate candidate · selected for confirmation' in text
+    assert 'Candidate runner-up' in text and 'runner-up · selected' not in text
+    assert '11.5' in text and '1.375' in text and '12.75' in text and '2.625' in text
+    assert text.count('Development viable') == 2
+
+
+def test_selected_development_score_must_match_its_retained_entry():
+    data = verdict_payload()
+    saved = data['ledger_snapshot']['decisions'][0]['assessment']
+    saved['development_scores'][0]['primary_mean'] = 99.0
+    with pytest.raises(ValueError, match='development score'):
+        render_optimization_report(bind(data))
+    saved['development_scores'] = [runner_up()]
+    with pytest.raises(ValueError, match='development score'):
+        render_optimization_report(bind(data))
+
+
+def test_recorded_verdicts_are_shown_and_checked_against_their_intervals():
+    output = render_optimization_report(bind(verdict_payload()))
+    for text in (overview_text(output), stage_text(output, 'Confirmation'), stage_text(output, 'Holdout')):
+        assert 'Verdict: improved' in text
+    text = visible(output)
+    assert text.count('Verdict: improved') == 3
+    assert 'derived' not in text.lower()
+
+    for recorded in ('worse', 'inconclusive'):
+        with pytest.raises(ValueError, match='verdict'):
+            render_optimization_report(bind(verdict_payload(recorded)))
+    data = verdict_payload()
+    data['ledger_snapshot']['decisions'][0]['assessment']['holdout']['verdict'] = 'better'
+    with pytest.raises(ValueError, match='verdict'):
+        render_optimization_report(bind(data))
+    data = verdict_payload()
+    data['ledger_snapshot']['decisions'][0]['assessment']['verdict'] = 'worse'
+    with pytest.raises(ValueError, match='verdict'):
+        render_optimization_report(bind(data))
+
+
+@pytest.mark.parametrize('low,high,verdict', [(1.75, 2.5, 'improved'), (0.125, 2.5, 'inconclusive'),
+                                              (-3.0, -0.5, 'worse')])
+def test_legacy_decisions_show_a_verdict_derived_from_saved_endpoints(low, high, verdict):
+    data = payload()
+    saved = data['ledger_snapshot']['decisions'][0]['assessment']
+    saved['holdout']['primary'].update(confidence_interval=[low, high], lower_confidence_bound=low)
+    output = render_optimization_report(bind(data))
+    derived = '(derived from saved interval endpoints)'
+    assert f'Verdict: improved {derived}' in stage_text(output, 'Confirmation')
+    assert f'Verdict: {verdict} {derived}' in stage_text(output, 'Holdout')
+    # The decision has no recorded verdict; its final stage supplies one.
+    assert f'Verdict: {verdict} {derived}' in overview_text(output)
+
+
+def test_legacy_verdict_needs_a_recognized_interval_and_minimum():
+    data = payload()
+    saved = data['ledger_snapshot']['decisions'][0]['assessment']
+    del saved['confirmation']['min_improvement']
+    saved['holdout']['primary'] = {'baseline_mean': 4}
+    text = visible(render_optimization_report(bind(data)))
+    assert 'derived' not in text
+    assert text.count('Verdict: Not recorded') == 3
+
+
+def test_development_decisions_have_no_verdict():
+    data = payload()
+    data['ledger_snapshot']['decisions'][0].update(promoted=False)
+    data['ledger_snapshot']['decisions'][0]['assessment'] = {
+        'stage': 'development', 'development_scores': [development(), runner_up()]}
+    output = render_optimization_report(bind(data))
+    assert 'Verdict' not in visible(output)
+    assert 'Candidate runner-up' in stage_text(output, 'Development')
+    assert 'selected for confirmation' not in visible(output)
+
+
+def reference_payload(rule='must_not_be_worse'):
+    data = verdict_payload()
+    snapshot = data['ledger_snapshot']
+    snapshot['candidates'].append({'candidate_id': 'reference', 'policy_hash': 'sha256:' + '8' * 64,
+                                   'candidate': {'policy': {'concurrency': 3},
+                                                 'hypothesis': 'Synthetic reference policy',
+                                                 'parent': 'incumbent'}, 'created_at_ns': 0})
+    snapshot['candidate_count'] = 3
+    snapshot['campaign']['ordered_candidate_ids'].append('reference')
+    worse = paired_t_comparison()
+    worse.update(baseline_mean=15.5, candidate_mean=13.25, mean_improvement=-2.25,
+                 confidence_interval=[-3.0, -0.5], lower_confidence_bound=-3.0)
+    stages = {}
+    for stage in ('confirmation', 'holdout'):
+        saved = deepcopy(snapshot['decisions'][0]['assessment'][stage])
+        saved.update(primary=deepcopy(worse), verdict='worse', promote=False)
+        stages[stage] = saved
+    snapshot['decisions'][0]['assessment'].update(reference_rule=rule, references=[
+        {'candidate_id': 'reference', 'policy_hash': 'sha256:' + '8' * 64, **stages, 'verdict': 'worse'}])
+    return data
+
+
+def test_multi_arm_decisions_tabulate_every_arm_against_the_decision_candidate():
+    output = render_optimization_report(bind(reference_payload()))
+    text = stage_text(output, 'References')
+    assert 'must_not_be_worse' in text
+    table = output.split('<h3>References</h3>', 1)[1].split('</table>', 1)[0]
+    rows = re.findall(r'<tr role="row">(.*?)</tr>', table)[1:]
+    cells = [[visible(cell) for cell in re.findall(r'<(?:th|td) [^>]*>(.*?)</(?:th|td)>', row)]
+             for row in rows]
+    assert [row[:3] for row in cells] == [
+        ['incumbent', 'Incumbent', 'Confirmation'], ['incumbent', 'Incumbent', 'Holdout'],
+        ['reference', 'Reference', 'Confirmation'], ['reference', 'Reference', 'Holdout']]
+    assert [row[-1] for row in cells] == ['improved', 'improved', 'worse', 'worse']
+    assert cells[2][3:6] == ['15.5', '13.25', '-3.0 to -0.5']
+    assert 'Reference referenceVerdict: worse' in text
+    policies = visible(output.split('<h2 id="policies">', 1)[1].split('<h2 id="trials">', 1)[0])
+    assert 'Reference' in policies and 'Decision candidate' in policies
+    # The two-arm sections are unchanged.
+    assert output.count('<svg ') == 4
+    assert 'References' not in visible(render_optimization_report(bind(verdict_payload())))
+
+
+def test_multi_arm_report_shows_references_a_development_decision_never_compared():
+    data = reference_payload('report')
+    record = data['ledger_snapshot']['decisions'][0]
+    record.update(promoted=False)
+    record['assessment'] = {'stage': 'development', 'development_scores': [development()],
+                            'reference_rule': 'report',
+                            'references': [{'candidate_id': 'reference',
+                                            'policy_hash': 'sha256:' + '8' * 64}]}
+    text = stage_text(render_optimization_report(bind(data)), 'References')
+    assert 'report' in text and 'not compared' in text
+
+
+@pytest.mark.parametrize('change', ['verdict', 'final', 'rows', 'unknown'])
+def test_inconsistent_reference_evidence_is_refused(change):
+    data = reference_payload()
+    reference = data['ledger_snapshot']['decisions'][0]['assessment']['references'][0]
+    if change == 'verdict':
+        reference['holdout']['verdict'] = 'improved'
+    elif change == 'final':
+        reference['verdict'] = 'improved'
+    elif change == 'rows':
+        data['ledger_snapshot']['decisions'][0]['assessment']['references'] = {'reference': True}
+    else:
+        reference['candidate_id'] = 'missing'
+    with pytest.raises(ValueError):
+        render_optimization_report(bind(data))
+
+
 def test_direction_labels_are_html_text_outside_scaled_svg_for_each_saved_interval():
     output = render_optimization_report(payload())
     svgs = re.findall(r'<svg .*?</svg>', output)

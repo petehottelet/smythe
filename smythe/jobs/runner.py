@@ -10,20 +10,35 @@ import math
 import os
 import re
 import time
+from collections.abc import Sequence
 from dataclasses import dataclass
 from decimal import Decimal
 from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
+from smythe.acceptance import ValidationSubject
 from smythe.budget import BudgetValidationError, validate_completion_usage
 from smythe.jobs.artifact_io import (
     MAX_ARTIFACT_BYTES,
+    ArtifactInspection,
+    ArtifactInspectionError,
     atomic_publish_bytes,
     claim_artifact_root,
     inspect_artifact,
 )
+from smythe.jobs.delivery import (
+    RESPONSE_PATH,
+    annotate_delivery,
+    artifact_spec_identity,
+    delivery_record,
+    run_validator,
+    validator_registry,
+    validator_result,
+)
+from smythe.jobs.inspection import check_artifact_integrity
 from smythe.jobs.models import (
+    ArtifactSpecV1,
     DEFAULT_CALL_TIMEOUT_S,
     DEFAULT_MAX_WALL_SECONDS,
     MAX_ATTACHMENT_BYTES,
@@ -36,6 +51,7 @@ from smythe.jobs.preflight import (
     JobApprovalV1,
     JobPlanV1,
     PlannedOperationV1,
+    PreflightError,
     preflight_job,
     verify_approval,
 )
@@ -52,6 +68,7 @@ from smythe.jobs.store import (
 )
 from smythe.provider import Artifact, CompletionResult
 from smythe.tools import ChatMessage
+from smythe.validation import ValidationFinding, ValidationReport, ValidatorIdentity, hard_finding
 
 
 _SAFE_COMPONENT = re.compile(r"[^A-Za-z0-9._-]+")
@@ -74,8 +91,28 @@ class JobExecutionMetrics:
         }
 
 
+@dataclass(frozen=True, slots=True)
+class _ArtifactCheck:
+    """Published artifact receipts, attempt errors and the delivery record."""
+
+    records: list[dict[str, Any]]
+    errors: list[str]
+    record: dict[str, Any]
+
+    @property
+    def accepted(self) -> bool:
+        return self.record["decision"] == "accepted"
+
+
 class JobRunner:
-    """Execute only planned calls, with a durable boundary before dispatch."""
+    """Execute only planned calls, with a durable boundary before dispatch.
+
+    ``validators`` registers the trusted local validators that a plan's
+    artifact specs name. Each runs, after the built-in artifact check, on
+    the exact bytes of every decodable artifact. A plan that names a
+    validator this runner has not registered with the same identity is
+    refused before a run is created or resumed.
+    """
 
     def __init__(
         self,
@@ -86,7 +123,9 @@ class JobRunner:
         lease_heartbeat_s: float | None = None,
         call_timeout_s: float | None = None,
         max_wall_seconds: float | None = None,
+        validators: Sequence[Any] = (),
     ) -> None:
+        self._validators = validator_registry(validators)
         if (
             isinstance(lease_ttl_s, bool)
             or not isinstance(lease_ttl_s, (int, float))
@@ -139,7 +178,11 @@ class JobRunner:
         *,
         manifest_root: str | Path,
         run_id: str | None = None,
+        allow_approval_reuse: bool = False,
     ) -> dict[str, Any]:
+        """Create and execute a run; a used approval needs ``allow_approval_reuse``."""
+        if type(allow_approval_reuse) is not bool:
+            raise TypeError("allow_approval_reuse must be a boolean")
         verify_approval(plan, approval)
         root = Path(manifest_root).resolve()
         if run_id is not None:
@@ -150,6 +193,7 @@ class JobRunner:
             approval,
             manifest_root=root,
             run_id=run_id,
+            allow_approval_reuse=allow_approval_reuse,
         )
         _validate_run_id(created_id)
         return await self._execute_with_lease(created_id, plan, root)
@@ -175,13 +219,14 @@ class JobRunner:
         record = self.store.manifest_record(run_id)
         root = Path(record["manifest_root"])
         manifest = JobManifestV1.from_json(record["manifest_json"])
-        plan = preflight_job(manifest, manifest_root=root)
+        plan = self._preflight(manifest, root)
         approval = JobApprovalV1.from_dict(record["approval"])
         verify_approval(plan, approval)
         self._validate_dispatch_inputs(plan, root)
-        return await self._execute_with_lease(
+        result = await self._execute_with_lease(
             run_id, plan, root, recover=True, pause_generation=observed_pause,
         )
+        return await asyncio.to_thread(self._delivery_view, result)
 
     async def reroll(
         self,
@@ -195,23 +240,52 @@ class JobRunner:
         record = self.store.manifest_record(run_id)
         root = Path(record["manifest_root"])
         manifest = JobManifestV1.from_json(record["manifest_json"])
-        plan = preflight_job(manifest, manifest_root=root)
+        plan = self._preflight(manifest, root)
         approval = JobApprovalV1.from_dict(record["approval"])
         verify_approval(plan, approval)
         self._validate_dispatch_inputs(plan, root)
-        return await self._execute_with_lease(
+        result = await self._execute_with_lease(
             run_id,
             plan,
             root,
             recover=True,
             reroll=(operation_keys, reason, acknowledge_unknown),
         )
+        return await asyncio.to_thread(self._delivery_view, result)
+
+    def _delivery_view(self, snapshot: dict[str, Any]) -> dict[str, Any]:
+        """Recheck every accepted artifact's bytes and derive delivery eligibility.
+
+        A resumed run's earlier outputs are delivered only if their bytes still
+        match the recorded SHA-256. A changed, missing or unreadable file is
+        reported in ``artifact_integrity`` and makes its operation ineligible;
+        recorded statuses and acceptance flags are never changed.
+        """
+        accepted = [artifact for artifact in snapshot["artifacts"] if artifact["accepted"]]
+        summary = check_artifact_integrity(snapshot, accepted, byte_limit=None)
+        snapshot["artifact_integrity"] = summary | {
+            "scope": "accepted artifact bytes after resume; acceptance is unchanged",
+        }
+        return annotate_delivery(snapshot, self.store.delivery_records(snapshot["run_id"]))
+
+    def _preflight(self, manifest: JobManifestV1, root: Path) -> JobPlanV1:
+        """Rebuild a stored run's plan with this runner's registered validators."""
+        validators = [validator for _identity, validator in self._validators.values()]
+        return preflight_job(manifest, manifest_root=root, validators=validators)
 
     def _validate_dispatch_inputs(self, plan: JobPlanV1, root: Path) -> None:
         fingerprints = {item.relative_path: item for item in plan.attachments}
         for fingerprint in fingerprints.values():
             _read_bound_attachment(fingerprint, root)
         for operation in plan.operations:
+            for identity in operation.validators:
+                registered = self._validators.get(identity.name)
+                if registered is None or registered[0] != identity:
+                    raise PreflightError(
+                        f"operation {operation.operation_key!r} needs validator "
+                        f"{identity.name!r} version {identity.version!r}, which this runner "
+                        "has not registered with the same identity"
+                    )
             self.providers.preflight(operation)
             self.providers.get(operation)
 
@@ -517,14 +591,18 @@ class JobRunner:
 
         try:
             # Everything after the dispatch boundary—including untrusted cost
-            # metadata, image decoding, filesystem durability, and the final
-            # SQLite transaction—shares one conservative ambiguity boundary.
+            # metadata, filesystem durability, and the final SQLite
+            # transaction—shares one conservative ambiguity boundary. Valid
+            # accounting is settled first, so bytes that cannot be decoded or
+            # exceed a limit become a deterministic rejection at that cost.
             cost_micros, cost_complete, cost_estimate = self._cost(result, operation)
-            artifact_records, errors = await asyncio.to_thread(
+            check = await asyncio.to_thread(
                 self._persist_and_validate,
                 result,
                 operation,
+                attempt_id=attempt["attempt_id"],
                 attempt_number=attempt["attempt_number"],
+                validators=[self._validators[identity.name] for identity in operation.validators],
                 run_root=_validated_run_root(
                     root,
                     output_directory=plan.output_directory,
@@ -532,16 +610,16 @@ class JobRunner:
                     artifact_directory=artifact_directory,
                 ),
             )
-            accepted = bool(artifact_records) and not errors
             self.store.complete_call(
                 permit.call_id,
                 cost_microusd=cost_micros,
                 cost_is_complete=cost_complete,
                 cost_is_estimate=cost_estimate,
-                artifacts=artifact_records,
+                artifacts=check.records,
                 result_text=result.text,
-                accepted=accepted,
-                error="; ".join(errors) if errors else None,
+                accepted=check.accepted,
+                error="; ".join(check.errors) if check.errors else None,
+                delivery_acceptance=check.record,
                 lease=lease,
             )
         except asyncio.CancelledError:
@@ -657,45 +735,87 @@ class JobRunner:
         result: CompletionResult,
         operation: PlannedOperationV1,
         *,
+        attempt_id: str,
         attempt_number: int,
         run_root: Path,
-    ) -> tuple[list[dict[str, Any]], list[str]]:
-        if not result.artifacts:
-            return [], ["provider returned no artifacts"]
-        if len(result.artifacts) > MAX_ARTIFACTS_PER_CALL:
-            raise ValueError(f"provider returned more than {MAX_ARTIFACTS_PER_CALL} artifacts")
+        validators: Sequence[tuple[ValidatorIdentity, Any]] = (),
+    ) -> _ArtifactCheck:
+        """Check a response's artifacts, then publish every decodable one.
+
+        The built-in artifact check reports each finding with its code.
+        Undecodable or over-limit bytes are hard findings and are never
+        written; rejected bytes that decode are published for review with
+        ``accepted=0``. Registered ``validators`` then check each decodable
+        artifact's exact bytes; one that fails to decide never makes the call
+        an unknown outcome. Artifact data that is not bytes breaks the
+        provider contract and raises instead.
+        """
+        builtin = artifact_spec_identity(operation.artifact)
+        checked: dict[str, list[ValidationReport]] = {
+            identity.name: [] for identity, _validator in validators
+        }
+
+        def results(builtin_reports: list[ValidationReport]) -> list[dict[str, Any]]:
+            return [validator_result(builtin, builtin_reports)] + [
+                validator_result(identity, checked[identity.name])
+                for identity, _validator in validators
+            ]
+
+        artifacts = list(result.artifacts or ())
+        if any(not isinstance(artifact.data, bytes) for artifact in artifacts):
+            raise TypeError("provider artifact data must be bytes")
+        total_bytes = sum(len(artifact.data) for artifact in artifacts)
+        refused: ValidationFinding | None = None
+        if not artifacts:
+            refused = hard_finding("no_artifacts", "provider returned no artifacts")
+        elif len(artifacts) > MAX_ARTIFACTS_PER_CALL:
+            refused = hard_finding(
+                "artifact_count_limit",
+                f"provider returned more than {MAX_ARTIFACTS_PER_CALL} artifacts",
+                expected=MAX_ARTIFACTS_PER_CALL, observed=len(artifacts),
+            )
+        elif total_bytes > MAX_TOTAL_ARTIFACT_BYTES_PER_CALL:
+            refused = hard_finding(
+                "artifact_bytes_limit",
+                "provider artifacts exceed the aggregate per-call byte limit",
+                expected=MAX_TOTAL_ARTIFACT_BYTES_PER_CALL, observed=total_bytes,
+            )
+        if refused is not None:
+            report = ValidationReport(RESPONSE_PATH, (refused,), validator=builtin)
+            return _ArtifactCheck([], [refused.message], delivery_record(
+                attempt_id, [], results([report]), [refused.message],
+            ))
         safe_key = _SAFE_COMPONENT.sub("_", operation.operation_key).strip("._")
         records: list[dict[str, Any]] = []
         errors: list[str] = []
+        subjects: list[dict[str, Any]] = []
+        reports: list[ValidationReport] = []
         pending_writes: list[tuple[Path, bytes]] = []
-        total_bytes = 0
-        for index, artifact in enumerate(result.artifacts):
-            if not isinstance(artifact.data, bytes):
-                raise TypeError("provider artifact data must be bytes")
-            if len(artifact.data) > MAX_ARTIFACT_BYTES:
-                raise ValueError(f"provider artifact exceeds the {MAX_ARTIFACT_BYTES}-byte limit")
-            total_bytes += len(artifact.data)
-            if total_bytes > MAX_TOTAL_ARTIFACT_BYTES_PER_CALL:
-                raise ValueError("provider artifacts exceed the aggregate per-call byte limit")
-            inspection = inspect_artifact(artifact.data, artifact.mime_type)
+        for index, artifact in enumerate(artifacts):
             filename = _artifact_filename(operation, artifact, index)
             relative = Path("artifacts") / safe_key / f"attempt-{attempt_number:04d}" / filename
+            inspection, findings = _artifact_findings(artifact, operation.artifact, filename)
+            reports.append(ValidationReport(relative.as_posix(), tuple(findings), validator=builtin))
+            errors.extend(finding.message for finding in findings)
+            subjects.append({
+                "path": relative.as_posix(),
+                "sha256": (inspection.sha256 if inspection is not None
+                           else hashlib.sha256(artifact.data).hexdigest()),
+                "size_bytes": len(artifact.data),
+                "published": inspection is not None,
+            })
+            if inspection is None:
+                continue
+            if validators:
+                subject = ValidationSubject(artifact.data)
+                for identity, validator in validators:
+                    report, reasons = run_validator(
+                        identity, validator, subject, relative.as_posix(), filename,
+                    )
+                    checked[identity.name].append(report)
+                    errors.extend(reasons)
             destination = run_root / relative
             _prepare_confined_parent(destination, run_root)
-            if inspection.mime_type != operation.artifact.mime_type:
-                errors.append(
-                    f"{filename}: expected {operation.artifact.mime_type}, "
-                    f"observed {inspection.mime_type}"
-                )
-            if operation.artifact.width is not None and (
-                inspection.width != operation.artifact.width
-                or inspection.height != operation.artifact.height
-            ):
-                errors.append(
-                    f"{filename}: expected {operation.artifact.width}x"
-                    f"{operation.artifact.height}, observed "
-                    f"{inspection.width}x{inspection.height}"
-                )
             records.append(
                 {
                     "artifact_id": uuid4().hex,
@@ -710,7 +830,8 @@ class JobRunner:
             pending_writes.append((destination, artifact.data))
         for destination, data in pending_writes:
             atomic_publish_bytes(destination, data)
-        return records, errors
+        return _ArtifactCheck(records, errors,
+                              delivery_record(attempt_id, subjects, results(reports), errors))
 
 
 def _positive_finite_timeout(value: object, field: str) -> float:
@@ -756,6 +877,45 @@ def _artifact_filename(
     stem = Path(requested).stem if requested else "artifact"
     suffix = artifact.suffix
     return f"{stem}-{index + 1:02d}{suffix}"
+
+
+def _artifact_findings(
+    artifact: Artifact,
+    spec: ArtifactSpecV1,
+    filename: str,
+) -> tuple[ArtifactInspection | None, list[ValidationFinding]]:
+    """The built-in artifact check: bounded decoding, then the spec's MIME and size.
+
+    Inspection is None when the bytes cannot be decoded within the limits.
+    Finding messages keep the attempt error text of earlier releases.
+    """
+    if len(artifact.data) > MAX_ARTIFACT_BYTES:
+        return None, [hard_finding(
+            "artifact_too_large",
+            f"{filename}: provider artifact exceeds the {MAX_ARTIFACT_BYTES}-byte limit",
+            expected=MAX_ARTIFACT_BYTES, observed=len(artifact.data),
+        )]
+    try:
+        inspection = inspect_artifact(artifact.data, artifact.mime_type)
+    except ArtifactInspectionError as exc:
+        return None, [hard_finding("artifact_undecodable", f"{filename}: {exc}")]
+    findings = []
+    if inspection.mime_type != spec.mime_type:
+        findings.append(hard_finding(
+            "mime_type_mismatch",
+            f"{filename}: expected {spec.mime_type}, observed {inspection.mime_type}",
+            expected=spec.mime_type, observed=inspection.mime_type,
+        ))
+    if spec.width is not None and (
+        inspection.width != spec.width or inspection.height != spec.height
+    ):
+        findings.append(hard_finding(
+            "dimensions_mismatch",
+            f"{filename}: expected {spec.width}x{spec.height}, observed "
+            f"{inspection.width}x{inspection.height}",
+            expected=[spec.width, spec.height], observed=[inspection.width, inspection.height],
+        ))
+    return inspection, findings
 
 
 def _validate_run_id(run_id: str) -> str:

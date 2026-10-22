@@ -2,6 +2,8 @@
 
 The collector owns ledger validation. This renderer checks its detached v1
 payload and hash, preserves recorded values, and draws only saved comparisons.
+A decision without a recorded verdict shows one derived from its saved interval
+endpoints, labeled as derived.
 """
 
 from __future__ import annotations
@@ -12,6 +14,8 @@ from html import escape
 import json
 import math
 import re
+
+from smythe.optimize.statistics import VERDICTS, improvement_verdict
 
 
 _CSP = "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'"
@@ -339,17 +343,27 @@ def _interval_plot(item: dict, threshold: int | float | None, identity: str) -> 
 
 
 def _development(assessment: dict) -> str:
-    scores = []
+    selected = None
     if 'development' in assessment and assessment['development'] is not None:
-        scores = [_object(assessment['development'], 'Development score')]
-    elif 'development_scores' in assessment:
+        selected = _object(assessment['development'], 'Development score')
+    if 'development_scores' in assessment:
         scores = _rows(assessment['development_scores'], 'Development scores')
+        if selected is not None:
+            entry = [s for s in scores if s.get('candidate_id') == selected.get('candidate_id')]
+            if not entry or entry[0] != selected:
+                raise ValueError('Selected development score differs from the retained scores')
+    else:
+        scores = [] if selected is None else [selected]
     parts = ['<h3>Development</h3>']
     if not scores:
         return ''.join(parts) + '<p>Detailed development scores not recorded.</p>'
     parts.append('<p class="note">Only retained development scores are shown. No confidence interval or new ranking is calculated.</p>')
+    if 'development_scores' not in assessment:
+        parts.append('<p class="note">This decision retained only the selected candidate’s development score.</p>')
     for score in scores:
-        parts.append(f'<h4>Candidate {_code(score.get("candidate_id"))}</h4>')
+        chosen = selected is not None and score.get('candidate_id') == selected.get('candidate_id')
+        mark = ' · selected for confirmation' if chosen else ''
+        parts.append(f'<h4>Candidate {_code(score.get("candidate_id"))}{mark}</h4>')
         means = _object(score.get('metric_means', {}), 'Development means')
         baseline = _object(score.get('incumbent_metric_means', {}), 'Development baseline')
         improvement = _object(score.get('mean_improvements', {}), 'Development improvements')
@@ -372,12 +386,60 @@ def _development(assessment: dict) -> str:
     return ''.join(parts)
 
 
+def _minimum(assessment: dict) -> int | float | None:
+    minimum = assessment.get('min_improvement')
+    if minimum is not None and _finite(minimum, 'Minimum improvement') < 0:
+        raise ValueError('Minimum improvement must be nonnegative')
+    return minimum
+
+
+def _recorded_verdict(value: object) -> str:
+    if value not in VERDICTS:
+        raise ValueError('Recorded verdict is invalid')
+    return value
+
+
+def _verdict(assessment: dict) -> tuple[str, bool] | None:
+    """Return a stage's (verdict, derived) pair from its saved primary interval."""
+    primary, minimum = _comparison(assessment.get('primary')), _minimum(assessment)
+    derived = None if primary is None or minimum is None else improvement_verdict(
+        primary['confidence_interval'], minimum)
+    if assessment.get('verdict') is None:
+        return None if derived is None else (derived, True)
+    recorded = _recorded_verdict(assessment['verdict'])
+    if derived not in (None, recorded):
+        raise ValueError('Recorded verdict disagrees with its saved interval')
+    return recorded, False
+
+
+def _verdict_line(verdict: tuple[str, bool] | None) -> str:
+    if verdict is None:
+        return '<p>Verdict: Not recorded</p>'
+    label = ' (derived from saved interval endpoints)' if verdict[1] else ''
+    return f'<p>Verdict: <strong>{_text(verdict[0])}</strong>{label}</p>'
+
+
+def _decision_verdict(assessment: dict) -> str:
+    """Show the decision's verdict, or derive it from its last paired stage."""
+    stages = [assessment[key] for key in ('holdout', 'confirmation') if assessment.get(key) is not None]
+    final = _verdict(_object(stages[0], 'Final assessment')) if stages else None
+    if assessment.get('verdict') is not None:
+        recorded = _recorded_verdict(assessment['verdict'])
+        if final is not None and final[0] != recorded:
+            raise ValueError('Recorded verdict disagrees with its final assessment')
+        final = recorded, False
+    elif not stages:
+        return ''
+    return _verdict_line(final)
+
+
 def _assessment(value: object, stage: str, objectives: dict[str, dict]) -> str:
     parts = [f'<h3>{_text(stage)}</h3>']
     if value is None:
         return ''.join(parts) + '<p>No assessment recorded for this stage.</p>'
     assessment = _object(value, stage)
     parts.append(_definitions([(f'{stage} promotion passed', _flag(assessment.get('promote')))]))
+    parts.append(_verdict_line(_verdict(assessment)))
     raw = [('Primary', assessment.get('primary'))]
     if 'secondary' in assessment:
         raw.extend(('Secondary', item) for item in _rows(assessment['secondary'], 'Secondary comparisons'))
@@ -389,11 +451,7 @@ def _assessment(value: object, stage: str, objectives: dict[str, dict]) -> str:
         objective = objectives.get(item['objective_name'], {})
         if objective and item['direction'] != objective.get('direction'):
             raise ValueError('Comparison direction differs from recorded objective')
-        minimum = assessment.get('min_improvement') if role == 'Primary' else None
-        if minimum is not None:
-            _finite(minimum, 'Minimum improvement')
-            if minimum < 0:
-                raise ValueError('Minimum improvement must be nonnegative')
+        minimum = _minimum(assessment) if role == 'Primary' else None
         parts.append(f'<div class="metric"><h4>{_text(item["objective_name"])} · {role.lower()}</h4>')
         direction = 'Higher' if item['direction'] == 'maximize' else 'Lower'
         parts.append(f'<p class="note">{direction} raw values are better. Units: recorded metric units. '
@@ -433,6 +491,45 @@ def _assessment(value: object, stage: str, objectives: dict[str, dict]) -> str:
         parts.append(_flags(assessment['gates'], f'{stage} gates'))
     if 'reasons' in assessment:
         parts.append(_reasons(assessment['reasons']))
+    return ''.join(parts)
+
+
+def _references(assessment: dict, incumbent: object, recorded: list) -> str:
+    """Tabulate each saved arm against the decision candidate, stage by stage."""
+    references = _rows(assessment['references'], 'References')
+    if any(item.get('candidate_id') not in recorded for item in references):
+        raise ValueError('Reference is not a recorded candidate')
+    rule = assessment.get('reference_rule')
+    effect = (' A stage fails when any reference is better on the primary objective (verdict worse).'
+              if rule == 'must_not_be_worse' else
+              ' References are recorded and do not change promotion.' if rule == 'report' else '')
+    parts = ['<h3>References</h3>', f'<p>Reference rule: {_code(rule)}.{effect}</p>']
+    rows = []
+    for identifier, role, saved in [(incumbent, 'Incumbent', assessment),
+                                    *((item['candidate_id'], 'Reference', item) for item in references)]:
+        for stage in ('confirmation', 'holdout'):
+            if saved.get(stage) is None:
+                continue
+            item = _object(saved[stage], f'{role} {stage}')
+            primary, verdict = _comparison(item.get('primary')), _verdict(item)
+            values = ['Not recorded'] * 3 if primary is None else [
+                _number(primary['baseline_mean']), _number(primary['candidate_mean']),
+                _number(primary['confidence_interval'][0]) + ' to ' + _number(primary['confidence_interval'][1])]
+            rows.append([_code(identifier), role, stage.title(), *values, 'Not recorded' if verdict is None
+                         else _text(verdict[0]) + (' (derived)' if verdict[1] else '')])
+    if rows:
+        parts.append('<p class="note">Each row compares one arm with the decision candidate on the same seeds, '
+                     'on the primary objective in recorded metric units; positive improvement means the '
+                     'candidate is better.</p>')
+        parts.append(_table('Saved comparisons with the decision candidate',
+                            ['Arm', 'Role', 'Stage', 'Arm mean', 'Candidate mean', 'Improvement interval',
+                             'Verdict'], rows))
+    else:
+        parts.append('<p>References were not compared: the campaign stopped in development.</p>')
+    for item in references:
+        line = _decision_verdict(item)
+        if line:
+            parts.append(f'<h4>Reference {_code(item["candidate_id"])}</h4>{line}')
     return ''.join(parts)
 
 
@@ -503,6 +600,8 @@ def render_optimization_report(payload: dict) -> str:
     if decision is not None and type(decision.get('promoted')) is not bool:
         raise ValueError('Recorded decision must have a boolean promoted flag')
     state = 'No terminal decision' if decision is None else 'Promoted' if decision['promoted'] else 'Rejected'
+    verdict = '' if decision is None else _decision_verdict(
+        _object(decision.get('assessment', {}), 'Decision assessment'))
     name = _text(contract.get('name'), 'Autotune campaign')
     parts = ['<!doctype html><!-- Existing operator-report direction: black/white editorial; '
              'first viewport shows recorded decision and exact balances; read-only mode; '
@@ -517,6 +616,7 @@ def render_optimization_report(payload: dict) -> str:
              '<a href="#provenance">Evidence</a></nav></header>',
              '<div class="overview"><div><h2>Recorded decision</h2>',
              f'<p>{_text(decision.get("reason")) if decision else "No terminal decision is recorded. Retained trials may be incomplete."}</p>',
+             verdict,
              f'<p>{total:,} trials · {counts.get("completed", 0):,} completed · '
              f'<strong>{counts.get("unknown", 0):,} unknown</strong> · '
              f'{counts.get("prepared", 0) + counts.get("dispatched", 0):,} prepared or dispatched.</p>',
@@ -533,6 +633,7 @@ def render_optimization_report(payload: dict) -> str:
              '<section aria-labelledby="comparisons"><h2 id="comparisons">Saved comparisons</h2>',
              '<p>These are retained evaluator observations and decision results. Statistics are not rerun, '
              'and the report does not establish live-provider performance or statistical calibration.</p>']
+    references: set[str] = set()
     if decision is None:
         parts.append('<p>No decision assessment is available.</p>')
     else:
@@ -540,6 +641,9 @@ def render_optimization_report(payload: dict) -> str:
         parts.append(_development(assessment))
         parts.append(_assessment(assessment.get('confirmation'), 'Confirmation', objectives))
         parts.append(_assessment(assessment.get('holdout'), 'Holdout', objectives))
+        if 'references' in assessment:
+            parts.append(_references(assessment, campaign.get('incumbent_candidate_id'), order))
+            references = {item['candidate_id'] for item in assessment['references']}
     parts.append('</section><section aria-labelledby="policies"><h2 id="policies">Candidate policies</h2>'
                  '<p>Recorded inventory order is preserved. This is not a new performance ranking.</p>')
     for row in candidates:
@@ -550,6 +654,8 @@ def render_optimization_report(payload: dict) -> str:
             roles.append('Incumbent')
         if decision and identifier == decision.get('candidate_id'):
             roles.append('Decision candidate')
+        if identifier in references:
+            roles.append('Reference')
         parts.append(f'<h3>{_code(identifier)}</h3><p class="state">{_text(" · ".join(roles) or "Recorded candidate")}</p>')
         parts.append(f'<p>{_text(candidate.get("hypothesis"))}</p>')
         parts.append(_definitions([('Parent', _code(candidate.get('parent'))),

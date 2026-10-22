@@ -5,8 +5,17 @@ import json
 
 import pytest
 
+import smythe.swarm as swarm_module
+from smythe.acceptance import (
+    AcceptanceSource,
+    DeliveryAcceptance,
+    task_sha256,
+    text_sha256,
+)
+from smythe.budget import BudgetValidationError, Sentinel
 from smythe.checkpoint import (
     FileCheckpointStore,
+    build_state,
     task_from_dict,
     graph_from_dict,
     graph_to_dict,
@@ -23,6 +32,7 @@ from smythe.graph import (
     Topology,
 )
 from smythe.provider import CompletionResult, Provider
+from smythe.registry import Registry
 from smythe.supervisor import Supervisor
 from smythe.swarm import Swarm
 from smythe.task import Task
@@ -244,6 +254,105 @@ def test_resume_restores_budget_accounting(tmp_path):
     assert set(final_costs) == {"a", "b", "c"}
     assert result.total_cost_usd == pytest.approx(sum(final_costs.values()))
     assert result.total_cost_usd > cost_after_crash
+
+
+class PricedProvider(Provider):
+    """Reports each call's own USD cost, so the ledger prices no tokens."""
+
+    def __init__(self) -> None:
+        self.calls = 0
+
+    async def complete(self, system: str, prompt: str, model: str) -> CompletionResult:
+        self.calls += 1
+        return CompletionResult(text="priced", prompt_tokens=10, completion_tokens=10, cost_usd=0.01)
+
+
+def _record_budgets(monkeypatch) -> list[Sentinel]:
+    """Collect every Sentinel a Swarm creates from here on."""
+    budgets: list[Sentinel] = []
+
+    class RecordingSentinel(Sentinel):
+        def __init__(self, *args, **kwargs) -> None:
+            super().__init__(*args, **kwargs)
+            budgets.append(self)
+
+    monkeypatch.setattr(swarm_module, "Sentinel", RecordingSentinel)
+    return budgets
+
+
+def _run_budget(budgets: list[Sentinel]) -> Sentinel:
+    [budget] = [item for item in budgets if set(item.breakdown()) == {"a", "b", "c"}]
+    return budget
+
+
+def _crash_after_a_token_priced_node(store) -> str:
+    # Node "a" reports tokens and no USD cost, so the ledger prices them at
+    # the blended rate; node "b" then fails.
+    swarm = Swarm(provider=ScriptedProvider(fail_labels={"B"}), model="test-model",
+                  checkpoint_store=store)
+    with pytest.raises(RuntimeError, match="boom: B"):
+        swarm.execute(_serial_graph())
+    [execution_id] = store.list_ids()
+    return execution_id
+
+
+def test_resume_keeps_the_token_estimates_recorded_before_the_crash(tmp_path, monkeypatch):
+    """Regression: a resumed run forgot which restored costs were token estimates."""
+    store = FileCheckpointStore(tmp_path)
+    execution_id = _crash_after_a_token_priced_node(store)
+
+    budgets = _record_budgets(monkeypatch)
+    result = Swarm(provider=PricedProvider(), model="test-model",
+                   checkpoint_store=store).resume(execution_id)
+    # The resumed calls report their own cost, so only the restored node
+    # can make the total a token estimate.
+    budget = _run_budget(budgets)
+    assert budget.cost_contains_token_estimates
+    assert result.cost_is_complete and not result.cost_contains_estimates
+    assert budget.token_estimate_nodes == {"a"}
+    assert store.load(execution_id)["budget"]["token_estimate_nodes"] == ["a"]
+
+    # Returning the stored result of the finished run restores them too.
+    budgets.clear()
+    provider = PricedProvider()
+    Swarm(provider=provider, model="test-model", checkpoint_store=store).resume(execution_id)
+    assert _run_budget(budgets).cost_contains_token_estimates and provider.calls == 0
+
+
+def test_a_checkpoint_without_token_estimates_resumes_as_before(tmp_path, monkeypatch):
+    store = FileCheckpointStore(tmp_path)
+    execution_id = _crash_after_a_token_priced_node(store)
+    state = store.load(execution_id)
+    del state["budget"]["token_estimate_nodes"]  # written before the key existed
+    store.save(execution_id, state)
+
+    budgets = _record_budgets(monkeypatch)
+    Swarm(provider=PricedProvider(), model="test-model", checkpoint_store=store).resume(execution_id)
+    assert not _run_budget(budgets).cost_contains_token_estimates
+    assert store.load(execution_id)["budget"]["token_estimate_nodes"] == []
+
+
+def test_checkpoint_records_a_token_priced_merge_with_its_nodes(tmp_path):
+    store = FileCheckpointStore(tmp_path)
+    graph = ExecutionGraph(topology=[Topology.SERIAL], nodes=[Node(id="a", label="A")])
+    result = Swarm(provider=ScriptedProvider(), model="test-model", checkpoint_store=store,
+                   synthesizer=Synthesizer(strategy=SynthesisStrategy.LLM_MERGE)).execute(graph)
+    budget = store.load(result.execution_id)["budget"]
+    assert budget["token_estimate_nodes"] == ["__synthesis__", "a"]
+
+
+@pytest.mark.parametrize("value", ["a", ["a", 1], {"a": True}, None])
+def test_resume_refuses_unreadable_token_estimates_before_any_call(tmp_path, value):
+    store = FileCheckpointStore(tmp_path)
+    execution_id = _crash_after_a_token_priced_node(store)
+    state = store.load(execution_id)
+    state["budget"]["token_estimate_nodes"] = value
+    store.save(execution_id, state)
+
+    provider = PricedProvider()
+    with pytest.raises(BudgetValidationError, match="token_estimate_nodes"):
+        Swarm(provider=provider, model="test-model", checkpoint_store=store).resume(execution_id)
+    assert provider.calls == 0
 
 
 def test_resume_of_completed_execution_returns_stored_result(tmp_path):
@@ -507,3 +616,216 @@ def test_revision_allowance_is_not_refilled_by_resume(tmp_path):
 
     added = [n.id for n in result.graph.nodes if n.id.startswith("added-")]
     assert len(added) == 1, f"resume refilled the revision allowance: {added}"
+
+
+# ---------------------------------------------------------------------------
+# Delivery acceptance across checkpoint versions
+# ---------------------------------------------------------------------------
+
+_DELIVERED = "## Summary\nfinal text"
+
+
+class NoCallProvider(Provider):
+    """Counts provider calls; a stored result must need none."""
+
+    def __init__(self) -> None:
+        self.calls = 0
+
+    async def complete(self, system: str, prompt: str, model: str) -> CompletionResult:
+        self.calls += 1
+        return CompletionResult(text="unexpected call")
+
+
+def _acceptance(decision: str) -> DeliveryAcceptance:
+    return DeliveryAcceptance(
+        decision=decision, policy_sha256="b" * 64, output_sha256=text_sha256(_DELIVERED),
+        strategy="deliverable", sources=(AcceptanceSource("a"),),
+        task_sha256=task_sha256(Task("Write the summary")),
+        reasons=() if decision == "accepted" else ("a final validator rejected the output",),
+    )
+
+
+def _save(store, version, *, status="completed", acceptance=None):
+    """Write a checkpoint at *version*, generated here rather than committed."""
+    graph = ExecutionGraph(topology=[Topology.SERIAL], nodes=[
+        Node(id="a", label="A", status=NodeStatus.COMPLETED, result=_DELIVERED),
+    ])
+    state = build_state(
+        execution_id="saved", status=status, model="test-model", graph=graph,
+        registry=Registry(), task=Task("Write the summary"), max_budget_usd=None,
+        node_costs={"a": 0.0}, output=_DELIVERED if status == "completed" else None,
+        delivery_acceptance=acceptance,
+    )
+    state["version"] = version
+    if version == 1:
+        del state["control"]  # version 1 predates run control state
+    store.save("saved", state)
+
+
+@pytest.mark.parametrize("version", [1, 2, 3, 4])
+def test_resume_of_a_legacy_completed_checkpoint_reports_no_acceptance(tmp_path, version):
+    store = FileCheckpointStore(tmp_path)
+    _save(store, version)
+    provider = NoCallProvider()
+
+    result = Swarm(provider=provider, model="test-model", checkpoint_store=store).resume("saved")
+
+    assert result.output == _DELIVERED
+    assert (result.acceptance, result.rejected_output, result.accepted) == (None, None, False)
+    assert provider.calls == 0
+
+
+def test_resume_of_an_accepted_strict_checkpoint_returns_its_output(tmp_path):
+    store = FileCheckpointStore(tmp_path)
+    record = _acceptance("accepted")
+    _save(store, 5, acceptance=record)
+    provider = NoCallProvider()
+
+    result = Swarm(provider=provider, model="test-model", checkpoint_store=store).resume("saved")
+
+    assert result.output == _DELIVERED and result.rejected_output is None
+    assert result.acceptance == record and result.accepted is True
+    assert provider.calls == 0
+
+
+@pytest.mark.parametrize("decision", ["rejected", "needs_review", "indeterminate"])
+def test_resume_of_an_unaccepted_strict_checkpoint_withholds_its_output(tmp_path, decision):
+    store = FileCheckpointStore(tmp_path)
+    record = _acceptance(decision)
+    _save(store, 5, acceptance=record)
+
+    result = Swarm(provider=NoCallProvider(), model="test-model",
+                   checkpoint_store=store).resume("saved")
+
+    assert result.output == ""
+    assert result.rejected_output == _DELIVERED
+    assert result.acceptance == record and result.accepted is False
+
+
+def _not_evaluated(output_sha256: str | None = None) -> DeliveryAcceptance:
+    return DeliveryAcceptance(
+        decision="not_evaluated", policy_sha256="b" * 64, output_sha256=output_sha256,
+    )
+
+
+@pytest.mark.parametrize("bound", [False, True], ids=["no-digest", "digest"])
+def test_a_completed_checkpoint_cannot_be_written_with_a_not_evaluated_record(tmp_path, bound):
+    store = FileCheckpointStore(tmp_path)
+    record = _not_evaluated(text_sha256(_DELIVERED) if bound else None)
+
+    with pytest.raises(ValueError, match="must hold a decision"):
+        _save(store, 5, acceptance=record)
+    assert store.list_ids() == []
+
+
+@pytest.mark.parametrize("bound", [False, True], ids=["no-digest", "digest"])
+def test_resume_refuses_a_completed_checkpoint_whose_record_decided_nothing(tmp_path, bound):
+    """A completed record that decided nothing is refused, never delivered or withheld."""
+    store = FileCheckpointStore(tmp_path)
+    _save(store, 5, acceptance=_acceptance("accepted"))
+    state = store.load("saved")
+    state["delivery_acceptance"] = _not_evaluated(text_sha256(_DELIVERED) if bound else None).to_dict()
+    store.save("saved", state)
+    saved = store.load("saved")
+    provider = NoCallProvider()
+
+    with pytest.raises(ValueError, match="must hold a decision"):
+        Swarm(provider=provider, model="test-model", checkpoint_store=store).resume("saved")
+    assert provider.calls == 0
+    assert store.load("saved") == saved
+
+
+def test_resume_never_accepts_strict_output_that_no_longer_matches_its_record(tmp_path):
+    store = FileCheckpointStore(tmp_path)
+    _save(store, 5, acceptance=_acceptance("accepted"))
+    state = store.load("saved")
+    state["output"] = _DELIVERED + " edited"
+    store.save("saved", state)
+    provider = NoCallProvider()
+
+    result = Swarm(provider=provider, model="test-model", checkpoint_store=store).resume("saved")
+
+    assert result.accepted is False and result.acceptance.decision.value == "indeterminate"
+    assert result.output == "" and result.rejected_output == _DELIVERED + " edited"
+    assert result.acceptance.output_sha256 == text_sha256(_DELIVERED + " edited")
+    assert any("does not match" in reason for reason in result.acceptance.reasons)
+    assert provider.calls == 0
+
+    state["output"] = 42
+    store.save("saved", state)
+    with pytest.raises(ValueError, match="does not match"):
+        Swarm(provider=provider, model="test-model", checkpoint_store=store).resume("saved")
+
+
+def test_resume_refuses_a_completed_strict_checkpoint_without_its_record(tmp_path):
+    store = FileCheckpointStore(tmp_path)
+    _save(store, 5)
+    state = store.load("saved")
+    state["requires"] = ["delivery_acceptance"]
+    store.save("saved", state)
+
+    with pytest.raises(ValueError, match="delivery_acceptance"):
+        Swarm(provider=NoCallProvider(), model="test-model", checkpoint_store=store).resume("saved")
+
+
+@pytest.mark.parametrize("status", ["completed", "running"])
+def test_resume_refuses_a_checkpoint_that_requires_an_unknown_feature(tmp_path, status):
+    store = FileCheckpointStore(tmp_path)
+    record = (_acceptance("accepted") if status == "completed"
+              else DeliveryAcceptance("not_evaluated", "b" * 64))
+    _save(store, 5, status=status, acceptance=record)
+    state = store.load("saved")
+    state["requires"].append("attempt_allowance")
+    store.save("saved", state)
+    provider = NoCallProvider()
+
+    with pytest.raises(ValueError, match="attempt_allowance"):
+        Swarm(provider=provider, model="test-model", checkpoint_store=store).resume("saved")
+    assert provider.calls == 0
+
+
+@pytest.mark.parametrize("change", [
+    lambda block: block.update(version=2),
+    lambda block: block.update(decision="approved"),
+    lambda block: block.update(scope=["output"]),
+])
+def test_resume_refuses_an_unreadable_acceptance_record(tmp_path, change):
+    store = FileCheckpointStore(tmp_path)
+    _save(store, 5, acceptance=_acceptance("accepted"))
+    state = store.load("saved")
+    change(state["delivery_acceptance"])
+    store.save("saved", state)
+
+    with pytest.raises(ValueError, match="delivery acceptance"):
+        Swarm(provider=NoCallProvider(), model="test-model", checkpoint_store=store).resume("saved")
+
+
+def test_resume_refuses_an_unfinished_strict_checkpoint_before_any_call(tmp_path):
+    store = FileCheckpointStore(tmp_path)
+    _save(store, 5, status="running", acceptance=DeliveryAcceptance("not_evaluated", "b" * 64))
+    provider = NoCallProvider()
+
+    with pytest.raises(ValueError, match="strict delivery acceptance"):
+        Swarm(provider=provider, model="test-model", checkpoint_store=store).resume("saved")
+    assert provider.calls == 0
+    assert store.load("saved")["status"] == "running"
+
+
+def test_unknown_version_message_lists_the_readable_versions(tmp_path):
+    store = FileCheckpointStore(tmp_path)
+    store.save("new", {"version": 6, "graph": {"topology": ["serial"], "nodes": []}})
+    swarm = Swarm(provider=ScriptedProvider(), model="test-model", checkpoint_store=store)
+    with pytest.raises(ValueError, match=r"writes version 4 and reads \[1, 2, 3, 4, 5\]"):
+        swarm.resume("new")
+
+
+def test_ordinary_runs_still_write_version_4_without_a_record(tmp_path):
+    store = FileCheckpointStore(tmp_path)
+    swarm = Swarm(provider=ScriptedProvider(), model="test-model", checkpoint_store=store)
+
+    result = swarm.execute(_serial_graph())
+
+    state = store.load(result.execution_id)
+    assert state["version"] == 4 and "delivery_acceptance" not in state
+    assert (result.acceptance, result.rejected_output) == (None, None)
+    assert swarm.resume(result.execution_id).acceptance is None

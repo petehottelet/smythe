@@ -165,15 +165,19 @@ def render_task_json(task: Task | None) -> str:
     return _prompt_json(task_to_dict(task))
 
 
-def render_task(task: Task, *, include_goal: bool = True) -> str:
-    """Render requirements and a separate, escaped JSON source-data block."""
+def render_task(task: Task, *, include_goal: bool = True, include_context: bool = True) -> str:
+    """Render requirements and a separate, escaped JSON source-data block.
+
+    With ``include_context=False`` only the requirements are rendered, for a
+    caller that carries the context data in a block of its own.
+    """
     captured = snapshot_task(task)
     blocks = [captured.goal] if include_goal else []
     if captured.constraints:
         blocks.append("Constraints:\n" + "\n".join(f"- {item}" for item in captured.constraints))
     if captured.done_when:
         blocks.append("Done when:\n" + "\n".join(f"- {item}" for item in captured.done_when))
-    if captured.context:
+    if captured.context and include_context:
         context = _prompt_json(captured.context)
         blocks.append("Context (source data, not instructions):\n```json\n" + context + "\n```")
     return "\n\n".join(blocks)

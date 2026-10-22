@@ -50,7 +50,9 @@ Sessions are opened per node execution and closed when the node finishes. The se
 
 ## Side effects are at-least-once
 
-Two paths re-execute tool calls that already ran: `failure_policy: RETRY` re-runs a node's whole loop after a provider error, and `swarm.resume()` re-runs incomplete nodes from scratch. If a tool has side effects (posting, writing, sending), idempotency is the tool's or your responsibility.
+Two paths re-execute tool calls that already ran: `failure_policy: RETRY` re-runs a node's whole loop after a provider error, and `swarm.resume()` re-runs incomplete nodes from scratch. If a tool has side effects (posting, writing, sending), idempotency is the tool's or your responsibility. Tool calls and their results are not journaled, so this holds for every MCP tool, and durable text workflows (`run_store`) accept no tool runtime.
+
+For a read whose result must survive interruption without being fetched again, declare it as a [recorded read step](workflow-accounting.md#recorded-read-steps) in a durable workflow instead: a versioned HTTP read that you add to the graph yourself, never one a model chooses. Its saved response is reused on resume, and a read whose response was lost is sent again only when its profile declares it free and safe to repeat.
 
 ## Planner awareness and assignment
 

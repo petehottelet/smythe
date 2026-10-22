@@ -85,13 +85,26 @@ class BudgetEstimateRequired(PicklableError, ValueError):
     Image APIs charge on dimensions, quality, inputs, and outputs.  A generic
     token estimate is not a defensible reservation for them, so hard-budget
     execution fails closed until the caller supplies an inclusive per-call
-    ceiling on the provider or node.
+    ceiling on the provider or node.  ``node_id`` is None when a generated
+    plan's model is rejected before planning: its nodes all use the run's
+    model, and a plan gets no estimates unless the caller plans first and
+    sets them.  A rejected ``LLM_MERGE`` synthesis, including one rejected
+    before planning, has ``SYNTHESIS_NODE_ID``; any other rejection names
+    its node.
     """
 
-    def __init__(self, node_id: str, model: str, provider: str) -> None:
+    def __init__(self, node_id: str | None, model: str, provider: str) -> None:
         self.node_id = node_id
         self.model = model
         self.provider = provider
+        if node_id is None:
+            super().__init__(
+                f"Cannot enforce max_budget_usd for a generated plan: {provider} has no "
+                f"inclusive cost ceiling for model {model!r}. Configure "
+                "max_cost_per_call_usd on the provider, or call plan(), set "
+                "node.metadata['estimated_cost_usd'] on each node and execute the graph."
+            )
+            return
         super().__init__(
             f"Cannot enforce max_budget_usd for node {node_id!r}: "
             f"{provider} has no inclusive cost ceiling for model {model!r}. "
@@ -161,6 +174,7 @@ class Sentinel:
         self._spent: float = 0.0
         self._unknown_cost_nodes: set[str] = set()
         self._estimated_cost_nodes: set[str] = set()
+        self._token_estimate_nodes: set[str] = set()
 
     @property
     def max_budget_usd(self) -> float | None:
@@ -193,6 +207,23 @@ class Sentinel:
     def cost_contains_estimates(self) -> bool:
         """Whether the total contains provider/configured cost estimates."""
         return bool(self._estimated_cost_nodes)
+
+    @property
+    def cost_contains_token_estimates(self) -> bool:
+        """Whether the total prices any call's tokens at ``cost_per_token``.
+
+        That blended rate is an estimate, not the provider's price, even
+        though such a call leaves ``cost_contains_estimates`` False.
+        """
+        return bool(self._token_estimate_nodes)
+
+    @property
+    def token_estimate_nodes(self) -> frozenset[str]:
+        """IDs of the nodes whose cost prices tokens at ``cost_per_token``.
+
+        ``restore()`` takes the same IDs, and ordinary checkpoints record them.
+        """
+        return frozenset(self._token_estimate_nodes)
 
     def mark_unknown(self, node_id: str) -> None:
         """Mark unresolved billing without inventing usage or releasing exposure."""
@@ -291,6 +322,7 @@ class Sentinel:
         was_hard_ceiling = node_id in self._hard_reservations and not preserve_reservation
         unknown_cost_nodes = set(self._unknown_cost_nodes)
         estimated_cost_nodes = set(self._estimated_cost_nodes)
+        token_estimate_nodes = set(self._token_estimate_nodes)
 
         if getattr(result, "cost_usd_unknown", False):
             if had_reservation:
@@ -310,6 +342,8 @@ class Sentinel:
                     estimated_cost_nodes.add(node_id)
         else:
             call_cost = explicit if explicit is not None else self._token_cost(total_tokens)
+            if explicit is None:
+                token_estimate_nodes.add(node_id)
             if getattr(result, "cost_usd_is_estimate", False):
                 estimated_cost_nodes.add(node_id)
         node_cost = call_cost
@@ -329,6 +363,7 @@ class Sentinel:
             self._hard_reservations.discard(node_id)
         self._unknown_cost_nodes = unknown_cost_nodes
         self._estimated_cost_nodes = estimated_cost_nodes
+        self._token_estimate_nodes = token_estimate_nodes
         self._spent = total
 
         reservation_exceeded = was_hard_ceiling and call_cost > reserved + 1e-12
@@ -381,9 +416,16 @@ class Sentinel:
         *,
         unknown_cost_nodes: set[str] | None = None,
         estimated_cost_nodes: set[str] | None = None,
+        token_estimate_nodes: set[str] | None = None,
     ) -> None:
         """Seed per-node costs from a checkpoint so a resumed execution
-        keeps counting against the same budget."""
+        keeps counting against the same budget.
+
+        ``cost_contains_token_estimates`` counts a restored cost only when
+        ``token_estimate_nodes`` names its node. Ordinary checkpoints record
+        those nodes under ``budget.token_estimate_nodes``; one written before
+        that key existed names none.
+        """
         if not isinstance(node_costs, Mapping):
             raise BudgetValidationError("Checkpoint costs must be a mapping of node IDs to USD")
         restored = dict(self._node_costs)
@@ -392,7 +434,9 @@ class Sentinel:
         total = _sum_costs(chain(restored.values(), self._reservations.values()))
         unknown = self._unknown_cost_nodes.union(unknown_cost_nodes or set())
         estimated = self._estimated_cost_nodes.union(estimated_cost_nodes or set())
+        token_estimates = self._token_estimate_nodes.union(token_estimate_nodes or set())
         self._node_costs = restored
         self._spent = total
         self._unknown_cost_nodes = unknown
         self._estimated_cost_nodes = estimated
+        self._token_estimate_nodes = token_estimates

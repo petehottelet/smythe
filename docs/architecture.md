@@ -148,9 +148,18 @@ See [Verification](verifier.md#recovery-and-concurrent-work).
 
 Provider responses can include artifacts as well as text. Each execution
 writes artifact bytes atomically into its own directory under `artifact_dir`
-and records each file's absolute path and MIME type in the node's metadata.
-These records hold no content hashes; Jobs artifact records carry a SHA-256
-digest. Nodes can receive dependency images as native vision inputs.
+and records each file's absolute path, MIME type, SHA-256 digest and size in
+the node's metadata. Under a
+[strict acceptance policy](verifier.md#strict-delivery-acceptance), a
+regenerated node's files are named for its generation and never replace an
+existing file, so a rejected generation's files keep the bytes that were
+judged. That publication links each file into place, so it needs a filesystem
+with hard links: on one without them, such as FAT or exFAT, the node fails
+with an `OSError` that says so; choose an `artifact_dir` on a filesystem with
+hard links, such as NTFS, APFS or ext4. Nodes can receive dependency images as
+native vision inputs. A node reads each image from its path when it calls, and
+an image whose bytes no longer match the digest in its record raises
+`ArtifactIntegrityError` before the call rather than reaching the model.
 `OpenAIImageProvider` does not accept image inputs yet, so it raises
 `ValueError` for a request with attachments instead of generating without them.
 
@@ -187,7 +196,8 @@ is that of its final attempt.
 resuming call's spans and elapsed time, with `resumed` true and
 `latency_complete` false. Each record also keeps the result's
 `cost_is_complete` and `cost_contains_estimates` flags, and `acceptance` is
-`not_evaluated`: delivery acceptance is not evaluated yet. Records written
+the decision of a [strict acceptance policy](verifier.md#strict-delivery-acceptance),
+or `not_evaluated` for a run without one. Records written
 before these fields existed recall with them `null`, meaning not recorded, and
 recall skips rows where they are malformed. Planner prompts still show only the
 summed node time.
@@ -221,12 +231,23 @@ prompt mutation.
   execution, verification, supervision, and synthesis. Request-bound quotes,
   fenced dispatch, and retained response evidence govern admission and
   recovery. See [managed scope](workflow-accounting.md#supported-scope).
+- With `context_sources`, such a run records the context each node call is
+  given as an immutable snapshot in its journal: sources and dependency
+  outputs reach the model as marked untrusted data, a resumed call is given
+  the snapshot it was first given, and new sources enter a run only through
+  `refresh_context`, which re-evaluates its nodes. See
+  [context snapshots](tasks.md#context-snapshots).
 - A supervisor may change only pending work. It cannot drop a verification
   gate or the node it judges, or leave the gate no longer depending on that
   node; a step it adds after that node is not judged by the gate. One
   `LLMSupervisor` revision may add at most `max_added_nodes` nodes (default 3),
   and a proposal that would leave more than `max_total_added_nodes` (default 8)
-  revision-added nodes in the graph is refused.
+  revision-added nodes in the graph is refused. Under a strict acceptance
+  policy, so is a revision that would leave the delivered output without a
+  check that can accept it ([acceptance obligations](verifier.md#acceptance-obligations)).
+- A strict acceptance policy refuses, before any provider call, a graph whose
+  delivered output it could not decide, and counts a passed gate toward
+  acceptance only when the developer supplied it.
 - A verifier may reset only its target and downstream dependents.
 - A resumed run keeps completed results, recorded spend, and consumed control allowances.
 

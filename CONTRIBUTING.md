@@ -136,7 +136,13 @@ notes always belong in gitignored `00_project_files/`.
   built-in provider types, so replace the SDK client instead of subclassing a
   provider. [tests/fixture_service.py](tests/fixture_service.py) fakes an
   external service whose `snapshot()` shows every committed effect, including
-  one whose acknowledgement the caller lost.
+  one whose acknowledgement the caller lost. Requests can be scoped to a
+  tenant's collection, and the service can send a notice for each
+  acknowledged commit or record a forged one.
+  [tests/fixture_connector.py](tests/fixture_connector.py) adapts the service
+  to the `smythe.actions` connector contract, in process or over loopback
+  HTTP, with no retries, and provides an HMAC approval host whose key is
+  random for each instance.
 
 ## Pull request workflow
 

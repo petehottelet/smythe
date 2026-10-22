@@ -47,8 +47,10 @@ def test_distinct_custom_ids_have_distinct_portable_artifact_directories(tmp_pat
             results = []
             for run_id, color in zip(ids, ("red", "blue"), strict=True):
                 provider = ColoredProvider(color)
+                # Both runs use one approval on purpose so only their IDs differ.
                 result = await JobRunner(store, provider_pool=FixedPool(provider)).start(
                     plan, make_approval(plan), manifest_root=tmp_path, run_id=run_id,
+                    allow_approval_reuse=True,
                 )
                 assert result["status"] == "completed" and provider.calls == 1
                 results.append(result)
@@ -182,7 +184,8 @@ def test_legacy_same_store_case_alias_is_rejected_before_first_claim(tmp_path):
     plan = plan_for(tmp_path, count=1)
     with SQLiteRunStore(path) as store:
         for run_id in ("Run", "run"):
-            store.create_run(plan, make_approval(plan), manifest_root=tmp_path, run_id=run_id)
+            store.create_run(plan, make_approval(plan), manifest_root=tmp_path, run_id=run_id,
+                             allow_approval_reuse=True)
         # Model the retained raw path identities assigned by legacy migration.
         store._connection.execute("UPDATE runs SET artifact_namespace=NULL")
         provider = PixelProvider()

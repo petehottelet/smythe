@@ -21,19 +21,20 @@ verification, trace, artifact, and recovery controls.
 ## Plan and execute graphs
 
 - [Architecture](architecture.md) — planning tiers, execution flow, and validated planner history with summed node timing
-- [Tasks and handoffs](tasks.md) — complete task snapshots across planning, inspected graphs, synthesis, memory, and resume
-- [Execution policies](execution.md) — halt, retry, skip, timeouts, queued work, and 5,000-node deep-graph checks
+- [Tasks and handoffs](tasks.md) — complete task snapshots across planning, inspected graphs, synthesis, memory, and resume, and immutable context snapshots that keep sources as untrusted data in durable runs
+- [Execution policies](execution.md) — halt, retry, skip, timeouts, queued work, provider checks before any call, and 5,000-node deep-graph checks
 - [YAML and jobs](jobs.md) — declarative artifact work and the installed CLI
 - [Adaptive supervision](supervisor.md) — revise pending work from completed results
-- [Verification](verifier.md) — objective gates, active-work invalidation, and recoverable regeneration
+- [Verification](verifier.md) — objective gates, active-work invalidation, recoverable regeneration, and strict acceptance of the delivered output, with its obligations checked before any call and after every revision
 
 ## Operate durable work
 
-- [Durable text workflows](workflow-accounting.md) — phase-wide native costs, saved graph limits, exact request quotes, fenced ownership, and local response replay
+- [Durable text workflows](workflow-accounting.md) — phase-wide native costs, saved graph limits, exact request quotes, fenced ownership, local response replay, recorded read steps with network limits, and journal upgrades
 - [Checkpoint format](checkpoint-format.md) — flushed atomic publication, saved state, and resume semantics
-- [Cost guardrails](budgets.md) — strict usage validation, reservations, and failed-accounting recovery
-- [Jobs](jobs.md) — preflight, approval, detached workers and host limits, durable pause/resume, fenced ownership, artifact namespaces, database upgrades, inspection, rerolls, and exports
-- [Optimization](optimize.md) — bounded concurrency experiments, evidence ledgers, and campaign ownership, schema-v4 migration, and read-only HTML comparison reports
+- [Inspect saved runs](runs.md) — read-only `smythe runs inspect` and `list` over checkpoints and durable journals: execution, delivery acceptance, cost, timing, next action, and exit codes 10 and 11 for withheld output
+- [Cost guardrails](budgets.md) — strict usage validation, reservations, per-call ceilings, and failed-accounting recovery
+- [Jobs](jobs.md) — preflight, approval, detached workers and host limits, durable pause/resume, fenced ownership, artifact namespaces, delivery acceptance with registered validators and delivery eligibility, database upgrades, inspection, rerolls, and exports
+- [Optimization](optimize.md) — bounded concurrency experiments, reference arms, evidence ledgers, and campaign ownership, schema-v4 migration, and read-only HTML comparison reports
 - [Concurrent journal initialization checks](../tests/test_jobs_workflow_initialization.py) — WAL contention and atomic schema fixes, with regression evidence
 
 ## Connect models and tools

@@ -35,11 +35,14 @@ check::
 
 from __future__ import annotations
 
+import hashlib
+import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 from smythe._images import open_image
+from smythe.validation import ValidatorIdentity
 from smythe.verifier import CallableVerifier, Verdict
 
 # Pillow stays a runtime import inside functions, as in smythe._images: a
@@ -66,6 +69,25 @@ _HASH_SAMPLE = (9, 8)
 _BLANK_GRID = 64
 _BLANK_TOLERANCE = 8
 _BLANK_MIN_UNIFORM = 0.995
+_PALETTE_TOLERANCE = 60
+_PALETTE_MIN_ON_BRAND = 0.45
+_FLAT_MIN_FRACTION = 0.06
+_DUPLICATE_MIN_DISTANCE = 8
+
+# design_verifier's identity. Its configuration digest covers the caller's
+# settings and the detector thresholds below; a change to how the detectors
+# decide that the thresholds do not show must raise the version.
+DESIGN_VERIFIER_NAME = "smythe.design"
+DESIGN_VERIFIER_VERSION = "1"
+_DETECTOR_SETTINGS = {
+    "blank": {"grid": _BLANK_GRID, "tolerance": _BLANK_TOLERANCE,
+              "min_uniform": _BLANK_MIN_UNIFORM},
+    "flat-region": {"grid": _FLAT_GRID, "min_fraction": _FLAT_MIN_FRACTION},
+    "palette": {"sample": list(_PALETTE_SAMPLE), "tolerance": _PALETTE_TOLERANCE,
+                "min_on_brand": _PALETTE_MIN_ON_BRAND},
+    "near-duplicate": {"sample": list(_HASH_SAMPLE), "min_distance": _DUPLICATE_MIN_DISTANCE},
+}
+_HEX_COLOUR = re.compile(r"#?[0-9a-fA-F]{6}")
 
 
 def _clamp_dial(name: str, value: int) -> int:
@@ -149,9 +171,9 @@ class Finding:
 
 
 def _hex_to_rgb(value: str) -> tuple[int, int, int]:
-    text = value.lstrip("#")
-    if len(text) != 6:
+    if not isinstance(value, str) or not _HEX_COLOUR.fullmatch(value):
         raise ValueError(f"palette colour must be a 6-digit hex, got {value!r}")
+    text = value.lstrip("#")
     return tuple(int(text[i:i + 2], 16) for i in (0, 2, 4))  # type: ignore[return-value]
 
 
@@ -175,8 +197,8 @@ def check_palette(
     path: Path,
     palette: tuple[str, ...] | list[str],
     *,
-    tolerance: int = 60,
-    min_on_brand: float = 0.45,
+    tolerance: int = _PALETTE_TOLERANCE,
+    min_on_brand: float = _PALETTE_MIN_ON_BRAND,
 ) -> list[Finding]:
     """Fraction of pixels near a brand colour.
 
@@ -195,8 +217,8 @@ def _palette_findings(
     sample: _PILImage,
     targets: list[tuple[int, int, int]],
     *,
-    tolerance: int = 60,
-    min_on_brand: float = 0.45,
+    tolerance: int = _PALETTE_TOLERANCE,
+    min_on_brand: float = _PALETTE_MIN_ON_BRAND,
 ) -> list[Finding]:
     raw = sample.tobytes()
     pixels = [tuple(raw[i:i + 3]) for i in range(0, len(raw), 3)]
@@ -302,7 +324,7 @@ def _colour_name(premultiplied: tuple[int, ...]) -> str:
 
 
 def check_flat_regions(
-    path: Path, *, min_fraction: float = 0.06, grid: int = _FLAT_GRID,
+    path: Path, *, min_fraction: float = _FLAT_MIN_FRACTION, grid: int = _FLAT_GRID,
 ) -> list[Finding]:
     """Find large, perfectly uniform rectangles.
 
@@ -320,7 +342,7 @@ def check_flat_regions(
 
 
 def _flat_region_findings(
-    sample: _PILImage, *, min_fraction: float = 0.06, grid: int = _FLAT_GRID,
+    sample: _PILImage, *, min_fraction: float = _FLAT_MIN_FRACTION, grid: int = _FLAT_GRID,
 ) -> list[Finding]:
     flat_cells = 0
     for row in range(grid):
@@ -359,7 +381,7 @@ def _dhash_bits(sample: _PILImage) -> int:
 
 
 def check_near_duplicates(
-    paths: list[Path], *, min_distance: int = 8,
+    paths: list[Path], *, min_distance: int = _DUPLICATE_MIN_DISTANCE,
 ) -> list[Finding]:
     """Flag pairs that are too similar to be distinct deliverables.
 
@@ -371,7 +393,7 @@ def check_near_duplicates(
 
 
 def _near_duplicate_findings(
-    hashes: list[tuple[Path, int]], *, min_distance: int = 8,
+    hashes: list[tuple[Path, int]], *, min_distance: int = _DUPLICATE_MIN_DISTANCE,
 ) -> list[Finding]:
     findings: list[Finding] = []
     for i in range(len(hashes)):
@@ -397,14 +419,14 @@ class _Samples:
     gray: _PILImage
 
 
-def _decode_samples(path: Path) -> _Samples:
-    """Decode *path* once and take every detector's sample from it.
+def _decode_samples(source: Path | bytes) -> _Samples:
+    """Decode *source*, a path or bytes, once and take every detector's sample from it.
 
-    This is the only step that parses the file. Only one full-size
+    This is the only step that parses the image. Only one full-size
     conversion is alive at a time, so peak memory matches what a single
     detector needs on its own.
     """
-    with open_image(path) as img:
+    with open_image(source) as img:
         img.load()
         rgb = img.convert("RGB")
         palette = rgb.resize(_PALETTE_SAMPLE)
@@ -454,40 +476,84 @@ def inspect_asset(
     )
 
 
+class _DesignVerifier(CallableVerifier):
+    """The gate :func:`design_verifier` returns, carrying its identity."""
+
+    def __init__(self, fn: Any, identity: ValidatorIdentity) -> None:
+        super().__init__(fn)
+        self.identity = identity
+
+
 def design_verifier(
     system: DesignSystem | None = None,
     *,
     width: int | None = None,
     height: int | None = None,
     include_advisory: bool = False,
+    require_artifacts: bool = False,
 ) -> CallableVerifier:
     """A verifier that gates on deterministic findings alone.
 
     Cheap, instant, and free of judge variance — run this before
     spending a model call on aesthetic judgment. Hard findings fail the
     verdict: wrong dimensions, a blank image (see :func:`check_blank`),
-    near-duplicate artifacts, and a listed artifact that is missing or
-    cannot be decoded as a PNG, JPEG, GIF, or WebP image. Advisory
-    findings (palette, flat-region) are reported but do not fail by
-    default, because a soft palette miss or a plain background is not
-    worth paying to regenerate; ``include_advisory=True`` makes them
-    block too.
+    near-duplicate artifacts, and a listed artifact that is missing,
+    changed since it was written (its bytes no longer match the
+    ``sha256`` recorded for it) or cannot be decoded as a PNG, JPEG, GIF,
+    or WebP image. Each file is read once, and those bytes are both
+    compared with the record and decoded. Advisory findings (palette,
+    flat-region) are reported but do not fail by default, because a soft
+    palette miss or a plain background is not worth paying to
+    regenerate; ``include_advisory=True`` makes them block too.
+
+    A target with no artifacts passes, unless ``require_artifacts=True``,
+    as a gate on an image deliverable should be. The palette is checked
+    when the verifier is built, so a malformed colour raises
+    ``ValueError`` here rather than at the first verdict. The returned
+    verifier's ``identity`` is a ``ValidatorIdentity`` named
+    ``DESIGN_VERIFIER_NAME`` at ``DESIGN_VERIFIER_VERSION`` whose
+    configuration digest covers the palette, dimensions, both flags and
+    the detector thresholds.
     """
+    if type(require_artifacts) is not bool:
+        raise TypeError("require_artifacts must be a bool")
+    targets = [_hex_to_rgb(colour) for colour in system.palette] if system is not None else []
+    identity = ValidatorIdentity.for_config(DESIGN_VERIFIER_NAME, DESIGN_VERIFIER_VERSION, {
+        "palette": [f"#{red:02x}{green:02x}{blue:02x}" for red, green, blue in targets],
+        "width": width, "height": height, "include_advisory": bool(include_advisory),
+        "require_artifacts": require_artifacts, "detectors": _DETECTOR_SETTINGS,
+    })
 
     def verdict(verifier_node, target) -> Verdict:
-        records = target.metadata.get("artifacts") or []
-        paths = [Path(r["path"]) for r in records if r.get("path")]
-        if not paths:
+        records = [r for r in target.metadata.get("artifacts") or [] if r.get("path")]
+        if not records:
+            if require_artifacts:
+                return Verdict(passed=False,
+                               reason="no artifacts to inspect; this gate requires them")
             return Verdict(passed=True, reason="no artifacts to inspect")
 
         findings: list[Finding] = []
         hashes: list[tuple[Path, int]] = []
-        for path in paths:
-            if not path.exists():
+        for record in records:
+            path = Path(record["path"])
+            try:
+                data = path.read_bytes()
+            except FileNotFoundError:
                 findings.append(Finding("missing-artifact", f"{path.name} does not exist"))
                 continue
+            except OSError as exc:
+                detail = str(exc) or type(exc).__name__
+                findings.append(Finding("unreadable-artifact", f"{path.name}: {detail}"))
+                continue
+            recorded = record.get("sha256")
+            if isinstance(recorded, str) and hashlib.sha256(data).hexdigest() != recorded:
+                findings.append(Finding(
+                    "changed-artifact",
+                    f"{path.name} no longer holds the bytes recorded when it was written",
+                ))
+                continue
             try:
-                samples = _decode_samples(path)
+                samples = _decode_samples(data)
             except (ImportError, MemoryError):
                 raise  # A missing Pillow or an exhausted host is not a bad file.
             except Exception as exc:
@@ -506,9 +572,9 @@ def design_verifier(
                 detail = str(exc) or type(exc).__name__
                 findings.append(Finding("unreadable-artifact", f"{path.name}: {detail}"))
                 continue
-            findings.extend(
-                _inspect_samples(samples, system=system, width=width, height=height)
-            )
+            findings.extend(_inspect_samples(samples, width=width, height=height))
+            if targets:
+                findings.extend(_palette_findings(samples.palette, targets))
             hashes.append((path, _dhash_bits(samples.gray)))
         if len(hashes) > 1:
             findings.extend(_near_duplicate_findings(hashes))
@@ -521,4 +587,4 @@ def design_verifier(
             reason="; ".join(str(f) for f in blocking[:4]),
         )
 
-    return CallableVerifier(verdict)
+    return _DesignVerifier(verdict, identity)

@@ -8,10 +8,14 @@ import re
 import unicodedata
 from collections.abc import Mapping
 from dataclasses import dataclass, field
-from decimal import Decimal, DecimalException
+from decimal import (
+    ROUND_HALF_EVEN, Context, Decimal, DecimalException, DivisionByZero, InvalidOperation, Overflow,
+)
 from enum import Enum
 from types import MappingProxyType
 from typing import Any, TypeAlias
+
+from smythe._money import MICROUSD, MoneyUnitError, from_units, to_units
 
 MANIFEST_VERSION = 1
 MICRODOLLAR = Decimal("0.000001")
@@ -21,6 +25,15 @@ MICRODOLLAR = Decimal("0.000001")
 # not provider recommendations; callers must split larger campaigns into jobs.
 MAX_SIGNED_MICRO_USD = (1 << 63) - 1
 MAX_USD = Decimal(MAX_SIGNED_MICRO_USD) * MICRODOLLAR
+# Version 1 reports amounts from here up, whose microdollar count needs more
+# than 28 digits, as unable to fit microdollar precision rather than as too
+# large. It is the bound of Python's default decimal precision, fixed here so
+# that a caller's own decimal context cannot move it.
+_UNREPRESENTABLE_USD = Decimal("9999999999999999999999.9999995")
+# Python's default decimal context, for formatting that a caller's context
+# must not change.
+_DEFAULT_CONTEXT = Context(prec=28, rounding=ROUND_HALF_EVEN, Emin=-999999, Emax=999999,
+                           traps=[InvalidOperation, DivisionByZero, Overflow])
 MAX_MANIFEST_BYTES = 2 * 1024 * 1024
 MAX_CANONICAL_PLAN_BYTES = 64 * 1024 * 1024
 MAX_PROFILES = 64
@@ -38,6 +51,10 @@ MAX_TOTAL_ATTACHMENT_BYTES = 64 * 1024 * 1024
 MAX_ARTIFACT_DIMENSION = 16_384
 MAX_ARTIFACT_PIXELS = 64 * 1024 * 1024
 MAX_ARTIFACT_FILENAME_BYTES = 255
+MAX_ARTIFACT_VALIDATORS = 16
+MAX_VALIDATOR_VERSION_CHARS = 64
+# Built-in validator names; a manifest cannot name or replace them.
+RESERVED_VALIDATOR_PREFIX = "smythe."
 DEFAULT_CALL_TIMEOUT_S = 300.0
 MAX_CALL_TIMEOUT_S = 60 * 60.0
 DEFAULT_MAX_WALL_SECONDS = 6 * 60 * 60.0
@@ -96,7 +113,10 @@ class ProviderKind(str, Enum):
 
 
 def normalize_usd(value: object, *, field_name: str) -> Decimal:
-    """Return a non-negative amount with exact microdollar precision."""
+    """Return a non-negative amount with exact microdollar precision.
+
+    The result does not depend on the caller's decimal context.
+    """
     if isinstance(value, bool) or not isinstance(value, (str, int, float, Decimal)):
         raise ManifestValidationError(f"{field_name} must be a USD number")
     if isinstance(value, float) and not math.isfinite(value):
@@ -109,24 +129,21 @@ def normalize_usd(value: object, *, field_name: str) -> Decimal:
         raise ManifestValidationError(f"{field_name} must be finite")
     if amount < 0:
         raise ManifestValidationError(f"{field_name} must be non-negative")
+    if amount >= _UNREPRESENTABLE_USD:
+        raise ManifestValidationError(f"{field_name} must fit exact microdollar precision")
     try:
-        quantized = amount.quantize(MICRODOLLAR)
-    except (DecimalException, ValueError) as exc:
-        raise ManifestValidationError(f"{field_name} must fit exact microdollar precision") from exc
-    if quantized != amount:
-        raise ManifestValidationError(f"{field_name} supports at most six decimal places")
-    if quantized > MAX_USD:
+        micros = to_units(amount, MICROUSD)
+    except MoneyUnitError as exc:
+        raise ManifestValidationError(f"{field_name} supports at most six decimal places") from exc
+    if micros > MAX_SIGNED_MICRO_USD:
         raise ManifestValidationError(f"{field_name} exceeds signed 63-bit microdollar capacity")
-    return quantized
+    # A negative zero keeps its sign, as manifests and plans have recorded it.
+    return from_units(micros, MICROUSD).copy_sign(amount)
 
 
 def usd_to_micros(value: Decimal) -> int:
     """Convert a normalized USD Decimal to integer microdollars."""
-    normalized = normalize_usd(value, field_name="USD amount")
-    micros = int(normalized / MICRODOLLAR)
-    if micros > MAX_SIGNED_MICRO_USD:  # pragma: no cover - normalize guard
-        raise ManifestValidationError("USD amount exceeds signed 63-bit capacity")
-    return micros
+    return to_units(normalize_usd(value, field_name="USD amount"), MICROUSD)
 
 
 def micros_to_usd(value: int) -> Decimal:
@@ -140,11 +157,11 @@ def micros_to_usd(value: int) -> Decimal:
         raise ManifestValidationError(
             "microdollar amount must be a non-negative signed 63-bit integer"
         )
-    return (Decimal(value) * MICRODOLLAR).quantize(MICRODOLLAR)
+    return from_units(value, MICROUSD)
 
 
 def usd_string(value: Decimal) -> str:
-    return format(value.quantize(MICRODOLLAR), "f")
+    return format(value.quantize(MICRODOLLAR, context=_DEFAULT_CONTEXT), "f")
 
 
 def _strict_fields(
@@ -393,11 +410,57 @@ class ProviderProfileV1:
 
 
 @dataclass(frozen=True, slots=True)
+class ValidatorReferenceV1:
+    """A registered validator that an operation's artifacts must pass.
+
+    A manifest stores only the validator's name and version. The validator
+    is trusted local code registered in-process with ``preflight_job`` and
+    ``JobRunner``; a manifest never names code to import.
+    """
+
+    name: str
+    version: str
+
+    def __post_init__(self) -> None:
+        context = "artifact.validators[].name"
+        object.__setattr__(self, "name", _require_name(self.name, context))
+        if self.name.startswith(RESERVED_VALIDATOR_PREFIX):
+            raise ManifestValidationError(
+                f"{context} {self.name!r} uses the reserved {RESERVED_VALIDATOR_PREFIX!r} prefix"
+            )
+        if (
+            not isinstance(self.version, str)
+            or not self.version
+            or self.version != self.version.strip()
+            or len(self.version) > MAX_VALIDATOR_VERSION_CHARS
+        ):
+            raise ManifestValidationError(
+                "artifact.validators[].version must be a string such as \"1\" with no "
+                f"surrounding spaces and at most {MAX_VALIDATOR_VERSION_CHARS} characters"
+            )
+
+    @classmethod
+    def from_dict(cls, data: object) -> "ValidatorReferenceV1":
+        item = _require_mapping(data, "artifact.validators[]")
+        _strict_fields(
+            item,
+            allowed={"name", "version"},
+            required={"name", "version"},
+            context="artifact.validators[]",
+        )
+        return cls(name=item["name"], version=item["version"])
+
+    def to_dict(self) -> dict[str, JSONValue]:
+        return {"name": self.name, "version": self.version}
+
+
+@dataclass(frozen=True, slots=True)
 class ArtifactSpecV1:
     mime_type: str = "image/png"
     width: int | None = None
     height: int | None = None
     filename: str | None = None
+    validators: tuple[ValidatorReferenceV1, ...] = ()
 
     def __post_init__(self) -> None:
         if not isinstance(self.mime_type, str):
@@ -437,21 +500,42 @@ class ArtifactSpecV1:
                 "filename",
                 _validate_artifact_filename(self.filename, mime_type),
             )
+        if not isinstance(self.validators, (list, tuple)):
+            raise ManifestValidationError("artifact.validators must be an array")
+        validators = tuple(self.validators)
+        if any(not isinstance(item, ValidatorReferenceV1) for item in validators):
+            raise ManifestValidationError("artifact.validators contains an invalid validator")
+        if len(validators) > MAX_ARTIFACT_VALIDATORS:
+            raise ManifestValidationError(
+                f"artifact.validators exceeds {MAX_ARTIFACT_VALIDATORS} entries"
+            )
+        names = [item.name for item in validators]
+        if len(set(names)) != len(names):
+            raise ManifestValidationError("artifact.validators names a validator more than once")
+        object.__setattr__(self, "validators", validators)
 
     @classmethod
     def from_dict(cls, data: object) -> "ArtifactSpecV1":
         item = _require_mapping(data, "artifact")
         _strict_fields(
             item,
-            allowed={"mime_type", "width", "height", "filename"},
+            allowed={"mime_type", "width", "height", "filename", "validators"},
             required=set(),
             context="artifact",
         )
+        validators = item.get("validators", [])
+        if not isinstance(validators, list):
+            raise ManifestValidationError("artifact.validators must be an array")
+        if len(validators) > MAX_ARTIFACT_VALIDATORS:
+            raise ManifestValidationError(
+                f"artifact.validators exceeds {MAX_ARTIFACT_VALIDATORS} entries"
+            )
         return cls(
             mime_type=item.get("mime_type", "image/png"),
             width=item.get("width"),
             height=item.get("height"),
             filename=item.get("filename"),
+            validators=tuple(ValidatorReferenceV1.from_dict(entry) for entry in validators),
         )
 
     def to_dict(self) -> dict[str, JSONValue]:
@@ -461,6 +545,10 @@ class ArtifactSpecV1:
             result["height"] = self.height
         if self.filename is not None:
             result["filename"] = self.filename
+        # Omitted when empty, so manifests without validators keep their
+        # manifest hash, plan hash, operation IDs and approval tokens.
+        if self.validators:
+            result["validators"] = [validator.to_dict() for validator in self.validators]
         return result
 
 
@@ -815,6 +903,23 @@ JOB_MANIFEST_V1_JSON_SCHEMA: dict[str, Any] = {
                                 "type": "string",
                                 "minLength": 1,
                                 "maxLength": MAX_ARTIFACT_FILENAME_BYTES,
+                            },
+                            "validators": {
+                                "type": "array",
+                                "maxItems": MAX_ARTIFACT_VALIDATORS,
+                                "items": {
+                                    "type": "object",
+                                    "additionalProperties": False,
+                                    "required": ["name", "version"],
+                                    "properties": {
+                                        "name": {"type": "string", "pattern": _NAME_RE.pattern},
+                                        "version": {
+                                            "type": "string",
+                                            "minLength": 1,
+                                            "maxLength": MAX_VALIDATOR_VERSION_CHARS,
+                                        },
+                                    },
+                                },
                             },
                         },
                     },

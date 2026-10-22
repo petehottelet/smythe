@@ -1,5 +1,12 @@
 """Smythe: task-based personalized agent swarms with dynamic execution topology."""
 
+from smythe.acceptance import (
+    AcceptanceDecision,
+    AcceptancePolicy,
+    DeliveryAcceptance,
+    ValidationSubject,
+    Validator,
+)
 from smythe.budget import (
     BudgetEstimateRequired,
     BudgetReconciliationError,
@@ -9,6 +16,7 @@ from smythe.budget import (
 )
 from smythe.checkpoint import CheckpointStore, FileCheckpointStore
 from smythe.constrained_planner import ConstrainedArchitect, SubGraphTemplate
+from smythe.context import ContextSnapshot, ContextSource
 from smythe.design import DesignSystem, Finding, design_verifier, inspect_asset
 from smythe.distill import DistillationError, distill_template
 from smythe.graph import FailurePolicy, Revision, RevisionError
@@ -28,6 +36,7 @@ from smythe.provider import (
     OutputRefusedError,
     OutputTruncatedError,
     Provider,
+    ProviderFeatures,
     ProviderResponseError,
     ProviderAccountingError,
     ProviderAccountingCancelledError,
@@ -39,6 +48,7 @@ from smythe.workflow_binding import LocalOnly, WorkflowBindingError
 from smythe.workflow_provider import ProviderRequestRejectedError
 from smythe.workflow_policy import WorkflowGraphPolicy
 from smythe.workflow_store import SQLiteWorkflowStore, WorkflowError
+from smythe.workflow_tools import ReadProfile, ReadToolError
 from smythe.router import WhiteRabbit
 from smythe.skills import (
     CapabilityHydrationMode,
@@ -67,8 +77,18 @@ from smythe.tools import (
     ToolSession,
     ToolSpec,
 )
+from smythe.validation import (
+    FindingSeverity,
+    ValidationFinding,
+    ValidationOutcome,
+    ValidationReport,
+    ValidatorIdentity,
+)
+from smythe.validators import JSONValidator, TextValidator
 
 __all__ = [
+    "AcceptanceDecision",
+    "AcceptancePolicy",
     "AnthropicProvider",
     "AnthropicMessagesProvider",
     "ArchitectError",
@@ -83,13 +103,17 @@ __all__ = [
     "CheckpointStore",
     "CompletionResult",
     "ConstrainedArchitect",
+    "ContextSnapshot",
+    "ContextSource",
     "DefaultCapabilityMapper",
+    "DeliveryAcceptance",
     "DesignSystem",
     "DeterministicArchitect",
     "DistillationError",
     "FailurePolicy",
     "FileCheckpointStore",
     "Finding",
+    "FindingSeverity",
     "GeminiProvider",
     "LLMArchitect",
     "LLMSupervisor",
@@ -102,6 +126,7 @@ __all__ = [
     "OpenAIProvider",
     "OpenAIResponsesProvider",
     "IncompleteOutputError",
+    "JSONValidator",
     "OutputRefusedError",
     "OutputTruncatedError",
     "NativeReceipt",
@@ -112,10 +137,13 @@ __all__ = [
     "WorkflowError",
     "PlannerMemory",
     "Provider",
+    "ProviderFeatures",
     "ProviderResponseError",
     "ProviderAccountingError",
     "ProviderAccountingCancelledError",
     "ProviderRequestRejectedError",
+    "ReadProfile",
+    "ReadToolError",
     "Revision",
     "RevisionError",
     "Sentinel",
@@ -135,8 +163,15 @@ __all__ = [
     "ToolResult",
     "ToolRuntime",
     "ToolSession",
+    "TextValidator",
     "TokenVerifier",
     "ToolSpec",
+    "ValidationFinding",
+    "ValidationOutcome",
+    "ValidationReport",
+    "ValidationSubject",
+    "Validator",
+    "ValidatorIdentity",
     "Verdict",
     "Verifier",
     "VerificationRecoveryError",

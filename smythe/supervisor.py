@@ -20,7 +20,9 @@ Two guardrails keep this from becoming an unbounded agent loop:
   costs a trace entry rather than a corrupt run.  No revision can drop
   a verification gate or the node it judges, or leave the gate no
   longer depending on that node; a step a revision adds after that
-  node is not judged by the gate.
+  node is not judged by the gate.  Under a strict acceptance policy
+  without final validators, the executor refuses such a step, since
+  no check could then accept the delivered output.
 
 The design follows the adaptive-orchestration pattern: evaluate state,
 find the gap between what exists and what was asked for, then decide

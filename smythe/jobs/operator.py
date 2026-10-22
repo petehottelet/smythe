@@ -188,14 +188,23 @@ def _atomic_json(path: Path, value: dict) -> None:
 
 
 def _read_json(path: Path, *, missing_ok=False):
-    try:
-        _reject_link(path)
-        with path.open("rb") as stream:
-            data = stream.read(MAX_RECEIPT_BYTES + 1)
-    except FileNotFoundError:
-        if missing_ok:
-            return None
-        raise
+    # A Windows writer replacing the receipt can briefly deny opens, as
+    # _atomic_json allows for on its side; retry for up to a second.
+    deadline = time.monotonic() + 1
+    while True:
+        try:
+            _reject_link(path)
+            with path.open("rb") as stream:
+                data = stream.read(MAX_RECEIPT_BYTES + 1)
+            break
+        except FileNotFoundError:
+            if missing_ok:
+                return None
+            raise
+        except PermissionError:
+            if time.monotonic() >= deadline:
+                raise
+            time.sleep(.02)
     if len(data) > MAX_RECEIPT_BYTES:
         raise RunStoreError("Worker receipt is too large")
     def pairs(items):

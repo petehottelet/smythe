@@ -1,10 +1,10 @@
 """Exact Standard/global Fable Messages pricing, independent of output decoding."""
 
 from dataclasses import dataclass
-from decimal import Decimal
 from types import MappingProxyType
 from typing import Any
 
+from smythe._money import NANOUSD, from_units
 from smythe.pricing import PriceTable, registered_table
 
 MODEL = "claude-fable-5-1"
@@ -51,7 +51,8 @@ class ClaudeReceipt:
 
     @property
     def cost_usd(self):
-        return None if self.cost_nanousd is None else Decimal(self.cost_nanousd).scaleb(-9)
+        # Exact whatever the caller's decimal context; receipts compare by bytes.
+        return None if self.cost_nanousd is None else from_units(self.cost_nanousd, NANOUSD)
 
     def safe_summary(self) -> dict[str, Any]:
         table = price_table(self.price_version)

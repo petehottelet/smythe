@@ -83,8 +83,9 @@ The contract has four sections:
   provider options, and an inclusive maximum cost for one call. Billable
   profiles require a positive ceiling; offline profiles require exactly zero.
 - `operations` define a stable key, prompt, provider profile, optional count,
-  relative attachments, and the expected artifact MIME type, dimensions, and
-  filename. A count of 16 expands to `tile[0]` through `tile[15]`.
+  relative attachments, and the expected artifact MIME type, dimensions,
+  filename, and optional [registered validators](#registered-validators). A
+  count of 16 expands to `tile[0]` through `tile[15]`.
 - `execution.max_concurrency` bounds active calls. `max_attempts` bounds the
   complete attempt lineage, including later rerolls.
 - `execution.call_timeout_s` bounds each provider attempt (default 300 seconds,
@@ -174,6 +175,60 @@ Use the same `--max-spend-usd` value for `plan` and `run`. The token is an
 explicit plan-and-spend acknowledgment, not an authentication credential or a
 signature from a secret key.
 
+An approval token creates one run. The token is derived only from the manifest
+hash, plan hash and ceiling, so approving the same plan at the same ceiling
+again yields the same token. A Jobs database refuses a token that already created a run, before
+creating anything, with exit code 4 and an error that names the earlier run;
+continue that run with `smythe jobs resume RUN_ID` against the same `--store`. To start another run with
+its own full ceiling on purpose, add `--new-run`. The new run's `run_created`
+event records how many earlier runs used the token as
+`approval_reuse.prior_run_count` and the five most recent run IDs as
+`approval_reuse.prior_run_ids`. A
+different ceiling produces a different token. Resume and reroll continue an
+existing run and need no new approval. The check covers one database, and the
+token remains an acknowledgment rather than a credential.
+
+### Operation identity and input digest
+
+Each planned operation has two identities. Its `operation_id` (`op_...`) names
+one expanded operation: it covers the template, including its key, count,
+prompt and artifact spec, the ordinal, the profile, including its name and
+per-call ceiling, and the attachment paths. `jobs inspect --operation` and
+`jobs reroll` accept it.
+
+Its input digest describes what the operation asks its provider for.
+`operation_input_digest(operation, plan.attachments)` returns `sha256:`
+followed by the hash of version 1 of a canonical JSON object holding:
+
+- the provider kind and its adapter version from
+  `smythe.jobs.providers.ADAPTER_VERSIONS`, which increases whenever Smythe
+  changes how that provider's requests are built;
+- the model, provider options and prompt;
+- the artifact spec; and
+- each attachment's SHA-256 and MIME type, in the operation's order. The
+  MIME type comes from a fixed table of extensions (`.gif`, `.jpg` and
+  `.jpeg`, `.png` and `.webp`, in any case); any other extension counts as
+  `application/octet-stream`. The plan's fingerprints record the type the
+  platform's MIME database guesses, which differs between platforms and
+  Python versions, so the digest does not use it.
+
+The template key, count, ordinal, profile name, `max_attempts`, cost ceilings
+and attachment paths are left out. Every sample of a template therefore shares
+one digest, and renaming a profile or moving an attachment to another path
+with the same bytes and extension keeps it. A different prompt, model, option,
+artifact spec, attachment content or attachment order changes it.
+
+The digest is computed on demand and never stored. It is not part of the plan
+hash or approval token, so plans, exports, approvals and the Jobs schema are
+unchanged. `jobs inspect` adds `input_digest` to each operation, computed from
+the run's stored plan, prints it on an `Input digest:` line under each
+operation, and the HTML report shows it in an Input digest column. It is
+`null` (`unavailable` in the printed output) for an operation whose stored
+specification cannot produce one, or that sends attachments when the plan's
+stored attachment fingerprints cannot be read; inspection itself still
+succeeds.
+Jobs does not reuse artifacts across runs by digest.
+
 ## The dispatch journal
 
 Each run is stored incrementally in SQLite using WAL mode. Before a provider
@@ -193,7 +248,10 @@ The distinction between `prepared` and `dispatched` controls recovery:
   MIME type, byte size, and observed dimensions. Image bytes are decoded only
   as PNG, JPEG, GIF, or WebP, whatever MIME type the provider declares; other
   formats are refused before any other Pillow decoder runs. Like undecodable
-  data, they become `unknown_outcome` with the reason in the attempt error.
+  data, they are never written: the attempt is `rejected` at the cost the
+  provider reported, with the reason in the attempt error, and a reroll needs
+  no duplicate-spend acknowledgment. Invalid provider accounting still makes
+  the call an unknown outcome. See [delivery acceptance](#delivery-acceptance).
 
 Inspection applies its own limits, whatever the manifest requests: 32 MiB per
 artifact, 67,108,864 pixels per image or animation frame, 256 frames, and
@@ -239,7 +297,140 @@ smythe jobs status RUN_ID --events --json
 Snapshots distinguish confirmed cost, reserved cost, and unresolved exposure.
 `cost_is_complete` is false while an unknown or incomplete provider charge
 remains exposed; `cost_contains_estimates` reports whether any recorded call
-used a conservative estimate.
+used a conservative estimate. The `*_microusd` amounts are whole micro-USD,
+which the cost block's `unit` field names: `"microUSD"`. See
+[money units](budgets.md#money-units).
+
+## Delivery acceptance
+
+Every completed call is decided by checks on the exact response bytes. The
+built-in artifact check, `smythe.jobs.artifact-spec` version 1, decodes each
+artifact within the limits above and compares it with the operation's
+`artifact` spec. Each finding has a stable code:
+
+| Code | Finding |
+|---|---|
+| `no_artifacts` | The response has no artifact |
+| `artifact_count_limit` | The response has more than 10 artifacts |
+| `artifact_bytes_limit` | The response's artifacts exceed 128 MiB together |
+| `artifact_too_large` | One artifact exceeds 32 MiB |
+| `artifact_undecodable` | The bytes cannot be decoded, use a refused format, or exceed a pixel or frame limit |
+| `mime_type_mismatch` | The decoded MIME type differs from `mime_type` |
+| `dimensions_mismatch` | The decoded size differs from `width` and `height` |
+
+Any finding rejects the attempt; the operation becomes `rejected` and can be
+rerolled. Bytes that decode are published either way, with `accepted=0` when
+rejected, so they can be reviewed. The call's `call_completed` or
+`artifact_rejected` event records the decision under `delivery_acceptance`,
+in the transaction that settles the call's cost:
+
+```json
+{
+  "version": 1,
+  "scope": "artifacts",
+  "attempt_id": "...",
+  "decision": "rejected",
+  "reasons": ["tile.png: expected 1x1, observed 2x3"],
+  "subjects": [{"path": "artifacts/tile_0/attempt-0001/tile.png",
+                "sha256": "...", "size_bytes": 78, "published": true}],
+  "validators": [{
+    "validator": {"name": "smythe.jobs.artifact-spec", "version": "1",
+                  "config_sha256": "..."},
+    "outcome": "rejected",
+    "reports": [{"path": "artifacts/tile_0/attempt-0001/tile.png",
+                 "outcome": "rejected", "validator": {"...": "..."},
+                 "findings": [{"code": "dimensions_mismatch", "severity": "hard",
+                               "message": "tile.png: expected 1x1, observed 2x3",
+                               "expected": [1, 1], "observed": [2, 3]}]}]
+  }]
+}
+```
+
+`decision` is `accepted`, `rejected`, or `indeterminate`. `subjects` lists
+each artifact's recorded path, SHA-256 and size; `published` is false for
+bytes that were not written. Findings about the whole response are reported
+for the path `response`. The check's `config_sha256` hashes the MIME type and
+dimensions it compared. The attempt error keeps the finding messages, and the
+operation's status and recorded `accepted` flags mean what they did before.
+Calls recorded by earlier releases have no `delivery_acceptance` block. The
+Jobs database schema is unchanged.
+
+### Registered validators
+
+An operation's `artifact.validators` names further checks by name and
+version:
+
+```yaml
+    artifact:
+      mime_type: image/png
+      validators:
+        - name: brand-palette
+          version: "1"
+```
+
+A manifest never contains or imports validator code. A validator is trusted
+local code registered in-process, the same object the
+[delivery acceptance types](verifier.md#delivery-acceptance-records) describe:
+an `identity` (`ValidatorIdentity`) and a synchronous `validate(subject)` that
+returns a `ValidationReport`. Pass validators to both `preflight_job(...,
+validators=[...])` and `JobRunner(..., validators=[...])`; the CLI registers
+none, so it refuses a manifest that names one. Registration refuses a
+`Provider`, a class, a coroutine function, an awaitable, an `async def
+validate`, duplicate names, and names starting with `smythe.`. That check is a
+caller contract, not a sandbox: a validator must make no network requests or
+provider calls.
+
+Preflight refuses a name that is not registered, or registered at another
+version, before any run exists. The plan records each resolved identity,
+including its `config_sha256`, so a changed validator changes the plan hash:
+its approval no longer matches, and `resume` and `reroll` of a run approved
+under the old validator are refused before any provider call. A runner that
+lacks a validator the plan names, or has it with another identity, refuses
+to start the run. Manifests without validators keep their manifest hash, plan
+hash, operation IDs and approval tokens.
+
+Each registered validator runs after the built-in check on the exact
+in-memory bytes of every decodable artifact, as a `ValidationSubject`, and
+its reports are recorded beside the built-in check's, at most 32 findings
+each with hard findings first. A hard finding rejects the attempt. A
+validator that raises, returns anything but its own JSON-serializable
+`ValidationReport`, or reports `error` could not decide: its outcome is
+`error` and the decision is `indeterminate`, unless another check rejected
+the bytes. The call still settles at its reported cost, the operation becomes
+`rejected` and can be rerolled without a duplicate-spend acknowledgment; it
+never becomes an unknown outcome. The attempt error names the validator and
+the exception type, never the exception's message.
+
+### Delivery eligibility
+
+`jobs inspect` adds each attempt's recorded `delivery_acceptance`, and to each
+operation a projected `delivery_acceptance` and a derived
+`delivery_eligibility`. The projection describes the accepted attempt, or the
+latest completed one: its `source`, `attempt_id`, `decision`, the recorded
+`accepted` flag, each validator's identity and outcome, and the reasons. An
+attempt completed by an earlier release has no record and is projected with
+`source: "legacy_built_in"`, `decision: null` and `validators: null`: a
+legacy built-in decision whose validator is unrecorded. It is never reported
+as `accepted` or as `not_evaluated`, and it keeps the recorded flag as
+provenance.
+
+`delivery_eligibility` is `{"eligible": true, "reasons": []}` only when the
+recorded decision is `accepted`, the recorded validators are exactly the ones
+the operation's plan requires now, and every accepted artifact is `verified`
+on disk with the recorded SHA-256. Otherwise `reasons` lists codes:
+`no_decision`, `not_accepted`, `validator_unrecorded`, `validator_changed`,
+`record_invalid`, `record_mismatch`, or `artifact_` followed by the integrity
+status (`artifact_changed`, `artifact_missing`, `artifact_unsafe`,
+`artifact_unreadable`, `artifact_not_checked`). Eligibility is derived on
+every read and never written back; recorded statuses and `accepted` flags are
+unchanged. The HTML report shows it in a Delivery column, with the decision
+and validator results beside each attempt.
+
+`resume` and `reroll` recheck the SHA-256 of every accepted artifact in the run
+after execution, without the 64 MiB inspection limit, and return the same
+fields with an `artifact_integrity` summary. A changed or missing accepted file
+is reported there and makes its operation ineligible; the run's status and
+the operation's recorded acceptance stay as they were.
 
 ## List and inspect runs
 
@@ -276,7 +467,8 @@ the ledger snapshot. Inspection compares size and SHA-256, reading at most
 64 MiB per invocation and 32 MiB per file. Missing, changed, unreadable, and
 unchecked files are labeled. Unsafe paths, symbolic links, and junctions are
 not followed. These checks preserve the recorded acceptance decision and do
-not repeat image decoding or quality evaluation.
+not repeat image decoding or quality evaluation. They feed each operation's
+[delivery eligibility](#delivery-eligibility).
 
 `list`, `inspect`, `status`, `attach`, and `export` open the existing Jobs database in
 read-only mode, without provider initialization or schema migration. Missing,
@@ -389,7 +581,9 @@ marked dispatched can still reach or finish at the provider after ownership
 expires. Its uncommitted outcome remains unknown until investigated; the lease
 does not cancel an external request or make it safe to repeat automatically.
 
-A completed run starts zero new operations. Safe pre-dispatch interruptions
+A completed run starts zero new operations, and resume rechecks the bytes of
+its accepted artifacts before reporting their
+[delivery eligibility](#delivery-eligibility). Safe pre-dispatch interruptions
 return to pending. Dispatched-but-uncommitted calls remain `unknown_outcome`,
 and the run becomes `needs_attention`.
 
@@ -454,8 +648,11 @@ smythe jobs reroll RUN_ID "tile[3]" \
 ```
 
 Rerolls consume the same original approval and attempt allowance. The selected
-operation receives a new immutable attempt linked to its predecessor; other
-operations are not reset, and prior artifact records remain in the journal.
+operation receives a new immutable attempt linked to its predecessor that
+records the reroll reason, which `smythe jobs inspect` shows with that attempt;
+other operations are not reset, and prior artifact records remain in the
+journal. A safe retry after recovery starts another attempt without a reason,
+and attempts recorded by earlier versions keep an empty reason.
 Successful operations cannot be casually rerolled, which preserves accepted
 outputs byte-for-byte.
 
@@ -501,7 +698,7 @@ and output charge that one request can incur.
 | 1 | job finished `failed`, `partial`, `needs_attention`, or `budget_overrun` |
 | 2 | invalid manifest, preflight input, or command value |
 | 3 | provider configuration or optional dependency failure |
-| 4 | approval mismatch |
+| 4 | approval mismatch, or an already used approval without `--new-run` |
 | 5 | budget admission failure |
 | 6 | unknown run or invalid state transition |
 | 7 | local SQLite/filesystem failure, detached startup failure, or attachment detects a failed worker or expired lease |
@@ -531,11 +728,40 @@ with SQLiteRunStore("jobs.sqlite3") as store:
     )
 ```
 
+`JobRunner.start` and `SQLiteRunStore.create_run` raise `ApprovalError` for an
+approval that already created a run in the store. Pass
+`allow_approval_reuse=True` to start another run with it, as `--new-run` does.
+
+A manifest that names [registered validators](#registered-validators) runs
+with the same validator objects passed to preflight and to every runner that
+starts, resumes or rerolls it:
+
+```python
+from smythe.validation import ValidationReport, ValidatorIdentity, hard_finding
+
+class MaxBytes:
+    def __init__(self, limit):
+        self.limit = limit
+        self.identity = ValidatorIdentity.for_config("max-bytes", "1", {"limit": limit})
+
+    def validate(self, subject):
+        if len(subject.data) <= self.limit:
+            return ValidationReport("artifact", validator=self.identity)
+        finding = hard_finding("too_large", f"{len(subject.data)} bytes",
+                               expected=self.limit, observed=len(subject.data))
+        return ValidationReport("artifact", (finding,), validator=self.identity)
+
+validators = [MaxBytes(2_000_000)]
+plan = preflight_job(manifest, manifest_root=root, validators=validators)
+runner = JobRunner(store, validators=validators)
+```
+
 ## Current boundaries
 
 - Jobs v1 is a local SQLite worker, not a distributed queue or hosted service.
 - Built-in artifact acceptance checks MIME type and optional pixel dimensions.
-  The public `smythe.assets` package adds typed brand modes, deterministic
+  Registered validators add developer-written checks by name and version. The
+  public `smythe.assets` package adds typed brand modes, deterministic
   finishing, hash-bound receipts, and richer image validation for custom
   pipelines; those policies are not automatically inferred from a generic job
   manifest.

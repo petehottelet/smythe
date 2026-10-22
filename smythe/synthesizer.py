@@ -11,7 +11,8 @@ from typing import Any
 from smythe.budget import (
     BudgetEstimateRequired, BudgetValidationError, Sentinel, validate_completion_usage,
 )
-from smythe.graph import SYNTHESIS_NODE_ID, ExecutionGraph, Node, NodeStatus
+from smythe.executor_base import check_provider_support
+from smythe.graph import SYNTHESIS_NODE_ID, ExecutionGraph, Node, NodeStatus, _deliverable_ids
 from smythe.provider import (
     Provider, ProviderResponseError, _native_receipt, _native_response_errors,
     _raise_if_incomplete, _settle_response_error, _settle_response_group,
@@ -37,6 +38,30 @@ Preserve key information from every input.  Be concise and well-organized.
 """
 
 DEFAULT_SYNTHESIS_ESTIMATED_TOKENS = 2000
+
+
+def _completed(graph: ExecutionGraph) -> list[Node]:
+    """The nodes whose results synthesis reads, in graph order."""
+    return [n for n in graph.nodes if n.status == NodeStatus.COMPLETED and n.result is not None]
+
+
+def _select_deliverable(graph: ExecutionGraph, nodes: list[Node]) -> tuple[list[Node], bool]:
+    deliverable = _deliverable_ids(graph.nodes)
+    terminal = [n for n in nodes if n.id in deliverable]
+    if terminal:
+        return terminal, False
+    return nodes, bool(nodes)
+
+
+def deliverable_sources(graph: ExecutionGraph) -> tuple[list[Node], bool]:
+    """The nodes ``DELIVERABLE`` synthesis returns, and whether it fell back.
+
+    These are the completed terminal nodes that are not verifiers, in graph
+    order. When there are none, synthesis falls back to every completed
+    node, verifiers included, and the flag is True. A graph with no
+    completed node gives ``([], False)``.
+    """
+    return _select_deliverable(graph, _completed(graph))
 
 
 class Synthesizer:
@@ -65,6 +90,11 @@ class Synthesizer:
         self._budget = budget
         self._tracer = tracer
         self._run_binding = run_binding
+
+    @property
+    def strategy(self) -> SynthesisStrategy:
+        """The strategy this synthesizer applies."""
+        return self._strategy
 
     def workflow_description(self, **defaults) -> dict:
         require_exact(self, Synthesizer)
@@ -100,6 +130,30 @@ class Synthesizer:
         ):
             raise WorkflowBindingError("Bound synthesis does not accept call-time runtime overrides")
 
+    def check_merge_support(
+        self,
+        *,
+        provider: Provider | None = None,
+        model: str | None = None,
+        max_budget_usd: float | None = None,
+    ) -> None:
+        """Raise now what an ``LLM_MERGE`` call would raise for this configuration.
+
+        Resolves the provider and model as the merge does. With
+        *max_budget_usd* set, a provider that requires an inclusive per-call
+        ceiling and has none raises ``BudgetEstimateRequired``; a model the
+        provider declares unsupported raises ``ValueError``. Other strategies
+        make no call and never raise. An ordinary ``Swarm`` calls this before
+        planning and before its first node call.
+        """
+        resolved_provider = provider or self._provider
+        if (self._strategy is not SynthesisStrategy.LLM_MERGE or self._run_binding is not None
+                or resolved_provider is None):
+            return
+        resolved_model = model if model is not None else self._model
+        check_provider_support(resolved_provider, resolved_model or "", node_id=SYNTHESIS_NODE_ID,
+                               max_budget_usd=max_budget_usd)
+
     def synthesize(
         self,
         graph: ExecutionGraph,
@@ -111,10 +165,7 @@ class Synthesizer:
     ) -> str:
         """Produce a single output from the completed graph."""
         self._check_bound_overrides(provider, model, budget, tracer)
-        completed = [
-            n for n in graph.nodes
-            if n.status == NodeStatus.COMPLETED and n.result is not None
-        ]
+        completed = _completed(graph)
         if not completed:
             return ""
 
@@ -148,10 +199,7 @@ class Synthesizer:
     ) -> str:
         """Async variant for use inside an existing event loop."""
         self._check_bound_overrides(provider, model, budget, tracer)
-        completed = [
-            n for n in graph.nodes
-            if n.status == NodeStatus.COMPLETED and n.result is not None
-        ]
+        completed = _completed(graph)
         if not completed:
             return ""
 
@@ -190,18 +238,9 @@ class Synthesizer:
 
         Falls back to every completed node when a graph has no terminal
         result to hand back, so nothing is ever silently lost.
+        :func:`deliverable_sources` names the same nodes.
         """
-        verifier_ids = {node.id for node in graph.nodes if node.verifies}
-        depended_on = {
-            dep
-            for node in graph.nodes if node.id not in verifier_ids
-            for dep in node.depends_on
-        }
-        terminal = [
-            n for n in nodes
-            if n.id not in depended_on and n.id not in verifier_ids
-        ]
-        return Synthesizer._concatenate(terminal or nodes)
+        return Synthesizer._concatenate(_select_deliverable(graph, nodes)[0])
 
     @staticmethod
     def _concatenate(nodes: list[Node]) -> str:

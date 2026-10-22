@@ -20,7 +20,7 @@ import json
 import math
 import os
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from uuid import uuid4
 
 from smythe._errors import PicklableError
@@ -48,6 +48,24 @@ def _usage_tokens(usage: object, field_name: str) -> int:
     """Default absent legacy usage only; malformed falsy values must reach validation."""
     value = getattr(usage, field_name, None)
     return 0 if value is None else value
+
+
+def _missing_usage_mode(value: object) -> str:
+    if type(value) is not str or value not in ("zero", "unknown"):
+        raise ValueError(f"missing_usage must be 'zero' or 'unknown', got {value!r}")
+    return value
+
+
+def _usage_unknown(mode: str, usage: object, *field_names: str) -> bool:
+    """Whether a ``missing_usage="unknown"`` provider lacks usage to price.
+
+    Usage is missing when the response has none or leaves a count unset. The
+    absent count is still recorded as zero tokens; the flag stops the ledger
+    from treating that zero as a known charge.
+    """
+    return mode == "unknown" and (
+        usage is None or any(getattr(usage, name, None) is None for name in field_names)
+    )
 
 
 @dataclass
@@ -302,6 +320,70 @@ def _settle_response_error(error, *, budget, node_id, metadata, phase):
             metadata["cost_usd"] = budget.breakdown()[node_id]
 
 
+@dataclass(frozen=True)
+class ProviderFeatures:
+    """What a provider declares one model can do, for checks before any call.
+
+    Each field is ``True`` (supported), ``False`` (not supported: a call
+    that needs it is refused, or the output never appears) or ``None`` (not
+    declared). An ordinary ``Swarm`` rejects a run before planning, or
+    before its first node call, only for a feature declared ``False`` that
+    the run needs, so a provider that declares nothing runs as before.
+    """
+
+    model_supported: bool | None = None
+    """Whether the provider accepts this model name."""
+    text: bool | None = None
+    """Whether a reply carries text the model wrote."""
+    tools: bool | None = None
+    """Whether a request can offer the model tools to call."""
+    attachments: bool | None = None
+    """Whether a request can carry image attachments."""
+    image_output: bool | None = None
+    """Whether a reply can carry generated images as artifacts."""
+    cost_ceiling_required: bool | None = None
+    """Whether a call under ``max_budget_usd`` needs an inclusive per-call
+    ceiling, as ``requires_explicit_budget_estimate`` reports."""
+
+
+def _builtin_features(provider: Provider, owner: type, model: str, **features) -> ProviderFeatures:
+    """*owner*'s built-in declaration, or none once a subclass replaces its calls.
+
+    A subclass that overrides ``chat()`` or ``prepare()`` may serve more
+    than the built-in class, so it declares nothing until it overrides
+    ``feature_support()`` itself.
+    """
+    declared = Provider.feature_support(provider, model)
+    if any(getattr(type(provider), name, None) is not getattr(owner, name, None)
+           for name in ("chat", "prepare")):
+        return declared
+    return replace(declared, **features)
+
+
+def _declared_features(provider: Provider, model: str) -> ProviderFeatures:
+    """Read *provider*'s declaration for *model*; a provider without the hook declares nothing."""
+    declare = getattr(provider, "feature_support", None)
+    if declare is None:
+        return ProviderFeatures()
+    features = declare(model)
+    if not isinstance(features, ProviderFeatures):
+        raise TypeError(
+            f"{type(provider).__name__}.feature_support() must return ProviderFeatures, "
+            f"got {type(features).__name__}"
+        )
+    return features
+
+
+def _missing_cost_ceiling(provider: Provider, model: str) -> bool:
+    """Whether a capped call to *model* lacks the inclusive ceiling it requires.
+
+    The same test the executor applies when it reserves a node's budget,
+    before any node-level ``estimated_cost_usd``.
+    """
+    return (provider.requires_explicit_budget_estimate(model)
+            and provider.budget_estimate_usd(model) is None)
+
+
 class Provider(ABC):
     """Abstract base for LLM providers.
 
@@ -313,6 +395,18 @@ class Provider(ABC):
     @abstractmethod
     async def complete(self, system: str, prompt: str, model: str) -> CompletionResult:
         """Send a prompt to the LLM and return text + token usage."""
+
+    def feature_support(self, model: str) -> ProviderFeatures:
+        """Declare what *model* can do on this provider, for checks before any call.
+
+        An ordinary ``Swarm`` reads this before planning and before its first
+        node call, and rejects a run that needs a feature declared ``False``.
+        The default declares only ``cost_ceiling_required``, from
+        ``requires_explicit_budget_estimate``, so a custom provider runs as
+        before. Override it to have unsupported runs rejected before they
+        are paid for.
+        """
+        return ProviderFeatures(cost_ceiling_required=self.requires_explicit_budget_estimate(model))
 
     def budget_estimate_usd(self, model: str) -> float | None:
         """Return a conservative per-call reservation, when one is known.
@@ -411,6 +505,11 @@ class OfflineProvider(Provider):
     def snapshot_for_workflow(self) -> OfflineProvider:
         """Detach a static offline configuration without resetting a script."""
         return OfflineProvider(**self.workflow_descriptor()["config"])
+
+    def feature_support(self, model: str) -> ProviderFeatures:
+        # Attachments are acknowledged in the text; tool calls are not served.
+        return _builtin_features(self, OfflineProvider, model, text=True, tools=False,
+                                 attachments=True, image_output=self._artifacts_per_call > 0)
 
     async def complete(self, system: str, prompt: str, model: str) -> CompletionResult:
         from smythe.prompts import PLANNING_SYSTEM_PROMPT
@@ -559,11 +658,22 @@ class AnthropicProvider(Provider):
 
     SDK clients are cached per event loop (see ``_LoopClients``). A client
     assigned to ``_client`` is caller-owned and used as-is.
+
+    ``missing_usage`` decides what a response without usage costs. The
+    default, ``"zero"``, records zero tokens, which the Sentinel prices as a
+    known charge. ``"unknown"`` also marks the result's cost unknown
+    (``cost_usd_unknown``): the Sentinel then keeps the call's reservation as
+    an estimate or, without one, reports ``cost_is_complete=False``.
     """
 
-    def __init__(self, *, api_key: str | None = None, max_tokens: int = 4096) -> None:
+    _missing_usage = "zero"
+
+    def __init__(
+        self, *, api_key: str | None = None, max_tokens: int = 4096, missing_usage: str = "zero",
+    ) -> None:
         self._api_key = api_key or os.environ.get("ANTHROPIC_API_KEY", "")
         self._max_tokens = max_tokens
+        self._missing_usage = _missing_usage_mode(missing_usage)
         self._client = None
         self._loop_clients = _LoopClients()
 
@@ -580,6 +690,10 @@ class AnthropicProvider(Provider):
         if self._client is not None:
             return self._client
         return self._loop_clients.get(self._new_client)
+
+    def feature_support(self, model: str) -> ProviderFeatures:
+        return _builtin_features(self, AnthropicProvider, model, text=True, tools=True,
+                                 attachments=True, image_output=False)
 
     async def complete(self, system: str, prompt: str, model: str) -> CompletionResult:
         return await self.chat(system, [ChatMessage(role="user", content=prompt)], model)
@@ -631,12 +745,16 @@ class AnthropicProvider(Provider):
         if not isinstance(stop, str):
             stop = "tool_use" if tool_calls else "end_turn"
 
+        usage = response.usage
         return CompletionResult(
             text="\n".join(text_parts),
-            prompt_tokens=_usage_tokens(response.usage, "input_tokens"),
-            completion_tokens=_usage_tokens(response.usage, "output_tokens"),
+            prompt_tokens=_usage_tokens(usage, "input_tokens"),
+            completion_tokens=_usage_tokens(usage, "output_tokens"),
             tool_calls=tool_calls,
             stop_reason=stop,
+            cost_usd_unknown=_usage_unknown(
+                self._missing_usage, usage, "input_tokens", "output_tokens",
+            ),
         )
 
     @staticmethod
@@ -696,7 +814,11 @@ class OpenAIProvider(Provider):
 
     Pass ``base_url`` to target any OpenAI-compatible endpoint —
     Ollama (http://localhost:11434/v1), LM Studio, vLLM, etc.
+    ``missing_usage`` works as on :class:`AnthropicProvider`; compatible
+    endpoints often omit usage.
     """
+
+    _missing_usage = "zero"
 
     def __init__(
         self,
@@ -706,6 +828,7 @@ class OpenAIProvider(Provider):
         base_url: str | None = None,
         request_timeout_s: float | None = None,
         max_retries: int | None = None,
+        missing_usage: str = "zero",
     ) -> None:
         if request_timeout_s is not None and (
             isinstance(request_timeout_s, bool)
@@ -720,6 +843,7 @@ class OpenAIProvider(Provider):
             or max_retries < 0
         ):
             raise ValueError("max_retries must be a non-negative integer")
+        self._missing_usage = _missing_usage_mode(missing_usage)
         self._api_key = api_key or os.environ.get("OPENAI_API_KEY", "")
         self._max_tokens = max_tokens
         self._base_url = base_url or os.environ.get("OPENAI_BASE_URL") or None
@@ -752,6 +876,10 @@ class OpenAIProvider(Provider):
         if self._client is not None:
             return self._client
         return self._loop_clients.get(self._new_client)
+
+    def feature_support(self, model: str) -> ProviderFeatures:
+        return _builtin_features(self, OpenAIProvider, model, text=True, tools=True,
+                                 attachments=True, image_output=False)
 
     async def complete(self, system: str, prompt: str, model: str) -> CompletionResult:
         return await self.chat(system, [ChatMessage(role="user", content=prompt)], model)
@@ -828,6 +956,9 @@ class OpenAIProvider(Provider):
             completion_tokens=_usage_tokens(usage, "completion_tokens"),
             tool_calls=tool_calls,
             stop_reason=stop,
+            cost_usd_unknown=_usage_unknown(
+                self._missing_usage, usage, "prompt_tokens", "completion_tokens",
+            ),
         )
 
     @staticmethod
@@ -1004,6 +1135,14 @@ class OpenAIImageProvider(OpenAIProvider):
     def requires_explicit_budget_estimate(self, model: str) -> bool:
         return True
 
+    def feature_support(self, model: str) -> ProviderFeatures:
+        # The prompt is sent as image instructions; the reply text only
+        # describes the generated images.
+        return _builtin_features(
+            self, OpenAIImageProvider, model, model_supported=model.lower().startswith("gpt-image-"),
+            text=False, tools=False, attachments=False, image_output=True,
+        )
+
     async def chat(
         self,
         system: str,
@@ -1094,7 +1233,13 @@ class GeminiProvider(Provider):
     ``cost_per_image_usd`` to bill those calls per image instead of the
     Sentinel's blended token rate — image models price output per image,
     which token math badly underestimates.
+
+    ``missing_usage`` works as on :class:`AnthropicProvider` for responses
+    without images. A response with images keeps its per-call ceiling or
+    per-image cost, which does not come from usage.
     """
+
+    _missing_usage = "zero"
 
     # Finish reasons for a response that Gemini's safety, recitation or
     # content policies stopped; they become the "content_filter" stop reason.
@@ -1112,7 +1257,9 @@ class GeminiProvider(Provider):
         cost_per_image_usd: float | None = None,
         max_cost_per_call_usd: float | None = None,
         image_config: dict | None = None,
+        missing_usage: str = "zero",
     ) -> None:
+        self._missing_usage = _missing_usage_mode(missing_usage)
         self._api_key = api_key or os.environ.get("GOOGLE_API_KEY", "")
         self._max_tokens = max_tokens
         self._response_modalities = response_modalities
@@ -1154,9 +1301,17 @@ class GeminiProvider(Provider):
         return self._max_cost_per_call_usd
 
     def requires_explicit_budget_estimate(self, model: str) -> bool:
+        return self._requests_images(model)
+
+    def _requests_images(self, model: str) -> bool:
+        """Whether a request for *model* can return images."""
         if self._response_modalities is not None:
             return any(str(item).upper() == "IMAGE" for item in self._response_modalities)
         return any(hint in model.lower() for hint in ("image", "banana"))
+
+    def feature_support(self, model: str) -> ProviderFeatures:
+        return _builtin_features(self, GeminiProvider, model, text=True, tools=True,
+                                 attachments=True, image_output=self._requests_images(model))
 
     def _new_client(self):
         try:
@@ -1279,6 +1434,10 @@ class GeminiProvider(Provider):
             stop = "incomplete"
 
         usage = response.usage_metadata
+        if cost_usd is None:
+            cost_usd_unknown = _usage_unknown(
+                self._missing_usage, usage, "prompt_token_count", "candidates_token_count",
+            )
         # The SDK can set token-count attributes to None (observed on
         # image-only responses), so coerce before arithmetic downstream.
         return CompletionResult(

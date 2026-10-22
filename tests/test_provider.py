@@ -242,6 +242,143 @@ def test_gemini_provider_empty_text():
 
 
 # ---------------------------------------------------------------------------
+# Missing usage: zero tokens by default, unknown cost when opted in
+# ---------------------------------------------------------------------------
+
+
+def _usage_less_text_provider(kind, usage, **kwargs):
+    """A legacy SDK provider whose text response carries ``usage``."""
+    from unittest.mock import AsyncMock, MagicMock
+
+    response = MagicMock()
+    client = MagicMock()
+    if kind == "anthropic":
+        provider = AnthropicProvider(api_key="fake", **kwargs)
+        response.content, response.stop_reason, response.usage = [], "end_turn", usage
+        client.messages.create = AsyncMock(return_value=response)
+    elif kind == "openai":
+        provider = OpenAIProvider(api_key="fake", **kwargs)
+        response.choices, response.usage = [], usage
+        client.chat.completions.create = AsyncMock(return_value=response)
+    else:
+        provider = GeminiProvider(api_key="fake", **kwargs)
+        response.text, response.candidates, response.function_calls = "text", [], None
+        response.prompt_feedback, response.usage_metadata = None, usage
+        client.aio.models.generate_content = AsyncMock(return_value=response)
+    provider._client = client
+    return provider
+
+
+_USAGE_FIELDS = {
+    "anthropic": ("input_tokens", "output_tokens"),
+    "openai": ("prompt_tokens", "completion_tokens"),
+    "gemini": ("prompt_token_count", "candidates_token_count"),
+}
+
+
+def _usage(kind, prompt, completion):
+    from types import SimpleNamespace
+
+    first, second = _USAGE_FIELDS[kind]
+    return SimpleNamespace(**{first: prompt, second: completion})
+
+
+@pytest.mark.parametrize("kind", sorted(_USAGE_FIELDS))
+def test_missing_usage_counts_as_zero_tokens_by_default(kind):
+    for usage in (None, _usage(kind, None, None)):
+        provider = _usage_less_text_provider(kind, usage)
+        result = asyncio.run(provider.complete("sys", "prompt", "model"))
+        assert (result.prompt_tokens, result.completion_tokens) == (0, 0)
+        assert result.cost_usd is None and not result.cost_usd_unknown
+
+
+@pytest.mark.parametrize("kind", sorted(_USAGE_FIELDS))
+@pytest.mark.parametrize("counts", [None, (None, 5), (7, None)],
+                         ids=["absent", "no-prompt-count", "no-completion-count"])
+def test_opted_in_provider_records_missing_usage_as_unknown_cost(kind, counts):
+    usage = None if counts is None else _usage(kind, *counts)
+    provider = _usage_less_text_provider(kind, usage, missing_usage="unknown")
+    result = asyncio.run(provider.complete("sys", "prompt", "model"))
+    # The counts the response did report are kept; the charge is unknown,
+    # not a known zero.
+    assert result.total_tokens == sum(count or 0 for count in counts or ())
+    assert result.cost_usd is None and result.cost_usd_unknown
+
+
+@pytest.mark.parametrize("kind", sorted(_USAGE_FIELDS))
+def test_opted_in_provider_with_reported_usage_records_a_known_cost(kind):
+    for prompt, completion in ((10, 5), (0, 0)):
+        provider = _usage_less_text_provider(
+            kind, _usage(kind, prompt, completion), missing_usage="unknown",
+        )
+        result = asyncio.run(provider.complete("sys", "prompt", "model"))
+        assert result.total_tokens == prompt + completion
+        assert not result.cost_usd_unknown
+
+
+@pytest.mark.parametrize("value", ["ignore", "", None, True, "Unknown"])
+@pytest.mark.parametrize("provider_class", [AnthropicProvider, OpenAIProvider, GeminiProvider])
+def test_missing_usage_accepts_only_zero_or_unknown(provider_class, value):
+    with pytest.raises(ValueError, match="missing_usage"):
+        provider_class(api_key="fake", missing_usage=value)
+
+
+def test_missing_usage_option_never_marks_image_costs():
+    response = _image_response(images=1)
+    response.usage_metadata = None
+    bounded = _gemini_with_response(response, max_cost_per_call_usd=0.06, missing_usage="unknown")
+    result = asyncio.run(bounded.complete("sys", "prompt", "gemini-2.5-flash-image"))
+    # The configured whole-call ceiling is the recorded cost, as without the option.
+    assert result.cost_usd == pytest.approx(0.06) and result.cost_usd_is_estimate
+    assert not result.cost_usd_unknown
+    # GPT Image calls are priced by their ceiling and take no such option.
+    with pytest.raises(TypeError):
+        OpenAIImageProvider(api_key="fake", missing_usage="unknown")
+
+
+@pytest.mark.parametrize("missing_usage,complete", [("zero", True), ("unknown", False)])
+def test_run_with_missing_usage_reports_incomplete_cost_only_when_opted_in(missing_usage, complete):
+    from smythe.graph import ExecutionGraph, Node, Topology
+
+    provider = _usage_less_text_provider("openai", None, missing_usage=missing_usage)
+    graph = ExecutionGraph([Topology.SERIAL], [Node(id="draft", label="Draft")])
+    result = Swarm(model="gpt-test", provider=provider, artifact_dir=None).execute(graph)
+    assert result.total_cost_usd == 0.0
+    assert result.cost_is_complete is complete
+    assert (graph.nodes[0].metadata.get("cost_usd_unknown") is True) is not complete
+
+
+def test_parallel_run_keeps_the_reservation_of_a_call_without_usage():
+    from smythe.graph import ExecutionGraph, Node, Topology
+
+    provider = _usage_less_text_provider("anthropic", None, missing_usage="unknown")
+    graph = ExecutionGraph([Topology.SERIAL], [Node(id="draft", label="Draft")])
+    result = Swarm(model="claude-test", provider=provider, artifact_dir=None, parallel=True,
+                   max_budget_usd=1).execute(graph)
+    # The reservation made before the call stands in for its unknown cost,
+    # as for any provider that reports an unknown cost, so the total stays
+    # complete.
+    assert result.total_cost_usd > 0 and result.cost_contains_estimates
+    assert result.cost_is_complete
+    assert graph.nodes[0].metadata["cost_usd_unknown"] is True
+
+
+def test_serial_node_estimate_stands_in_for_a_call_without_usage():
+    from smythe.graph import ExecutionGraph, Node, Topology
+
+    provider = _usage_less_text_provider("gemini", None, missing_usage="unknown")
+    graph = ExecutionGraph([Topology.SERIAL], [
+        Node(id="draft", label="Draft", metadata={"estimated_cost_usd": 0.02}),
+    ])
+    result = Swarm(model="gemini-test", provider=provider, artifact_dir=None,
+                   max_budget_usd=1).execute(graph)
+    # Serial execution reserves a node's own estimate, which then stands in
+    # for the unknown cost.
+    assert result.total_cost_usd == pytest.approx(0.02)
+    assert result.cost_contains_estimates and result.cost_is_complete
+
+
+# ---------------------------------------------------------------------------
 # Tool-aware chat()
 # ---------------------------------------------------------------------------
 

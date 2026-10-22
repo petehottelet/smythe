@@ -30,7 +30,8 @@ When `check` fails `draft`, the executor records the rejection, cancels and
 awaits affected active work, then resets `draft` **and everything downstream
 of it** to pending. Regeneration starts after that reset is saved. Completed
 charges remain recorded; outputs and artifact references from the rejected
-generation are cleared.
+generation are cleared. Under a [strict acceptance policy](#rejected-generations)
+a bounded record of each cleared generation is kept instead.
 
 A [supervisor](supervisor.md#what-a-revision-may-change) cannot revise a gate
 away: a revision that drops `check` or `draft`, rewires `check` without
@@ -39,7 +40,9 @@ keeping `draft` among its dependencies, or rewires another step so that
 add a step after `draft`. The gate does not judge that step, and under
 `DELIVERABLE` synthesis a step that depends on `draft` becomes the returned
 output instead of `draft`
-([steps added after a gate](supervisor.md#steps-added-after-a-gate)).
+([steps added after a gate](supervisor.md#steps-added-after-a-gate)). A
+[strict acceptance policy](#strict-delivery-acceptance) accepts such output
+only through a final validator, and without one refuses the revision.
 
 ## Recovery and concurrent work
 
@@ -156,7 +159,17 @@ triggers at most `max_regenerations` send-backs; after that, the run
 finishes with the last output rather than stopping. A gate with
 `max_regenerations=0` is advisory and its verdict is never read. Ask the
 judge for JSON, or for a single PASS or FAIL on its own line, so that a
-readable verdict is the norm.
+readable verdict is the norm. Under a [strict acceptance
+policy](#strict-delivery-acceptance) the final verdict is read and recorded
+in both cases.
+
+A verdict that fails because no verdict could be read, rather than because
+the reply states FAIL, is marked `invalid` (`Verdict.invalid`): an empty,
+overlong or unreadable reply, an invalid or contradictory JSON verdict,
+disagreeing verdicts, or a reply with no standalone verdict. Only a JSON
+`"passed": false` or a stated FAIL with no PASS beside it is a valid
+rejection. The mark changes nothing for an ordinary gate and does not take
+part in comparing verdicts.
 
 ## Gating without a model
 
@@ -178,21 +191,524 @@ The function decides the gate only through an explicit bool. It may return:
 - a `Verdict(passed=..., reason=...)` whose `passed` is a bool, when you want
   the reason recorded in the trace; or
 - an object with a bool `passed` attribute, such as a
-  `smythe.assets.ValidationReport`. Its `reason` or `summary` string becomes
-  the verdict's reason; a failing report without either lists up to four of
-  its hard findings as `code: message`.
+  [`ValidationReport`](#validation-reports). Its `reason` or `summary` string
+  becomes the verdict's reason; a failing report without either lists up to
+  four of its hard findings as `code: message`. A report whose `outcome` is
+  `"error"` could not decide, so its reason is `validator error`, followed by
+  the report's validator name in parentheses and up to four of its findings
+  when it has them: `validator error (required-section): unreadable: output
+  is not UTF-8`.
 
 Anything else **fails** the gate, with a reason that names the returned type
 (`verifier returned str`). The string `"FAIL"`, a non-empty list of
 findings, `None`, `1`, a NumPy boolean, and a `passed` that is not a bool are
 not verdicts, so return `bool(...)` when a check produces another type. The
 function is called synchronously: an `async def` function's coroutine is
-closed without running, and the gate fails.
+closed without running, and the gate fails. These results, and a report
+whose `outcome` is `error`, give a verdict marked `invalid`.
+
+`smythe.design.design_verifier(system, width=..., height=...)` is a ready-made
+objective gate for images. It reads each file the judged node wrote once,
+fails a file that is missing, unreadable or no longer holds the bytes whose
+`sha256` its record carries, and fails blank frames, wrong dimensions and
+near-duplicates; palette and flat-region findings block only with
+`include_advisory=True`. A node without files passes unless
+`require_artifacts=True`, which a gate on an image deliverable should set.
+The palette is checked when the verifier is built, and the verifier's
+`identity` is a `ValidatorIdentity` named `smythe.design` whose version and
+configuration digest cover its settings and detector thresholds.
 
 The executor holds every `Verifier` to the same rule: a verdict passes only
 when its `passed` is exactly `True`. A custom verifier's
 `Verdict(passed="false")` or `Verdict(passed=1)` is a failed verdict, and the
 regeneration span records `verdict 'passed' must be a bool`.
+
+### Validation reports
+
+`smythe.validation` defines `ValidationReport`, `ValidationFinding` and
+`FindingSeverity` without importing an image library; `smythe.assets`
+re-exports the same classes for image validation. A report's `outcome` is
+`passed`, `rejected` or `error`:
+
+- Without a stated outcome, a report with no hard findings is `passed` and
+  one with any hard finding is `rejected`. Advisory findings never decide it.
+- A validator that could not decide states `outcome="error"`. An `error`
+  report never passes, so as a gate result it fails.
+- A stated outcome must agree with the findings: a `passed` report has no
+  hard findings and a `rejected` report has at least one.
+- `dataclasses.replace(report, findings=...)` derives an outcome that was not
+  stated again from the new findings, and checks a stated outcome against
+  them. A report read with `from_dict()` states the outcome its data records.
+
+`smythe.assets.validate_image(path, spec, ...)` reads the file once and checks
+that snapshot, so the bytes hashed for a finishing receipt are the bytes
+decoded. `validate_image_bytes(data, spec, ...)` does the same for bytes
+already in memory; it resolves a relative logo or font path only against an
+explicit `base_dir` and otherwise reports the master unavailable, where
+`validate_image` falls back to the working directory.
+
+`report.validator` optionally holds a `ValidatorIdentity`: the validator's
+name, version and `config_sha256`, the SHA-256 of its configuration as
+canonical JSON (`ValidatorIdentity.for_config(name, version, config)` computes
+it). `to_dict()` and `from_dict()` convert reports, findings and identities to
+and from JSON data; a tuple in a finding's `expected` or `observed` value
+becomes a JSON array, and `from_dict()` rejects unknown keys and outcomes.
+
+### Gate validators in durable workflows
+
+A [durable text workflow](workflow-accounting.md) accepts no `CallableVerifier`,
+because its function has no version a saved run could be checked against.
+Declare a validator instead, and pass the declaration as `verifier`:
+
+```python
+from smythe import LocalOnly, Swarm
+
+sources = LocalOnly(lambda: RequiredSection("## Sources"), "required-section", "1",
+                    role="validator")
+swarm = Swarm(run_store=store, verifier=sources, ...)
+```
+
+`RequiredSection` is the validator shown under
+[delivery acceptance records](#delivery-acceptance-records). The factory
+builds a fresh validator for each run; its `ValidatorIdentity` must have the
+declared name and version. Each gate then passes when the validator's report
+on the exact text of the node it judges is `passed`, and fails with the
+report's hard findings when it is `rejected`. A validator that raises, returns
+anything but its own `ValidationReport` or reports `error` could not decide:
+the gate ends at once without a verdict, its receipt consumed with `outcome`
+`error`, so it spends no regeneration and buys no further judge call, with or
+without a strict policy. The run continues with the judged output, which a
+strict policy decides `on_invalid`. The gate node still runs and makes its
+provider call; only the verdict comes from the validator.
+
+The declaration refuses a `Provider`, a coroutine function or an awaitable as
+the factory, and refuses what the factory builds when it is a provider, an
+awaitable, a class, an object without a synchronous `validate()` or one whose
+identity has another name or version. The run's recipe records
+`"verifier": "validator-v1"` and the validator's name, version and
+`config_sha256` under `validators`, so resuming the run with another
+validator, version or configuration raises `WorkflowConflictError` before any
+call. Recipes without a validator keep their bytes. An ordinary `Swarm`
+refuses a `LocalOnly` verifier with `TypeError`; there, a `CallableVerifier`
+whose function returns
+`validator.validate(ValidationSubject.from_text(target.result))` runs the
+same check.
+
+## Delivery acceptance records
+
+A gate decides whether one node's output may move on. Delivery acceptance
+decides whether the run's delivered output is accepted, and is reported apart
+from execution and cost. `smythe.acceptance` defines its types:
+
+- `AcceptancePolicy()` is advisory: gates advise, as described above, and no
+  record is made. `AcceptancePolicy(mode="strict", ...)` takes
+  `final_validators`, which check the exact delivered bytes;
+  `allow_gate_acceptance` (default `True`), which lets a passed gate you
+  supplied accept output that is byte for byte its target's result;
+  `allow_generated_gates` (default `False`), which lets a gate that a
+  generated plan or a supervisor revision added do the same
+  ([which gates count](#which-gates-count)); `on_exhausted`
+  (`"rejected"`, or `"needs_review"`) for an exhausted gate whose final
+  verdict fails; and `on_invalid` (`"indeterminate"`, or `"needs_review"`)
+  for a missing, malformed or erroring verdict. An advisory policy refuses
+  these settings, and so does a strict policy that could never accept.
+  `policy.to_dict()` lists validator identities sorted by name, never code,
+  and includes `allow_generated_gates` only when it is set;
+  `policy.sha256` hashes it.
+- `DeliveryAcceptance` is the versioned record of one decision:
+  `not_evaluated`, `accepted`, `rejected`, `needs_review` or `indeterminate`.
+  It binds the SHA-256 of the delivered bytes, the synthesis strategy, the
+  source nodes and their generations, the task and policy hashes, and each
+  validator's outcome. Checkpoints and JSON keep it under
+  `delivery_acceptance`; the [checkpoint format](checkpoint-format.md#delivery-acceptance-version-5)
+  lists its fields.
+- A validator is trusted local code: an object with an `identity`
+  (`ValidatorIdentity`) and a synchronous `validate(subject)` that returns a
+  `ValidationReport`, with `outcome="error"` when it cannot decide. `subject`
+  is a `ValidationSubject`: the exact bytes, their `sha256` and `text()`.
+  Registration refuses a `Provider`, a class, a coroutine function, an
+  awaitable and an `async def validate`, including a `validate` object whose
+  `__call__` is async. That structural check enforces a caller contract; it
+  is not a sandbox. It cannot see a synchronous `validate()` that makes
+  network requests or paid calls, which a validator must not do.
+
+```python
+from smythe import AcceptancePolicy, ValidationReport, ValidatorIdentity
+from smythe.validation import hard_finding
+
+class RequiredSection:
+    def __init__(self, heading):
+        self.heading = heading
+        self.identity = ValidatorIdentity.for_config(
+            "required-section", "1", {"heading": heading},
+        )
+
+    def validate(self, subject):
+        if self.heading in subject.text():
+            return ValidationReport("output", validator=self.identity)
+        missing = hard_finding("section_missing", f"no {self.heading!r} section")
+        return ValidationReport("output", (missing,), validator=self.identity)
+
+policy = AcceptancePolicy(mode="strict", final_validators=[RequiredSection("## Sources")])
+```
+
+The [built-in final validators](#built-in-final-validators) check required
+sections, length bounds and JSON paths without a class of your own.
+
+`SwarmResult.acceptance` holds the record, or `None` when there is none.
+`SwarmResult.accepted` is true only for an `accepted` record. When a record
+exists and does not accept, `output` is `""` and the text is in
+`rejected_output`. `SwarmResult.to_dict()` returns the result as JSON data
+with the record under `delivery_acceptance`, and the `execution`, `delivery`,
+`unknown_exposure` and `next_action` blocks that
+[`smythe runs inspect`](runs.md) reports for a saved run. Advisory and legacy
+runs have
+`acceptance=None`; a run under a [strict policy](#strict-delivery-acceptance)
+always has a record, and a strict `Swarm` withholds the output of a completed
+run resumed without one. `PlannerMemory` stores the record's decision as
+`acceptance`, or `not_evaluated` without one. Jobs run the same validator
+objects on artifact bytes when a manifest names them; see
+[registered validators](jobs.md#registered-validators).
+
+## Strict delivery acceptance
+
+```python
+from smythe import AcceptancePolicy, Swarm
+
+policy = AcceptancePolicy(mode="strict", final_validators=[RequiredSection("## Sources")])
+swarm = Swarm(acceptance=policy, ...)
+result = swarm.execute(task)
+if result.accepted:
+    publish(result.output)
+else:
+    print(result.acceptance.decision, result.acceptance.reasons)
+```
+
+[`examples/15_strict_acceptance.py`](../examples/15_strict_acceptance.py) runs
+this offline: a draft passes its gate, a later step drops the required
+section, and the strict run keeps the defective text as `rejected_output`.
+
+`Swarm(acceptance=...)` and `Swarm.from_yaml(..., acceptance=...)` take the
+policy. It comes only from that argument: a YAML file, a graph, a `Task`, a
+generated plan or a supervisor revision cannot set or weaken it. `None`, the
+default, and `AcceptancePolicy()` keep the behavior described above. Strict
+acceptance runs on ordinary runs and on
+[durable text workflows](#strict-acceptance-in-durable-workflows).
+
+**The delivered output decides.** After synthesis, the run decides on exactly
+the text it delivers, as UTF-8 bytes. Every final validator runs once on those
+bytes as local code, with no provider call and no graph node, and every gate
+in the graph is read from its recorded final verdict. The decision is:
+
+1. `rejected` when a final validator rejects the output. A final rejection is
+   terminal: nothing is regenerated.
+2. Otherwise `on_exhausted` when a gate's final verdict fails.
+3. Otherwise `on_invalid` when a final validator or a gate could not decide,
+   or a delivered node wrote files that no check covers (see below).
+4. Otherwise `accepted` when every final validator passed, or, without final
+   validators and with `allow_gate_acceptance`, when the output is byte for
+   byte the result of the one node `DELIVERABLE` synthesis returned and a
+   gate that [counts](#which-gates-count) passed that node at its current
+   generation.
+5. Otherwise `on_invalid`: no check covers the delivered output.
+
+A gate therefore accepts only the node it judged. A later step, including one
+a supervisor adds after the gated node, two deliverable nodes, the
+`DELIVERABLE` fallback to every completed node, and `CONCATENATE`,
+`STRUCTURED`, `LLM_MERGE` or a custom synthesizer all need a final validator.
+A `Swarm` whose strict policy has none raises `ValueError` when it is built
+with a synthesis other than `DELIVERABLE`, and refuses the other cases
+[before any call](#acceptance-obligations).
+
+<a id="which-gates-count"></a>
+**Which gates count.** Acceptance criteria are inputs you control, so a gate
+accepts output on its own only when you supplied it: in a graph you pass to
+`execute()` or load from YAML, in a plan that a `DeterministicArchitect`
+builds or a `ConstrainedArchitect` composes from your templates, or, in a
+durable run, in a plan that a `LocalOnly` architect builds in local code. A
+strict `Swarm` marks each gate of a plan that any other architect, such as
+`LLMArchitect`, generates with `generated_gate: true` in its metadata, and
+`apply_revision` marks every node a supervisor revision adds with
+`added_by_revision: true`. A passed verdict from such a gate does not accept
+the output: without a final validator the decision is `on_invalid`. Set
+`allow_generated_gates=True` to count them as well. Their failing verdicts
+always count. A plan made by a `Swarm` without a strict policy carries no
+mark, so a graph you take from it and pass to a strict `Swarm` counts as
+yours.
+
+<a id="acceptance-obligations"></a>
+**Obligations checked before any call.** A strict run that could never
+decide its output is refused with `ValueError` before it spends anything.
+`smythe.acceptance.validate_acceptance_obligations(graph, policy,
+strategy="deliverable")` reads the graph's structure, not its results, and
+lists every unmet obligation:
+
+- a gate that verifies itself or a node that is not in the graph, or that
+  does not depend on the node it verifies, directly or through other nodes,
+  and so could judge it before it runs;
+- a gate with `FailurePolicy.SKIP`, which would leave it without a verdict
+  when its judge fails;
+- without final validators, a delivered output that no counted gate covers:
+  `DELIVERABLE` synthesis must deliver exactly one node, and a gate that
+  counts must judge it.
+
+A strict `Swarm` checks a graph you pass to `execute()` or load from YAML
+before any provider call, and a generated plan after planning, before any
+node runs. Without final validators or `allow_generated_gates`, it refuses
+before planning a run whose architects all generate their gates, such as the
+default `LLMArchitect`, because no gate of that plan could accept; `plan()`
+still returns the graph for inspection, and executing it is refused. A
+[supervisor revision](supervisor.md#steps-added-after-a-gate) that would
+break an obligation the graph met is refused like any invalid revision. A
+resumed run is not checked again: its graph met the obligations when it
+started. A [durable run](#strict-acceptance-in-durable-workflows) applies
+the same checks at the same points.
+
+A final validator that raises, returns an awaitable or anything other than a
+`ValidationReport`, reports `outcome="error"`, or returns a report naming
+another validator has outcome `error`.
+
+**Files a delivered node wrote.** Final validators check only the output text.
+A delivered node's files are covered when a passed gate that the policy
+counts judged that node at its current generation, such as
+[`design_verifier(require_artifacts=True)`](#gating-without-a-model). Each file's
+record must carry the `sha256` and `size_bytes` written with it, and the file
+must still hold exactly those bytes when the run decides. A file that is not
+hashed, is missing or has changed, or files that no passed gate on their node
+covers, give `on_invalid` unless an earlier rule applies. The record binds
+every verified file under `artifacts` by name, SHA-256, size and MIME type.
+
+**Gates under a strict policy.** A valid rejection before exhaustion
+regenerates as usual. The judge's last verdict is then read, without another
+call, and recorded in its consumed receipt with `outcome` (`passed`,
+`rejected` or `error`), `passed`, `reason` and, for an exhausted failing
+verdict, `exhausted: true`; that verdict decides `on_exhausted` (`rejected`
+by default, or `needs_review`). A verdict marked `invalid`, a `passed` that is
+not a bool, a result that is not a `Verdict`, and a verifier that raises have
+outcome `error`: the receipt is consumed at once, no regeneration is spent,
+the run continues, and the decision is `on_invalid` (`indeterminate` by
+default, or `needs_review`). A gate with `max_regenerations=0` is read once
+when its judge completes and its verdict recorded under `advisory_verdict`
+in the judge's metadata; a failing verdict counts as exhausted. A judge that
+was skipped or failed, or whose target was unavailable, leaves the gate
+undecided. Each recorded verdict names the judge's and its target's
+generations, and regeneration clears it.
+
+Only a verdict the run's own judges produce decides it. Each attempt of a
+judge replaces the verdict record it carries, so the record holds that
+attempt's verdict even when a graph is run again or a YAML file sets the
+metadata. A judge that completed before a fresh run does not run again, so a
+strict `Swarm` refuses with `ValueError`, before any provider call, a graph in
+which any judge has already completed: whether it holds a consumed or pending
+receipt, an `advisory_verdict`, a bound `verification_target_generation` or
+only an earlier reply, the run would decide on a verdict it did not produce.
+Resume the run's checkpoint, or set the judge back to pending so it judges
+its target in the run. Without a strict policy none of this changes:
+an exhausted or advisory gate's verdict is never read and a verifier that
+raises stops the run.
+
+**Results and recovery.** A strict run's result always carries its record: an
+accepted result has the exact text in `output`; any other decision returns
+normally with `output=""` and the text in `rejected_output`. Every checkpoint
+of a strict run is [version 5](checkpoint-format.md#delivery-acceptance-version-5)
+and carries the record, `not_evaluated` until the run finishes. An unfinished
+strict run resumes only under a policy with the same `sha256`, and is refused
+before any provider call otherwise; a strict `Swarm` refuses an unfinished
+checkpoint written without one. Resuming a completed strict run checks the
+saved output against the record's digest, re-hashes every file the record
+binds, and checks the task, source generations and, when the resuming `Swarm`
+has a strict policy, its `sha256` against the record; any mismatch returns an
+`indeterminate` record for the saved output, never acceptance.
+
+A completed checkpoint without a record (versions 1 to 4, or version 5
+without `delivery_acceptance` in `requires`) was never decided. A `Swarm`
+without a strict policy returns its text in `output`, as before. A strict
+`Swarm` withholds it: the result has `output=""`, the saved text in
+`rejected_output` and `acceptance=None`, and a warning on the `smythe.swarm`
+logger says how to obtain a decision. Re-run the task under the strict
+policy, or decide the saved output yourself with
+`evaluate_delivery(policy, result.graph, result.rejected_output, ...)`. The
+checkpoint is not changed.
+
+The trace gains one span with `node_id` `acceptance:delivery`, status
+`acceptance_<decision>` and the first reason as its label; `Tracer.summary()`
+keys are unchanged, and the validators' time counts as verification in
+[`SwarmResult.timing`](execution.md#timing).
+`smythe.acceptance.evaluate_delivery(policy, graph, output, strategy=...,
+sources=...)` makes the same decision outside a run, and
+`smythe.synthesizer.deliverable_sources(graph)` returns the nodes
+`DELIVERABLE` synthesis delivers and whether it fell back.
+
+## Built-in final validators
+
+`TextValidator` and `JSONValidator` (in `smythe.validators`, also exported
+from `smythe`) are final validators configured by a specification: JSON data
+that versioned library code interprets. A validator's `identity` is its name,
+the version of that code (`"1"`), and the SHA-256 of its specification with
+every default filled in, so a policy's `sha256` and each acceptance record pin
+the exact checks; `validator.spec` returns that specification. Both run
+locally with no provider call and report `rejected`, never `error`, for output
+that fails a check, including bytes that are not UTF-8. An invalid
+specification raises `ValueError` when the validator is built: an unknown key
+or kind, a missing key, a character count outside 0 to 1,000,000,000 or a
+check's count outside 0 to 10,000, a non-finite number, or a repeated section
+or check id. `name=` renames a validator, so that one policy
+can hold two of the same kind; a policy refuses two validators with one name.
+
+```python
+from smythe import AcceptancePolicy, JSONValidator, Swarm, TextValidator
+
+complete = TextValidator({"sections": ["Argument", "Critique"], "max_chars": 12_000})
+swarm = Swarm(acceptance=AcceptancePolicy(mode="strict", final_validators=[complete]), ...)
+```
+
+**Text.** `TextValidator(spec)`, named `smythe.text-spec`, takes these keys,
+each optional:
+
+| Key | Default | Requires |
+|---|---|---|
+| `min_chars` | `1` | at least this many characters after surrounding whitespace is removed, so empty output fails |
+| `max_chars` | `None` | at most this many characters, when set |
+| `sections` | `[]` | each listed heading, as a Markdown ATX heading (`#` to `######`) outside fenced code, at any level |
+| `ordered` | `true` | the sections in the listed order; other headings may come between them |
+| `min_section_chars` | `1` | at least this many characters in each required section, up to the next heading at its level or above |
+
+Headings compare ignoring case, spacing, `*` and `_` emphasis and a final
+colon, so `## **Critique:**` is the section `Critique`; a bold line or a
+heading inside a code block is not a heading. A section may be written as a
+heading line, such as `## Sources`: its `#` marker and the spaces around it
+are removed when the validator is built, so `spec` lists `Sources` and a
+heading at any level satisfies it. Findings are `text_too_short`,
+`text_too_long`, `section_missing`, `section_out_of_order`, `section_empty`
+and `not_utf8`; a `section_out_of_order` finding observes each required
+heading once, in the order it first appears.
+
+A sections check is how strict acceptance holds a run to its whole
+deliverable. With the policy above, a final step that returns only its own
+increment, such as `## Critique` without the argument it critiques, fails
+with `section_missing: required section 'Argument' is missing`: the decision
+is `rejected`, `output` is `""` and the increment is in `rejected_output`.
+
+**JSON.** `JSONValidator(spec)`, named `smythe.json-spec`, requires the whole
+output to be strict JSON: a code fence around it, a repeated object key,
+`NaN`, `Infinity`, a number too large for a float, or nesting too deep for
+the interpreter to parse or compare fails with `json_invalid`, and output
+larger than `max_bytes` (default 1,048,576) with `json_too_large`. The
+nesting depth that counts as too deep depends on the Python version and the
+caller's stack; such output is rejected either way. Its `checks` (default `[]`) each have an `id` (2 to 64
+lowercase letters, digits or hyphens, starting with a letter), a `kind` and a
+`path`: a list of object keys and array indexes from the document root, `[]`
+for the root itself. A path that does not resolve fails with
+`json_path_missing`; any other failed check gives `json_check_failed`.
+
+| Kind | Other keys | Passes when the value at `path` |
+|---|---|---|
+| `present` | | exists |
+| `equals` | `expected` | equals `expected` as canonical JSON, so `1` does not equal `1.0` or `true` |
+| `number` | `expected`, `tolerance` (default 0) | is a finite number, not a bool, within `tolerance` of `expected` |
+| `nonempty` | `min_chars` (default 1) | is a string with at least `min_chars` characters after surrounding whitespace is removed |
+| `object` | `minimum` (default 1) | is an object with at least `minimum` keys |
+| `length` | `expected` | is an array or object with exactly `expected` items |
+| `keys` | `expected` | is an object whose keys are exactly `expected` |
+| `required_keys` | `expected` | is an object holding every key in `expected` |
+| `citations` | `allowed`, `minimum` (default 1) | is an array of distinct strings, each in `allowed`, with at least `minimum` of them |
+
+```python
+summary = JSONValidator({"checks": [
+    {"id": "fields", "kind": "required_keys", "path": [], "expected": ["total", "sources"]},
+    {"id": "total", "kind": "number", "path": ["total"], "expected": 41},
+    {"id": "sources", "kind": "citations", "path": ["sources"], "allowed": ["doc-1", "doc-2"]},
+]})
+```
+
+### Rejected generations
+
+Under a strict policy a regeneration keeps a record of what it discards. Each
+reset node that had produced a result or files gains an entry in the
+`rejected_generations` list in its metadata: the generation, its status, the
+judge and its reason, the SHA-256 and UTF-8 size of the result, an `excerpt`
+of its first 1,024 bytes, and the generation's artifact records with their
+digests. A longer result is written in full to a `sidecar` file beside the
+run's artifacts, such as `draft_g0_rejected.txt`, when the run has an
+`artifact_dir`. A regenerated node's files are named for its generation and
+never replace a file ([artifacts](architecture.md#artifacts-and-jobs)), so a
+record's paths still hold the bytes that were judged.
+
+Ordinary checkpoints rewrite the whole graph on every save, so the records of
+all nodes together add at most 64 KiB to a checkpoint
+(`smythe.executor_base.REJECTED_GENERATIONS_MAX_BYTES`). Past that a record
+keeps no excerpt, and one that still does not fit is not kept; the
+regeneration span in the trace still names its node. Without a strict policy
+a regeneration clears rejected results and artifact references as before. The
+[checkpoint format](checkpoint-format.md#verification-state) lists the record's
+fields.
+
+### Strict acceptance in durable workflows
+
+A `Swarm` with a durable `run_store` decides the same way, on the same
+policy, and records the decision in its journal:
+
+- **The same gates count and the same obligations hold.** The run marks each
+  gate of a generated plan `generated_gate`, in the planning result its
+  journal saves, and each node a supervisor revision adds `added_by_revision`,
+  as an ordinary run does ([which gates count](#which-gates-count)). It
+  checks the [obligations](#acceptance-obligations) before any node call: a
+  graph you pass to `execute()` before its run is created, and a generated
+  plan, or a planned graph you edit, before its first node runs. Without
+  final validators or `allow_generated_gates`, `execute()` with a task is
+  refused before the planning call when every architect that could plan
+  generates its gates. A refusal raises `ValueError`. A refused plan keeps
+  its planning charge and stays `planned`, and resuming it is refused the
+  same way. A supervisor revision that would break an obligation is refused
+  and traced, and the run continues on its plan.
+- **The policy is part of the run.** The recipe records `policy.to_dict()`
+  under `acceptance`: validator names, versions and configuration digests,
+  never code. Final validators are the policy's validator objects, registered
+  in-process as on ordinary runs. Resuming under another policy, or without
+  one, raises `WorkflowConflictError` before any call, and so does a strict
+  `Swarm` resuming a run that began without one. Gates use `TokenVerifier`
+  or a [gate validator](#gate-validators-in-durable-workflows);
+  `CallableVerifier` is refused with `WorkflowBindingError`.
+- **The decision is a journal operation.** After synthesis, an operation of
+  kind `acceptance`, keyed by the output digest and everything else the
+  record binds, runs the final validators and reads the gates, and the
+  completed checkpoint consumes it in the same transaction as the output.
+  A run stopped after synthesis and before the decision is committed decides
+  again when it resumes: the validators run on the same saved output, which
+  is never accepted for having been synthesized. A committed decision is read
+  back without running a validator or calling a provider.
+- **Checkpoints.** A run whose recipe has a strict policy or a gate validator
+  writes checkpoint version 2, which adds `delivery_acceptance`: the
+  `not_evaluated` record until the run completes, then the decision, and
+  `null` without a strict policy. Other runs still write version 1, and a
+  checkpoint whose version does not match its recipe raises
+  `WorkflowStateError`. Earlier releases cannot resume version 2 runs; they
+  already refuse their recipes.
+- **Completed runs.** Resuming a completed run checks the saved output
+  against the record's digest, the task and source generations against the
+  record, and the record against the decision the journal applied. Any
+  mismatch returns an `indeterminate` record with the saved text in
+  `rejected_output`, never acceptance. A run without a strict policy returns
+  `acceptance=None`. [`smythe runs inspect`](runs.md) makes the same checks
+  without resuming the run.
+- **Synthesis keys.** Such a run journals its synthesis under `synthesis`
+  while no node has regenerated and under `synthesis/<n>` afterwards, where
+  `n` is the sum of the nodes' generations, so synthesis for a regenerated
+  graph never replays an earlier generation's output. Other runs keep the key
+  `synthesis`.
+
+**Verdicts left pending.** A judge's receipt stays `pending` until its verdict
+is read, and resume then reads the judge's saved reply with the rules of the
+release that resumes. A pending receipt never passes unread. The rules
+[above](#reading-a-verdict) date from 0.8.1: earlier releases passed replies
+such as `the draft does not PASS` or an empty reply, while durable recipes
+kept the verifier identity `token-v1`. A receipt that such a release left
+pending is read with the current rules and fails closed, so the gate
+regenerates within its allowance. Under a strict policy an unreadable verdict
+is an `error` outcome that makes the decision `indeterminate`. Strict recipes
+name the current rules `token-v2` (`smythe.verifier.TOKEN_VERIFIER_IDENTITY`).
+A release that changes the rules changes that identity, and with it the
+recipe, so a strict run is read only with the rules it started with.
 
 ## Gating from YAML and from a generated plan
 
@@ -233,20 +749,40 @@ contain at most one gate, the gate must list the node it verifies in
 `depends_on`, and it may set `max_regenerations` to at most 2. A plan
 that breaks these rules is rejected and the planner asks the model for a
 corrected plan. Graphs you write in Python or YAML may declare several
-gates.
+gates. Under a strict acceptance policy a generated plan's gate still
+regenerates and can reject, but does not accept output on its own
+([which gates count](#which-gates-count)).
 
 The verifier's verdict is never the deliverable: `DELIVERABLE`
 synthesis excludes verifier nodes, so a gated run returns the artefact
 rather than the "PASS" that approved it.
 
+### The final step
+
+The executor tells each node whose output `DELIVERABLE` synthesis returns, when
+it has dependencies, that it is the final step: its output is the deliverable
+and must carry forward everything the task asked for, not only its own
+contribution. Prompts follow the same rule as that synthesis. A judge is never
+told it is the final step, and its edge to the node it verifies does not count,
+so in a draft-to-judge graph the draft receives the instruction. A step that
+depends on the draft is the final step instead. A step that depends only on
+the judge leaves the draft deliverable, so both are final steps and
+`DELIVERABLE` synthesis returns both. Executors take a keyword-only
+`prompt_assembly`; `1` restores the earlier placement, which counted the
+judge's edge and so told a judge that nothing depends on, rather than the
+draft, that it was the final step.
+[Durable text workflows](workflow-accounting.md#recovery-boundaries) keep the
+earlier placement.
+
 ## Cost
 
 A gate node is executed like any other node: it makes a provider call. When
 the gate has `max_regenerations` above 0, the verifier then computes the
-verdict from that call's result. A durable workflow, which accepts only
-`TokenVerifier`, journals the call in the `verification` phase. A
-`CallableVerifier` replaces only the verdict computation, so an objective gate
-still pays for its node's call, and again after each regeneration.
+verdict from that call's result. A durable workflow, which accepts
+`TokenVerifier` or a [gate validator](#gate-validators-in-durable-workflows),
+journals the call in the `verification` phase. A `CallableVerifier` or a
+validator replaces only the verdict computation, so an objective gate still
+pays for its node's call, and again after each regeneration.
 
 Regeneration buys another provider call, so it is bounded per verifier
 by `max_regenerations` (default `0`, which makes the verdict advisory

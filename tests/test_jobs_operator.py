@@ -772,3 +772,37 @@ def test_attachment_uses_observation_clock_before_receipt_read_delay(journal, mo
     monkeypatch.setattr(operator.time, "time_ns", lambda: 200)
     result = operator.attach_job(journal.path, "run", timeout_s=0)
     assert result["attachment"]["state"] == "timeout" and result["attachment"]["lease_active"]
+
+
+def test_receipt_read_retries_a_transient_windows_sharing_violation(tmp_path, monkeypatch):
+    path = tmp_path / "finished.json"
+    path.write_text(json.dumps({"version": 1}), encoding="utf-8")
+    real_open = Path.open
+    failures = []
+
+    def flaky_open(self, *args, **kwargs):
+        if self == path and len(failures) < 2:
+            failures.append(1)
+            raise PermissionError(13, "Permission denied", str(self))
+        return real_open(self, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "open", flaky_open)
+
+    assert operator._read_json(path) == {"version": 1}
+    assert len(failures) == 2
+
+
+def test_receipt_read_gives_up_on_a_persistent_permission_error(tmp_path, monkeypatch):
+    path = tmp_path / "finished.json"
+    path.write_text("{}", encoding="utf-8")
+    clock = iter(range(0, 1000, 1))
+
+    def denied(self, *args, **kwargs):
+        raise PermissionError(13, "Permission denied", str(self))
+
+    monkeypatch.setattr(Path, "open", denied)
+    monkeypatch.setattr(operator.time, "monotonic", lambda: float(next(clock)))
+    monkeypatch.setattr(operator.time, "sleep", lambda seconds: None)
+
+    with pytest.raises(PermissionError):
+        operator._read_json(path)

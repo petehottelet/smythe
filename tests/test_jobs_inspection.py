@@ -2,17 +2,19 @@
 
 from __future__ import annotations
 
+from contextlib import closing
 import copy
 import hashlib
 import json
 import os
+import sqlite3
 from types import SimpleNamespace
 
 import pytest
 
-from smythe.jobs import JobManifestV1, make_approval, preflight_job
+from smythe.jobs import JobManifestV1, make_approval, operation_input_digest, preflight_job
 from smythe.jobs.inspection import inspect_job, list_jobs
-from smythe.jobs.store import SQLiteRunStore
+from smythe.jobs.store import RunStoreError, SQLiteRunStore
 
 
 @pytest.fixture
@@ -104,6 +106,279 @@ def test_current_disk_finding_does_not_rewrite_acceptance(recorded, change, expe
     assert report["artifacts"][0]["accepted"] == 1
     assert report["status"] == "completed"
     assert database.read_bytes() == before
+
+
+def _completed_run(tmp_path, count=2):
+    """A run made by this release, whose calls record their delivery decisions."""
+    import asyncio
+
+    pytest.importorskip("PIL.Image")
+    from smythe.jobs.runner import JobRunner
+
+    manifest = JobManifestV1.from_dict({
+        "version": 1, "name": "delivery-fixture",
+        "profiles": [{"name": "default", "provider": "offline", "model": "offline-image",
+                      "max_cost_per_call_usd": "0", "options": {"artifacts_per_call": 1}}],
+        "operations": [{"key": "glyph", "count": count, "prompt": "One glyph",
+                        "profile": "default", "artifact": {"mime_type": "image/png"}}],
+        "execution": {"max_concurrency": 2, "max_attempts": 1, "max_budget_usd": "0",
+                      "output_directory": "outputs"},
+    })
+    plan = preflight_job(manifest, manifest_root=tmp_path)
+    database = tmp_path / "jobs.sqlite3"
+    with SQLiteRunStore(database) as store:
+        result = asyncio.run(JobRunner(store).start(plan, make_approval(plan),
+                                                    manifest_root=tmp_path))
+    root = tmp_path / "outputs" / result["artifact_directory"]
+    paths = {artifact["attempt_id"]: root / artifact["relative_path"]
+             for artifact in result["artifacts"]}
+    return database, result["run_id"], paths
+
+
+def test_recorded_decisions_make_intact_accepted_outputs_eligible(tmp_path):
+    database, run_id, _ = _completed_run(tmp_path)
+    with SQLiteRunStore(database, read_only=True) as store:
+        report = inspect_job(store, run_id)
+
+    for operation in report["operations"]:
+        acceptance = operation["delivery_acceptance"]
+        assert acceptance["source"] == "recorded" and acceptance["decision"] == "accepted"
+        assert acceptance["accepted"] is True
+        assert acceptance["attempt_id"] == operation["accepted_attempt_id"]
+        assert [item["outcome"] for item in acceptance["validators"]] == ["passed"]
+        assert acceptance["validators"][0]["validator"]["name"] == "smythe.jobs.artifact-spec"
+        assert operation["delivery_eligibility"] == {"eligible": True, "reasons": []}
+    for attempt in report["attempts"]:
+        record = attempt["delivery_acceptance"]
+        assert record["attempt_id"] == attempt["attempt_id"] and record["decision"] == "accepted"
+        assert record["validators"][0]["reports"][0]["outcome"] == "passed"
+    json.dumps(report)
+
+
+@pytest.mark.parametrize("change,reason", [("hash", "artifact_changed"),
+                                           ("missing", "artifact_missing")])
+def test_changed_accepted_bytes_are_ineligible_and_acceptance_is_unchanged(tmp_path, change, reason):
+    database, run_id, paths = _completed_run(tmp_path)
+    changed_attempt, path = next(iter(paths.items()))
+    if change == "missing":
+        path.unlink()
+    else:
+        path.write_bytes(b"x" * path.stat().st_size)
+    before = database.read_bytes()
+    with SQLiteRunStore(database, read_only=True) as store:
+        report = inspect_job(store, run_id)
+
+    assert database.read_bytes() == before
+    assert report["status"] == "completed" and report["counts"] == {"succeeded": 2}
+    assert all(artifact["accepted"] == 1 for artifact in report["artifacts"])
+    by_attempt = {op["accepted_attempt_id"]: op for op in report["operations"]}
+    assert by_attempt.pop(changed_attempt)["delivery_eligibility"] == {
+        "eligible": False, "reasons": [reason]}
+    [intact] = by_attempt.values()
+    assert intact["delivery_eligibility"]["eligible"] is True
+    assert all(op["delivery_acceptance"]["decision"] == "accepted" for op in report["operations"])
+
+
+def test_legacy_decisions_are_built_in_with_validator_unrecorded(recorded):
+    database, run_id, _ = recorded
+    with SQLiteRunStore(database, read_only=True) as store:
+        report = inspect_job(store, run_id)
+
+    for operation in report["operations"]:
+        assert operation["delivery_acceptance"] == {
+            "source": "legacy_built_in", "attempt_id": operation["accepted_attempt_id"],
+            "decision": None, "accepted": True, "validators": None, "reasons": [],
+        }
+        assert operation["delivery_eligibility"] == {
+            "eligible": False, "reasons": ["validator_unrecorded"]}
+    assert all(attempt["delivery_acceptance"] is None for attempt in report["attempts"])
+    assert "not_evaluated" not in json.dumps(report)
+
+
+def test_a_newer_builtin_check_makes_recorded_decisions_not_current(tmp_path, monkeypatch):
+    import smythe.jobs.delivery as delivery
+
+    database, run_id, _ = _completed_run(tmp_path, count=1)
+    monkeypatch.setattr(delivery, "ARTIFACT_SPEC_VALIDATOR_VERSION", "2")
+    with SQLiteRunStore(database, read_only=True) as store:
+        [operation] = inspect_job(store, run_id)["operations"]
+
+    assert operation["delivery_acceptance"]["decision"] == "accepted"
+    assert operation["delivery_eligibility"] == {"eligible": False, "reasons": ["validator_changed"]}
+
+
+def test_rejected_and_undecided_operations_are_not_eligible(tmp_path):
+    from smythe.jobs.delivery import artifact_spec_identity, validator_result
+    from smythe.validation import ValidationReport, hard_finding
+
+    manifest = JobManifestV1.from_dict({
+        "version": 1, "name": "undecided",
+        "profiles": [{"name": "default", "provider": "offline", "model": "offline-image",
+                      "max_cost_per_call_usd": "0"}],
+        "operations": [{"key": "glyph", "count": 3, "prompt": "One glyph", "profile": "default"}],
+        "execution": {"max_concurrency": 1, "max_attempts": 1, "max_budget_usd": "0",
+                      "output_directory": "outputs"},
+    })
+    plan = preflight_job(manifest, manifest_root=tmp_path)
+    identity = artifact_spec_identity(plan.operations[0].artifact)
+    finding = hard_finding("no_artifacts", "provider returned no artifacts")
+    database = tmp_path / "jobs.sqlite3"
+    with SQLiteRunStore(database) as store:
+        run_id = store.create_run(plan, make_approval(plan), manifest_root=tmp_path)
+        rejected, malformed, pending = store.pending_operations(run_id)
+        for operation, validators in ((rejected, None), (malformed, "not a list")):
+            attempt = store.begin_attempt(run_id, operation["operation_id"])
+            permit = store.prepare_call(attempt["attempt_id"], 0)
+            store.mark_call_dispatched(permit.call_id)
+            report = ValidationReport("response", (finding,), validator=identity)
+            record = {"version": 1, "scope": "artifacts", "attempt_id": attempt["attempt_id"],
+                      "decision": "rejected", "reasons": [finding.message], "subjects": [],
+                      "validators": validators or [validator_result(identity, [report])]}
+            store.complete_call(permit.call_id, cost_microusd=0, cost_is_complete=True,
+                                cost_is_estimate=False, artifacts=[], result_text="none",
+                                accepted=False, error=finding.message,
+                                delivery_acceptance=record)
+    with SQLiteRunStore(database, read_only=True) as store:
+        report = inspect_job(store, run_id)
+
+    by_id = {op["operation_id"]: op for op in report["operations"]}
+    assert by_id[rejected["operation_id"]]["delivery_acceptance"]["decision"] == "rejected"
+    assert by_id[rejected["operation_id"]]["delivery_eligibility"] == {
+        "eligible": False, "reasons": ["not_accepted"]}
+    assert by_id[malformed["operation_id"]]["delivery_acceptance"]["decision"] is None
+    assert by_id[malformed["operation_id"]]["delivery_eligibility"] == {
+        "eligible": False, "reasons": ["not_accepted", "record_invalid"]}
+    assert by_id[pending["operation_id"]]["delivery_acceptance"] is None
+    assert by_id[pending["operation_id"]]["delivery_eligibility"] == {
+        "eligible": False, "reasons": ["no_decision"]}
+
+
+@pytest.mark.parametrize("sha256,status,reasons", [
+    ("a" * 64, "verified", []),
+    ("b" * 64, "verified", ["record_mismatch"]),
+    ("a" * 64, "not_checked", ["artifact_not_checked"]),
+    ("a" * 64, "unsafe", ["artifact_unsafe"]),
+])
+def test_eligibility_needs_the_recorded_bytes_and_a_verified_file(sha256, status, reasons):
+    from smythe.jobs.delivery import annotate_delivery, artifact_spec_identity
+
+    spec = {"artifact": {"mime_type": "image/png"}}
+    record = {"version": 1, "scope": "artifacts", "attempt_id": "a1", "decision": "accepted",
+              "reasons": [], "validators": [{"validator": artifact_spec_identity(spec["artifact"])
+                                            .to_dict(), "outcome": "passed", "reports": []}],
+              "subjects": [{"path": "x.png", "sha256": "a" * 64, "size_bytes": 1,
+                            "published": True}]}
+    snapshot = {
+        "operations": [{"operation_id": "op", "accepted_attempt_id": "a1", "spec": spec}],
+        "attempts": [{"attempt_id": "a1", "operation_id": "op", "attempt_number": 1,
+                      "status": "succeeded"}],
+        "artifacts": [{"attempt_id": "a1", "operation_id": "op", "relative_path": "x.png",
+                       "sha256": sha256, "accepted": 1, "integrity": {"status": status}}],
+    }
+
+    [operation] = annotate_delivery(snapshot, {"a1": record})["operations"]
+
+    assert operation["delivery_eligibility"] == {"eligible": not reasons, "reasons": reasons}
+
+
+def _reference_run(tmp_path):
+    """An approved run whose first template sends a reference image and whose second sends none."""
+    (tmp_path / "brand").mkdir()
+    (tmp_path / "brand" / "logo.png").write_bytes(b"logo-bytes")
+    manifest = JobManifestV1.from_dict({
+        "version": 1, "name": "input-digest",
+        "profiles": [{"name": "render", "provider": "gemini_image",
+                      "model": "gemini-2.5-flash-image", "max_cost_per_call_usd": "0.05"}],
+        "operations": [
+            {"key": "hero", "count": 2, "prompt": "Render the hero", "profile": "render",
+             "attachments": ["brand/logo.png"]},
+            {"key": "plain", "prompt": "Render the hero", "profile": "render"},
+        ],
+        "execution": {"max_concurrency": 2, "max_attempts": 1, "max_budget_usd": "0.15",
+                      "output_directory": "outputs"},
+    })
+    plan = preflight_job(manifest, manifest_root=tmp_path)
+    database = tmp_path / "jobs.sqlite3"
+    with SQLiteRunStore(database) as store:
+        run_id = store.create_run(plan, make_approval(plan), manifest_root=tmp_path)
+    return database, run_id, plan
+
+
+def test_inspection_reports_each_operations_input_digest_from_the_stored_plan(tmp_path):
+    database, run_id, plan = _reference_run(tmp_path)
+    expected = {operation.operation_id: operation_input_digest(operation, plan.attachments)
+                for operation in plan.operations}
+    before = database.read_bytes()
+    with SQLiteRunStore(database, read_only=True) as store:
+        report = inspect_job(store, run_id)
+        [selected] = inspect_job(store, run_id, operation="hero[1]")["operations"]
+        paged = inspect_job(store, run_id, limit=1, offset=2)["operations"]
+
+    assert database.read_bytes() == before
+    digests = {operation["operation_id"]: operation["input_digest"]
+               for operation in report["operations"]}
+    assert digests == expected
+    by_key = {operation["operation_key"]: operation["input_digest"]
+              for operation in report["operations"]}
+    assert by_key["hero[0]"] == by_key["hero[1]"] != by_key["plain[0]"]
+    assert selected["input_digest"] == by_key["hero[1]"]
+    assert [operation["input_digest"] for operation in paged] == [by_key["plain[0]"]]
+    assert all("input_digest" not in operation["spec"] for operation in report["operations"])
+    json.dumps(report)
+
+
+def test_repeated_samples_without_attachments_share_an_input_digest(recorded):
+    database, run_id, _ = recorded
+    with SQLiteRunStore(database, read_only=True) as store:
+        report = inspect_job(store, run_id)
+
+    [digest] = {operation["input_digest"] for operation in report["operations"]}
+    assert digest.startswith("sha256:") and len(digest) == len("sha256:") + 64
+
+
+def test_an_operation_whose_digest_cannot_be_computed_reports_none(tmp_path):
+    valid = {"provider": "offline", "model": "offline-image", "options": {}, "prompt": "Draw",
+             "attachments": [], "artifact": {"mime_type": "image/png"}}
+    snapshot = {
+        "run_id": "run", "manifest_root": str(tmp_path), "output_directory": "outputs",
+        "artifacts": [],
+        "operations": [
+            {"operation_id": "valid", "spec": valid},
+            {"operation_id": "no-model", "spec": {k: v for k, v in valid.items() if k != "model"}},
+            {"operation_id": "unknown-provider", "spec": valid | {"provider": "other"}},
+            {"operation_id": "unplanned-file", "spec": valid | {"attachments": ["unplanned.png"]}},
+        ],
+    }
+    store = SimpleNamespace(inspection_snapshot=lambda *a, **kw: copy.deepcopy(snapshot),
+                            plan_attachments=lambda run_id: [])
+
+    digests = {operation["operation_id"]: operation["input_digest"]
+               for operation in inspect_job(store, "run")["operations"]}
+
+    assert digests["valid"].startswith("sha256:")
+    assert {key: value for key, value in digests.items() if key != "valid"} == {
+        "no-model": None, "unknown-provider": None, "unplanned-file": None}
+
+
+@pytest.mark.parametrize("attachments", ["'not a list'", "json('[1]')",
+                                         "json('[{\"relative_path\": \"brand/logo.png\"}]')"],
+                         ids=["not-an-array", "not-objects", "missing-fields"])
+def test_corrupt_stored_plan_attachments_give_null_input_digests(tmp_path, attachments):
+    """An unreadable attachments array used to fail the whole inspection; the
+    digest is informational, so only the digests it would feed are null."""
+    database, run_id, plan = _reference_run(tmp_path)
+    plain = operation_input_digest(plan.operations[-1], plan.attachments)
+    with closing(sqlite3.connect(database)) as db, db:
+        db.execute(f"UPDATE runs SET plan_json=json_set(plan_json,'$.attachments',{attachments})")
+
+    with SQLiteRunStore(database, read_only=True) as store:
+        with pytest.raises(RunStoreError):
+            store.plan_attachments(run_id)  # the store itself still fails closed
+        report = inspect_job(store, run_id)
+
+    digests = {operation["operation_key"]: operation["input_digest"]
+               for operation in report["operations"]}
+    assert digests == {"hero[0]": None, "hero[1]": None, "plain[0]": plain}
 
 
 def _fake_store(tmp_path, **updates):

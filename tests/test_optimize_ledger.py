@@ -9,11 +9,13 @@ import math
 import os
 import sqlite3
 import stat
+import time
 import uuid
 from threading import Barrier
 
 import pytest
 
+from smythe.optimize import ledger as ledger_module
 from smythe.optimize.contracts import (
     Candidate,
     ExperimentContract,
@@ -133,6 +135,7 @@ def _prepared(
     split: str = "development",
     phase: str = "evaluate",
     evaluator_hash: str = EVALUATOR_HASH,
+    **options: object,
 ) -> str:
     return ledger.prepare_trial(
         campaign_id,
@@ -142,6 +145,7 @@ def _prepared(
         seed,
         evaluator_hash=evaluator_hash,
         ceiling_microusd=1_000,
+        **options,  # type: ignore[arg-type]
     lease=_lease(ledger, campaign_id))
 
 
@@ -646,6 +650,136 @@ def test_holdout_rows_written_without_a_seal_record_count_as_prior_use(tmp_path)
         )
         with pytest.raises(HoldoutAlreadyUsedError, match="campaign 'legacy-first'"):
             _prepared(ledger, new, variant_challenger, seed=1, split="holdout")
+
+
+def test_holdout_draw_campaigns_lists_every_campaign_that_prepared_a_holdout_trial(tmp_path):
+    path = tmp_path / "draws.db"
+    contract = _contract()
+    identity = holdout_identity(contract, EVALUATOR_HASH)
+    other_evaluator = "sha256:" + "f" * 64
+    incumbent = _candidate(contract, "incumbent")
+    first_challenger = _candidate(contract, "first")
+    second_challenger = _candidate(contract, "second")
+    with ExperimentLedger(path) as ledger:
+        first = _seal(ledger, contract, incumbent, first_challenger, campaign_id="first")
+        second = _seal(ledger, contract, incumbent, second_challenger, campaign_id="second")
+        third = _seal(ledger, contract, incumbent, campaign_id="third")
+        # Development trials draw nothing from the holdout pool.
+        _prepared(ledger, first, first_challenger, seed=1)
+        assert ledger.holdout_draw_campaigns(identity) == ()
+
+        # Every holdout trial draws, an incumbent's included, while holdout
+        # use stays per challenger policy.
+        _prepared(ledger, second, incumbent, seed=1, split="holdout")
+        _prepared(ledger, first, first_challenger, seed=1, split="holdout")
+        _prepared(ledger, second, second_challenger, seed=1, split="holdout")
+        _prepared(ledger, first, incumbent, seed=1, split="holdout")
+        assert ledger.holdout_draw_campaigns(identity) == ("second", "first")
+        assert ledger.holdout_uses(identity) == {
+            first_challenger.policy_hash: ("first",),
+            second_challenger.policy_hash: ("second",),
+        }
+
+        # Another evaluator is another holdout identity.
+        _prepared(
+            ledger, third, incumbent, seed=1, split="holdout", evaluator_hash=other_evaluator
+        )
+        assert ledger.holdout_draw_campaigns(identity) == ("second", "first")
+        assert ledger.holdout_draw_campaigns(
+            holdout_identity(contract, other_evaluator)
+        ) == ("third",)
+        with pytest.raises(ValueError, match="holdout identity"):
+            ledger.holdout_draw_campaigns("not-an-identity")
+
+    with ExperimentLedger(path, read_only=True) as reader:
+        assert reader.holdout_draw_campaigns(identity) == ("second", "first")
+
+
+def test_prepare_trial_refuses_a_holdout_draw_beyond_the_cap(tmp_path):
+    contract = _contract()
+    identity = holdout_identity(contract, EVALUATOR_HASH)
+    incumbent = _candidate(contract, "incumbent")
+    challenger = _candidate(contract, "challenger")
+    with ExperimentLedger(tmp_path / "cap.db") as ledger:
+        first = _seal(ledger, contract, incumbent, challenger, campaign_id="first")
+        second = _seal(ledger, contract, incumbent, campaign_id="second")
+        _prepared(ledger, first, challenger, seed=1, split="holdout", max_holdout_draws=1)
+        # The campaign that drew keeps drawing its own holdout.
+        _prepared(ledger, first, incumbent, seed=1, split="holdout", max_holdout_draws=1)
+        _prepared(ledger, first, challenger, seed=2, split="holdout", max_holdout_draws=1)
+
+        # Any other campaign is refused, even for its incumbent.
+        with pytest.raises(HoldoutAlreadyUsedError, match="campaign 'first'") as refused:
+            _prepared(ledger, second, incumbent, seed=1, split="holdout", max_holdout_draws=1)
+        assert identity in str(refused.value)
+        assert ledger.list_trials(second) == []
+
+        # Other splits never draw, and a larger cap admits the draw.
+        _prepared(ledger, second, incumbent, seed=1, max_holdout_draws=1)
+        _prepared(ledger, second, incumbent, seed=1, split="holdout", max_holdout_draws=2)
+        assert ledger.holdout_draw_campaigns(identity) == ("first", "second")
+        for invalid in (0, -1, True, 1.0):
+            with pytest.raises(ValueError, match="max_holdout_draws"):
+                _prepared(
+                    ledger, first, challenger, seed=3, split="holdout", max_holdout_draws=invalid
+                )
+
+
+def test_two_connections_racing_for_the_last_holdout_draw_admit_exactly_one(
+    tmp_path, monkeypatch
+):
+    path = tmp_path / "race.db"
+    contract = _contract()
+    identity = holdout_identity(contract, EVALUATOR_HASH)
+    incumbent = _candidate(contract, "incumbent")
+    challengers = {"campaign-a": _candidate(contract, "a"), "campaign-b": _candidate(contract, "b")}
+    with ExperimentLedger(path) as ledger:
+        leases = {}
+        for campaign_id, challenger in challengers.items():
+            _seal(ledger, contract, incumbent, challenger, campaign_id=campaign_id)
+            leases[campaign_id] = _lease(ledger, campaign_id)
+
+    # Keep each cap check open briefly: a check outside the write transaction
+    # would let the other connection read the same empty draw list meanwhile.
+    count_draws = ledger_module._holdout_draws
+
+    def slow_count(*args):
+        draws = count_draws(*args)
+        time.sleep(0.2)
+        return draws
+
+    monkeypatch.setattr(ledger_module, "_holdout_draws", slow_count)
+    barrier = Barrier(2)
+
+    def draw(campaign_id: str) -> str:
+        with ExperimentLedger(path) as connection:
+            barrier.wait()
+            try:
+                connection.prepare_trial(
+                    campaign_id,
+                    challengers[campaign_id].candidate_id,
+                    "holdout",
+                    "evaluate",
+                    1,
+                    evaluator_hash=EVALUATOR_HASH,
+                    ceiling_microusd=1_000,
+                    lease=leases[campaign_id],
+                    max_holdout_draws=1,
+                )
+            except HoldoutAlreadyUsedError:
+                return "refused"
+            return "drawn"
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        results = dict(zip(challengers, pool.map(draw, challengers)))
+
+    assert sorted(results.values()) == ["drawn", "refused"]
+    with ExperimentLedger(path) as ledger:
+        drawn = next(campaign for campaign, result in results.items() if result == "drawn")
+        assert ledger.holdout_draw_campaigns(identity) == (drawn,)
+        assert [
+            campaign for campaign in challengers if ledger.list_trials(campaign)
+        ] == [drawn]
 
 
 @pytest.mark.skipif(os.name == "nt", reason="POSIX permission bits")
@@ -1161,6 +1295,282 @@ def test_promotion_decision_is_append_only_and_evidence_bound(tmp_path):
     assert snapshot["decisions"][0]["promoted"] is False
     assert snapshot["decisions"][0]["assessment"]["stage"] == "development"
     assert ledger.validate_decision_inventory(campaign_id) == (decision.decision_id,)
+
+
+def _phase(role: str, plan_hash: str = PLAN_HASH) -> str:
+    return f"{role}.plan_" + plan_hash.removeprefix("sha256:")
+
+
+def _completed(
+    ledger: ExperimentLedger,
+    campaign_id: str,
+    candidate: Candidate,
+    split: str,
+    role: str,
+    seed: int,
+) -> str:
+    key = _prepared(ledger, campaign_id, candidate, seed=seed, split=split, phase=_phase(role))
+    lease = _lease(ledger, campaign_id)
+    ledger.claim_trial_dispatch(key, lease=lease)
+    ledger.complete_trial(
+        key,
+        metrics={"quality": 8},
+        gates={"format": True},
+        actual_cost_microusd=0,
+        duration_ms=1,
+        lease=lease,
+    )
+    return key
+
+
+def _multi_arm_campaign(
+    ledger: ExperimentLedger,
+    campaign_id: str,
+    *,
+    reference_role: str = "reference",
+    challenger_role: str = "challenger",
+) -> tuple[dict[str, Candidate], list[str]]:
+    """Two challengers in development, then the first beside one reference."""
+
+    contract = _contract(max_candidates=4, max_trials=12, budget=12_000)
+    arms = {
+        name: _candidate(contract, name)
+        for name in ("incumbent", "challenger", "runner-up", "reference")
+    }
+    _seal(ledger, contract, *arms.values(), campaign_id=campaign_id)
+    keys = [
+        _completed(ledger, campaign_id, arms[name], "development", role, 1)
+        for name, role in (
+            ("incumbent", "incumbent"),
+            ("challenger", "challenger"),
+            ("runner-up", "challenger"),
+        )
+    ]
+    for name, role in (
+        ("incumbent", "incumbent"),
+        ("challenger", challenger_role),
+        ("reference", reference_role),
+    ):
+        keys.extend(
+            _completed(ledger, campaign_id, arms[name], "confirmation", role, seed)
+            for seed in (11, 12, 13)
+        )
+    return arms, keys
+
+
+def _multi_arm_decision(
+    ledger: ExperimentLedger,
+    campaign_id: str,
+    keys: list[str],
+    candidate: Candidate,
+    declared: list[Candidate],
+    **assessment: object,
+) -> PromotionDecision:
+    return PromotionDecision(
+        campaign_id=campaign_id,
+        candidate_id=candidate.candidate_id,
+        promoted=False,
+        reason="confirmation rejected candidate",
+        trial_keys=tuple(keys),
+        assessment={
+            "optimization_plan_hash": PLAN_HASH,
+            "holdout_seed_commitment": ledger.get_holdout_seed_commitment(campaign_id),
+            "runner_version": 4,
+            "confirmation": {"promote": False, "verdict": "inconclusive"},
+            "holdout": None,
+            "reference_rule": "report",
+            "references": [
+                {
+                    "candidate_id": reference.candidate_id,
+                    "policy_hash": reference.policy_hash,
+                    "confirmation": {"promote": False, "verdict": "worse"},
+                    "holdout": None,
+                    "verdict": "worse",
+                }
+                for reference in declared
+            ],
+            **assessment,
+        },
+    )
+
+
+def test_multi_arm_decisions_bind_declared_references_to_reference_trials(tmp_path):
+    ledger = ExperimentLedger(tmp_path / "references.db")
+    arms, keys = _multi_arm_campaign(ledger, "three-arm")
+    challenger, runner_up, reference = (
+        arms[name] for name in ("challenger", "runner-up", "reference")
+    )
+    lease = _lease(ledger, "three-arm")
+
+    refused = {
+        "a challenger declared as a reference": _multi_arm_decision(
+            ledger, "three-arm", keys, challenger, [runner_up, reference]
+        ),
+        "a reference as the decision candidate": _multi_arm_decision(
+            ledger, "three-arm", keys, reference, [reference]
+        ),
+        "an undeclared reference as the decision candidate": _multi_arm_decision(
+            ledger, "three-arm", keys, reference, []
+        ),
+        "an undeclared reference": _multi_arm_decision(
+            ledger, "three-arm", keys, challenger, []
+        ),
+        "the incumbent as a reference": _multi_arm_decision(
+            ledger, "three-arm", keys, challenger, [arms["incumbent"], reference]
+        ),
+        "an unknown reference rule": _multi_arm_decision(
+            ledger, "three-arm", keys, challenger, [reference], reference_rule="always"
+        ),
+        "a reference without its verdict": _multi_arm_decision(
+            ledger,
+            "three-arm",
+            keys,
+            challenger,
+            [reference],
+            references=[{"candidate_id": reference.candidate_id, "holdout": None}],
+        ),
+        "a reference with holdout evidence after a rejected confirmation": _multi_arm_decision(
+            ledger,
+            "three-arm",
+            keys,
+            challenger,
+            [reference],
+            references=[
+                {
+                    "candidate_id": reference.candidate_id,
+                    "confirmation": {"promote": False, "verdict": "worse"},
+                    "holdout": {"promote": False, "verdict": "worse"},
+                }
+            ],
+        ),
+    }
+    for case, decision in refused.items():
+        with pytest.raises(LedgerConflictError):
+            ledger.append_decision(decision, lease=lease)
+        assert ledger.snapshot("three-arm")["decision_count"] == 0, case
+
+    decision = _multi_arm_decision(ledger, "three-arm", keys, challenger, [reference])
+    assert ledger.append_decision(decision, lease=lease) == decision.decision_id
+    assert ledger.validate_decision_inventory("three-arm") == (decision.decision_id,)
+
+
+@pytest.mark.parametrize(
+    "roles",
+    [{"reference_role": "challenger"}, {"challenger_role": "reference"}],
+    ids=["reference-with-challenger-phase", "challenger-with-reference-phase"],
+)
+def test_reference_and_challenger_trials_keep_their_own_phases(tmp_path, roles):
+    ledger = ExperimentLedger(tmp_path / "phases.db")
+    arms, keys = _multi_arm_campaign(ledger, "phases", **roles)
+    decision = _multi_arm_decision(
+        ledger, "phases", keys, arms["challenger"], [arms["reference"]]
+    )
+    with pytest.raises(LedgerConflictError, match="not bound to the campaign plan"):
+        ledger.append_decision(decision, lease=_lease(ledger, "phases"))
+    assert ledger.snapshot("phases")["decision_count"] == 0
+
+
+def test_must_not_be_worse_decisions_cannot_promote_past_a_better_reference(tmp_path):
+    ledger = ExperimentLedger(tmp_path / "rule.db")
+    arms, keys = _multi_arm_campaign(ledger, "rule")
+    lease = _lease(ledger, "rule")
+    # Confirmation passed against the incumbent, but the reference is better:
+    # under the rule the campaign stops before the holdout.
+    blocked = _multi_arm_decision(
+        ledger,
+        "rule",
+        keys,
+        arms["challenger"],
+        [arms["reference"]],
+        confirmation={"promote": True, "verdict": "improved"},
+        reference_rule="must_not_be_worse",
+    )
+    reported = _multi_arm_decision(
+        ledger,
+        "rule",
+        keys,
+        arms["challenger"],
+        [arms["reference"]],
+        confirmation={"promote": True, "verdict": "improved"},
+    )
+    with pytest.raises(LedgerConflictError, match="requires a holdout"):
+        ledger.append_decision(reported, lease=lease)
+    assert ledger.append_decision(blocked, lease=lease) == blocked.decision_id
+
+
+def test_legacy_two_arm_decisions_still_validate(tmp_path):
+    ledger = ExperimentLedger(tmp_path / "legacy.db")
+    contract = _contract(max_candidates=2, max_trials=8, budget=8_000)
+    incumbent, challenger = _candidate(contract, "incumbent"), _candidate(contract, "challenger")
+    campaign_id = _seal(ledger, contract, incumbent, challenger, campaign_id="legacy")
+    keys = [
+        _completed(ledger, campaign_id, candidate, "development", role, 1)
+        for candidate, role in ((incumbent, "incumbent"), (challenger, "challenger"))
+    ]
+    for candidate, role in ((incumbent, "incumbent"), (challenger, "challenger")):
+        keys.extend(
+            _completed(ledger, campaign_id, candidate, "confirmation", role, seed)
+            for seed in (11, 12, 13)
+        )
+    decision = PromotionDecision(
+        campaign_id=campaign_id,
+        candidate_id=challenger.candidate_id,
+        promoted=False,
+        reason="confirmation rejected candidate",
+        trial_keys=tuple(keys),
+        assessment={
+            "optimization_plan_hash": PLAN_HASH,
+            "holdout_seed_commitment": ledger.get_holdout_seed_commitment(campaign_id),
+            "runner_version": 3,
+            "confirmation": {"promote": False},
+            "holdout": None,
+        },
+    )
+    assert ledger.append_decision(decision, lease=_lease(ledger, campaign_id))
+    assert ledger.validate_decision_inventory(campaign_id) == (decision.decision_id,)
+
+
+def test_reference_holdout_trials_draw_from_the_pool_but_are_not_holdout_use(tmp_path):
+    contract = _contract()
+    identity = holdout_identity(contract, EVALUATOR_HASH)
+    incumbent = _candidate(contract, "incumbent")
+    reference = _candidate(contract, "reference")
+    with ExperimentLedger(tmp_path / "reference-draws.db") as ledger:
+        first, second, third = (
+            _seal(ledger, contract, incumbent, reference, campaign_id=name)
+            for name in ("first", "second", "third")
+        )
+        _prepared(
+            ledger, first, reference, seed=1, split="holdout",
+            phase=_phase("reference"), max_holdout_draws=1,
+        )
+        assert ledger.holdout_uses(identity) == {}
+        assert ledger.holdout_draw_campaigns(identity) == ("first",)
+
+        # A reference draw counts toward the pool cap.
+        with pytest.raises(HoldoutAlreadyUsedError, match="finite holdout task pool"):
+            _prepared(
+                ledger, second, reference, seed=1, split="holdout",
+                phase=_phase("reference"), max_holdout_draws=1,
+            )
+
+        # The policy has not used its holdout, so it can still be tested.
+        _prepared(ledger, second, reference, seed=1, split="holdout", phase=_phase("challenger"))
+        assert ledger.holdout_uses(identity) == {reference.policy_hash: ("second",)}
+
+        # Only the exact reference phase of the campaign's own plan is exempt.
+        for phase in (
+            _phase("reference", "sha256:" + "b" * 64),
+            _phase("Reference"),
+            "reference.plan" + "_" * 65,
+        ):
+            with pytest.raises(HoldoutAlreadyUsedError, match="campaign 'second'"):
+                _prepared(ledger, third, reference, seed=1, split="holdout", phase=phase)
+        assert ledger.holdout_uses(identity) == {reference.policy_hash: ("second",)}
+
+    with ExperimentLedger(tmp_path / "reference-draws.db", read_only=True) as reader:
+        assert reader.holdout_uses(identity) == {reference.policy_hash: ("second",)}
+        assert reader.holdout_draw_campaigns(identity) == ("first", "second")
 
 
 def test_promotion_decision_identity_deep_freezes_all_nested_evidence():

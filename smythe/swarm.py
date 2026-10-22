@@ -6,35 +6,56 @@ import asyncio
 import json
 import logging
 import time
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable
 from uuid import uuid4
 
+from smythe._run_inspection import result_view
+from smythe.acceptance import (
+    GENERATED_GATE_KEY,
+    AcceptanceDecision,
+    AcceptanceMode,
+    AcceptancePolicy,
+    DeliveryAcceptance,
+    _delivery_problems,
+    evaluate_delivery,
+    task_sha256,
+    text_sha256,
+    validate_acceptance_obligations,
+)
 from smythe.budget import BudgetValidationError, Sentinel
+from smythe.context import ContextSource, snapshot_sources
 from smythe.checkpoint import (
     CHECKPOINT_VERSION,
     SUPPORTED_CHECKPOINT_VERSIONS,
     CheckpointStore,
     agents_from_list,
     build_state,
+    delivery_acceptance_from_state,
     drop_untrusted_mcp_servers,
     graph_from_dict,
+    graph_to_dict,
     reset_incomplete_nodes,
     task_from_dict,
+    timing_segments,
 )
 from smythe.executor import Executor
 from smythe.executor_base import (
     DEFAULT_MAX_TOOL_ITERATIONS,
     ExecutorBase,
+    check_pending_nodes,
+    check_provider_support,
     validate_max_concurrency,
     validate_max_revisions,
     validate_retry_backoff_s,
 )
-from smythe.graph import ExecutionGraph
+from smythe.graph import ExecutionGraph, NodeStatus
 from smythe.memory import PlannerMemory
 from smythe.tools import ToolRuntime
-from smythe.planner import Architect, LLMArchitect, SimpleArchitect
+from smythe.planner import Architect, DeterministicArchitect, LLMArchitect, SimpleArchitect
+from smythe.constrained_planner import ConstrainedArchitect
 from smythe.router import WhiteRabbit
 from smythe.provider import (
     AnthropicProvider,
@@ -47,13 +68,18 @@ from smythe.provider import (
 )
 from smythe.registry import Registry
 from smythe.supervisor import Supervisor
-from smythe.synthesizer import Synthesizer
+from smythe.synthesizer import SynthesisStrategy, Synthesizer, deliverable_sources
 from smythe.task import Task, snapshot_task, task_snapshots_equal, task_to_dict
 from smythe.tracer import Tracer
-from smythe.verifier import Verifier, validate_verification_checkpoint, verification_pending
-from smythe.workflow_binding import WorkflowBindingError
+from smythe.verifier import (
+    Verifier,
+    validate_verification_checkpoint,
+    verification_pending,
+)
+from smythe.workflow_binding import LocalOnly, WorkflowBindingError, _BoundLocal
 from smythe.workflow_policy import WorkflowGraphPolicy, snapshot_graph_policy
 from smythe.workflow_store import SQLiteWorkflowStore
+from smythe.workflow_tools import READ_STEP_KEY, ReadProfile
 
 logger = logging.getLogger("smythe.swarm")
 
@@ -79,6 +105,12 @@ class SwarmResult:
         timing: Where the call's time went: elapsed time, phase totals and
             waits, with one segment per call that worked on the execution.
             None for a result built by hand.
+        acceptance: The delivery acceptance record a strict policy made for
+            the output, or None when no record exists, as for advisory and
+            legacy runs.
+        rejected_output: The delivered text when a record exists but did not
+            accept it, or when a strict policy resumes a completed run that
+            has no record; ``output`` is then ``""``. None otherwise.
     """
 
     output: str
@@ -91,6 +123,37 @@ class SwarmResult:
     cost_scope: str = "execution_and_synthesis"
     workflow_accounting: dict[str, Any] | None = None
     timing: dict[str, Any] | None = None
+    acceptance: DeliveryAcceptance | None = None
+    rejected_output: str | None = None
+
+    @property
+    def accepted(self) -> bool:
+        """True only when the delivery acceptance record's decision is ``accepted``."""
+        return isinstance(self.acceptance, DeliveryAcceptance) and self.acceptance.accepted
+
+    def to_dict(self) -> dict[str, Any]:
+        """This result as detached JSON data.
+
+        The acceptance record appears under ``delivery_acceptance`` (None
+        without one) and the graph in its checkpoint form. ``execution``,
+        ``delivery``, ``unknown_exposure`` and ``next_action`` are the
+        blocks ``smythe runs inspect`` reports for a saved run.
+        """
+        return json.loads(json.dumps({
+            "execution_id": self.execution_id,
+            "output": self.output,
+            "delivery_acceptance": None if self.acceptance is None else self.acceptance.to_dict(),
+            "rejected_output": self.rejected_output,
+            "total_cost_usd": self.total_cost_usd,
+            "cost_is_complete": self.cost_is_complete,
+            "cost_contains_estimates": self.cost_contains_estimates,
+            "cost_scope": self.cost_scope,
+            "workflow_accounting": self.workflow_accounting,
+            "timing": self.timing,
+            "trace": self.trace,
+            "graph": graph_to_dict(self.graph),
+            **result_view(self),
+        }, allow_nan=False))
 
 
 class _RunTiming:
@@ -126,21 +189,81 @@ class _RunTiming:
                 "segments": self._segments(timing)}
 
 
-def _saved_segments(state: dict[str, Any]) -> list[dict[str, Any]]:
-    """Timing segments an earlier call saved; none if the block is unreadable.
+def _delivered(output: Any, acceptance: DeliveryAcceptance | None) -> tuple[Any, str | None]:
+    """Split saved output into the delivered and the rejected slot.
 
-    Timing is informational, so an unreadable block never stops a resume.
+    Without a record the output is delivered as saved. With one, the output
+    must still match the record's digest, and only an accepted record
+    delivers it; otherwise ``output`` is empty and the text is kept as
+    ``rejected_output``. A ``not_evaluated`` record decided nothing, so its
+    output is withheld too; one that binds no digest has none to check.
     """
-    block = state.get("timing")
-    if not isinstance(block, dict) or type(block.get("version")) is not int or block["version"] != 1:
-        return []
-    segments = block.get("segments")
-    if not isinstance(segments, list) or not all(isinstance(item, dict) for item in segments):
-        return []
-    try:
-        return json.loads(json.dumps(segments, allow_nan=False))
-    except (TypeError, ValueError, RecursionError):
-        return []
+    if acceptance is None:
+        return output, None
+    if not isinstance(output, str) or (
+        acceptance.output_sha256 is not None and text_sha256(output) != acceptance.output_sha256
+    ):
+        raise ValueError("Checkpoint output does not match its delivery acceptance record")
+    if acceptance.accepted:
+        return output, None
+    return "", output
+
+
+def _synthesis_strategy(synthesizer: Any) -> str:
+    """The strategy a run's synthesizer applies, or ``custom`` for any other synthesizer."""
+    if type(synthesizer) is Synthesizer and type(synthesizer.strategy) is SynthesisStrategy:
+        return synthesizer.strategy.value
+    return "custom"
+
+
+def _builds_developer_gates(architect: Any) -> bool:
+    """Whether *architect*'s gates come from developer code rather than a model.
+
+    A ``DeterministicArchitect`` builds its graph in Python, a
+    ``ConstrainedArchitect`` composes developer templates, and a durable
+    run's ``LocalOnly`` architect plans in local code. Any other architect,
+    such as ``LLMArchitect``, may generate its gates.
+    """
+    return isinstance(architect, (DeterministicArchitect, ConstrainedArchitect,
+                                  LocalOnly, _BoundLocal))
+
+
+def _planning_architects(router: Any, architect: Any) -> tuple[Any, ...]:
+    """Every architect that could plan a run: *router*'s tiers, or *architect* without one.
+
+    Empty for a router other than ``WhiteRabbit``, whose tiers are unknown.
+    """
+    if router is None:
+        return (architect,)
+    if type(router) is WhiteRabbit:
+        return router._architects()
+    return ()
+
+
+def _check_gate_planning(policy: AcceptancePolicy | None, architects: tuple[Any, ...]) -> None:
+    """Refuse, before planning, a strict run whose plan no gate could accept.
+
+    Without final validators or ``allow_generated_gates`` only a gate from
+    developer code accepts, so a run whose every architect generates its
+    gates could never accept its output.
+    """
+    if (policy is not None and not policy.final_validators
+            and not policy.allow_generated_gates and architects
+            and not any(_builds_developer_gates(item) for item in architects)):
+        raise ValueError(
+            "A strict acceptance policy without a final validator accepts only output "
+            "that a gate you supplied judged, and this run's plan would come from an "
+            "architect that generates its gates. Add a final validator, set "
+            "allow_generated_gates=True, or execute a graph you build."
+        )
+
+
+def _mark_generated_gates(graph: ExecutionGraph, architect: Any) -> None:
+    """Mark each gate of a plan that *architect* generated with ``GENERATED_GATE_KEY``."""
+    if not _builds_developer_gates(architect):
+        for node in graph.nodes:
+            if node.verifies:
+                node.metadata[GENERATED_GATE_KEY] = True
 
 
 def _auto_detect_provider(model: str) -> Provider:
@@ -164,6 +287,31 @@ class Swarm:
     """Entry point for submitting tasks.
 
     Coordinates the full lifecycle: plan -> assign -> execute -> synthesize.
+
+    ``acceptance`` takes an :class:`~smythe.acceptance.AcceptancePolicy`. A
+    strict policy decides delivery acceptance after synthesis, on exactly the
+    delivered output, and records the decision with the completed
+    checkpoint; output it does not accept is returned as ``rejected_output``.
+    It decides only on verdicts produced in the run, so a fresh strict run
+    refuses a graph whose judge completed before it. Before any node runs,
+    it refuses a graph whose delivered output it could not decide
+    (:func:`~smythe.acceptance.validate_acceptance_obligations`), and before
+    planning a run whose plan could not meet that check.
+    None, the default, and an advisory policy keep legacy behavior. With a
+    durable ``run_store`` the same checks apply, the policy enters the run's
+    recipe and the decision is journaled; see ``smythe.workflow.WorkflowRuntime``.
+
+    ``read_tools`` declares the :class:`~smythe.workflow_tools.ReadProfile`
+    reads that a durable run's read steps may name; it requires
+    ``run_store``. An ordinary run refuses a read step before any node
+    call, whether a caller's graph, an architect's or template's plan or a
+    saved checkpoint declares it.
+
+    ``context_sources``, a sequence of :class:`~smythe.context.ContextSource`
+    that needs a durable ``run_store``, opts each new run into context
+    assembly: the run records the sources once, and every node call is given
+    a journaled context snapshot that marks sources and dependency outputs
+    as untrusted data. :meth:`refresh_context` gives a run new sources.
     """
 
     def __init__(
@@ -189,13 +337,42 @@ class Swarm:
         retry_backoff_s: float = 0.0,
         supervisor: Supervisor | None = None,
         max_revisions: int = 0,
-        verifier: Verifier | None = None,
+        verifier: Verifier | LocalOnly | None = None,
         run_store: SQLiteWorkflowStore | None = None,
         graph_policy: WorkflowGraphPolicy | None = None,
+        acceptance: AcceptancePolicy | None = None,
+        read_tools: tuple[ReadProfile, ...] | list[ReadProfile] = (),
+        context_sources: Sequence[ContextSource] | None = None,
     ) -> None:
         Sentinel(max_budget_usd)  # Reject malformed policy before planning can call a provider.
         if graph_policy is not None and run_store is None:
             raise WorkflowBindingError("graph_policy requires a durable run_store")
+        if read_tools is None:
+            read_tools = ()
+        if isinstance(read_tools, (str, bytes)) or not hasattr(read_tools, "__iter__"):
+            raise WorkflowBindingError("read_tools must be a sequence of ReadProfile declarations")
+        read_tools = tuple(read_tools)
+        if read_tools:
+            if run_store is None:
+                raise WorkflowBindingError("read_tools requires a durable run_store")
+            from smythe.workflow import _snapshot_read_tools
+
+            _snapshot_read_tools(read_tools)
+        if context_sources is not None and run_store is None:
+            raise WorkflowBindingError("context_sources requires a durable run_store")
+        self._context_sources = None if context_sources is None else snapshot_sources(context_sources)
+        if isinstance(verifier, LocalOnly) and run_store is None:
+            raise TypeError(
+                "verifier: a LocalOnly validator judges gates only in a durable run_store run; "
+                "an ordinary run takes a Verifier such as CallableVerifier"
+            )
+        if acceptance is not None and not isinstance(acceptance, AcceptancePolicy):
+            raise TypeError(
+                f"acceptance must be an AcceptancePolicy or None, not {type(acceptance).__name__}"
+            )
+        self._acceptance = acceptance
+        # The undecided record a strict run's unfinished checkpoints carry.
+        self._pending_record: tuple[Task | None, DeliveryAcceptance] | None = None
         # An ordinary run builds its executor only after routing and planning,
         # so check the executor's limits now. A durable run checks its own,
         # stricter limits before routing or planning on every entry point.
@@ -215,6 +392,7 @@ class Swarm:
         self.max_revisions = max_revisions
         self.verifier = verifier
         self._run_store = run_store
+        self._read_tools = read_tools
         # The running executor, so checkpoints can record the revision
         # allowance actually consumed rather than assuming zero.
         self._active_executor: Any = None
@@ -234,6 +412,7 @@ class Swarm:
         self._memory = memory
         self._registry = registry or Registry()
         self._synthesizer = synthesizer or Synthesizer()
+        self._check_acceptance_support()
         self._yaml_graph: ExecutionGraph | None = None
         self._router = router
         # Each execute or resume call measures its time with a new tracer.
@@ -253,33 +432,304 @@ class Swarm:
                 registry=self._registry,
             )
 
+    @property
+    def acceptance(self) -> AcceptancePolicy | None:
+        """The delivery acceptance policy this Swarm's runs follow, if any."""
+        return self._acceptance
+
+    def _strict_policy(self) -> AcceptancePolicy | None:
+        policy = self._acceptance
+        return policy if policy is not None and policy.mode is AcceptanceMode.STRICT else None
+
+    def _check_acceptance_support(self) -> None:
+        """Reject a strict policy that this Swarm's synthesis could never satisfy.
+
+        Without final validators only a passed gate can accept, and only
+        output that is one gated node's exact result, which only
+        ``DELIVERABLE`` synthesis returns.
+        """
+        policy = self._strict_policy()
+        if policy is None or policy.final_validators:
+            return
+        strategy = _synthesis_strategy(self._synthesizer)
+        if strategy != SynthesisStrategy.DELIVERABLE.value:
+            raise ValueError(
+                f"A strict acceptance policy without a final validator can accept only "
+                f"DELIVERABLE output that a passed gate judged; {strategy} synthesis needs "
+                "a final validator"
+            )
+
+    def _pending_acceptance(self, task: Task | None) -> DeliveryAcceptance | None:
+        """The undecided record a strict run's unfinished checkpoints carry."""
+        policy = self._strict_policy()
+        if policy is None:
+            return None
+        cached = self._pending_record
+        if cached is not None and cached[0] is task and cached[1].policy_sha256 == policy.sha256:
+            return cached[1]
+        record = DeliveryAcceptance(
+            AcceptanceDecision.NOT_EVALUATED, policy.sha256, task_sha256=task_sha256(task),
+        )
+        self._pending_record = (task, record)
+        return record
+
+    def _decide(
+        self, graph: ExecutionGraph, output: Any, task: Task | None, tracer: Tracer,
+    ) -> DeliveryAcceptance | None:
+        """Decide delivery acceptance for exactly *output*; None without a strict policy.
+
+        Final validators run here, after synthesis, with no provider call. A
+        final rejection is terminal: nothing is regenerated.
+        """
+        policy = self._strict_policy()
+        if policy is None:
+            return None
+        strategy = _synthesis_strategy(self._synthesizer)
+        if strategy == SynthesisStrategy.DELIVERABLE.value:
+            sources, used_fallback = deliverable_sources(graph)
+        else:
+            sources = [n for n in graph.nodes
+                       if n.status is NodeStatus.COMPLETED and n.result is not None]
+            used_fallback = False
+        with tracer.phase("verification"):
+            record = evaluate_delivery(
+                policy, graph, output, strategy=strategy, sources=sources,
+                used_fallback=used_fallback, task=task,
+            )
+        tracer.on_acceptance(record)
+        return record
+
+    def _finish(
+        self,
+        execution_id: str,
+        graph: ExecutionGraph,
+        budget: Sentinel,
+        task: Task | None,
+        created_at: float,
+        timing: _RunTiming,
+        output: Any,
+        acceptance: DeliveryAcceptance | None,
+    ) -> SwarmResult:
+        """Save a finished run with its decision and build its result.
+
+        Every execute and resume path ends here. Output a strict policy did
+        not accept is saved and returned as ``rejected_output``, never as
+        ``output``.
+        """
+        self._save_checkpoint(
+            execution_id, "completed", graph, budget, task, created_at, timing,
+            output=output, acceptance=acceptance,
+        )
+        delivered, rejected_output = _delivered(output, acceptance)
+        result = SwarmResult(
+            output=delivered,
+            graph=graph,
+            trace=timing.tracer.summary(),
+            total_cost_usd=budget.total_cost_usd,
+            cost_is_complete=budget.cost_is_complete,
+            cost_contains_estimates=budget.cost_contains_estimates,
+            execution_id=execution_id,
+            timing=timing.result(),
+            acceptance=acceptance,
+            rejected_output=rejected_output,
+        )
+        if self._memory is not None and task is not None:
+            self._memory.record(task, graph, result)
+        return result
+
+    def _reverified(
+        self, record: DeliveryAcceptance, output: Any, graph: ExecutionGraph, task: Task | None,
+    ) -> DeliveryAcceptance:
+        """Check a completed run's decision against what its checkpoint holds now.
+
+        The saved output must still match the record's digest, the task and
+        source generations it binds must be unchanged, every file it binds
+        must still hold the recorded bytes, and a strict policy on this
+        Swarm must be the one that decided. A mismatch gives an
+        ``indeterminate`` record for the saved output, never acceptance.
+        """
+        if not isinstance(output, str):
+            raise ValueError("Checkpoint output does not match its delivery acceptance record")
+        problems = _delivery_problems(record, output, graph, task)
+        policy = self._strict_policy()
+        if policy is not None and policy.sha256 != record.policy_sha256:
+            problems.append(
+                "this Swarm's acceptance policy did not make the saved decision, which "
+                "therefore does not carry over"
+            )
+        if not problems:
+            return record
+        return DeliveryAcceptance(
+            decision=AcceptanceDecision.INDETERMINATE,
+            policy_sha256=record.policy_sha256 if policy is None else policy.sha256,
+            output_sha256=text_sha256(output), strategy=record.strategy,
+            sources=record.sources, used_fallback=record.used_fallback,
+            task_sha256=task_sha256(task), reasons=tuple(problems), artifacts=record.artifacts,
+        )
+
+    @staticmethod
+    def _withheld(execution_id: str, output: Any) -> tuple[str, Any]:
+        """A strict Swarm's slots for a completed run that has no decision.
+
+        Nothing decided the saved output, so a strict policy does not deliver
+        it: ``output`` is empty and the text is ``rejected_output``, with no
+        record. The checkpoint is left as it was.
+        """
+        logger.warning(
+            "Checkpoint %r completed with no delivery acceptance record, so this Swarm's "
+            "strict policy withholds its output, which the result returns as "
+            "rejected_output. To decide it, re-run the task under this policy, or apply "
+            "smythe.acceptance.evaluate_delivery() to the saved output and graph.",
+            execution_id,
+        )
+        return "", output
+
+    def _check_resume_policy(
+        self, execution_id: str, saved: DeliveryAcceptance | None, task: Task | None,
+    ) -> None:
+        """Refuse to finish a run under a delivery acceptance policy other than its own."""
+        policy = self._strict_policy()
+        if saved is None:
+            if policy is not None:
+                raise ValueError(
+                    f"Checkpoint {execution_id!r} was written without strict delivery "
+                    "acceptance, so this Swarm's strict policy cannot finish it. Resume it "
+                    "without a strict policy, or re-run the task."
+                )
+            return
+        if policy is None or policy.sha256 != saved.policy_sha256:
+            raise ValueError(
+                f"Checkpoint {execution_id!r} belongs to an unfinished run with strict delivery "
+                f"acceptance under policy {saved.policy_sha256[:12]}; resume it with a Swarm "
+                "whose AcceptancePolicy has that sha256, or re-run the task."
+            )
+        if saved.task_sha256 != task_sha256(task):
+            raise ValueError(
+                f"Checkpoint {execution_id!r} holds a task that its strict delivery acceptance "
+                "record does not bind"
+            )
+
+    def _check_inherited_verdicts(self, graph: ExecutionGraph) -> None:
+        """Refuse a strict run on a gate whose judge completed before it.
+
+        A strict decision rests only on verdicts its own judges produced in
+        the run it decides. A pending judge replaces any record it carries
+        when it runs, but a completed judge does not run again: its saved
+        final verdict (a consumed receipt, or ``advisory_verdict`` without
+        regenerations) would decide a run that never read it, a pending
+        receipt or a bound target generation would have the run read a reply
+        written before it, and without either the gate could never decide.
+        A resumed run keeps its own records and is not checked here.
+        """
+        if self._strict_policy() is None:
+            return
+        for node in graph.nodes:
+            if node.verifies and node.status is NodeStatus.COMPLETED:
+                raise ValueError(
+                    f"Judge {node.id!r} completed before this run, so this run would not "
+                    "produce its verdict, and a strict acceptance policy decides only on "
+                    "verdicts produced in the run. Resume the run's checkpoint, or set the "
+                    "judge back to pending so it judges its target in this run."
+                )
+
     def plan(self, task: Task) -> ExecutionGraph:
         """Generate and assign an execution graph without running it.
 
         Returns the graph so you can inspect the architect's decisions
-        before committing to execution.
+        before committing to execution. Under ``max_budget_usd``, a provider
+        without the per-call ceiling it requires for the nodes' model does
+        not stop planning: set each node's ``metadata["estimated_cost_usd"]``
+        before ``execute(graph)``, which checks every node before its first
+        call. An ``LLM_MERGE`` synthesis, which no node estimate covers, is
+        still refused before planning.
         """
         if self._run_store is not None:
             return asyncio.run(self._workflow_runtime().plan(task))
-        return self._plan(task, Tracer())
+        return self._plan(task, Tracer(), executing=False)
 
     def _plan_for_execution(self, task: Task, tracer: Tracer) -> ExecutionGraph:
         """Plan *task* for execute(); a subclass's plan() stays authoritative."""
         if type(self).plan is not Swarm.plan:
+            # How the subclass plans is its own; its nodes are checked once
+            # the plan exists.
+            self._check_run_support()
             with tracer.phase("planning"):
-                return self.plan(task)
+                graph = self.plan(task)
+            self._refuse_read_steps(graph)
+            return graph
         return self._plan(task, tracer)
 
     async def _aplan_for_execution(self, task: Task, tracer: Tracer) -> ExecutionGraph:
         """Async _plan_for_execution(); a subclass's aplan() stays authoritative."""
         if type(self).aplan is not Swarm.aplan:
+            self._check_run_support()
             with tracer.phase("planning"):
-                return await self.aplan(task)
+                graph = await self.aplan(task)
+            self._refuse_read_steps(graph)
+            return graph
         return await self._aplan(task, tracer)
 
-    def _plan(self, task: Task, tracer: Tracer) -> ExecutionGraph:
-        """Plan *task*, measuring routing and planning on *tracer*."""
+    def _check_run_support(self) -> None:
+        """Reject a run its provider cannot serve, whatever its plan will contain.
+
+        A tool runtime offers tools to every node, and an ``LLM_MERGE``
+        synthesis calls the run's model, so both are known before any plan.
+        """
+        if self._tool_runtime is not None:
+            check_provider_support(self._provider, str(self.model), node_id=None,
+                                   check_model=False, tools=True)
+        self._check_synthesis_support(self.max_budget_usd)
+
+    def _check_synthesis_support(self, max_budget_usd: float | None) -> None:
+        # A synthesizer that is not a Synthesizer has no merge to check.
+        check = getattr(self._synthesizer, "check_merge_support", None)
+        if check is not None:
+            check(provider=self._provider, model=self.model, max_budget_usd=max_budget_usd)
+
+    def _check_planning_support(self, *, executing: bool) -> None:
+        """Reject, before routing or planning, a run its provider cannot serve.
+
+        A model-generated plan cannot set a node's model or cost estimate, so
+        when every plan comes from ``LLMArchitect`` the run's model is every
+        node's model and is checked now. Other architects build nodes in code
+        and may set both, so their nodes are checked once the plan exists.
+
+        The run's missing cost ceiling is refused only when *executing*: a
+        caller of plan() can still set each returned node's estimate, which
+        the node check before the first call accepts in its place. So is a
+        strict policy without final validators when every architect that
+        could plan generates its gates, which that policy does not count.
+        """
+        self._check_run_support()
+        architects = _planning_architects(self._router, self._architect)
+        if architects and all(type(item) is LLMArchitect for item in architects):
+            check_provider_support(self._provider, str(self.model), node_id=None,
+                                   max_budget_usd=self.max_budget_usd if executing else None)
+        if executing:
+            # The plan's gates will not count, so nothing could accept its output.
+            _check_gate_planning(self._strict_policy(), architects)
+
+    def _check_obligations(self, graph: ExecutionGraph) -> None:
+        """Refuse, before any node runs, a graph whose output a strict policy could not decide."""
+        policy = self._strict_policy()
+        if policy is not None:
+            validate_acceptance_obligations(
+                graph, policy, strategy=_synthesis_strategy(self._synthesizer),
+            )
+
+    def _check_dispatch_support(self, graph: ExecutionGraph, budget: Sentinel) -> None:
+        """Reject, before any node runs, nodes or a synthesis the provider cannot serve."""
+        check_pending_nodes(self._provider, graph, max_budget_usd=budget.max_budget_usd,
+                            tools=self._tool_runtime is not None)
+        self._check_synthesis_support(budget.max_budget_usd)
+
+    def _plan(self, task: Task, tracer: Tracer, *, executing: bool = True) -> ExecutionGraph:
+        """Plan *task*, measuring routing and planning on *tracer*.
+
+        *executing* is False for plan(), whose caller sees the graph first.
+        """
         Sentinel(self.max_budget_usd)
+        self._check_planning_support(executing=executing)
         task = snapshot_task(task)
         started = tracer.now()
         architect = self._select_architect(snapshot_task(task))
@@ -287,17 +737,18 @@ class Swarm:
             tracer.add_phase("routing", tracer.since(started))
         with tracer.phase("planning"):
             graph, architect_registry = architect.plan(snapshot_task(task))
-            return self._adopt_plan(graph, architect_registry, task)
+            return self._adopt_plan(graph, architect_registry, task, architect)
 
     async def aplan(self, task: Task) -> ExecutionGraph:
         """Async variant of plan() — safe to call from a running event loop."""
         if self._run_store is not None:
             return await self._workflow_runtime().plan(task)
-        return await self._aplan(task, Tracer())
+        return await self._aplan(task, Tracer(), executing=False)
 
-    async def _aplan(self, task: Task, tracer: Tracer) -> ExecutionGraph:
+    async def _aplan(self, task: Task, tracer: Tracer, *, executing: bool = True) -> ExecutionGraph:
         """Async _plan()."""
         Sentinel(self.max_budget_usd)
+        self._check_planning_support(executing=executing)
         task = snapshot_task(task)
         started = tracer.now()
         architect = await self._aselect_architect(snapshot_task(task))
@@ -305,10 +756,20 @@ class Swarm:
             tracer.add_phase("routing", tracer.since(started))
         with tracer.phase("planning"):
             graph, architect_registry = await architect.aplan(snapshot_task(task))
-            return self._adopt_plan(graph, architect_registry, task)
+            return self._adopt_plan(graph, architect_registry, task, architect)
 
-    def _adopt_plan(self, graph: ExecutionGraph, architect_registry: Registry, task: Task) -> ExecutionGraph:
-        """Register the plan's agents and stamp its nodes for execution."""
+    def _adopt_plan(
+        self, graph: ExecutionGraph, architect_registry: Registry, task: Task, architect: Architect,
+    ) -> ExecutionGraph:
+        """Register the plan's agents and stamp its nodes for execution.
+
+        Only ordinary runs plan here, so a plan with read steps, which an
+        architect or template can build in code, is refused before any node
+        call. Under a strict policy, each gate of a plan that *architect*
+        generated rather than built from developer code is marked with
+        ``GENERATED_GATE_KEY``, so that gate does not accept output on its own.
+        """
+        self._refuse_read_steps(graph)
         for agent in architect_registry.list_agents():
             self._registry.register(agent)
 
@@ -316,6 +777,8 @@ class Swarm:
         graph.task = task
         self._stamp_model(graph)
         self._stamp_task_context(graph, task)
+        if self._strict_policy() is not None:
+            _mark_generated_gates(graph, architect)
         return graph
 
     @staticmethod
@@ -386,6 +849,7 @@ class Swarm:
             graph = await self._aplan_for_execution(task_or_graph, tracer)
         else:
             graph = self._prepare_graph(task_or_graph)
+        self._check_obligations(graph)
         task = snapshot_task(graph.task) if graph.task is not None else None
 
         execution_id = uuid4().hex
@@ -411,9 +875,11 @@ class Swarm:
             on_control_update=self._control_checkpointer(
                 execution_id, graph, budget, task, created_at, timing,
             ),
+            acceptance=self._acceptance,
         )
         self._active_executor = executor
         try:
+            self._check_dispatch_support(graph, budget)
             graph = await executor.run(graph)
             with tracer.phase("synthesis"):
                 output = await self._synthesizer.asynthesize(
@@ -423,6 +889,7 @@ class Swarm:
                     budget=budget,
                     tracer=tracer,
                 )
+            acceptance = self._decide(graph, output, task, tracer)
         except BaseException as exc:
             self._save_checkpoint(
                 execution_id, "failed", graph, budget, task, created_at, timing,
@@ -431,26 +898,9 @@ class Swarm:
             )
             raise
 
-        self._save_checkpoint(
-            execution_id, "completed", graph, budget, task, created_at, timing,
-            output=output,
+        return self._finish(
+            execution_id, graph, budget, task, created_at, timing, output, acceptance,
         )
-
-        result = SwarmResult(
-            output=output,
-            graph=graph,
-            trace=tracer.summary(),
-            total_cost_usd=budget.total_cost_usd,
-            cost_is_complete=budget.cost_is_complete,
-            cost_contains_estimates=budget.cost_contains_estimates,
-            execution_id=execution_id,
-            timing=timing.result(),
-        )
-
-        if self._memory is not None and task is not None:
-            self._memory.record(task, graph, result)
-
-        return result
 
     def _execute_sync(self, task_or_graph: Task | ExecutionGraph) -> SwarmResult:
         """Serial execution using the standard Executor."""
@@ -463,6 +913,7 @@ class Swarm:
             graph = self._plan_for_execution(task_or_graph, tracer)
         else:
             graph = self._prepare_graph(task_or_graph)
+        self._check_obligations(graph)
         task = snapshot_task(graph.task) if graph.task is not None else None
 
         execution_id = uuid4().hex
@@ -488,9 +939,11 @@ class Swarm:
             on_control_update=self._control_checkpointer(
                 execution_id, graph, budget, task, created_at, timing,
             ),
+            acceptance=self._acceptance,
         )
         self._active_executor = executor
         try:
+            self._check_dispatch_support(graph, budget)
             graph = executor.run(graph)
             with tracer.phase("synthesis"):
                 output = self._synthesizer.synthesize(
@@ -500,6 +953,7 @@ class Swarm:
                     budget=budget,
                     tracer=tracer,
                 )
+            acceptance = self._decide(graph, output, task, tracer)
         except BaseException as exc:
             self._save_checkpoint(
                 execution_id, "failed", graph, budget, task, created_at, timing,
@@ -508,26 +962,9 @@ class Swarm:
             )
             raise
 
-        self._save_checkpoint(
-            execution_id, "completed", graph, budget, task, created_at, timing,
-            output=output,
+        return self._finish(
+            execution_id, graph, budget, task, created_at, timing, output, acceptance,
         )
-
-        result = SwarmResult(
-            output=output,
-            graph=graph,
-            trace=tracer.summary(),
-            total_cost_usd=budget.total_cost_usd,
-            cost_is_complete=budget.cost_is_complete,
-            cost_contains_estimates=budget.cost_contains_estimates,
-            execution_id=execution_id,
-            timing=timing.result(),
-        )
-
-        if self._memory is not None and task is not None:
-            self._memory.record(task, graph, result)
-
-        return result
 
     def _save_checkpoint(
         self,
@@ -541,11 +978,19 @@ class Swarm:
         output: str | None = None,
         accounting_error: str | None = None,
         response_error: dict | None = None,
+        acceptance: DeliveryAcceptance | None = None,
     ) -> None:
-        """Persist full execution state, if a checkpoint store is configured."""
+        """Persist full execution state, if a checkpoint store is configured.
+
+        A strict run's states are version 5: they carry *acceptance*, the
+        decision, or until there is one an undecided record that binds the
+        run's policy and task.
+        """
         if self._checkpoint_store is None:
             return
         with timing.tracer.phase("checkpoint"):
+            if acceptance is None:
+                acceptance = self._pending_acceptance(task)
             state = build_state(
                 control={
                     "revisions_used": getattr(
@@ -563,6 +1008,8 @@ class Swarm:
                 output=output,
                 created_at=created_at,
                 timing=timing.checkpoint_block(),
+                token_estimate_nodes=budget.token_estimate_nodes,
+                delivery_acceptance=acceptance,
             )
             if accounting_error is not None:
                 state["budget"]["accounting_error"] = accounting_error
@@ -615,6 +1062,23 @@ class Swarm:
 
         return _on_control_update
 
+    def refresh_context(self, execution_id: str, sources: Sequence[ContextSource]) -> int:
+        """Give an unfinished durable run new sources.  Sync wrapper around arefresh_context()."""
+        return asyncio.run(self.arefresh_context(execution_id, sources))
+
+    async def arefresh_context(self, execution_id: str, sources: Sequence[ContextSource]) -> int:
+        """Record *sources* as a durable run's next source revision; returns that revision.
+
+        A run with context assembly keeps the sources it recorded, so sources
+        that changed while it was paused reach it only through this call.
+        Every node of the run is pending again at its next generation, and
+        :meth:`resume` re-evaluates each with a new context snapshot; nothing
+        is called here. See ``smythe.workflow.WorkflowRuntime.refresh_context``.
+        """
+        if self._run_store is None:
+            raise ValueError("refresh_context needs a durable run_store")
+        return await self._workflow_runtime().refresh_context(execution_id, sources)
+
     def resume(self, execution_id: str) -> SwarmResult:
         """Resume a checkpointed execution.  Sync wrapper around aresume()."""
         return asyncio.run(self.aresume(execution_id))
@@ -627,9 +1091,17 @@ class Swarm:
         and re-run. Cost accounting continues against the budget policy
         recorded in the checkpoint.  If the checkpointed execution
         already finished, its stored result is returned without
-        re-executing anything.  Resumed work runs one node at a time
+        re-executing anything; a strict run's result carries its delivery
+        acceptance record after the saved output, task, sources and policy
+        are checked against it, and any mismatch makes it ``indeterminate``.
+        A strict policy withholds the output of a completed run that has no
+        record, returning it as ``rejected_output`` with ``acceptance=None``.
+        An unfinished strict run resumes only under the same strict policy,
+        and a strict policy never finishes a run that began without one.
+        Resumed work runs one node at a time
         unless this Swarm has ``parallel=True``; a durable ``run_store``
-        run keeps the concurrency its first execution recorded.
+        run keeps the concurrency its first execution recorded and resumes
+        only under the acceptance policy its recipe records.
         """
         if self._run_store is not None:
             return await self._workflow_runtime().resume(
@@ -653,6 +1125,7 @@ class Swarm:
                 f"{list(SUPPORTED_CHECKPOINT_VERSIONS)}. Re-run the task "
                 f"instead of resuming."
             )
+        acceptance = delivery_acceptance_from_state(state)
 
         graph = graph_from_dict(state["graph"])
         if graph.run_ref is not None:
@@ -670,6 +1143,12 @@ class Swarm:
         budget_state = state.get("budget", {})
         if not isinstance(budget_state, dict):
             raise BudgetValidationError("Checkpoint budget must be an object")
+        # Checkpoints written before this list existed name no token estimates.
+        token_estimate_nodes = budget_state.get("token_estimate_nodes", [])
+        if not isinstance(token_estimate_nodes, list) or not all(
+            isinstance(node_id, str) for node_id in token_estimate_nodes
+        ):
+            raise BudgetValidationError("Checkpoint token_estimate_nodes must be a list of node IDs")
         budget = Sentinel(budget_state.get("max_budget_usd"))
         budget.restore(
             budget_state.get("node_costs", {}),
@@ -681,6 +1160,7 @@ class Swarm:
                 node.id for node in graph.nodes
                 if node.metadata.get("cost_usd_is_estimate")
             },
+            token_estimate_nodes=set(token_estimate_nodes),
         )
         invalid_nodes = [node.id for node in graph.nodes if node.metadata.get("accounting_invalid")]
         if invalid_nodes or "accounting_error" in budget_state:
@@ -698,11 +1178,16 @@ class Swarm:
 
         completed = state.get("status") == "completed" and state.get("output") is not None
         validate_verification_checkpoint(graph, version=version, completed=completed)
-        timing = _RunTiming(tracer, resumed=True, previous=_saved_segments(state))
+        timing = _RunTiming(tracer, resumed=True, previous=timing_segments(state))
         if completed and not verification_pending(graph):
+            if acceptance is not None:
+                acceptance = self._reverified(acceptance, state["output"], graph, task)
+            output, rejected_output = _delivered(state["output"], acceptance)
+            if acceptance is None and self._strict_policy() is not None:
+                output, rejected_output = self._withheld(execution_id, state["output"])
             tracer.add_phase("recovery", tracer.since(recovery_started))
             return SwarmResult(
-                output=state["output"],
+                output=output,
                 graph=graph,
                 trace=[],
                 total_cost_usd=budget.total_cost_usd,
@@ -710,7 +1195,14 @@ class Swarm:
                 cost_contains_estimates=budget.cost_contains_estimates,
                 execution_id=execution_id,
                 timing=timing.result(),
+                acceptance=acceptance,
+                rejected_output=rejected_output,
             )
+        # A checkpoint saved before ordinary runs refused read steps may hold one.
+        self._refuse_read_steps(graph)
+        # Finishing a run under another policy would decide its output
+        # differently, so only the policy it began with may finish it.
+        self._check_resume_policy(execution_id, acceptance, task)
 
         from smythe.async_executor import AsyncExecutor
 
@@ -751,10 +1243,12 @@ class Swarm:
             on_control_update=self._control_checkpointer(
                 execution_id, graph, budget, task, created_at, timing,
             ),
+            acceptance=self._acceptance,
         )
         self._active_executor = executor
         tracer.add_phase("recovery", tracer.since(recovery_started))
         try:
+            self._check_dispatch_support(graph, budget)
             graph = await executor.run(graph)
             with tracer.phase("synthesis"):
                 output = await self._synthesizer.asynthesize(
@@ -764,6 +1258,7 @@ class Swarm:
                     budget=budget,
                     tracer=tracer,
                 )
+            acceptance = self._decide(graph, output, task, tracer)
         except BaseException as exc:
             self._save_checkpoint(
                 execution_id, "failed", graph, budget, task, created_at, timing,
@@ -772,26 +1267,9 @@ class Swarm:
             )
             raise
 
-        self._save_checkpoint(
-            execution_id, "completed", graph, budget, task, created_at, timing,
-            output=output,
+        return self._finish(
+            execution_id, graph, budget, task, created_at, timing, output, acceptance,
         )
-
-        result = SwarmResult(
-            output=output,
-            graph=graph,
-            trace=tracer.summary(),
-            total_cost_usd=budget.total_cost_usd,
-            cost_is_complete=budget.cost_is_complete,
-            cost_contains_estimates=budget.cost_contains_estimates,
-            execution_id=execution_id,
-            timing=timing.result(),
-        )
-
-        if self._memory is not None and task is not None:
-            self._memory.record(task, graph, result)
-
-        return result
 
     def _resolve_input(
         self, task_or_graph: Task | ExecutionGraph | None,
@@ -817,12 +1295,16 @@ class Swarm:
         parallel: bool = False,
         run_store: SQLiteWorkflowStore | None = None,
         graph_policy: WorkflowGraphPolicy | None = None,
+        acceptance: AcceptancePolicy | None = None,
+        read_tools: tuple[ReadProfile, ...] | list[ReadProfile] = (),
     ) -> Swarm:
         """Create a Swarm pre-loaded with a YAML-defined execution graph.
 
         The returned Swarm's internal registry is populated with agents
         defined in the YAML file.  Call execute() with the loaded graph
-        to run it.
+        to run it.  A delivery acceptance policy comes only from the
+        ``acceptance`` argument, never from the file, and so do the read
+        profiles that the file's read steps name.
         """
         from smythe.loader import load_graph
 
@@ -836,6 +1318,8 @@ class Swarm:
             parallel=parallel,
             run_store=run_store,
             graph_policy=graph_policy,
+            acceptance=acceptance,
+            read_tools=read_tools,
         )
         if instance._graph_policy is not None:
             instance._graph_policy.validate(graph, default_model=instance.model)
@@ -849,6 +1333,16 @@ class Swarm:
             if "model" not in node.metadata:
                 node.metadata["model"] = self.model
 
+    @staticmethod
+    def _refuse_read_steps(graph: ExecutionGraph) -> None:
+        """Refuse, before any node call, an ordinary run of a graph with read steps."""
+        read_steps = [node.id for node in graph.nodes if READ_STEP_KEY in node.metadata]
+        if read_steps:
+            raise ValueError(
+                f"Nodes {read_steps} declare read steps, which run only in a durable workflow: "
+                "pass run_store and read_tools to Swarm"
+            )
+
     def _prepare_graph(self, graph: ExecutionGraph) -> ExecutionGraph:
         """Ready a caller-built graph for execution.
 
@@ -859,6 +1353,8 @@ class Swarm:
         if graph.run_ref is not None:
             raise ValueError("This graph requires its matching durable run_store")
         graph.validate()
+        self._refuse_read_steps(graph)
+        self._check_inherited_verdicts(graph)
         self._stamp_model(graph)
         if graph.task is not None:
             graph.task = snapshot_task(graph.task)
@@ -897,4 +1393,6 @@ class Swarm:
             retry_backoff_s=self.retry_backoff_s,
             max_concurrency=self.max_concurrency,
             graph_policy=self._graph_policy, behavior_settings=behavior_settings,
+            acceptance=self._acceptance, read_tools=self._read_tools,
+            context_sources=self._context_sources,
         )

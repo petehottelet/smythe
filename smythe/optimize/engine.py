@@ -16,6 +16,7 @@ from dataclasses import dataclass
 from typing import Any, TypeAlias
 
 from smythe.optimize.contracts import (
+    _SPLITS,
     Candidate,
     ExperimentContract,
     ObjectiveDirection,
@@ -25,6 +26,8 @@ from smythe.optimize.contracts import (
 )
 from smythe.optimize.ledger import (
     _ENGINE_HOLDOUT_CAPABILITY,
+    _REFERENCE_RULES,
+    _holdout_pool_message,
     _holdout_reuse_message,
     _lease_duration_ns,
     CampaignLease,
@@ -52,7 +55,7 @@ from smythe.optimize.statistics import (
 )
 
 
-RUNNER_VERSION = 3
+RUNNER_VERSION = 4
 DEFAULT_BOOTSTRAP_RESAMPLES = 2_000
 _HASH_RE = re.compile(r"sha256:[0-9a-f]{64}")
 _MAX_SIGNED_63 = (1 << 63) - 1
@@ -76,7 +79,13 @@ class OptimizationLimitError(OptimizationError):
 
 @dataclass(frozen=True, slots=True)
 class TrialContext:
-    """Immutable input supplied to one in-process evaluator invocation."""
+    """Immutable input supplied to one in-process evaluator invocation.
+
+    ``task_index`` is the task to evaluate, counted from 0 within the split's
+    declared task pool, or None when the runner declares no pool for the
+    split.  Paired trials on one seed share it, and no two seeds of a split
+    do.
+    """
 
     campaign_id: str
     optimization_plan_hash: str
@@ -88,6 +97,7 @@ class TrialContext:
     evaluator_hash: str
     ceiling_microusd: int
     deadline_monotonic: float
+    task_index: int | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -177,21 +187,36 @@ class OptimizationResult:
     holdout_assessment: PromotionAssessment | None
     trial_keys: tuple[str, ...]
     ledger_snapshot: dict[str, Any]
+    references: tuple[dict[str, Any], ...] = ()
 
     def __post_init__(self) -> None:
         scores = _json_copy([dict(item) for item in self.development_scores])
         snapshot = _json_copy(self.ledger_snapshot)
+        references = _json_copy([dict(item) for item in self.references])
         object.__setattr__(self, "development_scores", tuple(scores))
         object.__setattr__(self, "ledger_snapshot", snapshot)
+        object.__setattr__(self, "references", tuple(references))
+
+    @property
+    def verdict(self) -> str:
+        """Three-way verdict of the last paired assessment.
+
+        That is the holdout when it ran, otherwise confirmation. A campaign
+        that stopped in development formed no paired interval, so its
+        verdict is ``"inconclusive"``.
+        """
+
+        return _final_verdict(self.confirmation_assessment, self.holdout_assessment)
 
     def to_dict(self) -> dict[str, Any]:
-        return {
+        result = {
             "campaign_id": self.campaign_id,
             "optimization_plan_hash": self.optimization_plan_hash,
             "holdout_seed_commitment": self.holdout_seed_commitment,
             "incumbent_candidate_id": self.incumbent_candidate_id,
             "selected_candidate_id": self.selected_candidate_id,
             "promoted": self.promoted,
+            "verdict": self.verdict,
             "reason": self.reason,
             "decision_id": self.decision_id,
             "development_scores": _json_copy(list(self.development_scores)),
@@ -199,9 +224,12 @@ class OptimizationResult:
                 self.confirmation_assessment
             ),
             "holdout_assessment": _assessment_dict(self.holdout_assessment),
-            "trial_keys": list(self.trial_keys),
-            "ledger_snapshot": _json_copy(self.ledger_snapshot),
         }
+        if self.references:
+            result["references"] = _json_copy(list(self.references))
+        result["trial_keys"] = list(self.trial_keys)
+        result["ledger_snapshot"] = _json_copy(self.ledger_snapshot)
+        return result
 
 
 class OptimizationRunner:
@@ -218,6 +246,8 @@ class OptimizationRunner:
         campaign_id: str | None = None,
         lease_ttl_s: float = 30.0,
         lease_heartbeat_s: float | None = None,
+        task_pools: Mapping[str, int] | None = None,
+        max_holdout_draws: int | None = None,
     ) -> None:
         if not isinstance(contract, ExperimentContract):
             raise TypeError("contract must be an ExperimentContract")
@@ -244,6 +274,22 @@ class OptimizationRunner:
             not isinstance(campaign_id, str) or not campaign_id.strip()
         ):
             raise ValueError("campaign_id must be a non-empty string when provided")
+        if task_pools is not None and not isinstance(task_pools, Mapping):
+            raise TypeError("task_pools must map split names to task counts")
+        pools = dict(task_pools or {})
+        for split, size in pools.items():
+            if split not in _SPLITS:
+                raise ValueError(f"task_pools has an unknown split: {split!r}")
+            if isinstance(size, bool) or not isinstance(size, int) or not (
+                1 <= size <= _MAX_SIGNED_63
+            ):
+                raise ValueError(f"task_pools[{split!r}] must be a positive integer")
+        if max_holdout_draws is not None and (
+            isinstance(max_holdout_draws, bool)
+            or not isinstance(max_holdout_draws, int)
+            or not 1 <= max_holdout_draws <= _MAX_SIGNED_63
+        ):
+            raise ValueError("max_holdout_draws must be a positive integer when provided")
 
         self.contract = contract
         self.ledger = ledger
@@ -258,19 +304,35 @@ class OptimizationRunner:
             raise ValueError("lease heartbeat must be shorter than its TTL")
         self.lease_ttl_s = float(lease_ttl_s)
         self.lease_heartbeat_s = float(interval)
+        self.task_pools = {split: pools[split] for split in _SPLITS if split in pools}
+        self.max_holdout_draws = max_holdout_draws
 
     async def run(
         self,
         incumbent: Candidate,
         candidates: Sequence[Candidate],
+        *,
+        references: Sequence[Candidate] = (),
+        reference_rule: str = "report",
     ) -> OptimizationResult:
-        """Execute one deterministic campaign, safely resuming completed trials."""
+        """Execute one deterministic campaign, safely resuming completed trials.
+
+        ``references`` are sealed comparison policies, such as a predecessor
+        or a simpler alternative.  They skip development and run beside the
+        incumbent and the selected challenger on the same confirmation seeds
+        and, when confirmation passes, holdout seeds; the challenger is
+        assessed against each.  A reference is never promoted, and its
+        holdout trials are not holdout use, though they draw from a finite
+        holdout pool.  ``reference_rule="report"`` only records those
+        comparisons; ``"must_not_be_worse"`` also fails a stage when any
+        reference's verdict there is ``"worse"``.
+        """
 
         caller = asyncio.current_task()
         initial_cancellations = caller.cancelling()
         self._validate_executable_contract()
         started = time.monotonic()
-        plan = self._build_plan(incumbent, candidates)
+        plan = self._build_plan(incumbent, candidates, references, reference_rule)
         self._require_unused_holdouts(plan)
         try:
             self.ledger.create_campaign(self.contract, incumbent.candidate_id,
@@ -396,6 +458,7 @@ class OptimizationRunner:
         if not viable:
             reason = "no candidate passed development gates and hard bounds"
             candidate_id = selected_score["candidate_id"]
+            references = _reference_entries(plan)
             decision = PromotionDecision(
                 campaign_id=campaign_id,
                 candidate_id=candidate_id,
@@ -410,6 +473,7 @@ class OptimizationRunner:
                     "holdout_seed_commitment": holdout_seed_commitment,
                     "stage": "development",
                     "development_scores": list(scores),
+                    **_reference_fields(plan, references),
                 },
             )
             decision_id = self.ledger.append_decision(decision, lease=lease)
@@ -427,6 +491,7 @@ class OptimizationRunner:
                 holdout_assessment=None,
                 trial_keys=all_development_keys,
                 ledger_snapshot=self.ledger.snapshot(campaign_id),
+                references=references,
             )
 
         selected = next(
@@ -434,32 +499,32 @@ class OptimizationRunner:
             for item in plan["candidates"]
             if item.candidate_id == selected_score["candidate_id"]
         )
-        confirmation_baseline, confirmation_candidate = await self._evaluate_pair(
-            campaign_id,
-            plan["plan_hash"],
-            incumbent,
-            selected,
-            "confirmation",
-            confirmation_seeds,
-            deadline,
-            duration_budget,
-            lease=lease,
+        arms = (
+            (incumbent, "incumbent"),
+            (selected, "challenger"),
+            *((reference, "reference") for reference in plan["references"]),
         )
-        self._require_time(deadline)
-        confirmation = self._assess(
-            confirmation_baseline,
-            confirmation_candidate,
-            "confirmation",
-            plan["plan_hash"],
-            deadline,
-        )
-        self._require_time(deadline)
-        holdout: PromotionAssessment | None = None
         evidence = list(all_development_keys)
-        evidence.extend(record.trial_key for record in confirmation_baseline)
-        evidence.extend(record.trial_key for record in confirmation_candidate)
+        confirmation, reference_confirmations, confirmation_passed = (
+            await self._compare_arms(
+                campaign_id,
+                plan,
+                arms,
+                "confirmation",
+                confirmation_seeds,
+                deadline,
+                duration_budget,
+                evidence,
+                lease=lease,
+            )
+        )
+        holdout: PromotionAssessment | None = None
+        reference_holdouts: tuple[PromotionAssessment | None, ...] = (
+            (None,) * len(plan["references"])
+        )
+        holdout_passed = False
 
-        if confirmation.promote:
+        if confirmation_passed:
             # Durably claim this policy's one holdout for its holdout identity
             # before any holdout work is dispatched; a use already recorded by
             # any other campaign is refused here.
@@ -472,40 +537,34 @@ class OptimizationRunner:
                 holdout_seeds[0],
                 lease=lease,
             )
-            holdout_baseline, holdout_candidate = await self._evaluate_pair(
+            holdout, reference_holdouts, holdout_passed = await self._compare_arms(
                 campaign_id,
-                plan["plan_hash"],
-                incumbent,
-                selected,
+                plan,
+                arms,
                 "holdout",
                 holdout_seeds,
                 deadline,
                 duration_budget,
+                evidence,
                 lease=lease,
             )
-            self._require_time(deadline)
-            holdout = self._assess(
-                holdout_baseline,
-                holdout_candidate,
-                "holdout",
-                plan["plan_hash"],
-                deadline,
-            )
-            self._require_time(deadline)
-            evidence.extend(record.trial_key for record in holdout_baseline)
-            evidence.extend(record.trial_key for record in holdout_candidate)
 
-        promoted = confirmation.promote and holdout is not None and holdout.promote
+        promoted = confirmation_passed and holdout_passed
         if promoted:
             reason = "confirmation and untouched holdout both passed promotion policy"
-        elif not confirmation.promote:
+        elif not confirmation_passed:
             reason = "confirmation rejected candidate: " + "; ".join(
-                confirmation.reasons
+                self._stage_reasons(plan, confirmation, reference_confirmations)
             )
         else:
             assert holdout is not None
-            reason = "holdout rejected candidate: " + "; ".join(holdout.reasons)
+            reason = "holdout rejected candidate: " + "; ".join(
+                self._stage_reasons(plan, holdout, reference_holdouts)
+            )
         trial_keys = _unique_keys(evidence)
+        references = _reference_entries(
+            plan, reference_confirmations, reference_holdouts
+        )
         decision = PromotionDecision(
             campaign_id=campaign_id,
             candidate_id=selected.candidate_id,
@@ -519,8 +578,11 @@ class OptimizationRunner:
                 "ledger_durability": self.ledger.durability,
                 "holdout_seed_commitment": holdout_seed_commitment,
                 "development": selected_score,
+                "development_scores": list(scores),
                 "confirmation": _assessment_dict(confirmation),
                 "holdout": _assessment_dict(holdout),
+                "verdict": _final_verdict(confirmation, holdout),
+                **_reference_fields(plan, references),
             },
         )
         decision_id = self.ledger.append_decision(decision, lease=lease)
@@ -538,12 +600,75 @@ class OptimizationRunner:
             holdout_assessment=holdout,
             trial_keys=trial_keys,
             ledger_snapshot=self.ledger.snapshot(campaign_id),
+            references=references,
         )
+
+    async def _compare_arms(
+        self,
+        campaign_id: str,
+        plan: Mapping[str, Any],
+        arms: Sequence[tuple[Candidate, str]],
+        split: str,
+        seeds: Sequence[int],
+        deadline: float,
+        duration_budget: _DurationBudget,
+        evidence: list[str],
+        *,
+        lease: CampaignLease,
+    ) -> tuple[PromotionAssessment, tuple[PromotionAssessment, ...], bool]:
+        """Run every arm on one paired split and assess the challenger.
+
+        Returns the assessment against the incumbent, one against each
+        reference, and whether the stage passed under the reference rule.
+        Trial keys join ``evidence`` in arm order.
+        """
+
+        plan_hash = plan["plan_hash"]
+        records = await self._evaluate_arms(
+            campaign_id,
+            plan_hash,
+            arms,
+            split,
+            seeds,
+            deadline,
+            duration_budget,
+            lease=lease,
+        )
+        self._require_time(deadline)
+        baseline, candidate, *reference_records = records
+        assessment = self._assess(baseline, candidate, split, plan_hash, deadline)
+        references = tuple(
+            self._assess(item, candidate, split, plan_hash, deadline, "reference")
+            for item in reference_records
+        )
+        self._require_time(deadline)
+        evidence.extend(record.trial_key for series in records for record in series)
+        passed = assessment.promote and not self._stage_reasons(plan, None, references)
+        return assessment, references, passed
+
+    @staticmethod
+    def _stage_reasons(
+        plan: Mapping[str, Any],
+        assessment: PromotionAssessment | None,
+        references: Sequence[PromotionAssessment | None],
+    ) -> list[str]:
+        """Why a stage failed: its own reasons, then any blocking reference."""
+
+        reasons = [] if assessment is None else list(assessment.reasons)
+        if plan["reference_rule"] == "must_not_be_worse":
+            reasons.extend(
+                f"reference {reference.candidate_id} is better on the primary objective"
+                for reference, item in zip(plan["references"], references, strict=True)
+                if item is not None and item.verdict == "worse"
+            )
+        return reasons
 
     def _build_plan(
         self,
         incumbent: Candidate,
         candidates: Sequence[Candidate],
+        references: Sequence[Candidate] = (),
+        reference_rule: str = "report",
     ) -> dict[str, Any]:
         if not isinstance(incumbent, Candidate):
             raise TypeError("incumbent must be a Candidate")
@@ -554,7 +679,20 @@ class OptimizationRunner:
             raise OptimizationError("at least one challenger candidate is required")
         if any(not isinstance(candidate, Candidate) for candidate in challengers):
             raise TypeError("candidates must contain only Candidate values")
-        planned = (incumbent, *challengers)
+        if (
+            isinstance(references, (str, bytes))
+            or not isinstance(references, Sequence)
+            or any(not isinstance(item, Candidate) for item in references)
+        ):
+            raise TypeError("references must be a sequence of Candidate values")
+        if reference_rule not in _REFERENCE_RULES:
+            raise ValueError(
+                "reference_rule must be one of: " + ", ".join(_REFERENCE_RULES)
+            )
+        compared = tuple(references)
+        # References are sealed after the challengers, so a reference may name
+        # a challenger as its parent but not the reverse.
+        planned = (incumbent, *challengers, *compared)
         for candidate in planned:
             if candidate.contract_hash != self.contract.contract_hash:
                 raise OptimizationError("all candidates must belong to the runner contract")
@@ -568,15 +706,27 @@ class OptimizationRunner:
             raise OptimizationError("a challenger cannot be the incumbent candidate")
         if incumbent.policy_hash in hashes:
             raise OptimizationError("a challenger cannot repeat the incumbent policy")
+        reference_ids = [item.candidate_id for item in compared]
+        reference_hashes = {item.policy_hash for item in compared}
+        if len(set(reference_ids)) != len(compared) or len(reference_hashes) != len(compared):
+            raise OptimizationError("reference candidate IDs and policy hashes must be unique")
+        if not reference_hashes.isdisjoint({incumbent.policy_hash, *hashes}) or not set(
+            reference_ids
+        ).isdisjoint({incumbent.candidate_id, *ids}):
+            raise OptimizationError(
+                "a reference must differ from the incumbent and every challenger "
+                "by candidate ID and policy hash"
+            )
         if len(planned) > self.contract.max_candidates:
             raise OptimizationLimitError(
-                "planned incumbent and challengers exceed max_candidates"
+                "planned incumbent, challengers and references exceed max_candidates"
             )
 
+        # References skip development and join every paired split.
         required_trials = (
-            len(planned) * self.contract.development_repetitions
-            + 2 * self.contract.confirmation_repetitions
-            + 2 * self.contract.holdout_repetitions
+            (1 + len(challengers)) * self.contract.development_repetitions
+            + (2 + len(compared)) * self.contract.confirmation_repetitions
+            + (2 + len(compared)) * self.contract.holdout_repetitions
         )
         required_reservation = (
             required_trials * self.contract.per_trial_reservation_microusd
@@ -591,6 +741,13 @@ class OptimizationRunner:
                 f"paired plan requires {required_reservation} microusd of reservation "
                 f"but max_budget_microusd is {self.contract.max_budget_microusd}"
             )
+        for split, pool in self.task_pools.items():
+            repetitions = getattr(self.contract, f"{split}_repetitions")
+            if repetitions > pool:
+                raise OptimizationLimitError(
+                    f"{split} needs {repetitions} distinct tasks but its task pool "
+                    f"has {pool}"
+                )
         plan_payload = {
             "runner_version": RUNNER_VERSION,
             "statistics": {
@@ -605,13 +762,24 @@ class OptimizationRunner:
             "ledger_durability": self.ledger.durability,
             "required_trials": required_trials,
         }
+        # Optional settings join the plan only when declared, so plans that
+        # declare none keep their hashes.
+        if self.task_pools:
+            plan_payload["task_pools"] = dict(self.task_pools)
+        if self.max_holdout_draws is not None:
+            plan_payload["max_holdout_draws"] = self.max_holdout_draws
+        if compared:
+            plan_payload["ordered_reference_ids"] = reference_ids
+            plan_payload["reference_rule"] = reference_rule
         plan_hash = sha256_prefixed(plan_payload)
         campaign_id = self.campaign_id or (
-            "optimization_v3_" + plan_hash.removeprefix("sha256:")
+            f"optimization_v{RUNNER_VERSION}_" + plan_hash.removeprefix("sha256:")
         )
         return {
             "incumbent": incumbent,
             "candidates": challengers,
+            "references": compared,
+            "reference_rule": reference_rule,
             "all_candidates": planned,
             "required_trials": required_trials,
             "plan_hash": plan_hash,
@@ -635,7 +803,13 @@ class OptimizationRunner:
         parallelism, trial, wall-time, or spend cap cannot draw a second
         holdout for the same policy in this ledger.  Neither can upgrading the
         runner: holdouts used by earlier releases, which kept no separate
-        record, still count.
+        record, still count.  References are not checked: they are never
+        promoted, so their holdout trials are not use.
+
+        With ``max_holdout_draws``, a new campaign is also refused, whatever
+        its policies, once that many campaigns drew holdout trials under the
+        identity.  The cap is not part of the identity, so changing it never
+        reopens a used holdout.
         """
 
         campaign_id: str = plan["campaign_id"]
@@ -650,6 +824,12 @@ class OptimizationRunner:
                         identity,
                         consumers[0],
                     )
+                )
+        if self.max_holdout_draws is not None:
+            draws = self.ledger.holdout_draw_campaigns(identity)
+            if campaign_id not in draws and len(draws) >= self.max_holdout_draws:
+                raise HoldoutAlreadyUsedError(
+                    _holdout_pool_message(identity, draws, self.max_holdout_draws)
                 )
 
     def _validate_executable_contract(self) -> None:
@@ -747,6 +927,7 @@ class OptimizationRunner:
                 )
         trials = self.ledger.list_trials(campaign_id)
         if trials:
+            reference_ids = {item.candidate_id for item in plan["references"]}
             ambiguous: list[TrialRecord] = []
             split_seeds = dict(
                 zip(
@@ -770,6 +951,8 @@ class OptimizationRunner:
                 expected_role = (
                     "incumbent"
                     if trial.candidate_id == incumbent.candidate_id
+                    else "reference"
+                    if trial.candidate_id in reference_ids
                     else "challenger"
                 )
                 if trial.phase != _bound_phase(expected_role, plan["plan_hash"]):
@@ -891,19 +1074,20 @@ class OptimizationRunner:
             for candidate, result in zip(candidates, results, strict=True)
         }
 
-    async def _evaluate_pair(
+    async def _evaluate_arms(
         self,
         campaign_id: str,
         plan_hash: str,
-        incumbent: Candidate,
-        challenger: Candidate,
+        arms: Sequence[tuple[Candidate, str]],
         split: str,
         seeds: Sequence[int],
         deadline: float,
         duration_budget: _DurationBudget,
         *,
         lease: CampaignLease,
-    ) -> tuple[tuple[TrialRecord, ...], tuple[TrialRecord, ...]]:
+    ) -> tuple[tuple[TrialRecord, ...], ...]:
+        """Evaluate each ``(candidate, role)`` arm on the same paired seeds."""
+
         semaphore = asyncio.Semaphore(self.contract.max_parallel_candidates)
         stop_event = asyncio.Event()
 
@@ -928,16 +1112,14 @@ class OptimizationRunner:
                 stop_event.set()
                 raise
 
-        tasks = (
-            asyncio.create_task(evaluate(incumbent, "incumbent")),
-            asyncio.create_task(evaluate(challenger, "challenger")),
+        tasks = tuple(
+            asyncio.create_task(evaluate(candidate, role)) for candidate, role in arms
         )
         try:
-            baseline, candidate = await asyncio.gather(*tasks)
+            return tuple(await asyncio.gather(*tasks))
         except BaseException:
             await _cancel_and_drain(tasks)
             raise
-        return baseline, candidate
 
     async def _evaluate_series(
         self,
@@ -954,7 +1136,10 @@ class OptimizationRunner:
         lease: CampaignLease,
     ) -> tuple[TrialRecord, ...]:
         records: list[TrialRecord] = []
-        for seed in seeds:
+        # ``seeds`` is always the split's complete sealed seed list, so every
+        # candidate maps a seed to the same task.
+        task_indices = _task_indices(split, seeds, self.task_pools.get(split))
+        for seed, task_index in zip(seeds, task_indices, strict=True):
             if stop_event is not None and stop_event.is_set():
                 raise OptimizationNeedsAttention(
                     "parallel evaluation stopped before admitting another trial"
@@ -971,6 +1156,7 @@ class OptimizationRunner:
                     duration_budget,
                     stop_event,
                     lease=lease,
+                    task_index=task_index,
                 )
             )
         return tuple(records)
@@ -988,6 +1174,7 @@ class OptimizationRunner:
         stop_event: asyncio.Event | None,
         *,
         lease: CampaignLease,
+        task_index: int | None = None,
     ) -> TrialRecord:
         self._require_time(deadline)
         trial_key = self._prepare_trial(
@@ -1041,6 +1228,7 @@ class OptimizationRunner:
             evaluator_hash=self.evaluator_hash,
             ceiling_microusd=self.contract.per_trial_reservation_microusd,
             deadline_monotonic=deadline,
+            task_index=task_index,
         )
         trial_started = time.monotonic()
         try:
@@ -1120,6 +1308,7 @@ class OptimizationRunner:
                 evaluator_hash=self.evaluator_hash,
                 ceiling_microusd=self.contract.per_trial_reservation_microusd,
                 lease=lease,
+                max_holdout_draws=self.max_holdout_draws,
             )
         except UnknownTrialError as exc:
             raise OptimizationNeedsAttention(str(exc)) from exc
@@ -1366,6 +1555,7 @@ class OptimizationRunner:
         split: str,
         plan_hash: str,
         deadline: float,
+        baseline_role: str = "incumbent",
     ) -> PromotionAssessment:
         try:
             return assess_promotion(
@@ -1374,7 +1564,7 @@ class OptimizationRunner:
                 _metric_samples(candidate, self.contract),
                 baseline_seeds=[record.seed for record in baseline],
                 candidate_seeds=[record.seed for record in candidate],
-                gates=_paired_gates(baseline, candidate),
+                gates=_paired_gates(baseline, candidate, baseline_role),
                 min_improvement=self.contract.min_improvement,
                 confidence=self.contract.confidence,
                 bootstrap_resamples=self.bootstrap_resamples,
@@ -1428,6 +1618,7 @@ def _metric_samples(
 def _paired_gates(
     baseline: Sequence[TrialRecord],
     candidate: Sequence[TrialRecord],
+    baseline_role: str = "incumbent",
 ) -> dict[str, bool]:
     names = sorted(
         {
@@ -1437,7 +1628,7 @@ def _paired_gates(
         }
     )
     aggregated: dict[str, bool] = {}
-    for prefix, records in (("incumbent", baseline), ("candidate", candidate)):
+    for prefix, records in ((baseline_role, baseline), ("candidate", candidate)):
         for name in names:
             aggregated[f"{prefix}.{name}"] = all(
                 name in record.gates and record.gates[name] for record in records
@@ -1515,6 +1706,31 @@ def _split_seeds(
     return development, confirmation, holdout
 
 
+def _task_indices(
+    split: str, seeds: Sequence[int], pool: int | None
+) -> tuple[int | None, ...]:
+    """Draw one distinct task index below *pool* for each of a split's seeds.
+
+    A partial Fisher-Yates shuffle keyed by SHA-256 of the split and its
+    ordered seeds, so the draw is reproducible on resume and on any Python,
+    and holdout tasks follow the campaign's sealed holdout seeds.
+    """
+
+    if pool is None:
+        return (None,) * len(seeds)
+    key = canonical_json_bytes({"split": split, "seeds": list(seeds)})
+    moved: dict[int, int] = {}
+    indices: list[int | None] = []
+    for position in range(len(seeds)):
+        digest = hashlib.sha256(
+            b"smythe.optimize.task-index.v1\0" + key + position.to_bytes(8, "big")
+        ).digest()
+        chosen = position + int.from_bytes(digest[:8], "big") % (pool - position)
+        indices.append(moved.get(chosen, chosen))
+        moved[chosen] = moved.get(position, position)
+    return tuple(indices)
+
+
 def _comparison_dict(result: ComparisonResult) -> dict[str, Any]:
     return {
         "objective_name": result.objective_name,
@@ -1558,7 +1774,48 @@ def _assessment_dict(assessment: PromotionAssessment | None) -> dict[str, Any] |
         ),
         "min_improvement": assessment.min_improvement,
         "reasons": list(assessment.reasons),
+        "verdict": assessment.verdict,
     }
+
+
+def _final_verdict(
+    confirmation: PromotionAssessment | None,
+    holdout: PromotionAssessment | None,
+) -> str:
+    final = holdout if holdout is not None else confirmation
+    return "inconclusive" if final is None else final.verdict
+
+
+def _reference_entries(
+    plan: Mapping[str, Any],
+    confirmations: Sequence[PromotionAssessment] | None = None,
+    holdouts: Sequence[PromotionAssessment | None] = (),
+) -> tuple[dict[str, Any], ...]:
+    """Each reference's decision entry, with its comparisons once they ran."""
+
+    entries = []
+    for index, reference in enumerate(plan["references"]):
+        entry: dict[str, Any] = {
+            "candidate_id": reference.candidate_id,
+            "policy_hash": reference.policy_hash,
+        }
+        if confirmations is not None:
+            holdout = holdouts[index]
+            entry["confirmation"] = _assessment_dict(confirmations[index])
+            entry["holdout"] = _assessment_dict(holdout)
+            entry["verdict"] = _final_verdict(confirmations[index], holdout)
+        entries.append(entry)
+    return tuple(entries)
+
+
+def _reference_fields(
+    plan: Mapping[str, Any], references: Sequence[dict[str, Any]]
+) -> dict[str, Any]:
+    """Decision fields that name the references; none for a two-arm plan."""
+
+    if not references:
+        return {}
+    return {"reference_rule": plan["reference_rule"], "references": list(references)}
 
 
 __all__ = [

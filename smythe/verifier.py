@@ -29,9 +29,13 @@ import inspect
 import json
 import re
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from smythe.graph import ExecutionGraph, Node, NodeStatus
+
+# Node metadata that holds the verdict of a gate with ``max_regenerations=0``
+# under strict delivery acceptance. Such a gate has no verification receipt.
+ADVISORY_VERDICT_KEY = "advisory_verdict"
 
 
 class VerificationRecoveryError(RuntimeError):
@@ -117,10 +121,18 @@ def validate_verification_checkpoint(
 
 @dataclass(frozen=True)
 class Verdict:
-    """The outcome of a verification."""
+    """The outcome of a verification.
+
+    ``invalid`` is True when no verdict could be read: the judge's reply was
+    empty, unreadable or contradictory, or a function returned something
+    other than a verdict. Such a verdict fails its gate as before; strict
+    delivery acceptance treats it as undecided rather than as a rejection.
+    ``invalid`` does not take part in comparisons.
+    """
 
     passed: bool
     reason: str = ""
+    invalid: bool = field(default=False, compare=False)
 
 
 class Verifier(ABC):
@@ -454,7 +466,8 @@ def _read_prose(prose: str, evidence: _Evidence) -> None:
 
 
 def _rejected(reason: str) -> Verdict:
-    return Verdict(passed=False, reason=_clip(reason))
+    """A failing verdict for a reply or result that states no readable verdict."""
+    return Verdict(passed=False, reason=_clip(reason), invalid=True)
 
 
 def _decide(evidence: _Evidence, first_line: str) -> Verdict:
@@ -479,6 +492,13 @@ def _decide(evidence: _Evidence, first_line: str) -> Verdict:
     return _rejected(f"no PASS or FAIL verdict: {first_line}")
 
 
+# The identity of TokenVerifier's reading rules, which a durable recipe with a
+# strict acceptance policy records so that its gates are read only by the
+# rules the run started with. Change it whenever the rules change. Other
+# durable recipes keep "token-v1", which named the rules before 0.8.1 too.
+TOKEN_VERIFIER_IDENTITY = "token-v2"
+
+
 class TokenVerifier(Verifier):
     """Reads a verdict from the verifier node's text, failing closed.
 
@@ -497,18 +517,18 @@ class TokenVerifier(Verifier):
     its judge was unreadable.  The cost of failing closed is bounded: the
     executor regenerates at most ``max_regenerations`` times, then lets the
     run finish with the last output, and a gate with ``max_regenerations=0``
-    is never read.  docs/verifier.md lists the exact rules.
+    is never read.  A verdict that could not be read is marked ``invalid``;
+    under strict delivery acceptance it ends the gate undecided instead of
+    regenerating, and every final verdict is read and recorded.
+    docs/verifier.md lists the exact rules.
     """
 
     def verdict(self, verifier_node: Node, verified_node: Node) -> Verdict:
         text = str(verifier_node.result or "").strip()
         if not text:
-            return Verdict(passed=False, reason="verifier produced no output")
+            return _rejected("verifier produced no output")
         if len(text) > _MAX_VERDICT_CHARS:
-            return Verdict(
-                passed=False,
-                reason=f"verifier output is too long to read ({len(text)} characters)",
-            )
+            return _rejected(f"verifier output is too long to read ({len(text)} characters)")
         first_line = _FIRST_LINE.match(text).group()
         bare = text.strip(_REPLY_DECORATION)
         if _WHOLE_REPLY.fullmatch(bare):
@@ -542,21 +562,41 @@ def _shown(value: object) -> str:
     return _type_name(value)
 
 
-def _report_reason(result: object, passed: bool) -> str:
-    """The reason a report such as ``ValidationReport`` gives for its verdict."""
-    for name in ("reason", "summary"):
-        text = getattr(result, name, None)
-        if isinstance(text, str) and text:
-            return _clip(text)
-    findings = getattr(result, "hard_findings", None)
-    if passed or not isinstance(findings, (tuple, list)):
+def _findings_text(findings: object) -> str:
+    """Up to four findings as ``code: message``, separated by semicolons."""
+    if not isinstance(findings, (tuple, list)):
         return ""
     shown = []
     for finding in findings[:4]:
         code, message = getattr(finding, "code", None), getattr(finding, "message", None)
         if isinstance(message, str):
             shown.append(f"{code}: {message}" if isinstance(code, str) else message)
-    return _clip("; ".join(shown))
+    return "; ".join(shown)
+
+
+def _report_reason(result: object, passed: bool) -> str:
+    """The reason a report such as ``ValidationReport`` gives for its verdict.
+
+    A report's own ``reason`` or ``summary`` comes first. A failing report
+    whose ``outcome`` is ``"error"`` could not decide, so its reason says
+    ``validator error``, with the validator's name and the findings it has;
+    any other failing report lists its hard findings.
+    """
+    for name in ("reason", "summary"):
+        text = getattr(result, name, None)
+        if isinstance(text, str) and text:
+            return _clip(text)
+    if passed:
+        return ""
+    outcome = getattr(result, "outcome", None)
+    if isinstance(outcome, str) and outcome == "error":
+        reason = "validator error"
+        name = getattr(getattr(result, "validator", None), "name", None)
+        if isinstance(name, str) and name:
+            reason += f" ({name})"
+        detail = _findings_text(getattr(result, "findings", None))
+        return _clip(f"{reason}: {detail}" if detail else reason)
+    return _clip(_findings_text(getattr(result, "hard_findings", None)))
 
 
 def rejection_reason(verdict: Verdict) -> str:
@@ -588,11 +628,13 @@ class CallableVerifier(Verifier):
     The function returns a bool, a :class:`Verdict`, or an object with a
     bool ``passed`` attribute such as ``smythe.assets.ValidationReport``,
     whose ``reason`` or ``summary`` (or, for a failing report, its hard
-    findings) becomes the verdict's reason.  Anything else **fails**,
+    findings) becomes the verdict's reason; a report whose ``outcome`` is
+    ``"error"`` fails with ``validator error``.  Anything else **fails**,
     naming the returned type: ``"FAIL"``, a list of findings, ``None``, and
     a ``passed`` that is not a bool are not verdicts.  The function is
     called synchronously; a coroutine from an ``async def`` function is
-    closed without running and fails.
+    closed without running and fails.  Such results, and a report whose
+    ``outcome`` is ``"error"``, give a verdict marked ``invalid``.
     """
 
     def __init__(self, fn) -> None:
@@ -619,4 +661,76 @@ class CallableVerifier(Verifier):
             )
         if isinstance(result, Verdict):
             return result
-        return Verdict(passed=passed, reason=_report_reason(result, passed))
+        outcome = getattr(result, "outcome", None)
+        return Verdict(passed=passed, reason=_report_reason(result, passed),
+                       invalid=isinstance(outcome, str) and outcome == "error")
+
+
+def read_verdict(verdict: object) -> tuple[str, str]:
+    """Read a verifier's result as strict delivery acceptance does.
+
+    Returns ``(outcome, reason)``. The outcome is ``passed`` only for a
+    :class:`Verdict` whose ``passed`` is exactly True and that is not marked
+    ``invalid``, ``rejected`` for a valid failing verdict, and ``error`` for
+    anything else: an unreadable verdict, a ``passed`` that is not a bool, or
+    a result that is not a ``Verdict``.
+    """
+    if not isinstance(verdict, Verdict):
+        return "error", f"verifier returned {_type_name(verdict)}, not a Verdict"
+    reason = verdict.reason if isinstance(verdict.reason, str) else ""
+    if type(verdict.passed) is not bool:
+        return "error", rejection_reason(verdict)
+    if verdict.invalid is not False:
+        return "error", _clip(reason) or "the verdict could not be read"
+    if verdict.passed:
+        return "passed", _clip(reason)
+    return "rejected", rejection_reason(verdict)
+
+
+def _bound(record: dict, name: str, node: Node | None) -> bool:
+    """Whether *record* names *node*'s current generation under *name*."""
+    if node is None:
+        return False
+    try:
+        return type(record.get(name)) is int and record[name] == node_generation(node)
+    except VerificationRecoveryError:
+        return False
+
+
+def gate_disposition(node: Node, graph: ExecutionGraph) -> tuple[str, str]:
+    """A gate's final verdict, as strict delivery acceptance reads it.
+
+    Returns ``(outcome, reason)`` with outcome ``passed``, ``rejected`` or
+    ``error``. A gate with regenerations is read from its consumed
+    verification receipt, and a gate with ``max_regenerations=0`` from its
+    :data:`ADVISORY_VERDICT_KEY` record. Either must name the judge's and
+    its target's current generations. A judge that did not complete, a
+    pending or missing record, and a final verdict that was never read are
+    ``error``.
+    """
+    gate = f"gate {node.id!r}"
+    if node.status is not NodeStatus.COMPLETED:
+        return "error", f"{gate} {node.status.value} without a verdict"
+    key = "verification_receipt" if node.max_regenerations > 0 else ADVISORY_VERDICT_KEY
+    record = node.metadata.get(key)
+    if (not isinstance(record, dict) or type(record.get("version")) is not int
+            or record["version"] != 1
+            or (key == "verification_receipt" and record.get("state") != "consumed")):
+        return "error", f"{gate} has no recorded final verdict"
+    reason = record.get("reason") if isinstance(record.get("reason"), str) else ""
+    reason = f": {reason}" if reason else ""
+    outcome = record.get("outcome")
+    if outcome == "error":
+        return "error", f"{gate} has no valid verdict on {node.verifies!r}{reason}"
+    if outcome not in ("passed", "rejected"):
+        # A receipt consumed without strict reading passed only if it says so.
+        if record.get("passed") is not True:
+            return "error", f"{gate}'s final verdict on {node.verifies!r} was not read"
+        outcome = "passed"
+    target = next((n for n in graph.nodes if n.id == node.verifies), None)
+    if (record.get("target_id") != node.verifies or not _bound(record, "judge_generation", node)
+            or not _bound(record, "target_generation", target)):
+        return "error", f"{gate}'s verdict is not bound to the current {node.verifies!r}"
+    if outcome == "rejected":
+        return "rejected", f"{gate} has a failing final verdict on {node.verifies!r}{reason}"
+    return "passed", f"{gate} passed {node.verifies!r}"

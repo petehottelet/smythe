@@ -15,6 +15,8 @@ from decimal import Decimal
 from types import MappingProxyType
 from typing import Any
 
+from smythe._money import NANOUSD, from_units
+
 
 # The current version. Earlier versions stay registered in PRICE_TABLES.
 PRICE_VERSION = "openai-native-standard-global-2026-09-07-v1"
@@ -111,8 +113,7 @@ _MISSING = object()
 
 def _usd(nanousd: int) -> Decimal:
     """Convert integer nanoUSD exactly, independently of Decimal context limits."""
-    value = Decimal(nanousd).as_tuple()
-    return Decimal((value.sign, value.digits, value.exponent - 9))
+    return from_units(nanousd, NANOUSD)
 
 
 @dataclass(frozen=True, slots=True)

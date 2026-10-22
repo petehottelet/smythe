@@ -18,6 +18,8 @@ from enum import Enum
 from types import MappingProxyType
 from typing import Any, TypeAlias
 
+from smythe.validation import ValidatorIdentity
+
 CONTRACT_VERSION = 1
 _MAX_INT = (1 << 63) - 1
 _MAX_DEPTH = 32
@@ -28,6 +30,7 @@ _DOTTED_FIELD_RE = re.compile(
 )
 _CANDIDATE_ID_RE = re.compile(r"^cand_[0-9a-f]{64}$")
 _HASH_RE = re.compile(r"^sha256:[0-9a-f]{64}$")
+_SPLITS = ("development", "confirmation", "holdout")
 
 JSONScalar: TypeAlias = None | bool | int | float | str
 JSONValue: TypeAlias = JSONScalar | list["JSONValue"] | dict[str, "JSONValue"]
@@ -733,6 +736,131 @@ class Candidate:
         return candidate
 
 
+@dataclass(frozen=True, slots=True)
+class EvaluatorManifest:
+    """What an evaluator hash stands for, hashed into ``evaluator_hash``.
+
+    ``code_digest`` identifies the evaluator code.  ``split_manifests`` maps
+    ``development``, ``confirmation`` and ``holdout`` to the digest of that
+    split's task-pack manifest.  ``validators`` are the acceptance
+    validators' identities, ``judge`` is any judge's JSON configuration, and
+    ``price_snapshot_version`` names the prices used for cost.  Digests use
+    the ``sha256:<64 lowercase hex>`` form.  Validators are sorted, and
+    empty fields are left out of :meth:`to_dict`, whose canonical hash is
+    :attr:`evaluator_hash`.
+    """
+
+    code_digest: str
+    split_manifests: Mapping[str, str] = field(default_factory=dict)
+    validators: tuple[ValidatorIdentity, ...] = ()
+    judge: Mapping[str, object] = field(default_factory=dict)
+    price_snapshot_version: str | None = None
+    version: int = field(default=CONTRACT_VERSION, init=False)
+    evaluator_hash: str = field(init=False)
+
+    def __post_init__(self) -> None:
+        digests = _mapping(self.split_manifests, "manifest.split_manifests")
+        unknown = sorted(set(digests) - set(_SPLITS))
+        if unknown:
+            raise ContractValidationError(
+                f"manifest.split_manifests has unknown splits: {unknown}"
+            )
+        if isinstance(self.validators, (str, bytes)) or not isinstance(
+            self.validators, (list, tuple)
+        ):
+            raise ContractValidationError("manifest.validators must be an array")
+        validators: list[ValidatorIdentity] = []
+        for index, item in enumerate(self.validators):
+            try:
+                if not isinstance(item, ValidatorIdentity):
+                    item = ValidatorIdentity.from_dict(_mapping(item, "validator"))
+            except (TypeError, ValueError) as exc:
+                raise ContractValidationError(
+                    f"manifest.validators[{index}] is invalid: {exc}"
+                ) from exc
+            validators.append(item)
+        validators.sort(key=lambda item: (item.name, item.version, item.config_sha256))
+        if len(set(validators)) != len(validators):
+            raise ContractValidationError("manifest.validators contains duplicates")
+        price = self.price_snapshot_version
+        if price is not None and (
+            not isinstance(price, str)
+            or not price
+            or price != price.strip()
+            or len(price) > 128
+            or any(ord(char) < 32 or ord(char) == 127 for char in price)
+        ):
+            raise ContractValidationError(
+                "manifest.price_snapshot_version must be a printable string "
+                "of at most 128 characters without surrounding spaces"
+            )
+        object.__setattr__(
+            self, "code_digest", _digest(self.code_digest, "manifest.code_digest")
+        )
+        object.__setattr__(
+            self,
+            "split_manifests",
+            MappingProxyType(
+                {
+                    name: _digest(digests[name], f"manifest.split_manifests.{name}")
+                    for name in _SPLITS
+                    if name in digests
+                }
+            ),
+        )
+        object.__setattr__(self, "validators", tuple(validators))
+        judge = _json_copy(_mapping(self.judge, "manifest.judge"), context="manifest.judge")
+        object.__setattr__(self, "judge", _freeze_json(judge))
+        object.__setattr__(self, "evaluator_hash", sha256_prefixed(self.to_dict()))
+
+    def to_dict(self) -> dict[str, JSONValue]:
+        payload: dict[str, JSONValue] = {
+            "version": self.version,
+            "code_digest": self.code_digest,
+            "split_manifests": dict(self.split_manifests),
+            "validators": [item.to_dict() for item in self.validators],
+            "judge": _json_copy(self.judge, context="manifest.judge"),
+            "price_snapshot_version": self.price_snapshot_version,
+        }
+        return {key: value for key, value in payload.items() if value not in (None, {}, [])}
+
+    @classmethod
+    def from_dict(cls, data: object) -> "EvaluatorManifest":
+        item = _mapping(data, "manifest")
+        _strict_fields(
+            item,
+            allowed={
+                "version",
+                "code_digest",
+                "split_manifests",
+                "validators",
+                "judge",
+                "price_snapshot_version",
+            },
+            required={"version", "code_digest"},
+            context="manifest",
+        )
+        if item["version"] != CONTRACT_VERSION:
+            raise ContractValidationError(
+                f"unsupported evaluator manifest version: {item['version']!r}"
+            )
+        return cls(
+            code_digest=item["code_digest"],
+            split_manifests=item.get("split_manifests", {}),
+            validators=item.get("validators", ()),
+            judge=item.get("judge", {}),
+            price_snapshot_version=item.get("price_snapshot_version"),
+        )
+
+
+def _digest(value: object, context: str) -> str:
+    if not isinstance(value, str) or not _HASH_RE.fullmatch(value):
+        raise ContractValidationError(
+            f"{context} must have format sha256:<64 lowercase hex>"
+        )
+    return value
+
+
 def _safe_name(value: object, context: str) -> str:
     if not isinstance(value, str) or not _NAME_RE.fullmatch(value):
         raise ContractValidationError(
@@ -922,6 +1050,7 @@ __all__ = [
     "CONTRACT_VERSION",
     "Candidate",
     "ContractValidationError",
+    "EvaluatorManifest",
     "ExperimentContract",
     "MetricObjective",
     "MutableFieldRule",

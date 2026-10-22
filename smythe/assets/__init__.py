@@ -26,6 +26,7 @@ from smythe.assets.validation import (
     advisory_finding,
     hard_finding,
     validate_image,
+    validate_image_bytes,
 )
 
 __all__ = [
@@ -50,4 +51,5 @@ __all__ = [
     "preflight_assets",
     "sha256_file",
     "validate_image",
+    "validate_image_bytes",
 ]

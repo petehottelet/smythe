@@ -2,14 +2,14 @@
 
 import asyncio
 from contextlib import asynccontextmanager
-from decimal import Decimal
 import math
 import os
 
+from smythe._money import NANOUSD, from_units
 from smythe.pricing_anthropic import (PRICE_VERSION, messages_quote_nanousd, price_messages_response,
                                       price_table)
 from smythe.provider import (CompletionResult, Provider, ProviderAccountingCancelledError,
-                             ProviderAccountingError, ProviderResponseError)
+                             ProviderAccountingError, ProviderResponseError, _builtin_features)
 from smythe.provider_responses import (PreparedRequest, RawResponseEnvelope, ResponseQuote,
                                       ResponseQuoteError, _close_owned, _json_dump, _safe_id)
 from smythe.tools import ChatMessage
@@ -56,6 +56,12 @@ class AnthropicMessagesProvider(Provider):
 
     def requires_explicit_budget_estimate(self, model):
         return True
+
+    def feature_support(self, model):
+        """Models come from ``workflow_descriptor()``; text only, without tools or images."""
+        supported = model in self.workflow_descriptor()["supported_models"]
+        return _builtin_features(self, AnthropicMessagesProvider, model, model_supported=supported,
+                                 text=True, tools=False, attachments=False, image_output=False)
 
     def _get_client(self):
         if self._client is not None:
@@ -162,7 +168,8 @@ class AnthropicMessagesProvider(Provider):
             ceiling = messages_quote_nanousd(count, cap, prepared.model)
         except (ValueError, TypeError, OverflowError) as exc:
             raise ResponseQuoteError("Messages input count cannot establish a quote", envelope) from exc
-        return ResponseQuote(prepared.request_sha256, count, cap, Decimal(ceiling).scaleb(-9), PRICE_VERSION, envelope)
+        return ResponseQuote(prepared.request_sha256, count, cap, from_units(ceiling, NANOUSD),
+                             PRICE_VERSION, envelope)
 
     @staticmethod
     def extract_receipt(envelope, price_version=None):

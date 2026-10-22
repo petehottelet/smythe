@@ -3,19 +3,21 @@
 from __future__ import annotations
 
 import os
+import sqlite3
 import stat
-from contextlib import ExitStack
+from contextlib import ExitStack, closing
 from threading import Event, Thread
 
 import pytest
 
-from smythe.jobs import JobManifestV1, make_approval, preflight_job
+from smythe.jobs import ApprovalError, JobManifestV1, make_approval, preflight_job
 from smythe.jobs.store import (
     InvalidTransitionError,
     JobBudgetError,
     OperationStatus,
     RunLeaseError,
     RunStatus,
+    RunStoreError,
     SQLiteRunStore,
 )
 
@@ -30,9 +32,10 @@ def store_factory():
         yield create
 
 
-def _plan(tmp_path, *, provider="openai_image", attempts=2, count=1):
+def _plan(tmp_path, *, provider="openai_image", attempts=2, count=1, budget=None):
     ceiling = "0" if provider == "offline" else "0.10"
-    budget = "0" if provider == "offline" else f"{0.10 * attempts * count:.2f}"
+    if budget is None:
+        budget = "0" if provider == "offline" else f"{0.10 * attempts * count:.2f}"
     manifest = JobManifestV1.from_dict(
         {
             "version": 1,
@@ -75,6 +78,143 @@ def test_store_rejects_unsafe_custom_run_id(tmp_path, store_factory, run_id):
 
     with pytest.raises(ValueError, match="run_id"):
         store.create_run(plan, approval, manifest_root=tmp_path, run_id=run_id)
+
+
+def _created_payload(store, run_id):
+    events = store.snapshot(run_id, include_events=True)["events"]
+    return next(event["payload"] for event in events if event["event_type"] == "run_created")
+
+
+def test_a_used_approval_creates_no_second_run_and_names_the_first(tmp_path, store_factory):
+    plan, approval = _plan(tmp_path)
+    store = store_factory(tmp_path / "jobs.db")
+    store.create_run(plan, approval, manifest_root=tmp_path, run_id="first")
+    before = list(store._connection.iterdump())
+
+    for run_id in (None, "second", "first"):
+        with pytest.raises(ApprovalError, match="run 'first'.*smythe jobs resume first"):
+            store.create_run(plan, approval, manifest_root=tmp_path, run_id=run_id)
+    # The token is derived from the plan and ceiling, so a fresh approval and
+    # another connection to the same journal are refused as well.
+    with SQLiteRunStore(store.path) as other:
+        with pytest.raises(ApprovalError, match="first"):
+            other.create_run(plan, make_approval(plan), manifest_root=tmp_path)
+
+    assert list(store._connection.iterdump()) == before
+
+
+def test_a_different_ceiling_is_a_different_approval(tmp_path, store_factory):
+    plan, full = _plan(tmp_path, budget="0.30")
+    exact = make_approval(plan, approved_max_cost_usd="0.20")
+    store = store_factory(tmp_path / "jobs.db")
+
+    assert full.token != exact.token
+    first = store.create_run(plan, full, manifest_root=tmp_path)
+    second = store.create_run(plan, exact, manifest_root=tmp_path)
+
+    assert first != second
+    assert "approval_reuse" not in _created_payload(store, second)
+
+
+def test_acknowledged_approval_reuse_records_the_earlier_runs(tmp_path, store_factory):
+    plan, approval = _plan(tmp_path, provider="offline")
+    store = store_factory(tmp_path / "jobs.db")
+
+    for run_id in ("first", "second", "third"):
+        assert store.create_run(
+            plan, approval, manifest_root=tmp_path, run_id=run_id, allow_approval_reuse=True,
+        ) == run_id
+
+    first = _created_payload(store, "first")
+    assert "approval_reuse" not in first
+    assert _created_payload(store, "second")["approval_reuse"] == {
+        "prior_run_count": 1, "prior_run_ids": ["first"],
+    }
+    third = _created_payload(store, "third")
+    assert third.pop("approval_reuse") == {"prior_run_count": 2, "prior_run_ids": ["first", "second"]}
+    assert third == first
+    assert sorted(run["run_id"] for run in store.list_runs()) == ["first", "second", "third"]
+
+
+def test_reuse_record_keeps_the_five_latest_earlier_runs_and_a_count(tmp_path, store_factory):
+    plan, approval = _plan(tmp_path, provider="offline")
+    store = store_factory(tmp_path / "jobs.db")
+    run_ids = [f"run-{index}" for index in range(8)]
+    for run_id in run_ids:
+        store.create_run(plan, approval, manifest_root=tmp_path, run_id=run_id, allow_approval_reuse=True)
+
+    assert _created_payload(store, "run-7")["approval_reuse"] == {
+        "prior_run_count": 7, "prior_run_ids": run_ids[2:7],
+    }
+
+
+def test_refusal_names_at_most_the_five_latest_runs(tmp_path, store_factory):
+    plan, approval = _plan(tmp_path, provider="offline")
+    store = store_factory(tmp_path / "jobs.db")
+    run_ids = [f"run-{index}" for index in range(7)]
+    for run_id in run_ids:
+        store.create_run(plan, approval, manifest_root=tmp_path, run_id=run_id, allow_approval_reuse=True)
+
+    with pytest.raises(ApprovalError) as refused:
+        store.create_run(plan, approval, manifest_root=tmp_path)
+
+    message = str(refused.value)
+    assert "7 runs, most recently 'run-2', 'run-3', 'run-4', 'run-5', 'run-6';" in message
+    assert "'run-1'" not in message and "smythe jobs resume run-6" in message
+
+
+@pytest.mark.parametrize("value", [1, 0, None, "yes"])
+def test_approval_reuse_acknowledgment_must_be_a_boolean(tmp_path, store_factory, value):
+    plan, approval = _plan(tmp_path, provider="offline")
+    store = store_factory(tmp_path / "jobs.db")
+
+    with pytest.raises(TypeError, match="allow_approval_reuse must be a boolean"):
+        store.create_run(plan, approval, manifest_root=tmp_path, allow_approval_reuse=value)
+
+    assert store.list_runs() == []
+
+
+def test_concurrent_creators_with_one_approval_produce_exactly_one_run(tmp_path, store_factory):
+    plan, approval = _plan(tmp_path, provider="offline")
+    database = tmp_path / "jobs.db"
+    first, second = store_factory(database), store_factory(database)
+    second_began = Event()
+    outcomes: dict[str, object] = {}
+    thread: Thread | None = None
+
+    def create(store, run_id):
+        try:
+            outcomes[run_id] = store.create_run(plan, approval, manifest_root=tmp_path, run_id=run_id)
+        except BaseException as exc:
+            outcomes[run_id] = exc
+
+    def hold_first_after_its_check(statement: str) -> None:
+        nonlocal thread
+        if thread is None and statement.startswith("SELECT run_id FROM runs WHERE approval_token"):
+            # The second creator begins while the first still holds its write
+            # transaction between the reuse check and the insert.
+            thread = Thread(target=create, args=(second, "b"))
+            thread.start()
+            second_began.wait(10)
+
+    def note_second_begin(statement: str) -> None:
+        if statement == "BEGIN IMMEDIATE":
+            second_began.set()
+
+    first._connection.set_trace_callback(hold_first_after_its_check)
+    second._connection.set_trace_callback(note_second_begin)
+    try:
+        create(first, "a")
+    finally:
+        first._connection.set_trace_callback(None)
+        if thread is not None:
+            thread.join(timeout=30)
+        second._connection.set_trace_callback(None)
+
+    assert thread is not None and not thread.is_alive() and second_began.is_set()
+    assert outcomes["a"] == "a"
+    assert isinstance(outcomes["b"], ApprovalError) and "'a'" in str(outcomes["b"])
+    assert [run["run_id"] for run in first.list_runs()] == ["a"]
 
 
 @pytest.fixture
@@ -360,6 +500,191 @@ def test_reroll_changes_only_selected_failed_operation(tmp_path, store_factory):
         failed["operation_key"],
         operations[1]["operation_key"],
     }
+
+
+def _delivery_record(attempt_id, decision, subjects):
+    return {"version": 1, "scope": "artifacts", "attempt_id": attempt_id, "decision": decision,
+            "reasons": [] if decision == "accepted" else ["wrong size"], "subjects": subjects,
+            "validators": []}
+
+
+def test_complete_call_records_a_delivery_decision_that_matches_the_settlement(tmp_path, store_factory):
+    plan, approval = _plan(tmp_path, provider="offline")
+    store = store_factory(tmp_path / "jobs.db")
+    run_id = store.create_run(plan, approval, manifest_root=tmp_path)
+    operation = store.pending_operations(run_id)[0]
+    attempt = store.begin_attempt(run_id, operation["operation_id"])
+    permit = store.prepare_call(attempt["attempt_id"], 0)
+    store.mark_call_dispatched(permit.call_id)
+    artifact = {"relative_path": "artifacts/glyph.png", "mime_type": "image/png",
+                "sha256": "a" * 64, "size_bytes": 123}
+    subject = {"path": "artifacts/glyph.png", "sha256": "a" * 64, "size_bytes": 123,
+               "published": True}
+
+    def complete(record, accepted):
+        store.complete_call(permit.call_id, cost_microusd=0, cost_is_complete=True,
+                            cost_is_estimate=False, artifacts=[artifact], result_text="done",
+                            accepted=accepted, delivery_acceptance=record)
+
+    attempt_id = attempt["attempt_id"]
+    with pytest.raises(ValueError, match="decision"):
+        complete(_delivery_record(attempt_id, "rejected", [subject]), True)
+    with pytest.raises(ValueError, match="decision"):
+        complete(_delivery_record(attempt_id, "needs_review", [subject]), False)
+    with pytest.raises(ValueError, match="subject"):
+        complete(_delivery_record(attempt_id, "accepted", [dict(subject, sha256="b" * 64)]), True)
+    with pytest.raises(ValueError, match="attempt"):
+        complete(_delivery_record("other", "accepted", [subject]), True)
+    with pytest.raises(ValueError, match="JSON"):
+        complete(_delivery_record(attempt_id, "accepted", [subject]) | {"bad": float("nan")}, True)
+    complete(_delivery_record(attempt_id, "accepted", [subject]), True)
+
+    events = store.snapshot(run_id, include_events=True)["events"]
+    [completed] = [event for event in events if event["event_type"] == "call_completed"]
+    assert completed["payload"]["delivery_acceptance"] == _delivery_record(attempt_id, "accepted", [subject])
+    assert store.schema_version == 4
+
+
+def _settle_attempt(store, run_id, operation_id, outcome="rejected"):
+    attempt = store.begin_attempt(run_id, operation_id)
+    permit = store.prepare_call(attempt["attempt_id"], 0)
+    store.mark_call_dispatched(permit.call_id)
+    if outcome == "unknown_outcome":
+        store.mark_unknown_outcome(permit.call_id, "connection lost after dispatch")
+    else:
+        store.complete_call(
+            permit.call_id,
+            cost_microusd=0,
+            cost_is_complete=True,
+            cost_is_estimate=False,
+            artifacts=[],
+            result_text="invalid",
+            accepted=False,
+            error="missing artifact",
+        )
+
+
+def _attempt_reasons(store, run_id):
+    return [attempt["reason"] for attempt in store.snapshot(run_id)["attempts"]]
+
+
+@pytest.mark.parametrize("outcome", ["rejected", "unknown_outcome"])
+def test_reroll_reason_is_recorded_on_the_attempt_it_starts(tmp_path, store_factory, outcome):
+    plan, approval = _plan(tmp_path, provider="offline", attempts=2)
+    store = store_factory(tmp_path / "jobs.db")
+    run_id = store.create_run(plan, approval, manifest_root=tmp_path)
+    operation = store.pending_operations(run_id)[0]
+    _settle_attempt(store, run_id, operation["operation_id"], outcome)
+    store.queue_reroll(
+        run_id,
+        [operation["operation_key"]],
+        acknowledge_unknown=outcome == "unknown_outcome",
+        reason="replace rejected glyph",
+    )
+
+    store.begin_attempt(run_id, operation["operation_id"])
+
+    assert _attempt_reasons(store, run_id) == [None, "replace rejected glyph"]
+
+
+def test_attempts_without_a_newer_reroll_keep_no_reason(tmp_path, store_factory):
+    plan, approval = _plan(tmp_path, provider="offline", attempts=2)
+    store = store_factory(tmp_path / "jobs.db")
+    run_id = store.create_run(plan, approval, manifest_root=tmp_path)
+    operation_id = store.pending_operations(run_id)[0]["operation_id"]
+    first = store.begin_attempt(run_id, operation_id)
+    store.prepare_call(first["attempt_id"], 0)
+    store.recover_inflight(run_id)
+    _settle_attempt(store, run_id, operation_id)
+    store.queue_reroll(run_id, [operation_id], reason="operator review")
+    store.begin_attempt(run_id, operation_id)
+    store.recover_inflight(run_id)
+
+    # A safe retry is a new attempt, but only the attempt a reroll started
+    # carries that reroll's reason.
+    store.begin_attempt(run_id, operation_id)
+
+    assert _attempt_reasons(store, run_id) == [None, None, "operator review", None]
+
+
+def test_attempt_after_two_rerolls_records_the_latest_reason(tmp_path, store_factory):
+    plan, approval = _plan(tmp_path, provider="offline", attempts=3)
+    store = store_factory(tmp_path / "jobs.db")
+    run_id = store.create_run(plan, approval, manifest_root=tmp_path)
+    operation_id = store.pending_operations(run_id)[0]["operation_id"]
+    _settle_attempt(store, run_id, operation_id)
+    store.queue_reroll(run_id, [operation_id], reason="first review")
+    _settle_attempt(store, run_id, operation_id)
+    store.queue_reroll(run_id, [operation_id], reason="second review")
+
+    store.begin_attempt(run_id, operation_id)
+
+    assert _attempt_reasons(store, run_id) == [None, "first review", "second review"]
+
+
+def test_explicit_attempt_reason_takes_precedence_over_a_queued_reroll(tmp_path, store_factory):
+    plan, approval = _plan(tmp_path, provider="offline", attempts=2)
+    store = store_factory(tmp_path / "jobs.db")
+    run_id = store.create_run(plan, approval, manifest_root=tmp_path)
+    operation_id = store.pending_operations(run_id)[0]["operation_id"]
+    _settle_attempt(store, run_id, operation_id)
+    store.queue_reroll(run_id, [operation_id], reason="operator review")
+
+    store.begin_attempt(run_id, operation_id, reason="caller reason")
+
+    assert _attempt_reasons(store, run_id) == [None, "caller reason"]
+
+
+@pytest.mark.parametrize("reason", [None, 7, ["list"]])
+def test_reroll_without_a_text_reason_leaves_the_attempt_reason_empty(tmp_path, store_factory, reason):
+    plan, approval = _plan(tmp_path, provider="offline", attempts=2)
+    store = store_factory(tmp_path / "jobs.db")
+    run_id = store.create_run(plan, approval, manifest_root=tmp_path)
+    operation_id = store.pending_operations(run_id)[0]["operation_id"]
+    _settle_attempt(store, run_id, operation_id)
+    store.queue_reroll(run_id, [operation_id], reason=reason)
+
+    store.begin_attempt(run_id, operation_id)
+
+    assert _attempt_reasons(store, run_id) == [None, None]
+
+
+def test_corrupt_queued_reroll_event_refuses_the_attempt(tmp_path, store_factory):
+    plan, approval = _plan(tmp_path, provider="offline", attempts=2)
+    store = store_factory(tmp_path / "jobs.db")
+    run_id = store.create_run(plan, approval, manifest_root=tmp_path)
+    operation_id = store.pending_operations(run_id)[0]["operation_id"]
+    _settle_attempt(store, run_id, operation_id)
+    store.queue_reroll(run_id, [operation_id], reason="operator review")
+    store._connection.execute(
+        "UPDATE events SET payload_json = '{bad JSON' WHERE event_type = 'reroll_queued'"
+    )
+
+    with pytest.raises(RunStoreError, match="events.payload_json"):
+        store.begin_attempt(run_id, operation_id)
+
+    assert len(store.snapshot(run_id)["attempts"]) == 1
+    assert store.pending_operations(run_id)[0]["attempt_count"] == 1
+
+
+def test_recorded_attempt_reasons_are_never_backfilled(tmp_path):
+    plan, approval = _plan(tmp_path, provider="offline", attempts=3)
+    database = tmp_path / "jobs.db"
+    with SQLiteRunStore(database) as store:
+        run_id = store.create_run(plan, approval, manifest_root=tmp_path)
+        operation_id = store.pending_operations(run_id)[0]["operation_id"]
+        _settle_attempt(store, run_id, operation_id)
+        store.queue_reroll(run_id, [operation_id], reason="earlier reroll")
+        _settle_attempt(store, run_id, operation_id)
+    # Earlier versions left every attempt reason empty.
+    with closing(sqlite3.connect(database)) as db, db:
+        db.execute("UPDATE attempts SET reason = NULL")
+
+    with SQLiteRunStore(database) as store:
+        assert _attempt_reasons(store, run_id) == [None, None]
+        store.queue_reroll(run_id, [operation_id], reason="later reroll")
+        store.begin_attempt(run_id, operation_id)
+        assert _attempt_reasons(store, run_id) == [None, None, "later reroll"]
 
 
 def test_budget_overrun_is_derived_latched_and_blocks_every_admission(tmp_path, store_factory):

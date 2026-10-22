@@ -196,6 +196,16 @@ all recorded phases and failed attempts, using the adapter's dated published
 token prices. It does not represent a reconciled account invoice or hardware,
 human, and external service costs. No historical benchmark is repriced.
 
+### Money units
+
+The journal stores each amount as the decimal text of a whole number of
+nanoUSD. Stored receipts keep the form they were written in: an offline
+receipt records its zero cost as the string `"0"`. `max_budget_usd` is rounded
+down to whole nanoUSD. `workflow_accounting["unit"]` is `"nanoUSD"`, the unit
+of its amounts; stored rows and receipts carry no unit field. See
+[money units](budgets.md#money-units) for how these amounts compare with the
+float USD and micro-USD ledgers.
+
 ## Price versions
 
 Each native call records the price version it was admitted under, and its
@@ -239,7 +249,29 @@ Each call has a stable phase, component or node scope, generation, invocation,
 attempt, and turn. Its request, provider configuration, price version, and
 decoder version are immutable. A transaction grants dispatch permission once.
 After that point, missing response evidence stops automatic replay of the HTTP
-request, even if a connection failure leaves the remote outcome uncertain.
+request, even if a connection failure leaves the remote outcome uncertain. The
+one exception is a [read step](#recorded-read-steps) whose profile declares it
+free and safe to send again, which is read again as a new call.
+
+A call that was reserved but never dispatched, as when a process is killed
+between the reservation and the dispatch claim, keeps its reservation while
+the run can still send it. When its node runs again at the same generation,
+resuming sends it under that reservation and its saved quote, without counting
+its input again. The run releases it once it can no longer be sent:
+
+- when a checkpoint records a regeneration that moved its node to a later
+  generation, including a regeneration that resuming applies, because a node
+  calls only at its current generation;
+- when the run completes, for a call that an interrupted attempt or review
+  left behind, such as an attempt whose dispatch claim failed before a retry.
+
+Each release returns the reservation to the run's allowance and records a
+`call_released` event with the released amount and its reason,
+`superseded_generation` or `run_completed`. `SQLiteWorkflowStore` exposes these
+releases as `release_superseded_calls()` and `release_reserved_calls()`;
+`release_before_dispatch()` releases one call and records the same event. A
+call whose dispatch was claimed is never released: without response evidence,
+recovery holds it as unknown exposure.
 
 Raw bytes are committed before billing validation and decoding. A crash after
 that commit resumes through local settlement and decoding. Accepted outputs
@@ -258,8 +290,10 @@ immutable late evidence for its exact dispatch, but cannot advance the run.
 Recovery settles available late evidence before admitting new work.
 Each plan, execute or resume entry audits the whole journal once when it
 starts. A checkpoint saved during the run reads only the calls it consumes
-and, once a node has been regenerated, the keys of settled calls, so its cost
-does not grow with the run's events, evidence or earlier checkpoints.
+and, once a node has been regenerated, the keys of settled and reserved calls;
+the completed checkpoint also reads the keys of reserved calls to release
+them. Its cost therefore does not grow with the run's events, evidence or
+earlier checkpoints.
 
 A 0.8.0 journal holds every saved 4xx error response as unknown exposure. On
 resume, 0.8.1 settles a saved response that meets the zero-cost conditions
@@ -276,12 +310,218 @@ Competing openers reuse that identity. Failed initialization rolls back;
 existing evidence and read-only inspection retain their behavior.
 
 Resume requires the same component descriptions, model configuration, budget,
-retry backoff, and concurrency policy, apart from the
+retry backoff, concurrency policy, gate validator and
+[acceptance policy](#strict-delivery-acceptance), apart from the
 [price versions](#price-versions) of saved provider descriptions. It does not
 refill allowances. An
 inspected pending plan can be edited before execution; a stale graph from an
 already progressing run must use `resume()`. A graph carrying durable
 provenance cannot enter the ordinary unjournaled execution path.
+
+Node prompts follow the prompt-assembly version that the run's recipe records.
+Durable runs record none, which keeps the placement of every earlier release:
+the instruction that a node is the final step goes to each node that no other
+node depends on, including a judge that nothing depends on, and not to the
+node that judge verifies. [Ordinary runs](verifier.md#the-final-step) place it
+differently. No public setting opts a durable run into the ordinary placement
+yet; the recipe field `prompt_assembly` is reserved for that opt-in. Resume
+reads the version from the saved recipe, so a run in flight sends the requests
+it saved, and a saved recipe whose version this release does not support
+raises `WorkflowConflictError`.
+
+A run started with `context_sources` records `context_assembly: 1` in its
+recipe, the same way: each node call is then given a journaled context
+snapshot, and its prompt marks sources and dependency outputs as untrusted
+data ([context snapshots](tasks.md#context-snapshots)). Resume reads the
+version from the saved recipe, so a `Swarm` without `context_sources` resumes
+such a run with the sources it recorded, and one with `context_sources`
+cannot resume a run whose recipe has no `context_assembly`. Such a run keys
+synthesis by node generation, like a strict run, so a refresh of its sources
+never replays an earlier synthesis.
+
+## Strict delivery acceptance
+
+`Swarm(run_store=store, acceptance=AcceptancePolicy(mode="strict", ...))`
+decides whether the synthesized output is accepted, as an ordinary run does
+([strict delivery acceptance](verifier.md#strict-delivery-acceptance)), and
+journals the decision:
+
+- The recipe records the policy under `acceptance`, so the run resumes only
+  under the same policy, and gates read with `TokenVerifier` record the
+  verifier identity `token-v2` in place of `token-v1`. Recipes without a
+  strict policy keep their bytes.
+- [Which gates count](verifier.md#which-gates-count) follows the ordinary
+  rule: the saved planning result marks each gate of a generated plan
+  `generated_gate`, and a supervisor revision marks the nodes it adds. The
+  [acceptance obligations](verifier.md#acceptance-obligations) are checked
+  before any node call: for a graph you supply, before the run is created;
+  for a generated or edited plan, before its first node runs, so a refused
+  plan stays `planned` with its planning charge; and for each supervisor
+  revision, before it applies. Without final validators or
+  `allow_generated_gates`, a run whose architects all generate their gates
+  is refused before the planning call.
+- After the `synthesis` operation, an `acceptance` operation runs the final
+  validators on the exact output and reads every gate's final verdict, with
+  no provider call. It is keyed by the output digest and everything else its
+  record binds, and the completed checkpoint consumes it together with the
+  synthesis, in one transaction.
+- A process lost after synthesis and before the decision commits decides
+  again on resume, on the same saved output. A process lost after the
+  decision commits replays it, and one lost after the completed checkpoint
+  returns it; neither runs a validator or calls a provider again.
+- Checkpoints of runs with a strict policy or a gate validator are version 2,
+  with a `delivery_acceptance` block; other runs keep version 1. Synthesis in
+  such a run is keyed `synthesis` until a node regenerates, then
+  `synthesis/<n>` with `n` the sum of the node generations.
+- Resuming a completed run checks the saved output, task, source generations
+  and journal decision against the record; a mismatch gives an
+  `indeterminate` record and moves the text to `rejected_output`.
+
+The journal format is unchanged: operation kinds are free text, so this needs
+no journal upgrade. `tests/test_workflow_process_loss.py` kills a real
+process at each of these points and resumes the run, including a run with
+priced native calls and a regenerated draft, whose confirmed charges, node
+generations and regeneration count resume unchanged without a new call.
+
+## Recorded read steps
+
+A durable run can read a source as a step of its own, without a model call,
+and journal the read like a model call: a saved response is reused on resume
+instead of read again. Declare each read operation as a `ReadProfile`, pass
+the profiles as `read_tools`, and add read steps to a graph you write:
+
+```python
+import json
+
+from smythe import OpenAIResponsesProvider, ReadProfile, SQLiteWorkflowStore, Swarm
+from smythe.graph import ExecutionGraph, Node, Topology
+
+source = ReadProfile(
+    name="source", version="1",
+    url="https://docs.example.com/sources/{source_id}",
+    input_schema={"source_id": "string"},
+    metered=False, repeat_safe=True,
+    decode=lambda body: json.loads(body)["content"], decoder_version="source-json-v1",
+)
+graph = ExecutionGraph([Topology.SERIAL], [
+    source.step("fetch", {"source_id": "q3-brief"}),
+    Node(id="summary", label="Summarize the brief in three sentences", depends_on=["fetch"]),
+])
+with SQLiteWorkflowStore("smythe-runs.db") as store:
+    swarm = Swarm(model="gpt-6-astra", provider=OpenAIResponsesProvider(max_output_tokens=2048),
+                  run_store=store, max_budget_usd=1.00, read_tools=[source])
+    result = swarm.execute(graph)
+```
+
+A read step is a node whose `metadata["read_step"]` is
+`{"profile": <name>, "input": {...}}`; `profile.step(node_id, input, ...)`
+builds one after checking its input, and YAML graphs can declare the same
+metadata. The step's result is the decoded text, which the steps that depend
+on it receive as context, like any other step's result.
+
+### Profiles
+
+A profile is versioned data plus an optional local decoder:
+
+- `url` is an `http` or `https` URL. `{field}` placeholders may appear only
+  in its path or query, so input never chooses the host, and each takes the
+  percent-encoded value of an input field. A URL with credentials, a
+  fragment, spaces or non-ASCII text is refused.
+- `input_schema` maps each input field to `"string"` or `"integer"`. A step
+  must give exactly those fields; strings are 1 to 512 characters, without
+  control characters, and not `.` or `..`.
+- `metered` and `repeat_safe` have no defaults. `metered` says whether a
+  read can be charged: a metered profile declares its per-call price as
+  `ceiling_nanousd`, and a free one declares 0. `repeat_safe` says whether
+  sending the read again is harmless.
+- `decode(body)` turns a 200 response body into the step's text, and
+  `decoder_version` names it; a custom decoder needs its own version. Without
+  one, the body is read as strict UTF-8 (`utf8-text-v1`). The decoder is a
+  caller contract, not a sandbox: it must be local code without side effects.
+- `max_response_bytes` (default 1,000,000, at most 16 MiB), `timeout_s`
+  (default 30 seconds, at most 600), `max_redirects` (default 0, at most 10),
+  `allowed_hosts` (the URL's host is always allowed) and
+  `allow_private_networks` (default `False`) limit each read.
+
+A read sends one `GET`, asking for an uncompressed body, with no proxy. Unless
+`allow_private_networks` is set, every address its host resolves to must be
+public: loopback, private, link-local, shared and other special addresses are
+refused. The request connects to the address that was checked, so a second
+lookup cannot move it, and HTTPS still verifies the certificate for the host
+name. A destination refused before anything is sent releases the call's
+reservation, and the step fails. After the request is sent, a redirect beyond
+`max_redirects`, to a host outside `allowed_hosts`, to a scheme other than
+`http` or `https`, or from `https` to `http`, a body over
+`max_response_bytes`, and a read that takes longer than `timeout_s` are
+refused; the saved response then has an empty body and names the limit.
+The time limit covers the whole read, however slowly the source sends: the
+read stops and closes its connection once `timeout_s` seconds have passed.
+Only a host name lookup can take longer, for as long as the system resolver
+allows. Once connected, a read also stops as soon as its step stops waiting,
+for example at the node's own `timeout_s`.
+
+### Who can declare a read
+
+Only graphs and templates you write. A generated plan cannot: model output may
+set no node metadata except `role`, and `LLMSupervisor` adds steps with only
+an id, a label and dependencies. A step must name a profile in the run's
+`read_tools`, with valid input, and cannot judge another step.
+`read_tools` requires a `run_store`. An ordinary run raises `ValueError` for a
+read step before any node call: in a graph passed to `execute()` before it
+runs, in a plan that an architect or template builds as soon as it exists,
+and in a saved checkpoint before it resumes. A `tool_runtime` and model
+function calling stay unsupported in durable runs.
+
+The recipe records the profile descriptions under `read_tools`, without
+decoder code, only when a run declares any, so existing recipes keep their
+identity. Resuming with a changed profile raises `WorkflowConflictError` before
+any call. Read text is data for the steps after it: it cannot add a step, a
+profile, a tool or budget, or change the recipe.
+
+### Journal, cost and retries
+
+Each read is a call in the journal's `tool` phase, keyed by its node, its
+generation, invocation and attempt, with the kind `read_tool` and the price
+version `declared-read-v1`. The journal admits only the exact request the
+recorded profile builds from the step's input. The quote is the profile's
+declared ceiling; the call reserves it, claims its dispatch once, and saves
+the raw response before settling and decoding it.
+
+- A free read costs nothing, whatever its outcome, with one exception: a
+  read that is not `repeat_safe` and received no response has an uncertain
+  outcome, so it keeps unknown exposure, and the run is blocked with
+  `unknown_exposure`.
+- A metered read is charged its declared price for a 200 response. Any other
+  outcome may still have been charged, so it keeps unknown exposure at that
+  price and blocks the run. An uncertain metered read is never sent again
+  automatically.
+
+A read makes one request per journaled call and never retries inside it. A
+free read whose response is not a usable 200, such as another status, a
+refused limit or a lost connection, and any read whose decoder fails, settle
+at their known cost as a rejected result, and the step raises `ReadToolError`
+with the status or failure name, never the response body. The node's failure policy decides what happens next:
+`RETRY` reads again as a new journaled call. Resuming re-enters the last
+rejected call of a free, `repeat_safe` read as a new invocation, so a halted
+step reads once more; other rejections replay.
+
+### Interrupted reads
+
+| The process stopped | On resume |
+|---|---|
+| Before the dispatch claim | The same call is sent under its reservation and saved quote; nothing had been sent. |
+| After the claim, before the response was saved | A free, `repeat_safe` read settles at zero cost as rejected, records a `read_response_lost` event and reads again as a new invocation. Any other read keeps unknown exposure and blocks the run; it is never sent again. |
+| After the response was saved | The response is settled and decoded locally, without reading again. |
+| After the text was accepted | The saved text replays until a checkpoint consumes it. |
+
+`tests/test_workflow_read_tool.py` kills a real process at each of these
+points, against a fake service that counts every read it receives, and
+resumes the run.
+
+`inspect_run()`, `list_runs()` and journal events never include a read's URL,
+input, response or text; a receipt records the declared pricing, the HTTP
+status and any failure name. `load_replay()` and `load_evidence()` return
+them explicitly.
 
 ## Supported scope
 
@@ -291,21 +531,25 @@ native `OpenAIResponsesProvider` for `gpt-6-astra` and `gpt-5.6-sol`, native
 `OfflineProvider` plan/echo fixtures. Both native providers use their global
 endpoints. The path binds the built-in simple, LLM, and constrained architects,
 WhiteRabbit routing, static registries, LLM supervision, synthesis strategies,
-and token verification. Every reachable router tier and template is checked
-before routing can make a paid call. Provider instances are snapshotted per run.
+token verification, gates judged by a
+[registered validator](verifier.md#gate-validators-in-durable-workflows)
+declared with `LocalOnly(..., role="validator")`, and
+[recorded read steps](#recorded-read-steps) of declared profiles. Every reachable router tier
+and template is checked before routing can make a paid call. Provider
+instances are snapshotted per run.
 
 [Native Claude Messages](anthropic-messages.md) shares this journal and runs
 the [Fable 5.1 benchmark extension](../benchmarks/fable_51_benchmark_plan.md).
 The ordinary `AnthropicProvider` cannot enter this managed path, and neither
 can subclasses of the supported providers.
 
-Custom local architects, template builders, supervisors, and synthesizers use
-`LocalOnly(factory, identity, version, role=...)`. The factory must return a fresh
+Custom local architects, template builders, supervisors, synthesizers and gate
+validators use `LocalOnly(factory, identity, version, role=...)`. The factory must return a fresh
 component that performs no provider calls or external side effects. A template
 builder must also return the same nodes, with the same ids, for the same task
 and params ([why](architecture.md#planning-tiers)). This is an
 explicit caller contract, not a sandbox. Arbitrary paid custom components,
-scripted offline response cursors, tools, image attachments, active capability
+scripted offline response cursors, model-driven tools, image attachments, active capability
 hydration, live planner memory, and a separate checkpoint store are rejected.
 Those features remain available through the ordinary Swarm and artifact Jobs
 APIs within their documented accounting scopes. A rejected `run_store`,
@@ -322,14 +566,70 @@ hashes, and events. `store.lease_sessions(execution_id)` returns the
 journal-clock bounds of each lease session, which a durable result reports as
 its [timing](execution.md#timing). `store.audit(execution_id)` verifies accounting and evidence
 bindings. Open `SQLiteWorkflowStore(path, read_only=True)` for inspection without
-schema changes or provider construction. Explicit `load_replay()` and
-`load_evidence()` calls expose sensitive saved text and raw provider responses;
+schema changes or provider construction, including a journal from an earlier
+release ([journal upgrades](#journal-upgrades)). From the command line,
+`smythe runs --journal <path> inspect <run id>` reports the same balances,
+the run's state, its delivery decision and its next action through a
+read-only open; see
+[Inspect saved runs](runs.md). Explicit `load_replay()` and
+`load_evidence()` calls expose sensitive saved text and raw provider and read responses;
 protect the database and its SQLite sidecar files accordingly. Since 0.8.1, a
 new database file is created readable and writable by its owner only (mode
 0600 on POSIX), and SQLite gives its `-wal` and `-shm` files the same mode.
 Opening an existing file never changes its permissions. API keys are
 excluded from stored provider descriptions. Ordinary summaries and traces do
 not include raw responses or encrypted reasoning.
+
+## Journal upgrades
+
+The journal records its format version, which `store.store_version` reports.
+This release writes version 2, which adds the `tool` call phase of
+[recorded read steps](#recorded-read-steps); its tables are the same as
+version 1's. Smythe 0.9.x and earlier write version 1 and
+cannot open a version 2 journal, even read-only: they raise
+`WorkflowCorruptionError("Unsupported workflow journal version")`.
+
+Back up each journal before this release opens it for writing, and keep the
+backup for as long as 0.9.x may need to read it. Copy the file, and any
+`-wal` file beside it, while no process has it open, or use SQLite's backup
+API, which includes changes still in the `-wal` file:
+
+```python
+import sqlite3
+
+source, backup = sqlite3.connect("smythe-runs.db"), sqlite3.connect("smythe-runs-v1.db")
+source.backup(backup)
+backup.close()
+source.close()
+```
+
+The backup holds the same raw prompts and responses, so protect it like the
+journal; it is created with your default file permissions.
+
+- `SQLiteWorkflowStore(path, read_only=True)` opens a version 1 journal
+  without changing it, and `store_version` is 1. Listing, inspection, audit
+  and replay work as before, including while an earlier release's worker holds
+  a run.
+- `SQLiteWorkflowStore(path)` upgrades a version 1 journal in the transaction
+  that opens it. The upgrade changes only the recorded version: every run,
+  call, balance, reservation, receipt, evidence row, checkpoint and event keeps
+  its bytes, and the store identity is unchanged. Concurrent openers upgrade
+  it once. An interrupted upgrade, including a killed process, rolls back and
+  leaves a version 1 journal.
+- Stop workers from earlier releases first. Those workers check the version
+  only when they open the journal, so while any run holds an unexpired lease
+  the upgrade raises `WorkflowLeaseError` and leaves the journal at version 1
+  with its rows unchanged; the file may already have switched to SQLite's WAL
+  journal mode, which earlier releases also read. A released or
+  expired lease, such as one a killed process left, does not block it.
+- A store open for writing checks the version before each write. If another
+  release changes the version while the store is open, its next write raises
+  `WorkflowCorruptionError` and writes nothing.
+- A journal whose version is newer than this release supports is refused in
+  both modes, without changes.
+
+To return to 0.9.x, restore the backup; runs recorded after the upgrade are
+not in it.
 
 [Native provider](openai-responses.md) · [Cost guardrails](budgets.md) ·
 [Astra campaign protocol](../benchmarks/astra_benchmark_plan.md).

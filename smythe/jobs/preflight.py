@@ -8,13 +8,15 @@ import json
 import mimetypes
 import os
 import stat
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, replace
 from decimal import Decimal
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any
 
+from smythe.jobs.delivery import Registry, validator_registry
 from smythe.jobs.models import (
+    _IMAGE_EXTENSIONS_BY_MIME,
     ArtifactSpecV1,
     FrozenJSONValue,
     JobManifestV1,
@@ -36,6 +38,7 @@ from smythe.jobs.models import (
     usd_string,
     usd_to_micros,
 )
+from smythe.validation import ValidatorIdentity
 
 
 class PreflightError(ValueError):
@@ -95,8 +98,15 @@ class PlannedOperationV1:
     max_attempts: int
     max_cost_per_call_usd: Decimal
     worst_case_cost_usd: Decimal
+    # The registered validators the artifact spec names, resolved to their
+    # identities so the plan hash binds each validator's configuration.
+    validators: tuple[ValidatorIdentity, ...] = ()
 
     def __post_init__(self) -> None:
+        validators = tuple(self.validators)
+        if any(not isinstance(item, ValidatorIdentity) for item in validators):
+            raise ManifestValidationError("planned operation validators must be identities")
+        object.__setattr__(self, "validators", validators)
         frozen_options = freeze_json(
             self.options,
             context=f"planned operation {self.operation_id}.options",
@@ -120,7 +130,7 @@ class PlannedOperationV1:
         return f"{self.template_key}[{self.ordinal}]"
 
     def to_dict(self) -> dict[str, JSONValue]:
-        return {
+        result: dict[str, JSONValue] = {
             "operation_id": self.operation_id,
             "template_key": self.template_key,
             "ordinal": self.ordinal,
@@ -138,6 +148,10 @@ class PlannedOperationV1:
             "max_cost_per_call_usd": usd_string(self.max_cost_per_call_usd),
             "worst_case_cost_usd": usd_string(self.worst_case_cost_usd),
         }
+        # Omitted when empty, so plans without validators keep their hashes.
+        if self.validators:
+            result["validators"] = [identity.to_dict() for identity in self.validators]
+        return result
 
 
 @dataclass(frozen=True, slots=True)
@@ -435,6 +449,69 @@ def operation_id(
     return "op_" + digest[:32]
 
 
+INPUT_DIGEST_VERSION = 1
+# The MIME type the input digest records for an attachment, from its file
+# extension. A fingerprint's own type comes from mimetypes, whose guesses vary
+# by platform and Python version (Windows Python 3.12 guesses none for .webp),
+# so the digest reads this fixed table of the image types instead and records
+# any other extension as application/octet-stream.
+_DIGEST_MIME_TYPES = {
+    extension: mime_type
+    for mime_type, extensions in _IMAGE_EXTENSIONS_BY_MIME.items()
+    for extension in extensions
+}
+
+
+def _digest_mime_type(relative_path: str) -> str:
+    suffix = PurePosixPath(relative_path).suffix.lower()
+    return _DIGEST_MIME_TYPES.get(suffix, "application/octet-stream")
+
+
+def operation_input_digest(
+    operation: PlannedOperationV1 | Mapping[str, Any],
+    attachment_fingerprints: Sequence[AttachmentFingerprintV1 | Mapping[str, Any]],
+) -> str:
+    """Return a ``sha256:`` digest of what one operation asks its provider for.
+
+    It covers the provider kind and adapter version, model, options, prompt,
+    artifact spec and each attachment's SHA-256 and MIME type in order, but
+    not the template key, count, ordinal, profile name, attempt limit, cost
+    ceilings or attachment paths, so samples of one template share it. The
+    MIME type comes from a fixed table of extensions (``.gif``, ``.jpg``,
+    ``.jpeg``, ``.png`` and ``.webp``; any other is
+    ``application/octet-stream``), not from the fingerprint, so the digest
+    is the same on every platform. It is not part of the plan hash. Both
+    arguments may also be ``to_dict()`` forms; ``ValueError`` is raised for
+    an attachment without a fingerprint.
+    """
+    # Imported here because the providers module imports this one.
+    from smythe.jobs.providers import ADAPTER_VERSIONS
+
+    spec = operation.to_dict() if isinstance(operation, PlannedOperationV1) else operation
+    fingerprints = {}
+    for fingerprint in attachment_fingerprints:
+        if isinstance(fingerprint, AttachmentFingerprintV1):
+            fingerprint = fingerprint.to_dict()
+        fingerprints[fingerprint["relative_path"]] = fingerprint
+    attachments = []
+    for path in spec["attachments"]:
+        if path not in fingerprints:
+            raise ValueError(f"attachment {path!r} has no fingerprint")
+        attachments.append({"sha256": fingerprints[path]["sha256"],
+                            "mime_type": _digest_mime_type(path)})
+    provider = ProviderKind(spec["provider"])
+    return _sha256_json({
+        "version": INPUT_DIGEST_VERSION,
+        "provider": provider.value,
+        "adapter_version": ADAPTER_VERSIONS[provider],
+        "model": spec["model"],
+        "options": spec["options"],
+        "prompt": spec["prompt"],
+        "artifact": spec["artifact"],
+        "attachments": attachments,
+    })
+
+
 def _canonical_plan_size_upper_bound(
     *,
     manifest: JobManifestV1,
@@ -446,6 +523,7 @@ def _canonical_plan_size_upper_bound(
     manifest_hash: str,
     output_directory: str,
     total_micros: int,
+    validators: dict[str, tuple[ValidatorIdentity, ...]],
 ) -> int:
     """Bound expanded canonical JSON without materializing repeated operations."""
     attachment_payload = [
@@ -494,6 +572,10 @@ def _canonical_plan_size_upper_bound(
             "max_cost_per_call_usd": usd_string(profile.max_cost_per_call_usd),
             "worst_case_cost_usd": usd_string(micros_to_usd(operation_costs[template.key])),
         }
+        if validators[template.key]:
+            representative["validators"] = [
+                identity.to_dict() for identity in validators[template.key]
+            ]
         total_bytes += len(canonical_json_bytes(representative)) * template.count
         operation_count += template.count
         if total_bytes > MAX_CANONICAL_PLAN_BYTES:
@@ -503,10 +585,48 @@ def _canonical_plan_size_upper_bound(
     return total_bytes
 
 
-def preflight_job(manifest: JobManifestV1, *, manifest_root: str | Path) -> JobPlanV1:
-    """Expand a manifest and prove its complete worst-case spend before work."""
+def _resolve_validators(
+    templates: list[Any], registry: Registry,
+) -> dict[str, tuple[ValidatorIdentity, ...]]:
+    """Resolve every validator a template names against the in-process registry."""
+    resolved: dict[str, tuple[ValidatorIdentity, ...]] = {}
+    for template in templates:
+        identities = []
+        for reference in template.artifact.validators:
+            if reference.name not in registry:
+                raise PreflightError(
+                    f"operation {template.key!r} names validator {reference.name!r}, "
+                    "which is not registered; pass it in validators="
+                )
+            identity = registry[reference.name][0]
+            if identity.version != reference.version:
+                raise PreflightError(
+                    f"operation {template.key!r} names validator {reference.name!r} "
+                    f"version {reference.version!r}, but version {identity.version!r} "
+                    "is registered"
+                )
+            identities.append(identity)
+        resolved[template.key] = tuple(identities)
+    return resolved
+
+
+def preflight_job(
+    manifest: JobManifestV1,
+    *,
+    manifest_root: str | Path,
+    validators: Sequence[Any] = (),
+) -> JobPlanV1:
+    """Expand a manifest and prove its complete worst-case spend before work.
+
+    ``validators`` registers the trusted local validators that artifact specs
+    may name. Every named validator must be registered at the named version;
+    otherwise ``PreflightError`` is raised before any run exists. The plan
+    binds each resolved validator identity, including its configuration
+    digest, so changing a validator invalidates the approval.
+    """
     if not isinstance(manifest, JobManifestV1):
         raise TypeError("manifest must be a JobManifestV1")
+    registry = validator_registry(validators)
     root = Path(manifest_root)
     if not root.is_dir():
         raise PreflightError(f"manifest_root is not a directory: {root}")
@@ -577,6 +697,7 @@ def preflight_job(manifest: JobManifestV1, *, manifest_root: str | Path) -> JobP
             f"${usd_string(micros_to_usd(total_micros))} exceeds execution budget "
             f"${usd_string(manifest.execution.max_budget_usd)}"
         )
+    resolved_validators = _resolve_validators(templates, registry)
 
     referenced_attachments = sorted(
         {path for template in manifest.operations for path in template.attachments}
@@ -615,6 +736,7 @@ def preflight_job(manifest: JobManifestV1, *, manifest_root: str | Path) -> JobP
         manifest_hash=manifest_hash,
         output_directory=output_directory,
         total_micros=total_micros,
+        validators=resolved_validators,
     )
     if plan_size_upper_bound > MAX_CANONICAL_PLAN_BYTES:
         limit_mib = MAX_CANONICAL_PLAN_BYTES // (1024 * 1024)
@@ -662,6 +784,7 @@ def preflight_job(manifest: JobManifestV1, *, manifest_root: str | Path) -> JobP
                     max_attempts=manifest.execution.max_attempts,
                     max_cost_per_call_usd=profile.max_cost_per_call_usd,
                     worst_case_cost_usd=micros_to_usd(operation_cost_micros),
+                    validators=resolved_validators[template.key],
                 )
             )
 

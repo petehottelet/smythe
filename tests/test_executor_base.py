@@ -1,5 +1,7 @@
 """Tests for ExecutorBase shared helpers."""
 
+import errno
+import inspect
 import os
 
 import pytest
@@ -110,6 +112,136 @@ def test_executor_marks_only_terminal_nodes():
     assert TERMINAL_DELIVERABLE_NOTE in last
 
 
+class PromptsByStep(Provider):
+    """Records each node's prompt under its first line, the node's label; ``Check`` passes."""
+
+    def __init__(self):
+        self.prompts = {}
+
+    async def complete(self, system, prompt, model):
+        label = prompt.splitlines()[0]
+        self.prompts[label] = prompt
+        return CompletionResult(text="PASS" if label == "Check" else f"{label} output",
+                                prompt_tokens=1, completion_tokens=1)
+
+
+def _draft_and_judge():
+    """Research feeds a draft that a judge checks; no node depends on the judge."""
+    return ExecutionGraph(topology=[Topology.SERIAL], nodes=[
+        Node(label="Research", id="research"),
+        Node(label="Draft", id="draft", depends_on=["research"]),
+        Node(label="Check", id="judge", depends_on=["draft"], verifies="draft",
+             max_regenerations=1),
+    ])
+
+
+def _run(graph, *, parallel, **options):
+    import asyncio
+
+    from smythe.async_executor import AsyncExecutor
+    from smythe.executor import Executor
+
+    provider = PromptsByStep()
+    executor_type = AsyncExecutor if parallel else Executor
+    executor = executor_type(provider=provider, registry=Registry(), tracer=Tracer(),
+                             artifact_dir=None, **options)
+    if parallel:
+        asyncio.run(executor.run(graph))
+    else:
+        executor.run(graph)
+    assert all(node.status is NodeStatus.COMPLETED for node in graph.nodes)
+    return provider.prompts
+
+
+@pytest.mark.parametrize("parallel", [False, True], ids=["serial", "parallel"])
+def test_gated_deliverable_receives_the_terminal_note_and_its_judge_does_not(parallel):
+    """The judge's edge to the draft it verifies does not make the draft
+    non-terminal: the note goes to the node DELIVERABLE synthesis returns."""
+    from smythe.executor_base import TERMINAL_DELIVERABLE_NOTE
+    from smythe.synthesizer import deliverable_sources
+
+    graph = _draft_and_judge()
+    prompts = _run(graph, parallel=parallel)
+
+    assert TERMINAL_DELIVERABLE_NOTE in prompts["Draft"]
+    assert TERMINAL_DELIVERABLE_NOTE not in prompts["Check"]
+    assert TERMINAL_DELIVERABLE_NOTE not in prompts["Research"]
+    assert [node.id for node in deliverable_sources(graph)[0]] == ["draft"]
+
+
+@pytest.mark.parametrize("parallel", [False, True], ids=["serial", "parallel"])
+def test_prompt_assembly_version_1_keeps_the_note_on_terminal_judges(parallel):
+    from smythe.executor_base import TERMINAL_DELIVERABLE_NOTE
+
+    prompts = _run(_draft_and_judge(), parallel=parallel, prompt_assembly=1)
+
+    assert TERMINAL_DELIVERABLE_NOTE in prompts["Check"]
+    assert TERMINAL_DELIVERABLE_NOTE not in prompts["Draft"]
+    assert TERMINAL_DELIVERABLE_NOTE not in prompts["Research"]
+
+
+def test_a_step_that_depends_on_the_judge_is_the_terminal_step():
+    from smythe.executor_base import TERMINAL_DELIVERABLE_NOTE
+
+    graph = _draft_and_judge()
+    graph.nodes.append(Node(label="Publish", id="publish", depends_on=["judge", "draft"]))
+    prompts = _run(graph, parallel=False)
+
+    assert TERMINAL_DELIVERABLE_NOTE in prompts["Publish"]
+    assert not any(TERMINAL_DELIVERABLE_NOTE in prompts[label]
+                   for label in ("Research", "Draft", "Check"))
+
+
+@pytest.mark.parametrize("strict", [False, True], ids=["legacy", "strict"])
+@pytest.mark.parametrize("parallel", [False, True], ids=["serial", "parallel"])
+def test_a_swarm_gives_the_terminal_note_to_the_gated_draft_and_not_its_judge(parallel, strict):
+    """A Swarm places the note as its executors do: on the node its
+    DELIVERABLE synthesis returns, never on the judge that verifies it."""
+    from smythe.acceptance import AcceptancePolicy
+    from smythe.executor_base import TERMINAL_DELIVERABLE_NOTE
+    from smythe.swarm import Swarm
+
+    provider = PromptsByStep()
+    swarm = Swarm(provider=provider, model="test", parallel=parallel, artifact_dir=None,
+                  acceptance=AcceptancePolicy(mode="strict") if strict else None)
+    result = swarm.execute(_draft_and_judge())
+
+    assert TERMINAL_DELIVERABLE_NOTE in provider.prompts["Draft"]
+    assert TERMINAL_DELIVERABLE_NOTE not in provider.prompts["Check"]
+    assert TERMINAL_DELIVERABLE_NOTE not in provider.prompts["Research"]
+    # The judged draft is what the run delivers, and under a strict policy
+    # its passed gate accepts it.
+    assert result.output == "Draft output"
+    assert result.accepted is strict
+
+
+def test_a_step_that_depends_only_on_the_judge_is_a_final_step_beside_the_draft():
+    from smythe.executor_base import TERMINAL_DELIVERABLE_NOTE
+    from smythe.synthesizer import deliverable_sources
+
+    graph = _draft_and_judge()
+    graph.nodes.append(Node(label="Publish", id="publish", depends_on=["judge"]))
+    prompts = _run(graph, parallel=False)
+
+    assert TERMINAL_DELIVERABLE_NOTE in prompts["Draft"]
+    assert TERMINAL_DELIVERABLE_NOTE in prompts["Publish"]
+    assert not any(TERMINAL_DELIVERABLE_NOTE in prompts[label] for label in ("Research", "Check"))
+    assert [node.id for node in deliverable_sources(graph)[0]] == ["draft", "publish"]
+
+
+@pytest.mark.parametrize("value", [0, 3, True, 2.0, "2", None])
+def test_executors_refuse_an_unknown_prompt_assembly_version(value):
+    from smythe.async_executor import AsyncExecutor
+    from smythe.executor import Executor
+
+    for executor_type in (ExecutorBase, Executor, AsyncExecutor):
+        with pytest.raises(ValueError, match="prompt_assembly"):
+            executor_type(provider=DummyProvider(), registry=Registry(), tracer=Tracer(),
+                          prompt_assembly=value)
+        parameter = inspect.signature(executor_type).parameters["prompt_assembly"]
+        assert (parameter.kind, parameter.default) == (inspect.Parameter.KEYWORD_ONLY, 2)
+
+
 # --- task context propagation ------------------------------------------
 
 def test_root_node_prompt_carries_task_context():
@@ -208,6 +340,102 @@ def test_finalize_persists_artifacts_and_records_paths(tmp_path):
     # node.result stays the provider text verbatim (JSON consumers rely
     # on it); paths reach dependents via gather_dep_results instead.
     assert node.result == "done"
+
+
+def test_finalize_records_each_artifacts_digest_and_size(tmp_path):
+    base = _make_base_with_dir(tmp_path)
+    node = Node(label="make an image", id="hero")
+    base.finalize_node_result(node, _artifact_result(images=2))
+
+    import hashlib
+
+    for record in node.metadata["artifacts"]:
+        assert set(record) == {"path", "mime_type", "sha256", "size_bytes"}
+        assert record["sha256"] == hashlib.sha256(b"\x89PNG-bytes").hexdigest()
+        assert record["size_bytes"] == len(b"\x89PNG-bytes")
+
+
+def _strict_base(artifact_dir) -> ExecutorBase:
+    from smythe.acceptance import AcceptancePolicy
+
+    return ExecutorBase(provider=DummyProvider(), registry=Registry(), tracer=Tracer(),
+                        artifact_dir=artifact_dir, acceptance=AcceptancePolicy(mode="strict"))
+
+
+def test_strict_artifacts_name_their_generation_after_the_first(tmp_path):
+    base = _strict_base(tmp_path)
+    first = Node(label="make an image", id="hero")
+    base.finalize_node_result(first, _artifact_result(images=2))
+    later = Node(label="make an image", id="hero", metadata={"execution_generation": 2})
+    base.finalize_node_result(later, _artifact_result(images=1))
+
+    assert [Path(r["path"]).name for r in first.metadata["artifacts"]] == ["hero_00.png", "hero_01.png"]
+    assert [Path(r["path"]).name for r in later.metadata["artifacts"]] == ["hero_g2_00.png"]
+    # Legacy runs keep one name per position whatever the generation.
+    legacy = Node(label="make an image", id="hero", metadata={"execution_generation": 2})
+    _make_base_with_dir(tmp_path / "legacy").finalize_node_result(legacy, _artifact_result())
+    assert Path(legacy.metadata["artifacts"][0]["path"]).name == "hero_00.png"
+
+
+def test_strict_artifacts_never_replace_an_existing_file(tmp_path, monkeypatch):
+    def no_replace(*args):
+        pytest.fail("strict publication replaced a file")
+
+    monkeypatch.setattr("smythe.executor_base.os.replace", no_replace)
+    (tmp_path / "hero_00.png").write_bytes(b"earlier run")
+    (tmp_path / "hero_00-2.png").write_bytes(b"earlier crash")
+    node = Node(label="make an image", id="hero")
+    _strict_base(tmp_path).finalize_node_result(node, _artifact_result())
+
+    [record] = node.metadata["artifacts"]
+    assert Path(record["path"]).name == "hero_00-3.png"
+    assert Path(record["path"]).read_bytes() == b"\x89PNG-bytes"
+    assert (tmp_path / "hero_00.png").read_bytes() == b"earlier run"
+    assert (tmp_path / "hero_00-2.png").read_bytes() == b"earlier crash"
+    assert not list(tmp_path.glob(".*.tmp"))
+
+
+def _refuse_links(monkeypatch, code: int) -> None:
+    def link(source, destination):
+        raise OSError(code, os.strerror(code))
+
+    monkeypatch.setattr("smythe._publish.os.link", link)
+
+
+@pytest.mark.parametrize("code", [errno.EPERM, errno.ENOTSUP, errno.EOPNOTSUPP, errno.EINVAL],
+                         ids=["EPERM", "ENOTSUP", "EOPNOTSUPP", "EINVAL"])
+def test_strict_artifacts_on_a_filesystem_without_hard_links_name_the_cause(
+        tmp_path, monkeypatch, code):
+    """A failed link used to surface as a bare OSError such as "Operation not
+    permitted", which named neither hard links nor what to change."""
+    _refuse_links(monkeypatch, code)
+    node = Node(label="make an image", id="hero")
+    with pytest.raises(OSError) as raised:
+        _strict_base(tmp_path).finalize_node_result(node, _artifact_result())
+
+    message = str(raised.value)
+    assert raised.value.errno == code and isinstance(raised.value.__cause__, OSError)
+    assert "Filesystem does not support exclusive artifact publication" in message
+    assert "hard links" in message and "choose an artifact_dir" in message.lower()
+    assert str(tmp_path) in message
+    assert list(tmp_path.iterdir()) == [] and "artifacts" not in node.metadata
+
+
+def test_publication_names_the_missing_hard_links_for_jobs_too(tmp_path, monkeypatch):
+    from smythe.jobs.artifact_io import atomic_publish_bytes
+
+    _refuse_links(monkeypatch, errno.EPERM)
+    with pytest.raises(PermissionError, match="exclusive artifact publication") as raised:
+        atomic_publish_bytes(tmp_path / "artifact.bin", b"bytes")
+    assert "hard links" in str(raised.value) and "artifact_dir" not in str(raised.value)
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_other_link_failures_keep_their_own_error(tmp_path, monkeypatch):
+    _refuse_links(monkeypatch, errno.ENOSPC)
+    with pytest.raises(OSError) as raised:
+        _strict_base(tmp_path).finalize_node_result(Node(label="image", id="hero"), _artifact_result())
+    assert raised.value.errno == errno.ENOSPC and "hard links" not in str(raised.value)
 
 
 def test_finalize_replaces_artifact_atomically(tmp_path, monkeypatch):
@@ -514,3 +742,46 @@ def test_attachment_count_is_capped(tmp_path):
     judge = Node(label="judge", id="j", depends_on=["dep"], attach_dep_artifacts=True)
     graph = ExecutionGraph(topology=[Topology.SERIAL], nodes=[dep, judge])
     assert len(base.load_dep_image_artifacts(judge, graph)) == base.MAX_ATTACHED_IMAGES
+
+
+def _graph_with_recorded_image(tmp_path, data=b"\x89PNG-recorded"):
+    """A dependency whose image record carries the digest written with the file."""
+    import hashlib
+
+    image = tmp_path / "cand_00.png"
+    image.write_bytes(data)
+    graph, judge = _graph_with_image_dep(tmp_path, attach=True, image_bytes=data)
+    graph.nodes[0].metadata["artifacts"] = [{
+        "path": str(image), "mime_type": "image/png",
+        "sha256": hashlib.sha256(data).hexdigest(), "size_bytes": len(data),
+    }]
+    return graph, judge, image
+
+
+def test_dependency_image_is_attached_only_with_its_recorded_bytes(tmp_path):
+    from smythe.executor_base import ArtifactIntegrityError
+
+    base = _make_base_with_dir(None)
+    graph, judge, image = _graph_with_recorded_image(tmp_path)
+    assert [item.data for item in base.load_dep_image_artifacts(judge, graph)] == [b"\x89PNG-recorded"]
+    # The file is replaced after its record was written, for example while
+    # the run was paused. The judge must not see bytes the record never bound.
+    image.write_bytes(b"\x89PNG-replaced")
+    with pytest.raises(ArtifactIntegrityError, match="'cand_00.png' of node 'cand' changed"):
+        base.load_dep_image_artifacts(judge, graph)
+    # A record without a digest, as written before digests were recorded,
+    # still attaches what it reads.
+    del graph.nodes[0].metadata["artifacts"][0]["sha256"]
+    assert [item.data for item in base.load_dep_image_artifacts(judge, graph)] == [b"\x89PNG-replaced"]
+
+
+def test_judge_fails_before_calling_on_a_changed_dependency_image(tmp_path):
+    from smythe.executor_base import ArtifactIntegrityError
+
+    graph, judge, image = _graph_with_recorded_image(tmp_path)
+    image.write_bytes(b"\x89PNG-replaced")
+    provider = AttachmentCapturingProvider()
+    with pytest.raises(ArtifactIntegrityError):
+        Executor(provider=provider, registry=Registry(), tracer=Tracer(), artifact_dir=None).run(graph)
+    assert judge.status is NodeStatus.FAILED
+    assert provider.seen_attachments == []

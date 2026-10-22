@@ -6,29 +6,42 @@ import asyncio
 from collections.abc import Mapping
 from contextlib import asynccontextmanager
 from contextvars import ContextVar
-from decimal import Decimal
 import hashlib
 import json
 import math
 from types import MappingProxyType
 from uuid import uuid4
 
+from smythe._money import FLOOR, NANOUSD, to_units
+from smythe.acceptance import (
+    AcceptanceDecision, AcceptanceMode, AcceptancePolicy, AcceptanceSource, DeliveryAcceptance,
+    ValidationSubject, _delivery_problems, _final_check, evaluate_delivery, task_sha256, text_sha256,
+    validate_acceptance_obligations,
+)
 from smythe.budget import BudgetValidationError, Sentinel, validate_completion_usage
 from smythe.checkpoint import (
     graph_from_dict, graph_to_dict, node_from_dict, node_to_dict, reset_incomplete_nodes,
 )
-from smythe.executor_base import ExecutorBase
+from smythe.context import (
+    CONTEXT_ASSEMBLY_VERSION, CONTEXT_SNAPSHOT_KEY, SUPPORTED_CONTEXT_ASSEMBLY_VERSIONS,
+    ContextSnapshot, DependencyDigest, context_key, snapshot_sources, sources_from_operation,
+    sources_key, sources_sha256, text_sha256 as output_sha256,
+)
+from smythe.executor_base import REJECTED_GENERATIONS_KEY, SUPPORTED_PROMPT_ASSEMBLY_VERSIONS, ExecutorBase
 from smythe.graph import ExecutionGraph, NodeStatus, Revision, snapshot_run_ref
 from smythe.registry import Registry
 from smythe.provider import ProviderResponseError
+from smythe.synthesizer import deliverable_sources
 from smythe.task import Task, snapshot_task, task_from_dict, task_to_dict
 from smythe.tracer import Tracer
+from smythe.validation import ValidationOutcome
 from smythe.verifier import (
-    TokenVerifier, node_generation, validate_verification_checkpoint, verification_pending,
+    ADVISORY_VERDICT_KEY, TOKEN_VERIFIER_IDENTITY, TokenVerifier, Verdict, Verifier,
+    node_generation, validate_verification_checkpoint, verification_pending,
 )
 from smythe.workflow_binding import (
-    CallScope, ComponentBinding, WorkflowBindingError, bind_component, describe_component,
-    json_snapshot,
+    CallScope, ComponentBinding, LocalOnly, WorkflowBindingError, bind_component,
+    describe_component, json_snapshot,
 )
 from smythe.workflow_provider import (
     WorkflowProviderContext, describe_provider, validate_workflow_model,
@@ -38,6 +51,7 @@ from smythe.workflow_store import (
     CallKey, SQLiteWorkflowStore, WorkflowConflictError, WorkflowError, WorkflowLeaseError,
     WorkflowStateError, WorkflowValidationError, _is_http_rejection, _registered_price_version,
 )
+from smythe.workflow_tools import READ_STEP_KEY, JournaledReadTool, ReadProfile, reinvocable
 
 # Journal keys that embed a node id stop at 512 characters. Capping durable node
 # ids well below that leaves room for "supervision/<id>/<generation>".
@@ -61,8 +75,34 @@ MAX_NODE_ID_CHARS = 256
 #   recipe into WorkflowRuntime.behavior, so a changed default applies only to
 #   new runs; a value configured explicitly must equal the saved one. The
 #   settings are read-only after construction, which builds the recipe a new
-#   run records from them. No such field exists yet.
-RECIPE_BEHAVIOR_FIELDS = MappingProxyType({})
+#   run records from them.
+#
+# prompt_assembly selects how node prompts are assembled (see
+# smythe.executor_base.PROMPT_ASSEMBLY_VERSION). Version 1, which recipes
+# without the field mean and new runs still record by default, tells every
+# node that no other node depends on that it is the final step, a judge
+# included. Version 2 tells the nodes DELIVERABLE synthesis returns, as
+# ordinary runs do; only behavior_settings records it, and no public setting
+# passes that yet. A run keeps its version, so its saved requests still match
+# when it resumes.
+#
+# context_assembly selects how node calls are given their context (see
+# smythe.context). Version 0, which recipes without the field mean and new
+# runs record by default, sends the prompts of every earlier release. Version
+# 1, which context_sources selects, records each call's context snapshot and
+# renders its prompt from it, with sources and dependency outputs marked as
+# untrusted data.
+RECIPE_BEHAVIOR_FIELDS = MappingProxyType({"prompt_assembly": (1, 1), "context_assembly": (0, 0)})
+# The values this release supports for a behavior-version field. A configured
+# value outside them is refused, and so is a saved recipe that records one,
+# for example a recipe a newer release wrote.
+_BEHAVIOR_VERSIONS = MappingProxyType({"prompt_assembly": SUPPORTED_PROMPT_ASSEMBLY_VERSIONS,
+                                       "context_assembly": SUPPORTED_CONTEXT_ASSEMBLY_VERSIONS})
+# Node metadata that belongs to a node's current generation. A refresh of a
+# run's sources starts every node's next generation without it.
+_GENERATION_KEYS = ("artifacts", "artifacts_discarded", "verification_receipt",
+                    "verification_target_generation", ADVISORY_VERDICT_KEY, "regeneration_intent",
+                    "workflow_supervision", CONTEXT_SNAPSHOT_KEY)
 _PROVIDER_FIELDS = frozenset({"kind", "adapter_version", "decoder_version", "endpoint_scope",
                               "price_version", "supported_models", "config"})
 
@@ -101,7 +141,33 @@ def _snapshot_behavior_settings(settings):
     unknown = sorted(set(settings) - set(RECIPE_BEHAVIOR_FIELDS))
     if unknown:
         raise WorkflowBindingError("Unknown workflow behavior version: " + ", ".join(unknown))
+    for name, value in settings.items():
+        if not _supported_behavior(name, value):
+            raise WorkflowBindingError(f"Unsupported workflow {name} version: {value!r}")
     return MappingProxyType(settings)
+
+
+def _supported_behavior(name, value):
+    versions = _BEHAVIOR_VERSIONS.get(name)
+    # Versions are integers; a bool or float equal to one is not a version.
+    return versions is None or (type(value) is int and value in versions)
+
+
+def _snapshot_read_tools(read_tools):
+    """The declared read profiles by name; each name once, built-in profiles only."""
+    if read_tools is None:
+        read_tools = ()
+    if isinstance(read_tools, (str, bytes, Mapping)) or not hasattr(read_tools, "__iter__"):
+        raise WorkflowBindingError("read_tools must be a sequence of ReadProfile declarations")
+    profiles = {}
+    for profile in read_tools:
+        if type(profile) is not ReadProfile:
+            raise WorkflowBindingError(
+                f"read_tools takes ReadProfile declarations, not {type(profile).__name__}")
+        if profile.name in profiles:
+            raise WorkflowBindingError(f"read_tools declares {profile.name!r} more than once")
+        profiles[profile.name] = profile
+    return MappingProxyType(profiles)
 
 
 def _hash(value):
@@ -109,13 +175,121 @@ def _hash(value):
 
 
 def _nanousd(value):
-    # Decimal multiplication must not inherit the caller's rounding context.
-    if value is None:
+    # A budget floors to whole nanoUSD, whatever the caller's decimal context.
+    return None if value is None else to_units(value, NANOUSD, FLOOR)
+
+
+# The recipe's "verifier" for gates judged by a registered validator: the
+# rules below that turn its report into a verdict. Change it with them.
+VALIDATOR_VERIFIER_IDENTITY = "validator-v1"
+
+
+class _ValidatorVerifier(Verifier):
+    """Judges each gate by a registered validator's report on its target's exact text.
+
+    A ``passed`` report passes and a ``rejected`` one fails. A validator that
+    raises, returns anything but its own report or reports ``error``, and a
+    target without text, give a failing verdict marked ``invalid``, which
+    ends the gate without a verdict, with or without a strict policy.
+    """
+
+    # The executor ends a gate whose verdict is marked invalid instead of
+    # regenerating: a validator that could not decide never spends a
+    # regeneration or buys another judge call.
+    _invalid_ends_gate = True
+
+    def __init__(self, validator):
+        self.validator, self.identity = validator, validator.identity
+
+    def verdict(self, verifier_node, verified_node):
+        if not isinstance(verified_node.result, str):
+            return Verdict(False, f"{verified_node.id!r} has no text to validate", invalid=True)
+        outcome, reason = _final_check(
+            self.validator, self.identity, ValidationSubject.from_text(verified_node.result),
+            kind="gate validator",
+        )
+        return Verdict(outcome is ValidationOutcome.PASSED, reason,
+                       invalid=outcome is ValidationOutcome.ERROR)
+
+
+def _checkpoint_version(recipe):
+    """The durable checkpoint version a run with *recipe* writes.
+
+    Version 2 holds a delivery acceptance block. Only a recipe with a strict
+    policy or a gate validator writes it.
+    """
+    return 2 if "acceptance" in recipe or "validators" in recipe else 1
+
+
+def _saved_record(state, policy_sha256, task_digest):
+    """A version 2 checkpoint's record: undecided until completed, then the decision.
+
+    *policy_sha256* is the run's strict policy, or None for a recipe without
+    one, whose checkpoints hold no record; *task_digest* is the run's task.
+    Raises WorkflowStateError for a block that does not match the run.
+    """
+    if "delivery_acceptance" not in state:
+        raise WorkflowStateError("Workflow checkpoint has no delivery acceptance block")
+    data = state["delivery_acceptance"]
+    if policy_sha256 is None:
+        if data is not None:
+            raise WorkflowStateError("Workflow checkpoint holds a record its recipe does not decide")
         return None
-    amount = Decimal(str(value)).as_tuple()
-    coefficient = int("".join(map(str, amount.digits)))
-    exponent = amount.exponent + 9
-    return coefficient * 10 ** exponent if exponent >= 0 else coefficient // 10 ** -exponent
+    try:
+        record = DeliveryAcceptance.from_dict(data)
+    except (TypeError, ValueError) as error:
+        raise WorkflowStateError("Workflow checkpoint delivery acceptance is invalid") from error
+    completed = state.get("status") == "completed"
+    undecided = DeliveryAcceptance(AcceptanceDecision.NOT_EVALUATED, policy_sha256,
+                                   task_sha256=task_digest)
+    if (record.policy_sha256 != policy_sha256
+            or (record.decision is AcceptanceDecision.NOT_EVALUATED) is completed
+            or not completed and record != undecided):
+        raise WorkflowStateError("Workflow checkpoint delivery acceptance does not match its run")
+    return record
+
+
+def _synthesis_key(graph, *, scoped):
+    """The synthesis operation's key: ``synthesis`` at generation 0.
+
+    A recipe with a strict policy or a gate validator (*scoped*) scopes the
+    key by the sum of the graph's node generations, so synthesis after a
+    regeneration never replays an earlier generation's output. Other
+    recipes keep the one key their journals already hold.
+    """
+    generation = sum(node_generation(node) for node in graph.nodes) if scoped else 0
+    return "synthesis" if generation == 0 else f"synthesis/{generation}"
+
+
+def _decision_inputs(synthesis_key, policy_sha256, task_digest, output_sha256, strategy,
+                     sources, used_fallback):
+    """Everything a decision binds; its hash keys the acceptance operation."""
+    return {
+        "synthesis": synthesis_key, "output_sha256": output_sha256,
+        "policy_sha256": policy_sha256, "task_sha256": task_digest,
+        "strategy": strategy, "used_fallback": used_fallback,
+        "sources": [source.to_dict() for source in sources],
+    }
+
+
+def _decision_problems(store, run_id, graph, output, record, *, task, policy_sha256):
+    """What no longer matches a completed run's decided *record*, one reason each.
+
+    The saved *output* must match the record's digest, the run's *task* and
+    the source generations must be those it binds, and the journal must hold
+    the same decision, applied. An empty list means the record holds. Only
+    reads are made, so a store opened read-only will do.
+    """
+    problems = _delivery_problems(record, output, graph, task)
+    inputs = _decision_inputs(
+        _synthesis_key(graph, scoped=True), policy_sha256, task_sha256(task),
+        record.output_sha256, record.strategy, record.sources, record.used_fallback,
+    )
+    operation = store.load_operation(run_id, "acceptance/" + _hash(inputs))
+    if (operation is None or operation["state"] != "applied"
+            or operation["result"] != {"delivery_acceptance": record.to_dict()}):
+        problems.append("the journal holds no applied decision matching the saved record")
+    return problems
 
 
 class WorkflowBudget:
@@ -181,12 +355,34 @@ class WorkflowBudget:
 
 
 class WorkflowRuntime:
-    """One isolated binding per plan/execute/resume entry, one persistent run."""
+    """One isolated binding per plan/execute/resume entry, one persistent run.
+
+    A strict ``acceptance`` policy decides delivery after synthesis, as a
+    journal operation that the completed checkpoint consumes, and enters the
+    recipe so that the run finishes only under that policy. As on ordinary
+    runs, it marks the gates of a generated plan, refuses before planning a
+    run no gate of its plan could accept, and refuses a graph that does not
+    meet its acceptance obligations before any node runs.
+
+    ``read_tools`` declares the :class:`~smythe.workflow_tools.ReadProfile`
+    reads that the graph's read steps may name. The recipe records their
+    descriptions only when there are any, and each read step runs as a
+    journaled ``tool`` call without a model call.
+
+    ``context_sources``, a sequence of :class:`~smythe.context.ContextSource`
+    (possibly empty), opts a new run into context assembly version 1: its
+    recipe records ``context_assembly``, its first checkpoint records the
+    sources as revision 0, and each node call is given a journaled
+    :class:`~smythe.context.ContextSnapshot`. A run that already recorded its
+    sources keeps them, whatever sources a later runtime is given;
+    :meth:`refresh_context` replaces them explicitly.
+    """
 
     def __init__(self, *, store, model, max_budget_usd, provider, architect, registry,
                  router, synthesizer, supervisor, max_revisions, verifier, memory,
                  tool_runtime, checkpoint_store, checkpoint_every_n_nodes, retry_backoff_s,
-                 max_concurrency, graph_policy=None, behavior_settings=None):
+                 max_concurrency, graph_policy=None, behavior_settings=None, acceptance=None,
+                 read_tools=(), context_sources=None):
         if type(store) is not SQLiteWorkflowStore:
             raise WorkflowBindingError(
                 f"run_store must be SQLiteWorkflowStore itself, not {type(store).__name__}"
@@ -208,11 +404,31 @@ class WorkflowRuntime:
                 "checkpoint_store is not supported by durable text workflows, which "
                 "save their checkpoints in run_store"
             )
-        if verifier is not None and type(verifier) is not TokenVerifier:
+        # A gate validator is declared, so its identity and version enter the
+        # recipe; other verifier code is unversioned and is refused.
+        validator = type(verifier) is LocalOnly and verifier.role == "validator"
+        if verifier is not None and type(verifier) is not TokenVerifier and not validator:
             raise WorkflowBindingError(
-                "verifier must be the built-in TokenVerifier in durable text workflows, "
+                "verifier must be the built-in TokenVerifier or a validator declared with "
+                "LocalOnly(..., role='validator') in durable text workflows, "
                 f"not {type(verifier).__name__}"
             )
+        if acceptance is not None and not isinstance(acceptance, AcceptancePolicy):
+            raise WorkflowBindingError(
+                f"acceptance must be an AcceptancePolicy or None, not {type(acceptance).__name__}"
+            )
+        # Only a strict policy decides delivery; an advisory one records nothing.
+        if acceptance is not None and acceptance.mode is not AcceptanceMode.STRICT:
+            acceptance = None
+        if acceptance is not None and not acceptance.final_validators:
+            from smythe.swarm import _synthesis_strategy
+
+            strategy = _synthesis_strategy(synthesizer)
+            if strategy != "deliverable":
+                raise WorkflowBindingError(
+                    "acceptance without a final validator can accept only DELIVERABLE output "
+                    f"that a passed gate judged; {strategy} synthesis needs a final validator"
+                )
         if type(max_revisions) is not int or max_revisions < 0:
             raise WorkflowBindingError("max_revisions must be a non-negative integer")
         if type(max_concurrency) is not int or max_concurrency < 1:
@@ -225,20 +441,41 @@ class WorkflowRuntime:
         self.sources = {"architect": architect, "registry": registry, "router": router,
                         "synthesizer": synthesizer, "supervisor": supervisor}
         self.max_revisions, self.verifier = max_revisions, verifier
+        self.gate_validator = verifier if validator else None
+        self.acceptance = acceptance
+        self.undecided = self.saved_acceptance = None
         self.max_concurrency = max_concurrency
         self.execution_concurrency = None
         self.retry_backoff_s = retry_backoff_s
         self.checkpoint_every_n_nodes = checkpoint_every_n_nodes
         self.graph_policy = snapshot_graph_policy(graph_policy)
+        self.read_tools = _snapshot_read_tools(read_tools)
         # Explicitly configured behavior versions (see RECIPE_BEHAVIOR_FIELDS),
         # which the recipe below records for a new run, and, once a run is
         # bound, the versions that run uses.
-        self._behavior_settings = _snapshot_behavior_settings(behavior_settings)
+        settings = _snapshot_behavior_settings(behavior_settings)
+        if context_sources is not None:
+            context_sources = snapshot_sources(context_sources)
+            version = settings.get("context_assembly", CONTEXT_ASSEMBLY_VERSION)
+            if version == 0:
+                raise WorkflowBindingError("context_sources need a context_assembly version above 0")
+            settings = MappingProxyType({**settings, "context_assembly": version})
+        elif settings.get("context_assembly", 0):
+            context_sources = ()
+        self._behavior_settings = settings
+        # The sources a run that has recorded none records as revision 0;
+        # None when this runtime configures no context assembly.
+        self._supplied_sources = context_sources
         self.behavior = {}
         self.recipe = self._describe()
+        self.checkpoint_version = _checkpoint_version(self.recipe)
         self.graph = None
         self.executor = None
         self.revision = 0
+        self._revisions_used = 0
+        # The bound run's source revision and sources, under context assembly.
+        self.context_revision, self.context_sources = None, ()
+        self._snapshot_ids = {}
         self._operation = ContextVar("workflow_operation", default=None)
         self._operation_keys = {}
         self._worker_keys = {}
@@ -250,6 +487,11 @@ class WorkflowRuntime:
     def behavior_settings(self):
         """Read-only behavior versions configured for this runtime."""
         return self._behavior_settings
+
+    @property
+    def _context_version(self):
+        """The bound run's context-assembly version; 0 when it assembles none."""
+        return self.behavior.get("context_assembly", 0)
 
     def _describe(self):
         validate_workflow_model(self.provider, self.model)
@@ -267,6 +509,19 @@ class WorkflowRuntime:
         # change their identity and prevent otherwise compatible recovery.
         if self.graph_policy is not None:
             recipe["graph_policy"] = self.graph_policy.to_dict()
+        if self.gate_validator is not None:
+            recipe["verifier"] = VALIDATOR_VERIFIER_IDENTITY
+            recipe["validators"] = [describe_component(self.gate_validator, role="validator")]
+        if self.acceptance is not None:
+            # Validator identities, never code. "token-v1" also named the
+            # reading rules before 0.8.1, so a strict run names the current ones.
+            recipe["acceptance"] = self.acceptance.to_dict()
+            if self.gate_validator is None:
+                recipe["verifier"] = TOKEN_VERIFIER_IDENTITY
+        if self.read_tools:
+            # Profile descriptions, never decoder code; omitted when none.
+            recipe["read_tools"] = [self.read_tools[name].workflow_descriptor()
+                                    for name in sorted(self.read_tools)]
         for name, (absent, default) in RECIPE_BEHAVIOR_FIELDS.items():
             value = self.behavior_settings.get(name, default)
             if _canonical(value) != _canonical(absent):
@@ -280,9 +535,24 @@ class WorkflowRuntime:
         for name, (absent, _) in RECIPE_BEHAVIOR_FIELDS.items():
             current.pop(name, None)
             behavior[name] = saved.pop(name, absent)
+            if not _supported_behavior(name, behavior[name]):
+                raise WorkflowConflictError(
+                    f"Workflow {name} {behavior[name]!r} in the saved recipe is not supported "
+                    "by this release"
+                )
             if (name in self.behavior_settings
                     and _canonical(self.behavior_settings[name]) != _canonical(behavior[name])):
                 raise WorkflowConflictError(f"Workflow {name} differs from the saved recipe")
+        if _canonical(saved.get("acceptance")) != _canonical(current.get("acceptance")):
+            raise WorkflowConflictError(
+                "Workflow acceptance policy differs from the saved recipe; resume the run with "
+                "the policy it started with"
+            )
+        if _canonical(saved.get("read_tools")) != _canonical(current.get("read_tools")):
+            raise WorkflowConflictError(
+                "Workflow read_tools differ from the saved recipe; resume the run with the read "
+                "profiles it started with"
+            )
         if _canonical(_without_pricing(saved, saved=True)) != _canonical(_without_pricing(current)):
             raise WorkflowConflictError("Workflow components or budget differ from the saved recipe")
         self.behavior = behavior
@@ -313,6 +583,14 @@ class WorkflowRuntime:
                 self.providers[key] = source
                 self.provider_ids[id(source)] = key
         self.registry = self.bound["registry"]
+        self.gate_verifier = self.verifier
+        if self.gate_validator is not None:
+            # A fresh validator per run, which must be the one the recipe names.
+            validator = bind_component(self.gate_validator, binding.child("validator"),
+                                       role="validator")
+            if validator.identity.config_sha256 != self.recipe["validators"][0]["config_sha256"]:
+                raise WorkflowBindingError("Gate validator configuration differs from the recipe")
+            self.gate_verifier = _ValidatorVerifier(validator)
 
     def _component_call(self, source, scope):
         operation_key = _hash(scope.trigger)
@@ -343,11 +621,44 @@ class WorkflowRuntime:
         return self.context.for_call(self.provider_ids[id(source)], key)
 
     def _worker_call(self, node, phase, attempt, turn):
-        scope = CallScope(f"node/{node.id}", phase, {"node_id": node.id},
+        trigger = {"node_id": node.id}
+        if self._context_version:
+            # The call names the snapshot it was rendered from, so a call
+            # under a different snapshot is a different journal call.
+            snapshot_id = self._snapshot_ids.get((node.id, node_generation(node)))
+            if snapshot_id is None:
+                raise WorkflowStateError(f"Node {node.id!r} has no context snapshot to call with")
+            trigger["context_snapshot"] = snapshot_id
+        scope = CallScope(f"node/{node.id}", phase, trigger,
                           generation=node_generation(node), attempt=attempt, turn=turn)
         result = self._component_call(self.execution_provider, scope)
         self._worker_keys.setdefault((node.id, node_generation(node)), set()).add(result.key)
         return result
+
+    def _read_call(self, node, attempt):
+        """Bind a read step's attempt to its journal call, in the ``tool`` phase.
+
+        Re-entering the last call of an invocation that a free, repeat-safe
+        read settled as rejected, such as one whose response was lost, moves
+        to a new invocation and reads again; a rejection that a later attempt
+        already followed replays. Other rejections replay, and a read with an
+        unknown charge is never sent again.
+        """
+        step = node.metadata[READ_STEP_KEY]
+        generation, scope_id = node_generation(node), f"node/{node.id}"
+        operation_key = _hash({"node_id": node.id, "read_step": step})
+
+        def allocate(suffix=""):
+            invocation = self.store.allocate_invocation(
+                self.context.lease, "tool", scope_id, generation, operation_key + suffix)
+            return CallKey("tool", scope_id, generation, invocation, attempt, 0)
+
+        keys = [allocate()]
+        while (reinvocable(self.store.lookup_call(self.run_id, keys[-1]))
+               and not self.store.has_later_call(self.run_id, keys[-1])):
+            keys.append(allocate(f"/after-read-rejection/{len(keys)}"))
+        self._worker_keys.setdefault((node.id, generation), set()).update(keys)
+        return JournaledReadTool(self.context, self.read_tools[step["profile"]], keys[-1], step["input"])
 
     def _call_ids(self, keys):
         ids = []
@@ -363,6 +674,13 @@ class WorkflowRuntime:
         if run["budget_nanousd"] != _nanousd(self.max_budget_usd):
             raise WorkflowConflictError("Workflow components or budget differ from the saved recipe")
         self._adopt_recipe(run["config"])
+        self.context_revision, self.context_sources, self._snapshot_ids = None, (), {}
+        if self.acceptance is not None:
+            # The record a strict run's unfinished checkpoints carry.
+            self.undecided = DeliveryAcceptance(
+                AcceptanceDecision.NOT_EVALUATED, self.acceptance.sha256,
+                task_sha256=task_sha256(task_from_dict(run["task"])),
+            )
         self._bind()
         lease = self.store.acquire_lease(self.run_id, uuid4().hex, ttl_s=60)
         self.context = WorkflowProviderContext(self.store, lease, self.providers)
@@ -437,9 +755,16 @@ class WorkflowRuntime:
                 "execution_generation", "regenerations_used", "verification_receipt",
                 "regeneration_intent", "workflow_supervision", "native_receipts", "response_error",
                 "accounting_invalid", "accounting_error", "workflow_accounting_invalid", "cost_usd",
-                "cost_usd_unknown", "cost_usd_is_estimate",
+                "cost_usd_unknown", "cost_usd_is_estimate", ADVISORY_VERDICT_KEY,
+                REJECTED_GENERATIONS_KEY, CONTEXT_SNAPSHOT_KEY,
             )):
                 raise WorkflowBindingError("A new workflow cannot inherit execution or accounting history")
+            if self._context_version and graph.task is None and "task_context" in node.metadata:
+                # Snapshots carry a run's Task, never text a graph supplies in its place.
+                raise WorkflowBindingError(
+                    f"Node {node.id!r} carries task_context metadata without a Task; context "
+                    "assembly renders the run's Task, so give the graph a Task instead"
+                )
             for name in ("max_retries", "max_regenerations"):
                 value = getattr(node, name)
                 if type(value) is not int or value < 0:
@@ -454,11 +779,38 @@ class WorkflowRuntime:
                     f"Durable workflows currently support plain text nodes; node {node.id!r} "
                     "uses attach_dep_artifacts, attachments or artifacts"
                 )
+            if READ_STEP_KEY in node.metadata:
+                self._check_read_step(node)
             validate_workflow_model(self.execution_provider, node.metadata.get("model", self.model))
             if node.agent_id is not None and self.registry.get(node.agent_id) is None and (
                 registry is None or registry.get(node.agent_id) is None
             ):
                 raise WorkflowBindingError(f"Node {node.id!r} names an unknown agent")
+
+    def _check_read_step(self, node):
+        """Check a read step against the profiles the run's recipe declares.
+
+        A generated plan cannot declare one: model output may set no node
+        metadata but ``role`` (``smythe.loader``). Developer graphs and
+        template builders can, and their steps must name a declared profile
+        with valid input.
+        """
+        step = node.metadata[READ_STEP_KEY]
+        if type(step) is not dict or step.keys() != {"profile", "input"} or type(step["profile"]) is not str:
+            raise WorkflowBindingError(
+                f"Node {node.id!r} {READ_STEP_KEY} must be {{'profile': name, 'input': {{...}}}}")
+        profile = self.read_tools.get(step["profile"])
+        if profile is None:
+            raise WorkflowBindingError(
+                f"Node {node.id!r} reads with {step['profile']!r}, which this run's read_tools do "
+                "not declare"
+            )
+        try:
+            profile.request(step["input"])
+        except WorkflowBindingError as error:
+            raise WorkflowBindingError(f"Node {node.id!r} read step: {error}") from error
+        if node.verifies is not None:
+            raise WorkflowBindingError(f"Node {node.id!r} is a read step and cannot verify another node")
 
     def _check_plan(self, graph, registry):
         """Apply _plan's checks to a candidate plan without adopting it.
@@ -468,6 +820,23 @@ class WorkflowRuntime:
         """
         registry.workflow_description()
         self._validate_graph(graph, fresh=True, registry=registry)
+
+    def _check_planning(self):
+        """Refuse, before routing or planning, a strict run no gate of its plan could accept."""
+        from smythe.swarm import _check_gate_planning, _planning_architects
+
+        _check_gate_planning(self.acceptance, _planning_architects(
+            self.sources["router"], self.sources["architect"]))
+
+    def _check_obligations(self, graph):
+        """Refuse, before any node runs, a graph whose output the strict policy could not decide."""
+        if self.acceptance is not None:
+            from smythe.swarm import _synthesis_strategy
+
+            graph.validate()
+            validate_acceptance_obligations(
+                graph, self.acceptance, strategy=_synthesis_strategy(self.sources["synthesizer"]),
+            )
 
     def _prepare_graph(self, graph, *, fresh=False):
         self._validate_graph(graph, fresh=fresh)
@@ -482,11 +851,22 @@ class WorkflowRuntime:
         self.graph = graph
         return graph
 
-    def _save(self, status="running", *, output=None):
+    def _save(self, status="running", *, output=None, acceptance=None):
+        """Checkpoint the run; *acceptance* is the decision a completed one consumes."""
         if self.graph is None:
             return
         self._validate_graph_policy(self.graph)
         self.registry.workflow_description()
+        generations = {node.id: node_generation(node) for node in self.graph.nodes}
+        # A call claims its dispatch right after its reservation, without
+        # yielding, so a reserved call seen here was left by a killed process
+        # or a failed claim. Nodes call only at their current generation, so
+        # one of a superseded generation, including one that a regeneration
+        # applied on resume superseded, is never sent: release it. A completed
+        # run sends nothing more, so it releases every reservation left.
+        self.store.release_superseded_calls(self.context.lease, generations)
+        if status == "completed":
+            self.store.release_reserved_calls(self.context.lease, "run_completed")
         calls = []
         for node in self.graph.nodes:
             if node.status in {NodeStatus.COMPLETED, NodeStatus.FAILED, NodeStatus.SKIPPED}:
@@ -495,14 +875,22 @@ class WorkflowRuntime:
         # after the previous batched snapshot. Consume that settled call with
         # the checkpoint that durably advances its node generation. The query
         # reads only those calls, so a save's cost does not grow with history.
-        calls.extend(self.store.superseded_node_calls(
-            self.run_id, {node.id: node_generation(node) for node in self.graph.nodes}))
+        calls.extend(self.store.superseded_node_calls(self.run_id, generations))
         checkpoint = {
-            "version": 1, "status": status, "graph": graph_to_dict(self.graph),
+            "version": self.checkpoint_version, "status": status, "graph": graph_to_dict(self.graph),
             "registry": self.registry.workflow_description(), "output": output,
-            "revisions_used": self.executor.revisions_used if self.executor else 0,
+            "revisions_used": self.executor.revisions_used if self.executor else self._revisions_used,
             "max_concurrency": self.execution_concurrency,
         }
+        if self.checkpoint_version == 2:
+            record = acceptance or self.undecided
+            checkpoint["delivery_acceptance"] = None if record is None else record.to_dict()
+        if self._context_version:
+            if self.context_revision is None:
+                self._capture_sources()
+            # The source set by digest; its text stays in its journal operation.
+            checkpoint["context_sources"] = {"revision": self.context_revision,
+                                             "sha256": sources_sha256(self.context_sources)}
         saved = self.store.save_checkpoint(
             self.context.lease, self.revision, checkpoint, consumed_call_ids=calls,
             consumed_operation_ids=sorted(self._pending_operations), transition_kind=status,
@@ -512,6 +900,12 @@ class WorkflowRuntime:
 
     def _node_update(self, node):
         self._clear_resolved_native_error(node)
+        stamp = node.metadata.get(CONTEXT_SNAPSHOT_KEY)
+        if (node.status is NodeStatus.COMPLETED and isinstance(stamp, dict)
+                and stamp.get("generation") == node_generation(node)):
+            # The calls behind the result, which its dependents' snapshots name.
+            stamp["call_ids"] = self._call_ids(
+                self._worker_keys.get((node.id, node_generation(node)), ()))
         self._updates += 1
         if self._updates >= self.checkpoint_every_n_nodes:
             self._updates = 0
@@ -565,6 +959,112 @@ class WorkflowRuntime:
         self._pending_operations.add(operation["operation_id"])
         return operation["result"]
 
+    def _source_operation(self, revision, sources=None):
+        """The source set operation at *revision*, begun with *sources* when there is none."""
+        key = sources_key(revision)
+        operation = self.store.load_operation(self.run_id, key)
+        if operation is None and sources is not None:
+            operation = self.store.begin_operation(self.context.lease, key, "context", {
+                "revision": revision, "sources": [source.to_dict() for source in sources]})
+        return operation
+
+    def _read_sources(self, revision, operation):
+        try:
+            return sources_from_operation(operation, revision)
+        except (TypeError, ValueError) as error:
+            raise WorkflowStateError(f"Saved context source revision {revision} is invalid") from error
+
+    def _bind_sources(self, revision, operation):
+        """Adopt a source set operation as the run's sources; the next checkpoint consumes it."""
+        recorded = self._read_sources(revision, operation)
+        if operation["state"] == "started":
+            operation = self.store.complete_operation(
+                self.context.lease, sources_key(revision), {"sha256": sources_sha256(recorded)})
+        self.context_revision, self.context_sources = revision, recorded
+        self._pending_operations.add(operation["operation_id"])
+
+    def _capture_sources(self):
+        """Bind revision 0: the recorded one, or else the sources this runtime was given."""
+        operation = self._source_operation(0, self._supplied_sources)
+        if operation is None:
+            raise WorkflowStateError(
+                "Workflow never recorded its context sources; resume it with the "
+                "context_sources it started with"
+            )
+        self._bind_sources(0, operation)
+
+    def _restore_sources(self, record):
+        if (not isinstance(record, dict) or record.keys() != {"revision", "sha256"}
+                or type(record["revision"]) is not int or record["revision"] < 0):
+            raise WorkflowStateError("Workflow checkpoint has no valid context sources record")
+        operation = self._source_operation(record["revision"])
+        if operation is None:
+            raise WorkflowStateError("Workflow checkpoint names context sources the journal lacks")
+        self._bind_sources(record["revision"], operation)
+        if sources_sha256(self.context_sources) != record["sha256"]:
+            raise WorkflowStateError("Workflow checkpoint context sources do not match the journal")
+
+    async def _context_snapshot(self, node, graph, dep_results):
+        """The node's snapshot for its generation, recorded once as a ``context`` operation.
+
+        A node that already has one, including a call resumed after a crash
+        or a retried attempt, gets the snapshot the journal kept: the run's
+        sources and the dependency outputs it names are never read again.
+        """
+        generation = node_generation(node)
+        key = context_key(node.id, generation)
+        operation = self.store.load_operation(self.run_id, key)
+        if operation is None:
+            assembled = self._assemble_snapshot(node, graph, dep_results, generation)
+            operation = self.store.begin_operation(self.context.lease, key, "context",
+                                                   {"snapshot": assembled.to_dict()})
+        try:
+            snapshot = ContextSnapshot.from_dict(operation["inputs"].get("snapshot"))
+        except (TypeError, ValueError) as error:
+            raise WorkflowStateError(f"Saved context snapshot of node {node.id!r} is invalid") from error
+        if operation["state"] == "started":
+            operation = self.store.complete_operation(self.context.lease, key,
+                                                      {"snapshot_id": snapshot.snapshot_id})
+        if (operation["kind"] != "context"
+                or operation["result"] != {"snapshot_id": snapshot.snapshot_id}
+                or (snapshot.node_id, snapshot.generation) != (node.id, generation)
+                or snapshot.context_assembly != self._context_version
+                or snapshot.sources_revision != self.context_revision):
+            raise WorkflowStateError(
+                f"Saved context snapshot does not belong to node {node.id!r} at generation "
+                f"{generation} of this run"
+            )
+        self._pending_operations.add(operation["operation_id"])
+        self._snapshot_ids[node.id, generation] = snapshot.snapshot_id
+        node.metadata[CONTEXT_SNAPSHOT_KEY] = {"generation": generation,
+                                               "snapshot_id": snapshot.snapshot_id}
+        return snapshot
+
+    def _assemble_snapshot(self, node, graph, dep_results, generation):
+        task = graph.task
+        dependencies = []
+        for dep_id, value in dep_results.items():
+            dep = self.executor._cached_node_by_id(dep_id, graph)
+            stamp = dep.metadata.get(CONTEXT_SNAPSHOT_KEY)
+            calls = (stamp.get("call_ids", []) if isinstance(stamp, dict)
+                     and stamp.get("generation") == node_generation(dep) else [])
+            dependencies.append(DependencyDigest(
+                dep_id, node_generation(dep), dep.status.value,
+                output_sha256(value if isinstance(value, str) else str(value)), tuple(calls),
+            ))
+        agent = self.registry.get(node.agent_id) if node.agent_id else None
+        return ContextSnapshot(
+            node_id=node.id, generation=generation, step=node.label,
+            goal=None if task is None else task.goal,
+            constraints=() if task is None else task.constraints,
+            acceptance_criteria=() if task is None else task.done_when,
+            task_sha256=task_sha256(task), sources_revision=self.context_revision,
+            sources=self.context_sources, dependencies=tuple(dependencies),
+            agent_id=node.agent_id,
+            capabilities=() if agent is None else sorted(set(agent.profile.capabilities)),
+            context_assembly=self._context_version,
+        )
+
     async def _plan(self, task):
         async def build(inputs):
             frozen = task_from_dict(inputs["task"])
@@ -576,6 +1076,11 @@ class WorkflowRuntime:
             for agent in registry.list_agents():
                 self.registry.register(agent)
             graph.task = snapshot_task(frozen)
+            if self.acceptance is not None:
+                # The saved plan carries the marks, so a replay keeps them.
+                from smythe.swarm import _mark_generated_gates
+
+                _mark_generated_gates(graph, architect)
             self._prepare_graph(graph, fresh=True)
             return {"graph": graph_to_dict(graph), "registry": self.registry.workflow_description()}
 
@@ -598,6 +1103,7 @@ class WorkflowRuntime:
     async def execute(self, value, *, max_concurrency):
         if isinstance(value, Task):
             task = snapshot_task(value)
+            self._check_planning()
             async with self._session(self._new_run(task)):
                 await self._plan(task)
                 return await self._execute(max_concurrency)
@@ -609,6 +1115,8 @@ class WorkflowRuntime:
         value = graph_from_dict(json_snapshot(graph_to_dict(value)))
         reference = snapshot_run_ref(value.run_ref)
         if reference is None:
+            # A refused graph creates no run.
+            self._check_obligations(value)
             async with self._session(self._new_run(value.task)):
                 self._prepare_graph(value, fresh=True)
                 self._save("planned")
@@ -634,8 +1142,19 @@ class WorkflowRuntime:
             return None
         self.revision = saved["revision"]
         state = saved["checkpoint"]
-        if type(state.get("version")) is not int or state["version"] != 1:
+        version = state.get("version")
+        if type(version) is not int or version not in (1, 2):
             raise WorkflowStateError("Unsupported workflow checkpoint version")
+        if version != self.checkpoint_version:
+            raise WorkflowStateError(
+                f"Workflow checkpoint version {version} does not match its recipe, which "
+                f"writes version {self.checkpoint_version}"
+            )
+        if version == 2:
+            self.saved_acceptance = self._saved_acceptance(state)
+        if self._context_version:
+            self._restore_sources(state.get("context_sources"))
+        self._revisions_used = state.get("revisions_used", 0)
         registry = Registry.from_workflow_description(state["registry"])
         graph = graph_from_dict(state["graph"])
         if (graph.run_ref != self._reference()
@@ -646,6 +1165,12 @@ class WorkflowRuntime:
         self._prepare_graph(graph)
         return state
 
+    def _saved_acceptance(self, state):
+        """A version 2 checkpoint's record: undecided until completed, then the decision."""
+        if self.acceptance is None:
+            return _saved_record(state, None, None)
+        return _saved_record(state, self.acceptance.sha256, self.undecided.task_sha256)
+
     async def resume(self, run_id, *, max_concurrency):
         async with self._session(self.store.load_run(run_id)):
             state = self._restore()
@@ -653,8 +1178,66 @@ class WorkflowRuntime:
                 task = task_from_dict(self.run["task"])
                 if task is None:
                     raise WorkflowStateError("Caller-built workflow has no saved initial graph")
+                self._check_planning()
                 await self._plan(task)
             return await self._execute(max_concurrency, state=state)
+
+    async def refresh_context(self, run_id, sources):
+        """Give an unfinished run new sources, to be re-evaluated when it resumes.
+
+        Records *sources* (a sequence of :class:`~smythe.context.ContextSource`)
+        as the run's next source revision and checkpoints every node pending
+        at its next generation, so that resuming runs each node again with a
+        new snapshot. Nothing is called now, and earlier snapshots, calls and
+        charges stay in the journal. A run whose checkpoint is still
+        ``planned`` has run nothing and only adopts the revision. Sources
+        equal to the current ones change nothing. Returns the source revision
+        the run now uses.
+
+        Raises ``WorkflowStateError`` for a run without context assembly, a
+        completed run, a run with no saved graph, and a node whose provider
+        accounting is unresolved.
+        """
+        sources = snapshot_sources(sources)
+        async with self._session(self.store.load_run(run_id)):
+            if not self._context_version:
+                raise WorkflowStateError("Workflow does not use context assembly; it has no sources")
+            state = self._restore()
+            if state is None:
+                raise WorkflowStateError("Workflow has no saved graph yet; resume it first")
+            if state["status"] == "completed":
+                raise WorkflowStateError(
+                    "A completed workflow keeps the sources it delivered with; start a new run "
+                    "to use other sources"
+                )
+            if sources == self.context_sources:
+                return self.context_revision
+            for node in self.graph.nodes:
+                self._clear_resolved_native_error(node)
+                if (any(key in node.metadata for key in ("response_error", "workflow_accounting_invalid"))
+                        or node.metadata.get("accounting_invalid")):
+                    raise WorkflowStateError(
+                        f"Node {node.id!r} has unresolved provider accounting; resume the run to "
+                        "settle it before refreshing its sources"
+                    )
+            # A refresh that stopped before its checkpoint may have recorded
+            # other sources at the next revision; they were never used.
+            revision = self.context_revision + 1
+            while ((operation := self._source_operation(revision)) is not None
+                   and self._read_sources(revision, operation) != sources):
+                revision += 1
+            self._bind_sources(revision, operation or self._source_operation(revision, sources))
+            status = state["status"]
+            if status != "planned":
+                status = "running"
+                for node in self.graph.nodes:
+                    node.metadata["execution_generation"] = node_generation(node) + 1
+                    node.status, node.result = NodeStatus.PENDING, None
+                    for key in _GENERATION_KEYS:
+                        node.metadata.pop(key, None)
+            self.execution_concurrency = state.get("max_concurrency")
+            self._save(status)
+            return revision
 
     async def _execute(self, max_concurrency, *, state=None):
         from smythe.async_executor import AsyncExecutor
@@ -670,7 +1253,11 @@ class WorkflowRuntime:
                 or node.metadata.get("accounting_invalid") for node in self.graph.nodes
             ):
                 raise WorkflowStateError("Completed workflow has an unresolved control or accounting marker")
-            return self._result(state["output"])
+            return self._result(state["output"], self._reverified(state["output"]))
+        if state is None or state["status"] == "planned":
+            # No node has run, so a plan, edited or generated, is checked
+            # now. A run that started met its obligations then.
+            self._check_obligations(self.graph)
         self.execution_concurrency = (state.get("max_concurrency") if state else None) or max_concurrency
         if (type(self.execution_concurrency) is not int
                 or not 1 <= self.execution_concurrency <= self.max_concurrency):
@@ -681,11 +1268,15 @@ class WorkflowRuntime:
             provider=self.execution_provider, registry=self.registry, tracer=self.trace,
             budget=self.budget, max_concurrency=self.execution_concurrency, artifact_dir=None,
             retry_backoff_s=self.retry_backoff_s, task=self.graph.task,
-            verifier=self.verifier, max_revisions=self.max_revisions,
+            verifier=self.gate_verifier, max_revisions=self.max_revisions,
             revisions_used=state["revisions_used"] if state else 0,
             supervisor=_WorkflowSupervisor(self) if self.bound["supervisor"] else None,
             provider_call_factory=self._worker_call, on_node_update=self._node_update,
             on_control_update=self._save, on_supervision_update=self._supervision_update,
+            # The version the run's recipe records; 1 when it records none.
+            prompt_assembly=self.behavior.get("prompt_assembly", 1),
+            acceptance=self.acceptance, read_call_factory=self._read_call,
+            context_assembler=self._context_snapshot if self._context_version else None,
         )
         self._save()
         try:
@@ -707,14 +1298,96 @@ class WorkflowRuntime:
                     raise WorkflowStateError("Synthesis must return text")
                 return {"output": output}
 
+            key = self._synthesis_key()
             final = await self._operation_result(
-                "synthesis", "synthesis", {"graph": graph_to_dict(self.graph)}, synthesize,
+                key, "synthesis", {"graph": graph_to_dict(self.graph)}, synthesize,
             )
-            self._save("completed", output=final["output"])
-            return self._result(final["output"])
+            acceptance = None if self.acceptance is None else await self._decide(key, final["output"])
+            # The completed checkpoint consumes the synthesis and the decision together.
+            self._save("completed", output=final["output"], acceptance=acceptance)
+            return self._result(final["output"], acceptance)
         except BaseException:
             self._save("failed")
             raise
+
+    def _synthesis_key(self):
+        """The synthesis operation's key for this run (see :func:`_synthesis_key`)."""
+        return _synthesis_key(
+            self.graph, scoped=self.checkpoint_version == 2 or bool(self._context_version),
+        )
+
+    def _acceptance_inputs(self, synthesis_key, output_sha256, strategy, sources, used_fallback):
+        """Everything a decision binds; its hash keys the acceptance operation."""
+        return _decision_inputs(synthesis_key, self.acceptance.sha256, self.undecided.task_sha256,
+                                output_sha256, strategy, sources, used_fallback)
+
+    async def _decide(self, synthesis_key, output):
+        """Decide delivery acceptance for exactly *output* as a journal operation.
+
+        Final validators run once, locally, and the decision is committed
+        before the completed checkpoint consumes it. A run interrupted before
+        that commit decides again on the same output; a committed decision is
+        read back and never made again.
+        """
+        from smythe.swarm import _synthesis_strategy
+
+        strategy = _synthesis_strategy(self.sources["synthesizer"])
+        if strategy == "deliverable":
+            sources, used_fallback = deliverable_sources(self.graph)
+        else:
+            sources = [node for node in self.graph.nodes
+                       if node.status is NodeStatus.COMPLETED and node.result is not None]
+            used_fallback = False
+        inputs = self._acceptance_inputs(
+            synthesis_key, text_sha256(output), strategy,
+            [AcceptanceSource(node.id, node_generation(node)) for node in sources], used_fallback,
+        )
+
+        async def decide(_):
+            record = evaluate_delivery(
+                self.acceptance, self.graph, output, strategy=strategy, sources=sources,
+                used_fallback=used_fallback, task=self.graph.task,
+            )
+            return {"delivery_acceptance": record.to_dict()}
+
+        result = await self._operation_result("acceptance/" + _hash(inputs), "acceptance", inputs, decide)
+        try:
+            record = DeliveryAcceptance.from_dict(result.get("delivery_acceptance"))
+        except (TypeError, ValueError) as error:
+            raise WorkflowStateError("Saved delivery acceptance is invalid") from error
+        if (record.decision is AcceptanceDecision.NOT_EVALUATED
+                or record.task_sha256 != self.undecided.task_sha256
+                or self._acceptance_inputs(synthesis_key, record.output_sha256, record.strategy,
+                                           record.sources, record.used_fallback) != inputs):
+            raise WorkflowStateError("Saved delivery acceptance does not match its output")
+        self.trace.on_acceptance(record)
+        return record
+
+    def _reverified(self, output):
+        """Check a completed run's decision against its checkpoint and journal now.
+
+        The saved output must match the record's digest, the task and source
+        generations must be those it binds, and the journal must hold the same
+        decision, applied (see :func:`_decision_problems`). A mismatch gives an
+        ``indeterminate`` record for the saved output, never acceptance. Runs
+        without a strict policy have no record.
+        """
+        record = self.saved_acceptance
+        if self.acceptance is None:
+            return None
+        if not isinstance(output, str):
+            raise WorkflowStateError("Completed workflow output is not text")
+        problems = _decision_problems(self.store, self.run_id, self.graph, output, record,
+                                      task=task_from_dict(self.run["task"]),
+                                      policy_sha256=self.acceptance.sha256)
+        if not problems:
+            return record
+        return DeliveryAcceptance(
+            decision=AcceptanceDecision.INDETERMINATE, policy_sha256=self.acceptance.sha256,
+            output_sha256=text_sha256(output), strategy=record.strategy, sources=record.sources,
+            used_fallback=record.used_fallback, task_sha256=self.undecided.task_sha256,
+            reasons=tuple(problems),
+        )
 
     def _supervision_update(self, node, applied):
         disposition = node.metadata.get("workflow_supervision")
@@ -729,19 +1402,25 @@ class WorkflowRuntime:
         self._prepare_graph(self.graph)
         self._save()
 
-    def _result(self, output):
+    def _result(self, output, acceptance=None):
+        """The run's result; output a strict decision did not accept is ``rejected_output``."""
         from smythe.swarm import SwarmResult
 
         accounting = self.budget.snapshot()
+        delivered = acceptance is None or acceptance.accepted
         return SwarmResult(
-            output=output, graph=self.graph, trace=self.trace.summary(), execution_id=self.run_id,
+            output=output if delivered else "", graph=self.graph, trace=self.trace.summary(),
+            execution_id=self.run_id,
             total_cost_usd=accounting["confirmed_nanousd"] / 1e9,
             cost_is_complete=not accounting["unknown_calls"] and not accounting["reserved_nanousd"],
             cost_contains_estimates=False, cost_scope="complete_text_workflow",
+            # The unit tag names the *_nanousd amounts' unit; stored rows
+            # and receipts do not carry it.
             workflow_accounting={key: accounting[key] for key in (
                 "confirmed_nanousd", "reserved_nanousd", "unknown_nanousd", "unknown_calls", "call_count",
-            )},
-            timing=self._timing(),
+            )} | {"unit": NANOUSD},
+            timing=self._timing(), acceptance=acceptance,
+            rejected_output=None if delivered else output,
         )
 
     def _timing(self):
@@ -845,7 +1524,7 @@ class _WorkflowSupervisor:
                 )
                 return None
             target = call_key["scope_id"].removeprefix("node/")
-            if (call_key["phase"] in {"execution", "verification"}
+            if (call_key["phase"] in {"execution", "verification", "tool"}
                     and call_key["scope_id"].startswith("node/") and target in generations
                     and call_key["generation"] == generations[target]):
                 runtime.trace.on_revision(
@@ -853,6 +1532,17 @@ class _WorkflowSupervisor:
                     detail="Revision targets work already admitted in the durable journal",
                 )
                 return None
+        # A node given its context snapshot is admitted too: its saved
+        # snapshot names the dependencies a rewire would change.
+        if runtime._context_version and any(
+            runtime.store.load_operation(runtime.run_id, context_key(target, generation)) is not None
+            for target, generation in generations.items()
+        ):
+            runtime.trace.on_revision(
+                node, proposal, applied=False,
+                detail="Revision targets work already admitted in the durable journal",
+            )
+            return None
         if runtime.graph_policy is not None:
             try:
                 candidate = graph_from_dict(json_snapshot(graph_to_dict(graph)))

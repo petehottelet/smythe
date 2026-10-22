@@ -1,10 +1,13 @@
-"""Deterministic validation gates for finished image assets."""
+"""Deterministic validation gates for finished image assets.
+
+The finding and report types live in :mod:`smythe.validation`, which needs no
+image library; they are re-exported here unchanged.
+"""
 
 from __future__ import annotations
 
+import hashlib
 import os
-from dataclasses import dataclass
-from enum import StrEnum
 from pathlib import Path
 from typing import Iterable
 
@@ -16,107 +19,30 @@ from smythe.assets.models import (
     BrandSpec,
     TextPolicy,
 )
+from smythe.validation import (
+    FindingSeverity,
+    ValidationFinding,
+    ValidationReport,
+    advisory_finding,
+    hard_finding,
+)
 
 
-class FindingSeverity(StrEnum):
-    """Whether a finding can fail deterministic acceptance."""
-
-    HARD = "hard"
-    ADVISORY = "advisory"
-
-
-@dataclass(frozen=True, slots=True)
-class ValidationFinding:
-    """One stable, machine-readable validation observation."""
-
-    code: str
-    message: str
-    severity: FindingSeverity = FindingSeverity.HARD
-    expected: object | None = None
-    observed: object | None = None
-
-    def __post_init__(self) -> None:
-        if not isinstance(self.code, str) or not self.code.strip():
-            raise ValueError("finding code must be a non-empty string")
-        if not isinstance(self.message, str) or not self.message.strip():
-            raise ValueError("finding message must be a non-empty string")
-        object.__setattr__(self, "code", self.code.strip())
-        object.__setattr__(self, "message", self.message.strip())
-        try:
-            severity = FindingSeverity(self.severity)
-        except (TypeError, ValueError) as exc:
-            raise ValueError(f"unknown finding severity: {self.severity!r}") from exc
-        object.__setattr__(self, "severity", severity)
-
-
-@dataclass(frozen=True, slots=True)
-class ValidationReport:
-    """A report whose pass state is controlled only by hard findings."""
-
-    path: str
-    findings: tuple[ValidationFinding, ...] = ()
-
-    @property
-    def hard_findings(self) -> tuple[ValidationFinding, ...]:
-        return tuple(
-            finding for finding in self.findings if finding.severity == FindingSeverity.HARD
-        )
-
-    @property
-    def advisories(self) -> tuple[ValidationFinding, ...]:
-        return tuple(
-            finding for finding in self.findings if finding.severity == FindingSeverity.ADVISORY
-        )
-
-    @property
-    def passed(self) -> bool:
-        return not self.hard_findings
-
-
-def hard_finding(
-    code: str,
-    message: str,
-    *,
-    expected: object | None = None,
-    observed: object | None = None,
-) -> ValidationFinding:
-    return ValidationFinding(
-        code=code,
-        message=message,
-        severity=FindingSeverity.HARD,
-        expected=expected,
-        observed=observed,
-    )
-
-
-def advisory_finding(
-    code: str,
-    message: str,
-    *,
-    expected: object | None = None,
-    observed: object | None = None,
-) -> ValidationFinding:
-    return ValidationFinding(
-        code=code,
-        message=message,
-        severity=FindingSeverity.ADVISORY,
-        expected=expected,
-        observed=observed,
-    )
-
-
-def _resolve(path: str | os.PathLike[str], base_dir: Path) -> Path:
+def _resolve(path: str | os.PathLike[str], base_dir: Path | None) -> Path | None:
+    """*path*, or *path* under *base_dir* when relative; None when nothing resolves it."""
     candidate = Path(path)
-    return candidate if candidate.is_absolute() else base_dir / candidate
+    if candidate.is_absolute():
+        return candidate
+    return None if base_dir is None else base_dir / candidate
 
 
 def _receipt_findings(
-    path: Path,
+    actual_hash: str,
     spec: AssetSpec,
     receipt: FinishReceipt,
     *,
     brand: BrandSpec | None,
-    base_dir: Path,
+    base_dir: Path | None,
 ) -> list[ValidationFinding]:
     findings: list[ValidationFinding] = []
     receipt_overlays: list[OverlayReceipt] = []
@@ -166,7 +92,6 @@ def _receipt_findings(
                     observed={"index": index, "kind": item.kind, "box": box},
                 )
             )
-    actual_hash = sha256_file(path)
     if actual_hash != receipt.output_sha256:
         findings.append(
             hard_finding(
@@ -224,12 +149,12 @@ def _receipt_findings(
             )
         else:
             logo_path = _resolve(brand.logo_path, base_dir)
-            if not logo_path.is_file():
+            if logo_path is None or not logo_path.is_file():
                 findings.append(
                     hard_finding(
                         "logo_master_unavailable",
                         "approved logo master is unavailable during validation",
-                        expected=str(logo_path),
+                        expected=str(brand.logo_path if logo_path is None else logo_path),
                     )
                 )
             else:
@@ -270,12 +195,12 @@ def _receipt_findings(
                 )
             if overlay.font_path:
                 font_path = _resolve(overlay.font_path, base_dir)
-                if not font_path.is_file():
+                if font_path is None or not font_path.is_file():
                     findings.append(
                         hard_finding(
                             "font_master_unavailable",
                             "supplied font master is unavailable during validation",
-                            expected=str(font_path),
+                            expected=str(overlay.font_path if font_path is None else font_path),
                         )
                     )
                 else:
@@ -292,27 +217,14 @@ def _receipt_findings(
     return findings
 
 
-def validate_image(
-    path: str | os.PathLike[str],
+def _checked_inputs(
     spec: AssetSpec,
-    *,
-    receipt: FinishReceipt | None = None,
-    require_receipt: bool = False,
-    brand: BrandSpec | None = None,
-    base_dir: str | os.PathLike[str] | None = None,
-    dpi_tolerance: float = 1.0,
-    advisory_findings: Iterable[ValidationFinding] = (),
-) -> ValidationReport:
-    """Validate content bytes against an asset specification.
-
-    Only PNG, JPEG, GIF, and WebP bytes are decoded; any other format, or an
-    image larger than the decoding pixel limit, is a ``decode_failed`` finding.
-
-    ``advisory_findings`` is intentionally a separate input and rejects hard
-    findings. This keeps vision/OCR/judge observations visible without letting
-    them silently redefine deterministic acceptance.
-    """
-
+    receipt: FinishReceipt | None,
+    brand: BrandSpec | None,
+    dpi_tolerance: float,
+    advisory_findings: Iterable[ValidationFinding],
+) -> tuple[ValidationFinding, ...]:
+    """Check the validation arguments and return the advisory findings."""
     if not isinstance(spec, AssetSpec):
         raise TypeError("spec must be an AssetSpec")
     if receipt is not None and not isinstance(receipt, FinishReceipt):
@@ -329,20 +241,106 @@ def validate_image(
         raise TypeError("advisory_findings must contain ValidationFinding values")
     if any(finding.severity != FindingSeverity.ADVISORY for finding in advisories):
         raise ValueError("advisory_findings cannot contain hard findings")
+    return advisories
 
+
+def validate_image(
+    path: str | os.PathLike[str],
+    spec: AssetSpec,
+    *,
+    receipt: FinishReceipt | None = None,
+    require_receipt: bool = False,
+    brand: BrandSpec | None = None,
+    base_dir: str | os.PathLike[str] | None = None,
+    dpi_tolerance: float = 1.0,
+    advisory_findings: Iterable[ValidationFinding] = (),
+) -> ValidationReport:
+    """Validate content bytes against an asset specification.
+
+    The file is read once, and :func:`validate_image_bytes` checks that one
+    snapshot: the bytes hashed for the receipt are the bytes decoded. A
+    relative logo or font path resolves against ``base_dir``, the current
+    working directory when it is None.
+
+    Only PNG, JPEG, GIF, and WebP bytes are decoded; any other format, or an
+    image larger than the decoding pixel limit, is a ``decode_failed`` finding.
+
+    ``advisory_findings`` is intentionally a separate input and rejects hard
+    findings. This keeps vision/OCR/judge observations visible without letting
+    them silently redefine deterministic acceptance.
+    """
+
+    advisories = _checked_inputs(spec, receipt, brand, dpi_tolerance, advisory_findings)
     image_path = Path(path)
-    root = Path(base_dir) if base_dir is not None else Path.cwd()
-    findings: list[ValidationFinding] = []
     if not image_path.is_file():
-        findings.append(
-            hard_finding(
-                "file_missing",
-                "finished artifact file does not exist",
-                observed=str(image_path),
-            )
+        missing = hard_finding(
+            "file_missing",
+            "finished artifact file does not exist",
+            observed=str(image_path),
         )
-        return ValidationReport(str(image_path), tuple(findings) + advisories)
+        return ValidationReport(str(image_path), (missing,) + advisories)
+    try:
+        data = image_path.read_bytes()
+    except OSError as exc:
+        unreadable = hard_finding(
+            "decode_failed",
+            "artifact bytes are not a decodable image",
+            observed=type(exc).__name__,
+        )
+        return ValidationReport(str(image_path), (unreadable,) + advisories)
+    return _validate_snapshot(
+        data, spec, str(image_path), receipt=receipt, require_receipt=require_receipt,
+        brand=brand, base_dir=Path(base_dir) if base_dir is not None else Path.cwd(),
+        dpi_tolerance=dpi_tolerance, advisories=advisories,
+    )
 
+
+def validate_image_bytes(
+    data: bytes,
+    spec: AssetSpec,
+    *,
+    path: str = "<bytes>",
+    receipt: FinishReceipt | None = None,
+    require_receipt: bool = False,
+    brand: BrandSpec | None = None,
+    base_dir: str | os.PathLike[str] | None = None,
+    dpi_tolerance: float = 1.0,
+    advisory_findings: Iterable[ValidationFinding] = (),
+) -> ValidationReport:
+    """Validate one in-memory snapshot of image bytes against an asset specification.
+
+    *data* is hashed for the receipt and decoded from the same bytes, so no
+    other bytes can stand in for the ones that were checked. *path* labels
+    the report. A relative logo or font path resolves only against an
+    explicit ``base_dir``; without one it is reported unavailable and is
+    never looked up in the working directory. Every other check is the one
+    :func:`validate_image` makes.
+    """
+    if not isinstance(data, (bytes, bytearray, memoryview)):
+        raise TypeError(f"data must be bytes, not {type(data).__name__}")
+    if not isinstance(path, str):
+        raise TypeError("path must be a string")
+    advisories = _checked_inputs(spec, receipt, brand, dpi_tolerance, advisory_findings)
+    return _validate_snapshot(
+        bytes(data), spec, path, receipt=receipt, require_receipt=require_receipt, brand=brand,
+        base_dir=Path(base_dir) if base_dir is not None else None,
+        dpi_tolerance=dpi_tolerance, advisories=advisories,
+    )
+
+
+def _validate_snapshot(
+    data: bytes,
+    spec: AssetSpec,
+    label: str,
+    *,
+    receipt: FinishReceipt | None,
+    require_receipt: bool,
+    brand: BrandSpec | None,
+    base_dir: Path | None,
+    dpi_tolerance: float,
+    advisories: tuple[ValidationFinding, ...],
+) -> ValidationReport:
+    findings: list[ValidationFinding] = []
     exact_policy = (
         spec.mark_policy == BrandMarkPolicy.COMPOSITE_EXACT
         or spec.text_policy == TextPolicy.COMPOSITE_EXACT
@@ -357,11 +355,11 @@ def validate_image(
     elif receipt is not None:
         findings.extend(
             _receipt_findings(
-                image_path,
+                hashlib.sha256(data).hexdigest(),
                 spec,
                 receipt,
                 brand=brand,
-                base_dir=root,
+                base_dir=base_dir,
             )
         )
 
@@ -375,7 +373,7 @@ def validate_image(
     # A spec larger than the default limit may legitimately decode that size.
     max_pixels = max(DEFAULT_MAX_IMAGE_PIXELS, spec.width * spec.height)
     try:
-        with open_image(image_path, max_pixels=max_pixels) as image:
+        with open_image(data, max_pixels=max_pixels) as image:
             image.load()
             observed_format = (image.format or "").upper()
             observed_size = image.size
@@ -401,7 +399,7 @@ def validate_image(
                 observed=type(exc).__name__,
             )
         )
-        return ValidationReport(str(image_path), tuple(findings) + advisories)
+        return ValidationReport(label, tuple(findings) + advisories)
 
     if observed_format == "JPG":
         observed_format = "JPEG"
@@ -468,7 +466,7 @@ def validate_image(
             )
         )
 
-    return ValidationReport(str(image_path), tuple(findings) + advisories)
+    return ValidationReport(label, tuple(findings) + advisories)
 
 
 __all__ = [
@@ -478,4 +476,5 @@ __all__ = [
     "advisory_finding",
     "hard_finding",
     "validate_image",
+    "validate_image_bytes",
 ]

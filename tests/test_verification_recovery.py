@@ -4,24 +4,35 @@ from __future__ import annotations
 
 import asyncio
 import copy
+import hashlib
+import json
+from pathlib import Path
 
 import pytest
 
 from smythe import VerificationRecoveryError
+from smythe.acceptance import AcceptancePolicy
 from smythe.async_executor import AsyncExecutor
 from smythe.budget import Sentinel
 from smythe.checkpoint import (
     CHECKPOINT_VERSION,
+    CheckpointStore,
     FileCheckpointStore,
     build_state,
     graph_from_dict,
     graph_to_dict,
 )
 from smythe.executor import Executor
+from smythe.executor_base import (
+    REJECTED_EXCERPT_BYTES,
+    REJECTED_GENERATIONS_KEY,
+    REJECTED_GENERATIONS_MAX_BYTES,
+)
 from smythe.graph import ExecutionGraph, FailurePolicy, Node, NodeStatus, Topology
-from smythe.provider import CompletionResult, Provider
+from smythe.provider import Artifact, CompletionResult, Provider
 from smythe.registry import Registry
 from smythe.swarm import Swarm
+from smythe.validation import ValidationReport, ValidatorIdentity
 from smythe.verifier import CallableVerifier
 from smythe.tracer import Tracer
 
@@ -319,6 +330,263 @@ def test_graph_snapshots_detach_nested_control_state():
     graph.nodes[1].metadata["verification_receipt"]["state"] = "consumed"
     assert snapshot["nodes"][1]["metadata"]["verification_receipt"]["state"] == "pending"
     assert restored.nodes[1].metadata["verification_receipt"]["state"] == "pending"
+
+
+class DrawingProvider(Provider):
+    """Each draft call returns new image bytes; the judge replies from a queue."""
+
+    def __init__(self, *verdicts):
+        self.verdicts = list(verdicts)
+        self.draws = 0
+
+    async def complete(self, system, prompt, model):
+        node_id = prompt.splitlines()[0]
+        if node_id == "judge":
+            return CompletionResult(text=self.verdicts.pop(0), cost_usd=0.1)
+        self.draws += 1
+        image = Artifact(data=f"image {self.draws}".encode(), mime_type="image/png")
+        return CompletionResult(text=f"{node_id} v{self.draws}", cost_usd=0.1, artifacts=[image])
+
+
+def _gated_drawing():
+    return ExecutionGraph(topology=[Topology.SERIAL], nodes=[
+        Node(id="draft", label="draft"),
+        Node(id="judge", label="judge", depends_on=["draft"], verifies="draft", max_regenerations=1),
+    ])
+
+
+def test_strict_regeneration_keeps_the_rejected_files(tmp_path):
+    swarm = Swarm(provider=DrawingProvider("FAIL: too dark", "PASS"), model="test",
+                  artifact_dir=tmp_path, acceptance=AcceptancePolicy(mode="strict"))
+    result = swarm.execute(_gated_drawing())
+
+    run_dir = tmp_path / result.execution_id[:12]
+    assert (run_dir / "draft_00.png").read_bytes() == b"image 1"
+    assert (run_dir / "draft_g1_00.png").read_bytes() == b"image 2"
+    [record] = result.graph.nodes[0].metadata["artifacts"]
+    assert Path(record["path"]) == (run_dir / "draft_g1_00.png").resolve()
+    assert record["sha256"] == hashlib.sha256(b"image 2").hexdigest()
+
+
+def test_legacy_regeneration_still_writes_one_name_per_position(tmp_path):
+    swarm = Swarm(provider=DrawingProvider("FAIL: too dark", "PASS"), model="test",
+                  artifact_dir=tmp_path)
+    result = swarm.execute(_gated_drawing())
+
+    run_dir = tmp_path / result.execution_id[:12]
+    assert sorted(path.name for path in run_dir.iterdir()) == ["draft_00.png"]
+    assert (run_dir / "draft_00.png").read_bytes() == b"image 2"
+    assert all(REJECTED_GENERATIONS_KEY not in node.metadata for node in result.graph.nodes)
+
+
+def test_strict_regeneration_records_each_rejected_generation(tmp_path):
+    swarm = Swarm(provider=DrawingProvider("FAIL: too dark", "PASS"), model="test",
+                  artifact_dir=tmp_path, acceptance=AcceptancePolicy(mode="strict"))
+    result = swarm.execute(_gated_drawing())
+    draft, judge = result.graph.nodes
+
+    [record] = draft.metadata[REJECTED_GENERATIONS_KEY]
+    reason = record.pop("reason")
+    assert "too dark" in reason
+    assert record == {
+        "version": 1, "generation": 0, "status": "completed", "judge_id": "judge",
+        "result_sha256": hashlib.sha256(b"draft v1").hexdigest(), "result_bytes": 8,
+        "excerpt": "draft v1",
+        "artifacts": [{
+            "path": str((tmp_path / result.execution_id[:12] / "draft_00.png").resolve()),
+            "mime_type": "image/png", "sha256": hashlib.sha256(b"image 1").hexdigest(),
+            "size_bytes": 7,
+        }],
+    }
+    assert Path(record["artifacts"][0]["path"]).read_bytes() == b"image 1"
+    [verdict] = judge.metadata[REJECTED_GENERATIONS_KEY]
+    assert (verdict["generation"], verdict["excerpt"], verdict["reason"]) == (0, "FAIL: too dark", reason)
+    assert draft.metadata["execution_generation"] == 1 and draft.result == "draft v2"
+
+
+class JsonMemoryStore(CheckpointStore):
+    """Keeps each saved state as detached JSON data, without file writes."""
+
+    def __init__(self):
+        self.states = {}
+
+    def save(self, execution_id, state):
+        self.states[execution_id] = json.loads(json.dumps(state))
+
+    def load(self, execution_id):
+        state = self.states.get(execution_id)
+        return None if state is None else json.loads(json.dumps(state))
+
+    def delete(self, execution_id):
+        self.states.pop(execution_id, None)
+
+    def list_ids(self):
+        return sorted(self.states)
+
+
+class LongDraftProvider(Provider):
+    TEXT = "caf\u00e9 " * 600  # 3,600 UTF-8 bytes
+
+    def __init__(self):
+        self.verdicts = ["FAIL: too long", "PASS"]
+
+    async def complete(self, system, prompt, model):
+        if prompt.splitlines()[0] == "judge":
+            return CompletionResult(text=self.verdicts.pop(0), cost_usd=0.1)
+        image = Artifact(data=b"image", mime_type="image/png")
+        return CompletionResult(text=self.TEXT, cost_usd=0.1, artifacts=[image])
+
+
+def test_a_long_rejected_result_keeps_an_excerpt_and_a_sidecar(tmp_path):
+    swarm = Swarm(provider=LongDraftProvider(), model="test", artifact_dir=tmp_path,
+                  acceptance=AcceptancePolicy(mode="strict"))
+    result = swarm.execute(_gated_drawing())
+
+    [record] = result.graph.nodes[0].metadata[REJECTED_GENERATIONS_KEY]
+    full = LongDraftProvider.TEXT.encode("utf-8")
+    assert record["result_bytes"] == len(full)
+    assert record["result_sha256"] == hashlib.sha256(full).hexdigest()
+    excerpt = record["excerpt"].encode("utf-8")
+    assert len(excerpt) <= REJECTED_EXCERPT_BYTES < len(full) and full.startswith(excerpt)
+    sidecar = Path(record["sidecar"])
+    assert sidecar.name == "draft_g0_rejected.txt"
+    assert sidecar.read_bytes() == full
+
+
+def test_a_failed_sidecar_write_leaves_the_reset_for_resume(tmp_path, monkeypatch):
+    import smythe.executor_base as executor_base
+
+    store = JsonMemoryStore()
+    publish = executor_base.publish_unique
+
+    def no_sidecars(directory, name, data):
+        if name.endswith("_rejected.txt"):
+            raise OSError("disk full")
+        return publish(directory, name, data)
+
+    monkeypatch.setattr(executor_base, "publish_unique", no_sidecars)
+    swarm = Swarm(provider=LongDraftProvider(), model="test", artifact_dir=tmp_path,
+                  checkpoint_store=store, acceptance=AcceptancePolicy(mode="strict"))
+    with pytest.raises(VerificationRecoveryError, match="retain"):
+        swarm.execute(_gated_drawing())
+
+    [execution_id] = store.states
+    draft, judge = store.states[execution_id]["graph"]["nodes"]
+    assert draft["status"] == "completed" and REJECTED_GENERATIONS_KEY not in draft["metadata"]
+    assert "regeneration_intent" in judge["metadata"]
+    assert not list(tmp_path.rglob("*_rejected.txt"))
+
+    monkeypatch.setattr(executor_base, "publish_unique", publish)
+    provider = LongDraftProvider()
+    provider.verdicts = ["PASS"]
+    result = Swarm(provider=provider, model="test", artifact_dir=tmp_path, checkpoint_store=store,
+                   acceptance=AcceptancePolicy(mode="strict")).resume(execution_id)
+
+    assert result.accepted
+    [record] = result.graph.nodes[0].metadata[REJECTED_GENERATIONS_KEY]
+    assert Path(record["sidecar"]).read_bytes() == LongDraftProvider.TEXT.encode("utf-8")
+
+
+def test_without_an_artifact_dir_a_rejected_result_keeps_only_its_excerpt():
+    swarm = Swarm(provider=LongDraftProvider(), model="test", artifact_dir=None,
+                  acceptance=AcceptancePolicy(mode="strict"))
+    result = swarm.execute(_gated_drawing())
+
+    [record] = result.graph.nodes[0].metadata[REJECTED_GENERATIONS_KEY]
+    assert "sidecar" not in record and "artifacts" not in record
+    assert record["artifacts_discarded"] == 1
+    assert len(record["excerpt"].encode("utf-8")) <= REJECTED_EXCERPT_BYTES
+
+
+class PassesAnything:
+    """A final validator that passes every output, so the gate alone decides."""
+
+    identity = ValidatorIdentity.for_config("passes-anything", "1")
+
+    def validate(self, subject):
+        return ValidationReport("output", validator=self.identity)
+
+
+@pytest.mark.parametrize("sidecars", [True, False])
+def test_rejected_generation_records_stay_within_the_checkpoint_byte_cap(tmp_path, monkeypatch, sidecars):
+    """Ordinary checkpoints rewrite the whole graph on every save, so the
+    records a strict run keeps are capped in bytes per checkpoint.
+
+    A record names its sidecar by absolute path, so with sidecars the size
+    of each record, and whether the space left at the cap still fits one
+    without its excerpt, depend on where the test runs. Without sidecars the
+    records have the same sizes everywhere.
+    """
+    # Each of these characters is escaped to six bytes of checkpoint JSON.
+    text = "\u00e9\u2603 " * 700
+
+    class Verbose(Provider):
+        async def complete(self, system, prompt, model):
+            node_id = prompt.splitlines()[0]
+            reply = f"FAIL: {text}" if node_id == "judge" else f"{node_id} {text}"
+            return CompletionResult(text=reply, cost_usd=0.0)
+
+    steps = [Node(id=f"step{i}", label=f"step{i}", depends_on=["draft"]) for i in range(4)]
+    # The judge runs after every step, so each rejection discards 6 results.
+    judge = Node(id="judge", label="judge", depends_on=["draft", *(n.id for n in steps)],
+                 verifies="draft", max_regenerations=6)
+    nodes = [Node(id="draft", label="draft"), *steps, judge]
+    store = JsonMemoryStore()
+    artifacts = tmp_path / "artifacts"
+    # Sidecar durability is not under test here; flushing each one is slow on some hosts.
+    monkeypatch.setattr("smythe._publish.os.fsync", lambda descriptor: None)
+    # The four steps are all delivered, so a strict run needs a final
+    # validator; one that passes everything leaves the exhausted gate to decide.
+    policy = AcceptancePolicy(mode="strict", final_validators=[PassesAnything()])
+    result = Swarm(provider=Verbose(), model="test", artifact_dir=artifacts if sidecars else None,
+                   checkpoint_store=store, acceptance=policy).execute(
+        ExecutionGraph(topology=[Topology.SERIAL], nodes=nodes))
+    assert result.acceptance.decision == "rejected"
+    assert result.acceptance.validators[0].outcome.value == "passed"
+
+    # The last checkpoint holds every record the run kept.
+    state = store.states[result.execution_id]
+    FileCheckpointStore(tmp_path / "with").save(result.execution_id, state)
+    path = tmp_path / "with" / f"{result.execution_id}.json"
+    records = [record for node in state["graph"]["nodes"]
+               for record in node["metadata"].get(REJECTED_GENERATIONS_KEY, [])]
+    # 6 nodes were reset 6 times; once the cap is reached, records drop their
+    # excerpt and then are not kept at all.
+    assert 0 < len(records) < 6 * 6
+    assert all("excerpt" in record for record in records if record["generation"] == 0)
+    if sidecars:
+        # A record that is not kept leaves no sidecar behind.
+        written = sorted(str(p.resolve()) for p in artifacts.rglob("*_rejected.txt"))
+        assert written == sorted(record["sidecar"] for record in records)
+    else:
+        assert any("excerpt" not in record for record in records)
+        assert not artifacts.exists()
+        assert all("sidecar" not in record for record in records)
+
+    for node in state["graph"]["nodes"]:
+        node["metadata"].pop(REJECTED_GENERATIONS_KEY, None)
+    FileCheckpointStore(tmp_path / "without").save(result.execution_id, state)
+    growth = path.stat().st_size - (tmp_path / "without" / path.name).stat().st_size
+    assert 0 < growth <= REJECTED_GENERATIONS_MAX_BYTES
+
+
+def test_strict_replay_of_a_partly_applied_reset_records_each_generation_once():
+    graph = completed_gate()
+    graph.nodes[1].result = "FAIL: old draft"
+    executor = Executor(provider=ScriptedProvider(), registry=Registry(), tracer=Tracer(),
+                        artifact_dir=None, acceptance=AcceptancePolicy(mode="strict"))
+    assert executor.prepare_regeneration(graph.nodes[1], graph) is not None
+    # An interruption after the draft was reset, before the reset was saved.
+    draft, judge, consumer = graph.nodes
+    draft.status, draft.result = NodeStatus.PENDING, None
+    draft.metadata["execution_generation"] = 1
+
+    executor.recover_verification(graph)
+
+    assert REJECTED_GENERATIONS_KEY not in draft.metadata
+    assert REJECTED_GENERATIONS_KEY not in consumer.metadata  # it never ran
+    [record] = judge.metadata[REJECTED_GENERATIONS_KEY]
+    assert (record["generation"], record["excerpt"]) == (0, "FAIL: old draft")
 
 
 @pytest.mark.parametrize("version", [True, False, 3.0, "3", None])

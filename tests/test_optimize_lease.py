@@ -378,7 +378,7 @@ async def test_completed_runner_replay_keeps_exact_evidence_and_identity(tmp_pat
         runner = OptimizationRunner(contract, ledger, evaluate, evaluator_hash=EVALUATOR, bootstrap_resamples=10)
         second = await runner.run(candidates[0], candidates[1:])
         assert first.to_dict() == second.to_dict()
-        assert first.campaign_id.startswith("optimization_v3_")
+        assert first.campaign_id.startswith("optimization_v4_")
         assert len(calls) == 14
         assert _evidence(ledger) == before
         assert "owner_id" not in json.dumps(first.to_dict())

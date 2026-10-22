@@ -27,9 +27,13 @@ from smythe.optimize.contracts import (
     canonical_json_bytes,
     sha256_prefixed,
 )
+from smythe.optimize.statistics import VERDICTS
 
 
 LEDGER_VERSION = 4
+# How a campaign's reference arms bear on promotion: "report" records their
+# comparisons; "must_not_be_worse" also fails a stage that one of them beats.
+_REFERENCE_RULES = ("report", "must_not_be_worse")
 _WRITER_FUNCTION = "smythe_autotune_writer_version"
 _OWNED_TABLES = ("ledger_meta", "campaigns", "candidates", "trials", "trial_events",
                  "promotion_decisions", "campaign_lease_epochs", "campaign_leases",
@@ -63,7 +67,9 @@ class HoldoutAlreadyUsedError(LedgerConflictError):
 
     Re-testing the same policy under the same holdout identity (see
     :func:`holdout_identity`) in the same ledger would draw a fresh holdout,
-    so the ledger refuses it.
+    so the ledger refuses it.  It is also raised for any campaign once a
+    declared ``max_holdout_draws`` cap on the identity's finite task pool is
+    reached.
     """
 
 
@@ -370,6 +376,51 @@ def _stored_holdout_identity(contract_json: object, evaluator_hash: str) -> str:
         ) from exc
 
 
+def _rows_with_identity(
+    cursor: sqlite3.Cursor, identity: str, query: str, values: Sequence[object] = ()
+) -> Iterator[sqlite3.Row]:
+    """Yield holdout rows whose stored contract and evaluator give *identity*."""
+
+    identities: dict[tuple[Any, Any], str] = {}
+    for row in cursor.execute(query, values).fetchall():
+        key = (row["contract_json"], row["evaluator_hash"])
+        if key not in identities:
+            identities[key] = _stored_holdout_identity(*key)
+        if identities[key] == identity:
+            yield row
+
+
+def _reference_phase(plan_hash: str) -> str:
+    """Phase of a campaign's reference trials, bound to its plan hash.
+
+    A reference arm is compared with the selected challenger and is never
+    promoted, so its holdout trials are not holdout use.
+    """
+
+    return "reference.plan_" + plan_hash.removeprefix("sha256:")
+
+
+def _holdout_draws(cursor: sqlite3.Cursor, identity: str) -> tuple[str, ...]:
+    """Campaigns that prepared any holdout trial under *identity*, by first draw.
+
+    Incumbent and reference rows count too: every holdout trial runs tasks
+    from the identity's holdout pool.
+    """
+
+    query = """
+        SELECT t.campaign_id AS campaign_id, t.evaluator_hash AS evaluator_hash,
+               c.contract_json AS contract_json,
+               MIN(t.prepared_at_ns) AS first_drawn_ns
+        FROM trials AS t
+        JOIN campaigns AS c ON c.campaign_id = t.campaign_id
+        WHERE t.split = 'holdout'
+        GROUP BY t.campaign_id, t.evaluator_hash
+        ORDER BY first_drawn_ns, t.campaign_id
+    """
+    rows = _rows_with_identity(cursor, identity, query)
+    return tuple(dict.fromkeys(row["campaign_id"] for row in rows))
+
+
 def _holdout_consumers(
     cursor: sqlite3.Cursor,
     identity: str,
@@ -378,13 +429,15 @@ def _holdout_consumers(
     """Map challenger policy hashes to campaigns that used a holdout identity.
 
     A holdout is used when a campaign prepares a holdout trial for a
-    non-incumbent candidate.  Each use's identity is recomputed from that
-    campaign's stored contract and that trial's evaluator hash, so campaigns
-    whose contracts differ only outside the identity share it.  Campaigns are
-    ordered by first holdout use.
+    non-incumbent candidate, unless the trial's phase is exactly the reference
+    phase of that campaign's plan (see :func:`_reference_phase`).  Each use's
+    identity is recomputed from that campaign's stored contract and that
+    trial's evaluator hash, so campaigns whose contracts differ only outside
+    the identity share it.  Campaigns are ordered by first holdout use.
     """
 
     # campaign_id determines contract_json, so it may be selected bare.
+    # Reference phases are compared exactly, unlike a case-insensitive LIKE.
     query = """
         SELECT k.policy_hash AS policy_hash, t.campaign_id AS campaign_id,
                t.evaluator_hash AS evaluator_hash,
@@ -396,6 +449,7 @@ def _holdout_consumers(
             ON k.campaign_id = t.campaign_id AND k.candidate_id = t.candidate_id
         WHERE t.split = 'holdout'
           AND t.candidate_id != c.incumbent_candidate_id
+          AND t.phase != ('reference.plan_' || substr(c.plan_hash, 8))
     """
     values: list[object] = []
     if policy_hash is not None:
@@ -405,16 +459,8 @@ def _holdout_consumers(
         GROUP BY k.policy_hash, t.campaign_id, t.evaluator_hash
         ORDER BY first_used_ns, t.campaign_id
     """
-    identities: dict[tuple[Any, Any], str] = {}
     consumers: dict[str, list[str]] = {}
-    for row in cursor.execute(query, values).fetchall():
-        key = (row["contract_json"], row["evaluator_hash"])
-        if key not in identities:
-            identities[key] = _stored_holdout_identity(
-                row["contract_json"], row["evaluator_hash"]
-            )
-        if identities[key] != identity:
-            continue
+    for row in _rows_with_identity(cursor, identity, query, values):
         campaigns = consumers.setdefault(row["policy_hash"], [])
         if row["campaign_id"] not in campaigns:
             campaigns.append(row["campaign_id"])
@@ -434,6 +480,19 @@ def _holdout_reuse_message(policy_hash: str, identity: str, campaign_id: str) ->
         "development or confirmation repetition count, or operational limit "
         f"does not change it. Inspect campaign {campaign_id!r} instead, or "
         "leave this policy out of the challenger set."
+    )
+
+
+def _holdout_pool_message(identity: str, campaigns: Sequence[str], limit: int) -> str:
+    """Explain why a draw beyond a finite holdout pool's cap is refused."""
+
+    return (
+        f"holdout identity {identity} allows {limit} campaign(s) to draw its "
+        f"finite holdout task pool and {len(campaigns)} already did, first "
+        f"campaign {campaigns[0]!r}; another draw would reuse held-out tasks, "
+        "so it is refused for every policy. The cap is not part of the "
+        "identity. Inspect those campaigns instead, or define a new holdout "
+        "evaluation, such as a new holdout task pack in the evaluator hash."
     )
 
 
@@ -1393,8 +1452,9 @@ class ExperimentLedger:
         ``identity`` comes from :func:`holdout_identity`.  Each policy maps to
         the campaigns that prepared holdout trials for it as a challenger
         under that identity, in first-use order, whatever their contracts'
-        fields outside the identity.  New campaigns may not re-test a listed
-        policy under the same identity.
+        fields outside the identity.  Holdout trials of a campaign's reference
+        arms are not listed.  New campaigns may not re-test a listed policy
+        under the same identity.
         """
 
         normalized = _sha256(identity, "holdout identity")
@@ -1402,6 +1462,23 @@ class ExperimentLedger:
             cursor = self._connection.cursor()
             try:
                 return _holdout_consumers(cursor, normalized)
+            finally:
+                cursor.close()
+
+    def holdout_draw_campaigns(self, identity: str) -> tuple[str, ...]:
+        """Return the campaigns that drew from a holdout identity's task pool.
+
+        A campaign draws when it prepares any holdout trial under
+        ``identity``, for its incumbent, a challenger or a reference.
+        Campaigns are in first-draw order.  ``max_holdout_draws`` on
+        :meth:`prepare_trial` and the runner caps how many there may be.
+        """
+
+        normalized = _sha256(identity, "holdout identity")
+        with self._lock:
+            cursor = self._connection.cursor()
+            try:
+                return _holdout_draws(cursor, normalized)
             finally:
                 cursor.close()
 
@@ -1543,7 +1620,20 @@ class ExperimentLedger:
         lease: CampaignLease,
         evaluator_hash: str,
         ceiling_microusd: int,
+        max_holdout_draws: int | None = None,
     ) -> str:
+        """Durably reserve one trial before any evaluator work.
+
+        A challenger's first holdout trial records its holdout use, and is
+        refused if the policy already used the holdout identity elsewhere.  A
+        trial whose phase is the campaign's reference phase,
+        ``reference.plan_<plan hash hex>``, is not use.  With
+        ``max_holdout_draws``, a new holdout trial of any role is refused
+        unless its campaign already drew from the holdout identity's pool or
+        fewer than that many campaigns have; the check runs in the write
+        transaction that inserts the trial.
+        """
+
         identifier = _safe_id(campaign_id, "campaign_id")
         candidate = _safe_id(candidate_id, "candidate_id")
         split_name = _nonempty(split, "split", maximum=128)
@@ -1551,6 +1641,13 @@ class ExperimentLedger:
         normalized_seed = _seed(seed)
         evaluator = _sha256(evaluator_hash, "evaluator_hash")
         ceiling = _nonnegative_int(ceiling_microusd, "ceiling_microusd")
+        draw_cap = (
+            None
+            if max_holdout_draws is None
+            else _nonnegative_int(max_holdout_draws, "max_holdout_draws")
+        )
+        if draw_cap == 0:
+            raise ValueError("max_holdout_draws must be a positive integer")
         trial_key = self.make_trial_key(
             identifier, candidate, split_name, phase_name, normalized_seed
         )
@@ -1592,31 +1689,45 @@ class ExperimentLedger:
                 raise LedgerConflictError(
                     f"campaign {identifier!r} already has a terminal decision"
                 )
-            if (
-                split_name == "holdout"
-                and candidate != campaign["incumbent_candidate_id"]
-            ):
-                # The first holdout row for a challenger is its durable
-                # holdout-use record, written in this transaction before any
-                # holdout evaluation.  Use is keyed by the holdout identity of
-                # this campaign's stored contract and this trial's evaluator,
-                # plus the policy content: never hypothesis prose, campaign
-                # identity, the challenger set, or operational caps.
-                policy_hash = candidate_row["policy_hash"]
+            # A reference trial draws from the holdout pool without using
+            # the policy's holdout.
+            uses_holdout = (
+                candidate != campaign["incumbent_candidate_id"]
+                and phase_name != _reference_phase(campaign["plan_hash"])
+            )
+            if split_name == "holdout" and (uses_holdout or draw_cap is not None):
                 identity = _stored_holdout_identity(
                     campaign["contract_json"], evaluator
                 )
-                prior = [
-                    item
-                    for item in _holdout_consumers(
-                        cursor, identity, policy_hash
-                    ).get(policy_hash, ())
-                    if item != identifier
-                ]
-                if prior:
-                    raise HoldoutAlreadyUsedError(
-                        _holdout_reuse_message(policy_hash, identity, prior[0])
-                    )
+                if uses_holdout:
+                    # The first holdout row for a challenger is its durable
+                    # holdout-use record, written in this transaction before
+                    # any holdout evaluation.  Use is keyed by the holdout
+                    # identity of this campaign's stored contract and this
+                    # trial's evaluator, plus the policy content: never
+                    # hypothesis prose, campaign identity, the challenger set,
+                    # or operational caps.
+                    policy_hash = candidate_row["policy_hash"]
+                    prior = [
+                        item
+                        for item in _holdout_consumers(
+                            cursor, identity, policy_hash
+                        ).get(policy_hash, ())
+                        if item != identifier
+                    ]
+                    if prior:
+                        raise HoldoutAlreadyUsedError(
+                            _holdout_reuse_message(policy_hash, identity, prior[0])
+                        )
+                if draw_cap is not None:
+                    # The same transaction inserts this campaign's first
+                    # draw, so two campaigns racing for the last draw cannot
+                    # both take it.
+                    draws = _holdout_draws(cursor, identity)
+                    if identifier not in draws and len(draws) >= draw_cap:
+                        raise HoldoutAlreadyUsedError(
+                            _holdout_pool_message(identity, draws, draw_cap)
+                        )
             contract = json.loads(campaign["contract_json"])
             required_ceiling = contract["per_trial_reservation_microusd"]
             if ceiling != required_ceiling:
@@ -1850,7 +1961,16 @@ class ExperimentLedger:
         campaign: sqlite3.Row,
         payload: Mapping[str, Any],
     ) -> None:
-        """Require terminal evidence to be the exact completed plan prefix."""
+        """Require terminal evidence to be the exact completed plan prefix.
+
+        A multi-arm decision declares its references in
+        ``assessment["references"]``: the last sealed candidates, in inventory
+        order, never the incumbent or the decision candidate.  References
+        have no development trials, join every paired split under the
+        campaign's reference phase, and under ``"must_not_be_worse"`` fail a
+        stage where any of their verdicts is ``"worse"``.  A decision without
+        references is checked exactly as before.
+        """
 
         trial_keys = payload.get("trial_keys")
         if not isinstance(trial_keys, list) or not trial_keys:
@@ -1876,6 +1996,23 @@ class ExperimentLedger:
             raise LedgerConflictError(
                 "promotion decision holdout commitment does not match"
             )
+        references = assessment.get("references", [])
+        if not isinstance(references, list) or any(
+            not isinstance(item, Mapping) for item in references
+        ):
+            raise LedgerConflictError("promotion decision references are invalid")
+        reference_ids = tuple(item.get("candidate_id") for item in references)
+        if reference_ids and (
+            reference_ids != candidate_ids[len(candidate_ids) - len(reference_ids):]
+            or incumbent_id in reference_ids
+            or candidate_id in reference_ids
+            or assessment.get("reference_rule") not in _REFERENCE_RULES
+        ):
+            raise LedgerConflictError(
+                "promotion decision references must be the last sealed candidates, "
+                "differ from the incumbent and the decision candidate, and name a "
+                "reference rule"
+            )
 
         promoted = payload.get("promoted")
         if not isinstance(promoted, bool):
@@ -1883,10 +2020,11 @@ class ExperimentLedger:
         contract = json.loads(campaign["contract_json"])
         split_plan: dict[str, tuple[tuple[str, ...], int]] = {
             "development": (
-                candidate_ids,
+                tuple(item for item in candidate_ids if item not in reference_ids),
                 contract["development_repetitions"],
             )
         }
+        compared = (incumbent_id, candidate_id, *reference_ids)
         if assessment.get("stage") == "development":
             if promoted:
                 raise LedgerConflictError("development-only decision cannot promote")
@@ -1900,11 +2038,10 @@ class ExperimentLedger:
                     "terminal decision requires a confirmation assessment"
                 )
             split_plan["confirmation"] = (
-                (incumbent_id, candidate_id),
+                compared,
                 contract["confirmation_repetitions"],
             )
-            confirmation_promoted = confirmation["promote"]
-            if confirmation_promoted:
+            if cls._stage_passed(assessment, references, "confirmation"):
                 if not isinstance(holdout, Mapping) or not isinstance(
                     holdout.get("promote"), bool
                 ):
@@ -1912,12 +2049,14 @@ class ExperimentLedger:
                         "passed confirmation requires a holdout assessment"
                     )
                 split_plan["holdout"] = (
-                    (incumbent_id, candidate_id),
+                    compared,
                     contract["holdout_repetitions"],
                 )
-                expected_promoted = bool(holdout["promote"])
+                expected_promoted = cls._stage_passed(assessment, references, "holdout")
             else:
-                if holdout is not None:
+                if holdout is not None or any(
+                    item.get("holdout") is not None for item in references
+                ):
                     raise LedgerConflictError(
                         "rejected confirmation cannot include holdout evidence"
                     )
@@ -1971,8 +2110,14 @@ class ExperimentLedger:
                     raise LedgerConflictError(
                         f"{split} evidence belongs to an unrelated candidate"
                     )
+                # A reference never has challenger phases, nor a challenger
+                # reference phases.
                 expected_role = (
-                    "incumbent" if observed_candidate == incumbent_id else "challenger"
+                    "incumbent"
+                    if observed_candidate == incumbent_id
+                    else "reference"
+                    if observed_candidate in reference_ids
+                    else "challenger"
                 )
                 expected_phase = f"{expected_role}.plan_{plan_suffix}"
                 if row["phase"] != expected_phase:
@@ -1987,6 +2132,24 @@ class ExperimentLedger:
                 raise LedgerConflictError(
                     f"promotion decision {split} evidence is not exactly paired"
                 )
+
+    @staticmethod
+    def _stage_passed(
+        assessment: Mapping[str, Any], references: Sequence[Mapping[str, Any]], stage: str
+    ) -> bool:
+        """Whether a decision's paired stage passed under its reference rule."""
+
+        passed = assessment[stage]["promote"]
+        for item in references:
+            comparison = item.get(stage)
+            if not isinstance(comparison, Mapping) or comparison.get("verdict") not in VERDICTS:
+                raise LedgerConflictError(f"reference {stage} assessment is invalid")
+            if (
+                assessment["reference_rule"] == "must_not_be_worse"
+                and comparison["verdict"] == "worse"
+            ):
+                passed = False
+        return passed
 
     def validate_decision_inventory(self, campaign_id: str) -> tuple[str, ...]:
         """Fail closed unless the campaign has zero or one exact terminal decision."""

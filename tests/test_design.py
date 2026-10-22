@@ -361,6 +361,52 @@ def test_verifier_passes_when_there_is_nothing_to_inspect():
     assert verdict.passed is True
 
 
+def test_verifier_can_require_artifacts():
+    verdict = design_verifier(require_artifacts=True).verdict(
+        Node(id="v", label="v"), Node(id="t", label="t"),
+    )
+    assert verdict.passed is False
+    assert "requires" in verdict.reason
+    with pytest.raises(TypeError, match="require_artifacts"):
+        design_verifier(require_artifacts="yes")
+
+
+def test_verifier_validates_its_palette_when_it_is_built():
+    for palette in (["#fff"], ["#gggggg"], [0xF5B301], ["##f5b301"]):
+        with pytest.raises(ValueError, match="6-digit hex"):
+            design_verifier(DesignSystem(palette=palette))
+
+
+def test_verifier_identity_names_its_version_and_settings():
+    identity = design_verifier().identity
+    assert (identity.name, identity.version) == ("smythe.design", design.DESIGN_VERIFIER_VERSION)
+    assert design_verifier().identity == identity
+    # Colours are compared as values, so spelling does not change the identity.
+    assert (design_verifier(DesignSystem(palette=["#F5B301"])).identity
+            == design_verifier(DesignSystem(palette=["f5b301"], notes="other notes")).identity)
+    variants = [
+        design_verifier(DesignSystem(palette=["#f5b301"])), design_verifier(width=64, height=64),
+        design_verifier(include_advisory=True), design_verifier(require_artifacts=True),
+    ]
+    assert len({identity, *(variant.identity for variant in variants)}) == 5
+
+
+def test_verifier_checks_each_artifact_against_its_recorded_digest(tmp_path):
+    import hashlib
+
+    good = _image(tmp_path / "good.png", noise=3)
+    target = _target_with([good])
+    target.metadata["artifacts"][0]["sha256"] = hashlib.sha256(good.read_bytes()).hexdigest()
+    assert design_verifier().verdict(Node(id="v", label="v"), target).passed is True
+
+    _image(good, noise=9)  # still a clean image, but not the bytes that were recorded
+    verdict = design_verifier().verdict(Node(id="v", label="v"), target)
+    assert verdict.passed is False
+    assert verdict.reason == (
+        "[hard] changed-artifact: good.png no longer holds the bytes recorded when it was written"
+    )
+
+
 def test_verifier_fails_when_the_only_artifact_is_missing(tmp_path):
     """Regression: a missing file was skipped and the verdict passed."""
     target = _target_with([tmp_path / "gone.png"])
@@ -529,6 +575,56 @@ def test_a_malformed_image_is_regenerated_instead_of_aborting_the_run(tmp_path):
     assert provider.calls == ["draw", "judge", "draw", "judge"]
     [regeneration] = [s for s in tracer.summary() if s["status"] == "regeneration"]
     assert regeneration["label"].startswith("[hard] unreadable-artifact: draw_00.png: ")
+
+
+class _Drawing:
+    """A provider that draws a clean image, or none, for the node labelled draw."""
+
+    def __init__(self, image: bytes | None) -> None:
+        from smythe.provider import Artifact, CompletionResult, Provider
+
+        class Draws(Provider):
+            async def complete(inner, system, prompt, model):
+                label = prompt.splitlines()[0].strip()
+                artifacts = ([Artifact(data=image, mime_type="image/png")]
+                             if label == "draw" and image is not None else [])
+                return CompletionResult(text="done", artifacts=artifacts,
+                                        prompt_tokens=1, completion_tokens=1)
+
+        self.provider = Draws()
+
+
+def _gated_draw() -> ExecutionGraph:
+    return ExecutionGraph(topology=[Topology.SERIAL], nodes=[
+        Node(id="draw", label="draw"),
+        Node(id="judge", label="judge", depends_on=["draw"], verifies="draw", max_regenerations=1),
+    ])
+
+
+def test_a_strict_run_accepts_an_image_its_design_gate_passed(tmp_path):
+    from smythe import AcceptancePolicy, Swarm
+
+    image = _image(tmp_path / "clean.png", noise=3).read_bytes()
+    swarm = Swarm(provider=_Drawing(image).provider, model="test-model",
+                  artifact_dir=tmp_path / "artifacts", acceptance=AcceptancePolicy(mode="strict"),
+                  verifier=design_verifier(require_artifacts=True))
+    result = swarm.execute(_gated_draw())
+
+    assert result.accepted, result.acceptance.reasons
+    [artifact] = result.acceptance.artifacts
+    assert (artifact.node_id, artifact.name, artifact.size_bytes) == ("draw", "draw_00.png", len(image))
+
+
+def test_a_strict_run_without_the_required_image_is_rejected(tmp_path):
+    from smythe import AcceptancePolicy, Swarm
+
+    swarm = Swarm(provider=_Drawing(None).provider, model="test-model",
+                  artifact_dir=tmp_path / "artifacts", acceptance=AcceptancePolicy(mode="strict"),
+                  verifier=design_verifier(require_artifacts=True))
+    result = swarm.execute(_gated_draw())
+
+    assert result.acceptance.decision == "rejected" and not result.accepted
+    assert any("requires" in reason for reason in result.acceptance.reasons)
 
 
 def test_verifier_does_not_disguise_its_own_errors_as_unreadable_files(tmp_path, monkeypatch):

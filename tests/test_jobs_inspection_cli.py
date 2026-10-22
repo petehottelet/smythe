@@ -125,8 +125,10 @@ def test_list_pagination_and_status_filter(job, capsys):
     manifest, root = load_manifest(job.manifest)
     plan = preflight_job(manifest, manifest_root=root)
     with SQLiteRunStore(job.path) as store:
-        store.create_run(plan, make_approval(plan), manifest_root=root, run_id="approved-a")
-        store.create_run(plan, make_approval(plan), manifest_root=root, run_id="approved-b")
+        # More runs of the seeded job's approval, created on purpose to page through.
+        for run_id in ("approved-a", "approved-b"):
+            store.create_run(plan, make_approval(plan), manifest_root=root, run_id=run_id,
+                             allow_approval_reuse=True)
     assert main(["jobs", "list", "--limit", "1", "--offset", "1", "--status", "approved",
                  "--store", str(job.path), "--json"]) == EXIT_OK
     listed = output(capsys)["list"]
@@ -169,6 +171,31 @@ def test_inspecting_failed_job_succeeds_but_status_exit_is_unchanged(tmp_path, c
     assert output(capsys)["status"]["counts"] == {"rejected": 1}
 
 
+def test_reroll_reason_is_shown_on_its_attempt_in_every_inspection_format(tmp_path, capsys, monkeypatch):
+    job = seed_job(tmp_path, capsys, rejected=True, monkeypatch=monkeypatch)
+    run_id = job.run["run_id"]
+    operation = job.run["operations"][0]["operation_key"]
+    assert main(["jobs", "reroll", run_id, operation, "--reason", "MIME check",
+                 "--store", str(job.path), "--json"]) == EXIT_JOB_FAILED
+    rerolled = output(capsys)["reroll"]
+    assert [attempt["reason"] for attempt in rerolled["attempts"]] == [None, "MIME check"]
+
+    assert main(["jobs", "inspect", run_id, "--store", str(job.path), "--json"]) == EXIT_OK
+    inspected = output(capsys)["inspect"]
+    assert [attempt["reason"] for attempt in inspected["attempts"]] == [None, "MIME check"]
+
+    assert main(["jobs", "inspect", run_id, "--store", str(job.path)]) == EXIT_OK
+    human = capsys.readouterr().out
+    assert human.count("Reason:") == 1
+    assert human.index("Attempt 2") < human.index("Reason: MIME check")
+
+    destination = tmp_path / "reports" / "inspection.html"
+    assert main(["jobs", "inspect", run_id, "--out", str(destination),
+                 "--store", str(job.path), "--json"]) == EXIT_OK
+    output(capsys)
+    assert "MIME check" in destination.read_text(encoding="utf-8")
+
+
 def test_human_inspection_shows_costs_call_states_attempts_and_artifact_findings(job, capsys):
     assert main(["jobs", "inspect", job.run["run_id"], "--store", str(job.path)]) == EXIT_OK
     captured = capsys.readouterr()
@@ -176,6 +203,34 @@ def test_human_inspection_shows_costs_call_states_attempts_and_artifact_findings
     assert job.run["run_id"] in captured.out and "completed" in captured.out
     for label in ("Confirmed", "Exposure", "Reserved", "Call state", "Attempt", "Artifact"):
         assert label in captured.out
+
+
+def test_human_inspection_shows_each_operations_input_digest(job, capsys):
+    assert main(["jobs", "inspect", job.run["run_id"], "--store", str(job.path), "--json"]) == EXIT_OK
+    operations = output(capsys)["inspect"]["operations"]
+    assert operations and all(operation["input_digest"] for operation in operations)
+
+    assert main(["jobs", "inspect", job.run["run_id"], "--store", str(job.path)]) == EXIT_OK
+    lines = capsys.readouterr().out.splitlines()
+    for operation in operations:
+        heading = next(index for index, line in enumerate(lines)
+                       if line.startswith(f"Operation {operation['operation_key']} "))
+        assert lines[heading + 1] == f"  Input digest: {operation['input_digest']}"
+
+
+def test_human_inspection_says_when_an_input_digest_is_unavailable(capsys):
+    from smythe.cli import _emit_job_inspection
+
+    _emit_job_inspection({
+        "run_id": "run", "name": "job", "status": "completed", "counts": {},
+        "cost": {"approved_microusd": 0, "confirmed_microusd": 0, "exposure_microusd": 0,
+                 "reserved_microusd": 0, "cost_is_complete": True, "cost_contains_estimates": False},
+        "pagination": {"returned": 1, "total": 1, "offset": 0, "limit": 50, "has_more": False},
+        "event_pagination": {"returned": 0, "total": 0}, "attempts": [], "calls": [], "artifacts": [],
+        "operations": [{"operation_key": "hero[0]", "operation_id": "op_1", "status": "completed",
+                        "attempt_count": 1, "max_attempts": 1, "input_digest": None}],
+    })
+    assert "  Input digest: unavailable\n" in capsys.readouterr().out
 
 
 def test_human_output_escapes_stored_terminal_controls(capsys):

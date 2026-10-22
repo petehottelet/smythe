@@ -11,7 +11,9 @@ from pathlib import Path, PurePosixPath, PureWindowsPath
 from typing import Any
 
 from smythe.jobs.artifact_io import MAX_ARTIFACT_BYTES
-from smythe.jobs.store import SQLiteRunStore
+from smythe.jobs.delivery import annotate_delivery
+from smythe.jobs.preflight import operation_input_digest
+from smythe.jobs.store import RunStoreError, SQLiteRunStore
 
 
 INSPECTION_VERSION = 1
@@ -173,13 +175,63 @@ def inspect_job(
     Run costs and status describe the entire ledger run. Operations and their
     attempt lineage are paged; recent events carry a separate limit. Files can
     change after the SQLite snapshot, so integrity findings are timestamped
-    observations and never change recorded acceptance or run status.
+    observations and never change recorded acceptance or run status. Each
+    attempt carries its recorded ``delivery_acceptance`` decision, and each
+    operation a projected ``delivery_acceptance`` and a derived
+    ``delivery_eligibility`` (see :func:`smythe.jobs.delivery.operation_delivery`).
+    Each operation also carries its ``input_digest``, computed from the stored
+    plan (see :func:`smythe.jobs.preflight.operation_input_digest`), or ``None``
+    when its stored specification, or the plan's stored attachment
+    fingerprints it needs, cannot produce one.
     """
     snapshot = store.inspection_snapshot(
         run_id, operation=operation, limit=limit, offset=offset, events_limit=events_limit
     )
     snapshot["inspection_version"] = INSPECTION_VERSION
     snapshot["inspected_at_ns"] = time.time_ns()
+    _add_input_digests(store, run_id, snapshot.get("operations", ()))
+    summary = check_artifact_integrity(
+        snapshot, snapshot["artifacts"], byte_limit=MAX_INSPECTION_HASH_BYTES,
+    )
+    snapshot["artifact_integrity"] = summary | {
+        "hash_byte_limit": MAX_INSPECTION_HASH_BYTES,
+        "scope": "artifact bytes in the selected operation page; acceptance is unchanged",
+    }
+    records = {attempt["attempt_id"]: attempt["delivery_acceptance"]
+               for attempt in snapshot.get("attempts", ())
+               if attempt.get("delivery_acceptance") is not None}
+    return annotate_delivery(snapshot, records)
+
+
+def _add_input_digests(store: SQLiteRunStore, run_id: str, operations) -> None:
+    # Plan fingerprints are read only when a listed operation sends attachments.
+    # The digest is informational: fingerprints that cannot be read leave the
+    # digests of operations that send attachments None, not the inspection failed.
+    fingerprints = []
+    if any(type(item.get("spec")) is dict and item["spec"].get("attachments")
+           for item in operations):
+        try:
+            fingerprints = store.plan_attachments(run_id)
+        except RunStoreError:
+            fingerprints = []
+    for item in operations:
+        try:
+            item["input_digest"] = operation_input_digest(item["spec"], fingerprints)
+        except (KeyError, TypeError, ValueError):
+            item["input_digest"] = None
+
+
+def check_artifact_integrity(
+    snapshot: dict[str, Any],
+    artifacts: list[dict[str, Any]],
+    *,
+    byte_limit: int | None,
+) -> dict[str, Any]:
+    """Set each artifact's ``integrity`` observation and summarize the findings.
+
+    Files are hashed until *byte_limit* bytes have been read; later files are
+    ``not_checked``. ``None`` checks every file. Recorded rows are unchanged.
+    """
     hashed = 0
     findings: dict[str, int] = {}
     try:
@@ -187,23 +239,16 @@ def inspect_job(
         root_error = None
     except (ValueError, KeyError, OSError, RuntimeError) as exc:
         root_error = str(exc)
-    for artifact in snapshot["artifacts"]:
+    for artifact in artifacts:
         if root_error is not None:
             integrity = {
                 "status": "unsafe", "detail": root_error, "checked_at_ns": time.time_ns()
             }
         else:
-            integrity, consumed = _integrity(
-                artifact, anchor, root_parts, MAX_INSPECTION_HASH_BYTES - hashed
-            )
+            remaining = MAX_ARTIFACT_BYTES if byte_limit is None else byte_limit - hashed
+            integrity, consumed = _integrity(artifact, anchor, root_parts, remaining)
             hashed += consumed
         artifact["integrity"] = integrity
         status = integrity["status"]
         findings[status] = findings.get(status, 0) + 1
-    snapshot["artifact_integrity"] = {
-        "counts": findings,
-        "bytes_hashed": hashed,
-        "hash_byte_limit": MAX_INSPECTION_HASH_BYTES,
-        "scope": "artifact bytes in the selected operation page; acceptance is unchanged",
-    }
-    return snapshot
+    return {"counts": findings, "bytes_hashed": hashed}

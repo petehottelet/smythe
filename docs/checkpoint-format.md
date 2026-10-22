@@ -1,4 +1,4 @@
-# Checkpoint format (version 4)
+# Checkpoint format (versions 4 and 5)
 
 This guide describes the ordinary `checkpoint_store` path. Opt-in
 [`run_store` workflows](workflow-accounting.md) use a separate SQLite journal
@@ -93,7 +93,8 @@ and recovery controls.
   ],
   "budget": {
     "max_budget_usd": 0.5,
-    "node_costs": {"research": 0.0003}
+    "node_costs": {"research": 0.0003},
+    "token_estimate_nodes": ["research"]
   },
   "output": "…final synthesized output, null until the run completes…",
   "timing": {
@@ -120,10 +121,12 @@ Notes:
   handoff. Both are `null` for a caller-built graph that carries no task.
 - Node `result` values that aren't JSON-serializable are stored as their `str()` form.
 - `budget.max_budget_usd` is the cap the execution started with; resume honors it, not whatever the resuming Swarm was constructed with.
+- `budget.token_estimate_nodes` lists the nodes, including `__synthesis__` for an `LLM_MERGE` synthesis, whose recorded cost prices tokens at the blended `cost_per_token` rate. Resume restores them, so `Sentinel.cost_contains_token_estimates` still reports costs priced before the checkpoint. A value other than a list of node IDs stops resume with `BudgetValidationError`.
 - `control.revisions_used` is how much of the supervisor's `max_revisions` allowance the run has already spent. Resume seeds the executor from it, so the cap bounds the **run**, not each attempt: a crash-resume cycle cannot refill the allowance and revise past the limit the caller set.
 - A node that a revision added carries `"added_by_revision": true` in its `metadata` (from 0.8.2). `LLMSupervisor` counts these nodes against `max_total_added_nodes`, so resume does not reset the count ([what the cap limits](supervisor.md#safety)). Nodes added before 0.8.2 have no marker and are not counted.
 - `task.done_when` carries the acceptance criteria forward. A resumed run that had forgotten them could not hold its own output to them.
 - `timing` records how long each call that worked on the execution took; see [timing segments](#timing-segments).
+- A version 5 checkpoint adds a top-level `requires` list and the state it names, such as a `delivery_acceptance` record; see [required state features](#required-state-features-version-5).
 
 ## Timing segments
 
@@ -157,6 +160,20 @@ Node metadata carries the generation and disposition of each gating verdict:
   rejection reason, absolute `regenerations_used` count, and an
   `affected_generations` map from node IDs to their old generations.
 
+Under a [strict acceptance policy](verifier.md#strict-delivery-acceptance),
+which writes version 5, a consumed receipt also records the final verdict:
+`outcome` (`passed`, `rejected` or `error`), `passed`, `reason`, and
+`exhausted: true` for a failing verdict after the last regeneration. A gate
+with `max_regenerations=0` records its verdict under `advisory_verdict` in the
+judge's metadata, with version `1`, `judge_generation`, `target_id`,
+`target_generation`, `outcome`, `passed` and `reason`; such a judge also
+records `verification_target_generation`. Each attempt of the judge drops the
+previous `advisory_verdict` when it starts, so a resumed run keeps the record
+only for a judge that completed before the crash. A gate that a strict run's
+generated plan contains carries `generated_gate: true`, and the saved mark
+keeps it from [accepting output on its own](verifier.md#which-gates-count)
+after resume.
+
 The intent is saved before cancellation. After affected workers settle, a
 second forced save records the reset: results and stale artifact references
 are cleared, affected generations advance exactly once, and the intent is
@@ -164,15 +181,134 @@ removed. Costs and consumed regeneration allowances survive the reset.
 Detached snapshot values prevent later metadata mutations from changing a
 checkpoint already handed to a custom store.
 
+Under a strict acceptance policy the reset first adds a record of each
+discarded generation to the node's `rejected_generations` list
+([rejected generations](verifier.md#rejected-generations)). A record has
+version `1`, `generation`, `status`, `judge_id`, `reason` (at most 300
+characters), `result_sha256` (`null` without a result), `result_bytes`, an
+`excerpt` of at most 1,024 bytes of the result's UTF-8 text, a `sidecar` path
+to the full text when the result is longer and the run has an
+`artifact_dir`, and the generation's `artifacts` records or
+`artifacts_discarded` count when it had files. The records of one checkpoint
+add at most 64 KiB as `FileCheckpointStore` writes them; past that a record
+has no `excerpt`, and one that still does not fit is left out. A replayed
+reset records each generation once. A new durable workflow refuses a graph
+whose nodes carry `rejected_generations`, as it refuses other execution
+history.
+
+## Required state features (version 5)
+
+Version 5 is written only for a state that a build reading version 4 would
+misread. Every version 5 checkpoint carries a top-level `requires` list naming
+the state features its reader must understand:
+
+```json
+"requires": ["delivery_acceptance"]
+```
+
+This build knows one feature, `delivery_acceptance`. A reader refuses, with
+`ValueError` and before any provider call, a version 5 checkpoint whose
+`requires` is missing or is not a list of strings, or that lists a feature it
+does not know, whether the run finished or not. A later feature can therefore
+be added under version 5 without an older reader finishing or delivering a
+run it would misread. `smythe.checkpoint.checkpoint_requirements(state)`
+returns the list after these checks.
+
+## Delivery acceptance (version 5)
+
+A state that carries a [delivery acceptance record](verifier.md#delivery-acceptance-records)
+is written as version 5, lists `delivery_acceptance` in `requires`, and keeps
+the record in a top-level `delivery_acceptance` block. A run under a
+[strict acceptance policy](verifier.md#strict-delivery-acceptance) writes
+every checkpoint this way: while it is unfinished the record is
+`not_evaluated` and binds the policy and task, and the completed checkpoint
+holds the decision. Other runs make no record and keep writing version 4;
+`build_state(..., delivery_acceptance=record)` writes version 5 and refuses a
+record whose `output_sha256` does not match the state's `output`, or a
+`completed` state whose record has no decision.
+
+The record is required exactly when it is listed: a version 5 state that
+lists `delivery_acceptance` without the block, or carries the block without
+listing it, is refused, and so is a `completed` state whose record is
+`not_evaluated`.
+
+```json
+"delivery_acceptance": {
+  "version": 1,
+  "decision": "accepted",
+  "reasons": [],
+  "output_sha256": "3f1c…",
+  "strategy": "deliverable",
+  "sources": [{"node_id": "report", "execution_generation": 1}],
+  "used_fallback": false,
+  "task_sha256": "9a0e…",
+  "policy_sha256": "8a51…",
+  "validators": [
+    {
+      "validator": {"name": "required-sections", "version": "1", "config_sha256": "c2d4…"},
+      "outcome": "passed"
+    }
+  ],
+  "scope": "output"
+}
+```
+
+- `version` is the record format. A reader rejects a record version, a
+  `decision` or a key it does not know instead of guessing what it means.
+- `decision` is `not_evaluated`, `accepted`, `rejected`, `needs_review` or
+  `indeterminate`. Every decision except `not_evaluated` binds
+  `output_sha256`, the SHA-256 of the checkpoint's `output` encoded as UTF-8,
+  and the synthesis `strategy`. Every decision except `accepted` and
+  `not_evaluated` lists at least one entry in `reasons`.
+- `sources` are the nodes the output came from, each with the
+  `execution_generation` used. `used_fallback` is true when synthesis fell
+  back to a node that was not a terminal deliverable.
+- `task_sha256` is the SHA-256 of the task snapshot as canonical JSON, or
+  `null` without a task. `policy_sha256` identifies the acceptance policy.
+- `validators` lists each final validator's identity and outcome (`passed`,
+  `rejected` or `error`). An `accepted` record holds only `passed` outcomes.
+- `scope` is `output`: the decision covers the delivered output, meaning the
+  synthesized text and any files its source nodes wrote.
+- `artifacts`, present only when source nodes delivered files, lists each
+  file whose bytes were verified: `node_id`, file `name`, `sha256`,
+  `size_bytes` and `mime_type`.
+
+Versions 1 through 4 have no record, whatever keys they hold. Resuming one
+returns `acceptance` as `None`: a legacy run is never reported as accepted or
+as not yet evaluated. A `Swarm` with a strict policy that resumes a completed
+checkpoint without a record, including a version 5 one that does not list
+`delivery_acceptance`, returns `output=""` with the saved text in
+`rejected_output`, because nothing decided it
+([strict delivery acceptance](verifier.md#strict-delivery-acceptance)).
+
+Resuming a completed version 5 checkpoint checks that `output` still matches
+`output_sha256`, that the task and every source node's generation are the ones
+the record binds, that every file in `artifacts` still holds its recorded
+bytes, and, when the resuming `Swarm` has a strict policy, that its
+`sha256` is `policy_sha256`. The result's `acceptance` is the record, or, after
+any mismatch, an `indeterminate` record for the saved output that names the
+mismatch: changed output is never accepted. An `accepted` record delivers the
+stored output; for any other decision `output` is `""` and the text is in
+`rejected_output`. An unfinished version 5 checkpoint resumes only under a
+strict policy whose `sha256` is its record's `policy_sha256`, and is refused
+with `ValueError` before any provider call otherwise, because finishing it
+under another policy would decide its output differently. A strict policy
+likewise refuses an unfinished checkpoint written without one.
+
+A completed checkpoint must hold a decided record: `build_state` refuses to
+write a completed state whose record is `not_evaluated`, and resume refuses
+such a state with `ValueError` before any provider call, leaving the
+checkpoint unchanged. Its output is neither delivered nor returned.
+
 ## Resume semantics
 
 `swarm.resume(execution_id)` (or `await swarm.aresume(...)`):
 
 1. Loads the state and rejects unknown ids (`KeyError`) and unreadable versions (`ValueError`).
-2. Restores the complete task, validates saved budget policy, charges, and verification state. Conflicting task copies, unresolved accounting markers, or ambiguous verification decisions stop recovery. A completed snapshot with output and no pending verification work returns its validated stored result and task.
+2. Restores the complete task, validates saved budget policy, charges, and verification state. Conflicting task copies, unresolved accounting markers, or ambiguous verification decisions stop recovery. A completed snapshot with output and no pending verification work returns its validated stored result and task; a version 5 snapshot returns its checked [delivery acceptance record](#delivery-acceptance-version-5) too. An unfinished version 5 snapshot stops here unless the resuming `Swarm` has the strict policy it began with.
 3. Otherwise restores the graph, re-registers the recorded agents, and resets `running` / `failed` nodes to `pending`. It finishes saved regeneration intents and consumes pending verdicts before dispatch. A rejected generation invalidates affected `completed` and `skipped` results too; other finished nodes keep their recorded results.
 4. Restores per-node costs into the budget so the resumed run keeps counting against the original cap.
-5. Executes the remaining nodes on the async executor, one at a time unless the resuming Swarm has `parallel=True` (then up to `max_concurrency`), synthesizes over the full graph, and writes the final checkpoint.
+5. Executes the remaining nodes on the async executor, one at a time unless the resuming Swarm has `parallel=True` (then up to `max_concurrency`), synthesizes over the full graph, decides delivery acceptance under a strict policy, and writes the final checkpoint.
 
 The trace on a resumed `SwarmResult` covers only the resumed portion; spans from before the crash are not reconstructed. Its `timing` likewise measures the resuming call, with `resumed` set and `latency_complete` false, and lists the earlier calls' saved segments before its own.
 
@@ -186,13 +322,22 @@ resume. See [Cost guardrails](budgets.md).
 
 ## Version compatibility
 
-This build writes version `4` and reads versions `1` through `4`.
+This build writes version `4` and reads versions `1` through `5`. It writes
+version `5` only for a state with a [delivery acceptance
+record](#delivery-acceptance-version-5), so builds that read only versions 1
+through 4 refuse it instead of delivering output they cannot check. A version
+5 reader also refuses any [required state feature](#required-state-features-version-5)
+it does not know.
 Version 2 added `control` and `task.done_when`; version 1 loads their original
 defaults of zero revisions and no acceptance criteria.
 
 The top-level `timing` block is optional and keeps version `4`. Earlier
 builds ignore the key when they resume and leave it out of the checkpoints
 they write; this build resumes checkpoints that lack it.
+
+`budget.token_estimate_nodes` is optional in the same way. A checkpoint
+without it restores no token estimates, as before the key existed, so
+`cost_contains_token_estimates` then reports only calls made after resume.
 
 Version 4 adds no field. It records that every MCP server listed under
 `agents` came from developer configuration: from 0.8.1 on, a model-generated
@@ -228,3 +373,7 @@ from smythe import FileCheckpointStore
 store = FileCheckpointStore()
 print(store.list_ids())
 ```
+
+`smythe runs list` lists the same ids from the command line with each run's
+state, delivery decision and next action, and `smythe runs inspect <id>` shows
+one checkpoint without changing it; see [Inspect saved runs](runs.md).

@@ -61,8 +61,9 @@ def test_concurrency_contract_is_bounded_exact_and_lineage_bound():
         ]
     )
 
-    contract, incumbent, challengers, scenario = _concurrency_campaign(args)
+    contract, incumbent, challengers, scenario, references = _concurrency_campaign(args)
 
+    assert references == ()
     assert scenario.work_items == 250
     assert contract.max_candidates == 4
     assert contract.max_trials == 4 * 3 + 2 * (5 + 5)
@@ -152,7 +153,7 @@ def test_default_campaign_is_offline_resume_safe_and_fully_evidenced(
 
     first = _run(ledger_path, capsys)
 
-    assert first["campaign_id"].startswith("optimization_v3_")
+    assert first["campaign_id"].startswith("optimization_v4_")
     assert first["optimization_plan_hash"].startswith("sha256:")
     assert first["evaluator_hash"].startswith("sha256:")
     assert first["contract_hash"].startswith("sha256:")
@@ -288,7 +289,7 @@ def test_auto_identity_includes_candidates_and_bootstrap_configuration(tmp_path,
 
     def plan(ledger, *options):
         args = parser.parse_args(["optimize", "concurrency", *options, *common])
-        contract, incumbent, candidates, scenario = _concurrency_campaign(args)
+        contract, incumbent, candidates, scenario, _references = _concurrency_campaign(args)
         runner = OptimizationRunner(
             contract,
             ledger,
@@ -385,6 +386,164 @@ def test_new_decisions_record_and_report_the_paired_t_rule(tmp_path, capsys):
     html = out.read_text(encoding="utf-8")
     assert html.count("Paired Student-t lower bound") == 6
     assert "Descriptive bootstrap interval (not used for promotion)" in html
+
+
+def test_run_json_reports_the_three_way_verdict_with_unchanged_exit_codes(
+    tmp_path, capsys
+):
+    two_challengers = (*_SMALL_CAMPAIGN[:1], "4,8", *_SMALL_CAMPAIGN[2:])
+    promoted = _run(tmp_path / "verdict.sqlite3", capsys, *two_challengers)
+    assert promoted["campaign_id"].startswith("optimization_v4_")
+    assert (promoted["promoted"], promoted["verdict"]) == (True, "improved")
+    assert "verdict" not in promoted["evidence"]
+    for stage in ("confirmation_assessment", "holdout_assessment"):
+        assert promoted["evidence"][stage]["verdict"] == "improved"
+    assessment = promoted["ledger_snapshot"]["decisions"][0]["assessment"]
+    assert assessment["verdict"] == "improved"
+    assert assessment["runner_version"] == 4
+    assert [
+        score["policy_hash"] for score in assessment["development_scores"]
+    ] == [score["policy_hash"] for score in promoted["evidence"]["development_scores"]]
+    assert len(assessment["development_scores"]) == 2
+
+    # A campaign that stops in development has no paired interval; it still
+    # exits successfully with an inconclusive verdict.
+    stopped = _run(
+        tmp_path / "stopped.sqlite3",
+        capsys,
+        *_SMALL_CAMPAIGN,
+        "--max-p95-latency-ms",
+        "1",
+    )
+    assert stopped["promoted"] is False
+    assert stopped["selected_candidate"] is None
+    assert stopped["verdict"] == "inconclusive"
+
+
+# A serial-capacity provider and a challenger whose single development trial
+# looked better, while its paired confirmation interval lies below zero. The
+# loose latency bound only varies the contract, and so the simulator's seeds.
+_WORSE_CAMPAIGN = (
+    "--candidate-concurrency", "2",
+    "--provider-capacity", "1",
+    "--work-items", "40",
+    "--base-latency-ms", "60",
+    "--max-p95-latency-ms", "1016000",
+    "--max-error-rate", "0.99",
+    "--min-improvement", "0",
+    "--bootstrap-resamples", "10",
+    "--development-repetitions", "1",
+    "--confirmation-repetitions", "3",
+    "--holdout-repetitions", "3",
+)
+
+
+def test_run_json_reports_a_worse_verdict_without_a_patch(tmp_path, capsys):
+    ledger_path = tmp_path / "worse.sqlite3"
+    worse = _run(ledger_path, capsys, *_WORSE_CAMPAIGN)
+
+    assert (worse["promoted"], worse["verdict"]) == (False, "worse")
+    assert "recommended_patch" not in worse and "verdict" not in worse["evidence"]
+    assert worse["selected_candidate"]["policy"] == {"max_concurrency": 2}
+    confirmation = worse["evidence"]["confirmation_assessment"]
+    assert confirmation["verdict"] == "worse" and confirmation["promote"] is False
+    assert confirmation["primary"]["confidence_interval"][1] < 0
+    assert worse["evidence"]["holdout_assessment"] is None
+    assert worse["evidence"]["reason"].startswith("confirmation rejected candidate")
+    [decision] = worse["ledger_snapshot"]["decisions"]
+    assert decision["assessment"]["verdict"] == "worse"
+
+    out = tmp_path / "worse.html"
+    assert main(["optimize", "inspect", worse["campaign_id"], "--ledger", str(ledger_path),
+                 "--out", str(out), "--json"]) == EXIT_OK
+    capsys.readouterr()
+    assert "Verdict: <strong>worse</strong></p>" in out.read_text(encoding="utf-8")
+
+
+def test_reference_concurrency_is_compared_on_paired_splits_and_never_promoted(
+    tmp_path, capsys
+):
+    args = build_parser().parse_args(
+        ["optimize", "concurrency", *_SMALL_CAMPAIGN, "--reference", "2", "--reference", "4"]
+    )
+    contract, incumbent, challengers, _scenario, references = _concurrency_campaign(args)
+    assert [item.policy["max_concurrency"] for item in references] == [2, 4]
+    assert all(item.parent == incumbent.candidate_id for item in references)
+    assert len(challengers) == 1
+    assert contract.max_candidates == 4
+    assert contract.max_trials == 2 * 1 + (2 + 2) * (3 + 3)
+
+    ledger_path = tmp_path / "references.sqlite3"
+    result = _run(ledger_path, capsys, *_SMALL_CAMPAIGN, "--reference", "2,4")
+    assert result["promoted"] is True
+    assert result["selected_candidate"]["policy"] == {"max_concurrency": 8}
+    compared = result["evidence"]["references"]
+    assert [item["candidate_id"] for item in compared] == [
+        item.candidate_id for item in references
+    ]
+    assert all(item["holdout"] is not None for item in compared)
+    assessment = result["ledger_snapshot"]["decisions"][0]["assessment"]
+    assert assessment["reference_rule"] == "report"
+    assert assessment["references"] == compared
+    assert result["ledger_snapshot"]["trial_count"] == 26
+
+    out = tmp_path / "report.html"
+    assert main(
+        ["optimize", "inspect", result["campaign_id"], "--ledger", str(ledger_path),
+         "--out", str(out), "--json"]
+    ) == EXIT_OK
+    capsys.readouterr()
+    assert "<h3>References</h3>" in out.read_text(encoding="utf-8")
+
+
+@pytest.mark.parametrize(
+    "values, message",
+    [
+        (["8"], "reference concurrency 8 is also a challenger"),
+        (["1"], "reference concurrency 1 is reserved for the incumbent"),
+        (["2,2"], "duplicate reference concurrency"),
+        (["2", "two"], "reference concurrency must be an integer"),
+    ],
+)
+def test_reference_concurrency_rejects_ambiguous_input(tmp_path, capsys, values, message):
+    options = [item for value in values for item in ("--reference", value)]
+    args = build_parser().parse_args(["optimize", "concurrency", *_SMALL_CAMPAIGN, *options])
+    with pytest.raises(ValueError, match=message):
+        _concurrency_campaign(args)
+    ledger_path = tmp_path / "invalid.sqlite3"
+    assert main(
+        ["optimize", "concurrency", "--ledger", str(ledger_path), "--json",
+         *_SMALL_CAMPAIGN, *options]
+    ) == EXIT_INVALID_INPUT
+    assert _json_output(capsys)["error"]["type"] == "ValueError"
+    assert not ledger_path.exists()
+
+
+def test_explicit_campaign_id_from_runner_version_3_exits_with_binding_drift(
+    tmp_path, capsys, monkeypatch
+):
+    ledger_path = tmp_path / "upgrade.sqlite3"
+    command = [
+        "optimize",
+        "concurrency",
+        "--ledger",
+        str(ledger_path),
+        "--json",
+        "--campaign-id",
+        "explicit-campaign",
+        *_SMALL_CAMPAIGN,
+    ]
+    with monkeypatch.context() as earlier_release:
+        earlier_release.setattr("smythe.optimize.engine.RUNNER_VERSION", 3)
+        assert main(command) == EXIT_OK
+        legacy = _json_output(capsys)["concurrency"]
+    assert legacy["campaign_id"] == "explicit-campaign"
+
+    assert main(command) == EXIT_OPTIMIZE_STATE
+    error = _json_output(capsys)["error"]
+    assert error["type"] == "OptimizationError"
+    assert "campaign binding drift" in error["message"]
+    assert _campaign_count(ledger_path) == 1
 
 
 def test_changing_campaign_id_cannot_reroll_a_used_holdout(tmp_path, capsys):
@@ -523,7 +682,7 @@ def test_holdout_rows_from_0_8_0_still_block_a_cli_reroll(tmp_path, capsys):
     args = build_parser().parse_args(
         ["optimize", "concurrency", *_HOLDOUT_EVALUATION, "--candidate-concurrency", "4,8"]
     )
-    contract, incumbent, challengers, scenario = _concurrency_campaign(args)
+    contract, incumbent, challengers, scenario, _references = _concurrency_campaign(args)
     used = next(item for item in challengers if item.policy["max_concurrency"] == 8)
     phase = "challenger.plan_" + "0" * 64
     trial_key = ExperimentLedger.make_trial_key("legacy-0-8-0", used.candidate_id, "holdout", phase, 1)

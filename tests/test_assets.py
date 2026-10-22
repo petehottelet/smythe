@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import builtins
 import hashlib
+import io
+import os
 from dataclasses import replace
 from pathlib import Path
 
@@ -26,6 +29,7 @@ from smythe.assets import (  # noqa: E402
     hard_finding,
     preflight_assets,
     validate_image,
+    validate_image_bytes,
 )
 
 
@@ -529,6 +533,87 @@ def test_receipt_detects_valid_image_replacement(tmp_path):
     assert "receipt_hash_mismatch" in {finding.code for finding in report.hard_findings}
 
 
+def _swap_after_first_read(monkeypatch, path: Path, replacement: bytes) -> None:
+    """Serve *path*'s bytes to its first reader, then replace the file on disk."""
+    real_open = io.open
+    served = False
+
+    def swapping_open(file, mode="r", *args, **kwargs):
+        nonlocal served
+        if (not served and isinstance(file, (str, os.PathLike)) and mode == "rb"
+                and Path(file).resolve() == path.resolve()):
+            served = True
+            with real_open(file, mode, *args, **kwargs) as stream:
+                data = stream.read()
+            with real_open(path, "wb") as stream:
+                stream.write(replacement)
+            return io.BytesIO(data)
+        return real_open(file, mode, *args, **kwargs)
+
+    monkeypatch.setattr(io, "open", swapping_open)
+    monkeypatch.setattr(builtins, "open", swapping_open)
+
+
+def test_validation_decodes_the_bytes_it_hashed(tmp_path, monkeypatch):
+    """Regression: the receipt hash and the decode read the file separately, so
+    bytes replaced between them passed against a receipt they did not match."""
+    spec = AssetSpec(id="hero", prompt="x", width=120, height=80)
+    finished = tmp_path / "final.png"
+    receipt = finish_image(_image(tmp_path / "source.png"), finished, spec)
+    hashed = _image(tmp_path / "small.png", size=(50, 40)).read_bytes()
+    finished.write_bytes(hashed)
+    receipt = replace(receipt, output_sha256=hashlib.sha256(hashed).hexdigest())
+    replacement = _image(tmp_path / "other.png", color=(0, 0, 0)).read_bytes()
+    _swap_after_first_read(monkeypatch, finished, replacement)
+
+    report = validate_image(finished, spec, receipt=receipt)
+
+    assert not report.passed
+    assert "dimensions_mismatch" in {finding.code for finding in report.hard_findings}
+
+
+def test_byte_validation_checks_one_snapshot_against_the_receipt(tmp_path):
+    source = _image(tmp_path / "source.png")
+    spec = AssetSpec(id="hero", prompt="x", width=120, height=80)
+    receipt = finish_image(source, tmp_path / "final.png", spec)
+    data = (tmp_path / "final.png").read_bytes()
+
+    report = validate_image_bytes(data, spec, receipt=receipt, require_receipt=True,
+                                  path="hero.png")
+    assert report.passed and report.path == "hero.png"
+    assert validate_image_bytes(data, spec).path == "<bytes>"
+
+    other = _image(tmp_path / "other.png", color=(0, 0, 0)).read_bytes()
+    mismatch = validate_image_bytes(other, spec, receipt=receipt)
+    assert [finding.code for finding in mismatch.hard_findings] == ["receipt_hash_mismatch"]
+    assert mismatch.hard_findings[0].observed == hashlib.sha256(other).hexdigest()
+
+    corrupt = validate_image_bytes(b"not an image", spec)
+    assert [finding.code for finding in corrupt.hard_findings] == ["decode_failed"]
+    with pytest.raises(TypeError, match="bytes"):
+        validate_image_bytes(str(source), spec)
+
+
+def test_byte_validation_resolves_relative_masters_only_from_base_dir(tmp_path, monkeypatch):
+    source = _image(tmp_path / "source.png", size=(160, 100))
+    _image(tmp_path / "logo.png", size=(40, 20), mode="RGBA")
+    brand = BrandSpec("Acme", "Industrial", BrandMode.PRODUCTION, logo_path="logo.png")
+    spec = AssetSpec(
+        id="hero", prompt="x", width=160, height=100,
+        mark_policy=BrandMarkPolicy.COMPOSITE_EXACT, logo_overlay=LogoOverlaySpec(width_ratio=0.2),
+    )
+    destination = tmp_path / "hero.png"
+    receipt = finish_image(source, destination, spec, brand=brand, base_dir=tmp_path)
+    data = destination.read_bytes()
+    monkeypatch.chdir(tmp_path)
+
+    # The path-based check keeps resolving a relative master from the working directory.
+    assert validate_image(destination, spec, receipt=receipt, brand=brand).passed
+    unresolved = validate_image_bytes(data, spec, receipt=receipt, brand=brand)
+    assert [finding.code for finding in unresolved.hard_findings] == ["logo_master_unavailable"]
+    assert validate_image_bytes(data, spec, receipt=receipt, brand=brand, base_dir=tmp_path).passed
+
+
 def test_validation_rejects_degenerate_and_out_of_bounds_overlay_receipt_boxes(tmp_path):
     source = _image(tmp_path / "source.png")
     font = _font_path()
@@ -585,3 +670,31 @@ def test_receipt_can_be_required_as_a_hard_gate(tmp_path):
     report = validate_image(image, spec, require_receipt=True)
     assert not report.passed
     assert [finding.code for finding in report.hard_findings] == ["receipt_missing"]
+
+
+def test_validation_types_are_reexported_from_their_image_free_module():
+    import smythe.assets
+    import smythe.assets.validation
+    import smythe.validation
+
+    for name in ("FindingSeverity", "ValidationFinding", "ValidationReport",
+                 "advisory_finding", "hard_finding"):
+        shared = getattr(smythe.validation, name)
+        assert getattr(smythe.assets, name) is shared
+        assert getattr(smythe.assets.validation, name) is shared
+        assert name in smythe.assets.__all__
+        assert name in smythe.assets.validation.__all__
+
+
+def test_image_validation_reports_derive_their_outcome(tmp_path):
+    from smythe.validation import ValidationReport
+
+    image = _image(tmp_path / "hero.png", size=(100, 100))
+    passing = validate_image(image, AssetSpec(id="hero", prompt="x", width=100, height=100))
+    failing = validate_image(image, AssetSpec(id="hero", prompt="x", width=50, height=50))
+
+    assert (passing.outcome, passing.passed, passing.validator) == ("passed", True, None)
+    assert (failing.outcome, failing.passed) == ("rejected", False)
+    data = failing.to_dict()
+    assert data["findings"][0]["expected"] == [50, 50]  # tuples become JSON arrays
+    assert ValidationReport.from_dict(data).to_dict() == data

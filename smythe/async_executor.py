@@ -6,11 +6,12 @@ import asyncio
 from collections import deque
 from itertools import islice
 from pathlib import Path
-from typing import TYPE_CHECKING, Callable
+from typing import TYPE_CHECKING, Any, Awaitable, Callable
 
 from smythe.budget import BudgetValidationError, Sentinel, SentinelAlert, validate_token_count
 from smythe.executor_base import (
     DEFAULT_MAX_TOOL_ITERATIONS,
+    PROMPT_ASSEMBLY_VERSION,
     ExecutorBase,
     NodeFinalizationError,
     validate_max_concurrency,
@@ -24,6 +25,8 @@ from smythe.verifier import VerificationRecoveryError
 from smythe.workflow_store import WorkflowError
 
 if TYPE_CHECKING:
+    from smythe.acceptance import AcceptancePolicy
+    from smythe.context import ContextSnapshot
     from smythe.supervisor import Supervisor
     from smythe.task import Task
     from smythe.verifier import Verifier
@@ -71,6 +74,13 @@ class AsyncExecutor(ExecutorBase):
         on_control_update: Callable[[], None] | None = None,
         provider_call_factory: Callable[[Node, str, int, int], Provider] | None = None,
         on_supervision_update: Callable[[Node, bool], None] | None = None,
+        *,
+        prompt_assembly: int = PROMPT_ASSEMBLY_VERSION,
+        read_call_factory: Callable[[Node, int], Any] | None = None,
+        context_assembler: Callable[
+            [Node, ExecutionGraph, dict[str, Any]], Awaitable[ContextSnapshot]
+        ] | None = None,
+        acceptance: AcceptancePolicy | None = None,
     ) -> None:
         super().__init__(
             provider=provider, registry=registry, tracer=tracer, budget=budget,
@@ -82,6 +92,10 @@ class AsyncExecutor(ExecutorBase):
             on_control_update=on_control_update,
             provider_call_factory=provider_call_factory,
             on_supervision_update=on_supervision_update,
+            prompt_assembly=prompt_assembly,
+            read_call_factory=read_call_factory,
+            acceptance=acceptance,
+            context_assembler=context_assembler,
         )
         self._estimated_tokens_per_node = validate_token_count(
             estimated_tokens_per_node, "estimated_tokens_per_node",

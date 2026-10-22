@@ -52,6 +52,34 @@ def test_run_detach_persists_approved_run_before_launch_and_closes_parent_store(
     assert requests == [{"startup_timeout_s": 30.0}]
 
 
+def test_run_detach_refuses_a_used_approval_unless_a_new_run_is_requested(tmp_path, monkeypatch, capsys):
+    manifest, _, approval = planned(tmp_path)
+    database = tmp_path / "jobs.db"
+    launched = []
+
+    def launch(store_path, run_id, **kwargs):
+        launched.append(run_id)
+        return {"run_id": run_id, "detached": True, "status": "started", "worker_pid": 42,
+                "log_path": str(tmp_path / "worker.log")}
+
+    monkeypatch.setattr(operator, "launch_worker", launch)
+    command = ["jobs", "run", str(manifest), "--approve", approval.token, "--detach",
+               "--store", str(database), "--json"]
+    assert main(command) == EXIT_OK
+    first = payload(capsys)["run"]["run_id"]
+
+    assert main(command) == EXIT_APPROVAL
+    error = payload(capsys)["error"]
+    assert error["type"] == "ApprovalError" and f"smythe jobs resume {first}" in error["message"]
+    assert launched == [first]
+
+    assert main([*command, "--new-run"]) == EXIT_OK
+    second = payload(capsys)["run"]["run_id"]
+    assert launched == [first, second] and second != first
+    with SQLiteRunStore(database, read_only=True) as store:
+        assert sorted(run["run_id"] for run in store.list_runs()) == sorted([first, second])
+
+
 def test_detach_rejects_invalid_approval_and_timeout_before_creating_run(tmp_path, monkeypatch, capsys):
     manifest, _, approval = planned(tmp_path)
     database = tmp_path / "jobs.db"

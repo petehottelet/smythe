@@ -1,0 +1,893 @@
+"""Delivery acceptance: the policy that decides a deliverable and its record.
+
+Delivery acceptance is separate from execution and cost. A run can complete,
+with its cost fully known, and still deliver output its policy did not accept.
+A :class:`DeliveryAcceptance` record binds one decision to the exact delivered
+bytes and files, the nodes and generations they came from, the task, the policy
+and the validators that decided it. Results and checkpoints use the key
+``delivery_acceptance`` for it.
+
+Validators are trusted local code registered in-process: an object with a
+:class:`~smythe.validation.ValidatorIdentity` and a synchronous
+``validate(subject)`` that returns a
+:class:`~smythe.validation.ValidationReport`. Registration refuses providers,
+coroutine functions, awaitables and an ``async`` ``validate``, including an
+object whose ``__call__`` is async. That check is a caller contract, not a
+sandbox: it cannot detect a synchronous validator that performs network I/O or
+paid calls, which such a validator must not do.
+Policies and records store only validator names, versions and configuration
+digests, never code.
+"""
+
+from __future__ import annotations
+
+import hashlib
+import inspect
+# Imported at runtime, not only for type checking, so that
+# typing.get_type_hints() can resolve the dataclass field annotations.
+from collections.abc import Sequence
+from dataclasses import dataclass, field
+from enum import StrEnum
+from pathlib import Path
+from typing import Any, Protocol
+
+from smythe.graph import REVISION_ADDED_KEY, ExecutionGraph, FailurePolicy, Node, _depends_on
+from smythe.task import Task, task_to_dict
+from smythe.validation import (
+    ValidationOutcome,
+    ValidationReport,
+    ValidatorIdentity,
+    _json_sha256,
+    _require_keys,
+    _require_sha256,
+)
+from smythe.verifier import gate_disposition, node_generation
+
+DELIVERY_ACCEPTANCE_VERSION = 1
+SUPPORTED_DELIVERY_ACCEPTANCE_VERSIONS = (1,)
+ACCEPTANCE_POLICY_VERSION = 1
+
+# What a record's decision covers: the delivered output, meaning the
+# synthesized text and the files its source nodes wrote.
+_SCOPES = frozenset({"output"})
+
+# Node metadata a strict Swarm sets on each gate of a plan that an architect
+# generated rather than built from developer code. Acceptance criteria are
+# controlled inputs, so such a gate, like one a supervisor revision added
+# (``added_by_revision``), does not accept output on its own.
+GENERATED_GATE_KEY = "generated_gate"
+
+
+class AcceptanceMode(StrEnum):
+    """``advisory`` keeps legacy behavior and records no decision; ``strict`` decides delivery."""
+
+    ADVISORY = "advisory"
+    STRICT = "strict"
+
+
+class AcceptanceDecision(StrEnum):
+    """The delivery acceptance decision a record holds.
+
+    ``not_evaluated`` means a record exists but nothing has been decided yet.
+    ``accepted`` means every required check passed on the exact delivered
+    bytes. ``rejected`` is a valid negative decision. ``needs_review`` occurs
+    only when a policy selects it. ``indeterminate`` means no valid decision
+    could be made, for example because a validator raised.
+    """
+
+    NOT_EVALUATED = "not_evaluated"
+    ACCEPTED = "accepted"
+    REJECTED = "rejected"
+    NEEDS_REVIEW = "needs_review"
+    INDETERMINATE = "indeterminate"
+
+
+def text_sha256(text: str) -> str:
+    """SHA-256 of *text* encoded as UTF-8, the bytes a text deliverable is checked as."""
+    if not isinstance(text, str):
+        raise TypeError("text must be a string")
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+def task_sha256(task: Task | None) -> str | None:
+    """SHA-256 of a task's canonical JSON snapshot, or None without a task."""
+    data = task_to_dict(task)
+    return None if data is None else _json_sha256(data, "task snapshot")
+
+
+@dataclass(frozen=True, slots=True)
+class ValidationSubject:
+    """The exact bytes a validator inspects, bound to their SHA-256."""
+
+    data: bytes
+    sha256: str = field(init=False)
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.data, (bytes, bytearray, memoryview)):
+            raise TypeError("a validation subject holds bytes; use from_text() for a string")
+        data = bytes(self.data)
+        object.__setattr__(self, "data", data)
+        object.__setattr__(self, "sha256", hashlib.sha256(data).hexdigest())
+
+    @classmethod
+    def from_text(cls, text: str) -> ValidationSubject:
+        """The UTF-8 bytes of *text*; ``sha256`` equals :func:`text_sha256`."""
+        if not isinstance(text, str):
+            raise TypeError("text must be a string")
+        return cls(text.encode("utf-8"))
+
+    def text(self) -> str:
+        """The bytes decoded as UTF-8; raises UnicodeDecodeError for other bytes."""
+        return self.data.decode("utf-8")
+
+
+class Validator(Protocol):
+    """Trusted local code that decides whether delivered bytes are acceptable.
+
+    ``validate`` is synchronous, makes no provider calls or network requests,
+    and reports ``error`` rather than guessing when it cannot decide.
+    """
+
+    @property
+    def identity(self) -> ValidatorIdentity: ...
+
+    def validate(self, subject: ValidationSubject) -> ValidationReport: ...
+
+
+def _is_async(function: Any) -> bool:
+    return inspect.iscoroutinefunction(function) or inspect.isasyncgenfunction(function)
+
+
+def _calls_async(function: Any) -> bool:
+    """Whether calling *function* is async, including an object through its ``__call__``."""
+    return _is_async(function) or _is_async(getattr(type(function), "__call__", None))
+
+
+def check_validator(validator: object) -> ValidatorIdentity:
+    """Check that *validator* can be registered, and return its identity.
+
+    Raises TypeError for a ``Provider``, a class, a coroutine function, an
+    awaitable (a coroutine is closed first), an object without a synchronous
+    ``validate()`` (an object whose ``__call__`` is async is not one) or
+    without a :class:`ValidatorIdentity`. This structural check cannot
+    detect a synchronous ``validate()`` that performs I/O.
+    """
+    from smythe.provider import Provider
+
+    if isinstance(validator, Provider):
+        raise TypeError(
+            "a Provider cannot be a validator: validators are local code that makes "
+            "no provider calls"
+        )
+    if inspect.isawaitable(validator):
+        if inspect.iscoroutine(validator):
+            validator.close()
+        raise TypeError(
+            f"an awaitable ({type(validator).__name__}) cannot be a validator; register "
+            "an object with a synchronous validate()"
+        )
+    if isinstance(validator, type):
+        raise TypeError(f"register a validator instance, not the class {validator.__name__}")
+    if _is_async(validator):
+        raise TypeError("a coroutine function cannot be a validator; validate() must be synchronous")
+    validate = getattr(validator, "validate", None)
+    if not callable(validate):
+        raise TypeError(f"validator {type(validator).__name__} has no validate() method")
+    if _calls_async(validate):
+        raise TypeError(
+            f"validator {type(validator).__name__} has an async validate(); it must be synchronous"
+        )
+    identity = getattr(validator, "identity", None)
+    if not isinstance(identity, ValidatorIdentity):
+        raise TypeError(
+            f"validator {type(validator).__name__} identity must be a ValidatorIdentity, "
+            f"not {type(identity).__name__}"
+        )
+    return identity
+
+
+def _choice(enum: type[StrEnum], value: Any, what: str) -> Any:
+    try:
+        return enum(value)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"Unknown {what}: {value!r}") from exc
+
+
+@dataclass(frozen=True, slots=True)
+class AcceptancePolicy:
+    """How a run decides whether its deliverable is accepted.
+
+    ``advisory``, the default, keeps legacy behavior: gates advise, and no
+    delivery acceptance record is made. ``strict`` decides delivery:
+    ``final_validators`` check the exact delivered bytes, and with
+    ``allow_gate_acceptance`` a passed gate may accept output that is
+    byte-for-byte the gated node's result. Only a gate the developer
+    supplied counts for that, unless ``allow_generated_gates`` also counts
+    one that a generated plan or a supervisor revision added. An exhausted
+    gate whose final verdict fails gives ``on_exhausted`` (``rejected`` or
+    ``needs_review``); a missing, malformed or erroring verdict gives
+    ``on_invalid`` (``indeterminate`` or ``needs_review``).
+
+    Validators are checked by :func:`check_validator` when the policy is
+    built, and their identities are captured then. :meth:`to_dict` lists those
+    identities sorted by name, never code, and :attr:`sha256` hashes it.
+    """
+
+    mode: AcceptanceMode = AcceptanceMode.ADVISORY
+    final_validators: Sequence[Validator] = ()
+    on_exhausted: AcceptanceDecision = AcceptanceDecision.REJECTED
+    on_invalid: AcceptanceDecision = AcceptanceDecision.INDETERMINATE
+    allow_gate_acceptance: bool = True
+    allow_generated_gates: bool = False
+    validator_identities: tuple[ValidatorIdentity, ...] = field(init=False)
+
+    def __post_init__(self) -> None:
+        mode = _choice(AcceptanceMode, self.mode, "acceptance mode")
+        if not isinstance(self.final_validators, (list, tuple)):
+            raise TypeError("final_validators must be a list or tuple of validators")
+        validators = tuple(self.final_validators)
+        identities = tuple(check_validator(validator) for validator in validators)
+        names = [identity.name for identity in identities]
+        duplicates = sorted({name for name in names if names.count(name) > 1})
+        if duplicates:
+            raise ValueError(f"final_validators has duplicate validator names: {duplicates}")
+        on_exhausted = _choice(AcceptanceDecision, self.on_exhausted, "on_exhausted decision")
+        if on_exhausted not in (AcceptanceDecision.REJECTED, AcceptanceDecision.NEEDS_REVIEW):
+            raise ValueError("on_exhausted must be 'rejected' or 'needs_review'")
+        on_invalid = _choice(AcceptanceDecision, self.on_invalid, "on_invalid decision")
+        if on_invalid not in (AcceptanceDecision.INDETERMINATE, AcceptanceDecision.NEEDS_REVIEW):
+            raise ValueError("on_invalid must be 'indeterminate' or 'needs_review'")
+        for name in ("allow_gate_acceptance", "allow_generated_gates"):
+            if type(getattr(self, name)) is not bool:
+                raise ValueError(f"{name} must be a bool")
+        if mode is AcceptanceMode.ADVISORY and (
+            validators or on_exhausted is not AcceptanceDecision.REJECTED
+            or on_invalid is not AcceptanceDecision.INDETERMINATE
+            or not self.allow_gate_acceptance or self.allow_generated_gates
+        ):
+            raise ValueError(
+                "an advisory policy records no delivery decision, so it takes no final "
+                "validators or decision settings; use mode='strict'"
+            )
+        if mode is AcceptanceMode.STRICT and not validators and not self.allow_gate_acceptance:
+            raise ValueError(
+                "a strict policy without final validators or gate acceptance could never accept"
+            )
+        if self.allow_generated_gates and not self.allow_gate_acceptance:
+            raise ValueError("allow_generated_gates needs allow_gate_acceptance")
+        object.__setattr__(self, "mode", mode)
+        object.__setattr__(self, "final_validators", validators)
+        object.__setattr__(self, "on_exhausted", on_exhausted)
+        object.__setattr__(self, "on_invalid", on_invalid)
+        object.__setattr__(self, "validator_identities", identities)
+
+    def to_dict(self) -> dict[str, Any]:
+        """The policy as canonical JSON data, with validator identities sorted by name.
+
+        ``allow_generated_gates`` appears only when set, so a policy without
+        it keeps the same :attr:`sha256`.
+        """
+        data = {
+            "version": ACCEPTANCE_POLICY_VERSION,
+            "mode": self.mode.value,
+            "final_validators": [
+                identity.to_dict()
+                for identity in sorted(self.validator_identities, key=lambda item: item.name)
+            ],
+            "on_exhausted": self.on_exhausted.value,
+            "on_invalid": self.on_invalid.value,
+            "allow_gate_acceptance": self.allow_gate_acceptance,
+        }
+        if self.allow_generated_gates:
+            data["allow_generated_gates"] = True
+        return data
+
+    def counts_gate(self, node: Node) -> bool:
+        """Whether a passed verdict of gate *node* may accept output under this policy.
+
+        A gate the developer supplied counts. One that a generated plan
+        (:data:`GENERATED_GATE_KEY`) or a supervisor revision
+        (``added_by_revision``) added counts only with ``allow_generated_gates``.
+        """
+        return self.allow_generated_gates or not (
+            node.metadata.get(GENERATED_GATE_KEY) or node.metadata.get(REVISION_ADDED_KEY)
+        )
+
+    @property
+    def sha256(self) -> str:
+        """SHA-256 of :meth:`to_dict` as canonical JSON: the policy's identity."""
+        return _json_sha256(self.to_dict(), "acceptance policy")
+
+
+@dataclass(frozen=True, slots=True)
+class AcceptanceSource:
+    """A node whose result fed the delivered output, at the generation used."""
+
+    node_id: str
+    execution_generation: int = 0
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.node_id, str) or not self.node_id:
+            raise ValueError("source node_id must be a non-empty string")
+        if type(self.execution_generation) is not int or self.execution_generation < 0:
+            raise ValueError("source execution_generation must be a non-negative integer")
+
+    def to_dict(self) -> dict[str, Any]:
+        return {"node_id": self.node_id, "execution_generation": self.execution_generation}
+
+    @classmethod
+    def from_dict(cls, data: Any) -> AcceptanceSource:
+        _require_keys(data, "acceptance source", frozenset({"node_id", "execution_generation"}))
+        return cls(data["node_id"], data["execution_generation"])
+
+
+_ARTIFACT_KEYS = frozenset({"node_id", "name", "sha256", "size_bytes", "mime_type"})
+
+
+@dataclass(frozen=True, slots=True)
+class AcceptanceArtifact:
+    """A file a delivered node wrote, bound by the SHA-256 and size of its bytes.
+
+    ``name`` is the file's name in the run's artifact directory; the node's
+    ``metadata["artifacts"]`` records hold its full path.
+    """
+
+    node_id: str
+    name: str
+    sha256: str
+    size_bytes: int
+    mime_type: str
+
+    def __post_init__(self) -> None:
+        for label in ("node_id", "name", "mime_type"):
+            value = getattr(self, label)
+            if not isinstance(value, str) or not value:
+                raise ValueError(f"artifact {label} must be a non-empty string")
+        _require_sha256(self.sha256, "artifact sha256")
+        if type(self.size_bytes) is not int or self.size_bytes < 0:
+            raise ValueError("artifact size_bytes must be a non-negative integer")
+
+    def to_dict(self) -> dict[str, Any]:
+        return {"node_id": self.node_id, "name": self.name, "sha256": self.sha256,
+                "size_bytes": self.size_bytes, "mime_type": self.mime_type}
+
+    @classmethod
+    def from_dict(cls, data: Any) -> AcceptanceArtifact:
+        _require_keys(data, "acceptance artifact", _ARTIFACT_KEYS)
+        return cls(data["node_id"], data["name"], data["sha256"], data["size_bytes"],
+                   data["mime_type"])
+
+
+def _file_sha256(path: Path, size: int) -> str | None:
+    """SHA-256 of *path* when it holds exactly *size* bytes, else None; reads at most size + 1."""
+    digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        remaining = size
+        while remaining:
+            chunk = stream.read(min(1024 * 1024, remaining))
+            if not chunk:
+                return None
+            digest.update(chunk)
+            remaining -= len(chunk)
+        if stream.read(1):
+            return None
+    return digest.hexdigest()
+
+
+def delivered_artifacts(node: Node) -> tuple[tuple[AcceptanceArtifact, ...], tuple[str, ...]]:
+    """The files *node* delivered, bound by their bytes, and why any could not be.
+
+    Each record in ``node.metadata["artifacts"]`` must carry the ``sha256``
+    and ``size_bytes`` written with the file, and the file must still hold
+    exactly those bytes. Returns the bound files and a reason for each one
+    that is not.
+    """
+    bound: list[AcceptanceArtifact] = []
+    problems: list[str] = []
+    records = node.metadata.get("artifacts") or []
+    for record in records if isinstance(records, list) else [None]:
+        record = record if isinstance(record, dict) else {}
+        path, size = record.get("path"), record.get("size_bytes")
+        try:
+            artifact = AcceptanceArtifact(
+                node.id, Path(path).name if isinstance(path, str) else "", record.get("sha256"),
+                size, record.get("mime_type"),
+            )
+        except ValueError:
+            problems.append(
+                f"node {node.id!r} delivered a file whose bytes are not hashed: strict "
+                "acceptance needs its path, sha256, size_bytes and mime_type recorded"
+            )
+            continue
+        try:
+            observed = _file_sha256(Path(path), size)
+        except OSError:
+            problems.append(f"file {artifact.name!r} that node {node.id!r} delivered is missing "
+                            "or cannot be read")
+            continue
+        if observed != artifact.sha256:
+            problems.append(f"file {artifact.name!r} that node {node.id!r} delivered changed "
+                            "after it was written")
+            continue
+        bound.append(artifact)
+    return tuple(bound), tuple(problems)
+
+
+@dataclass(frozen=True, slots=True)
+class ValidatorResult:
+    """One validator's identity and the outcome it reported."""
+
+    validator: ValidatorIdentity
+    outcome: ValidationOutcome
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.validator, ValidatorIdentity):
+            raise ValueError("validator must be a ValidatorIdentity")
+        object.__setattr__(self, "outcome", _choice(ValidationOutcome, self.outcome,
+                                                    "validation outcome"))
+
+    def to_dict(self) -> dict[str, Any]:
+        return {"validator": self.validator.to_dict(), "outcome": self.outcome.value}
+
+    @classmethod
+    def from_dict(cls, data: Any) -> ValidatorResult:
+        _require_keys(data, "validator result", frozenset({"validator", "outcome"}))
+        if not isinstance(data["outcome"], str):
+            raise ValueError(f"Unknown validation outcome: {data['outcome']!r}")
+        return cls(ValidatorIdentity.from_dict(data["validator"]), data["outcome"])
+
+
+_RECORD_KEYS = frozenset({
+    "version", "decision", "reasons", "output_sha256", "strategy", "sources",
+    "used_fallback", "task_sha256", "policy_sha256", "validators", "scope",
+})
+
+
+@dataclass(frozen=True, slots=True)
+class DeliveryAcceptance:
+    """A versioned delivery acceptance decision and what it is bound to.
+
+    Every decision except ``not_evaluated`` binds ``output_sha256`` (the
+    SHA-256 of the delivered bytes) and the synthesis ``strategy``; a decision
+    other than ``accepted`` states at least one reason, and an ``accepted``
+    record holds no validator outcome other than ``passed``. ``sources`` are
+    the nodes the output came from with their ``execution_generation``,
+    ``used_fallback`` is True when synthesis fell back to a node that was not
+    a terminal deliverable, ``task_sha256`` is :func:`task_sha256` of the
+    run's task, ``policy_sha256`` is the deciding policy's
+    :attr:`AcceptancePolicy.sha256`, and ``scope`` names what was evaluated
+    (``output``: the delivered output). ``artifacts`` binds each file a
+    source node delivered by its SHA-256 and size; it is empty for text, and
+    :meth:`to_dict` then leaves the key out.
+
+    :meth:`from_dict` rejects unknown record versions, unknown decisions and
+    unknown keys rather than guessing what a newer record means.
+    """
+
+    decision: AcceptanceDecision
+    policy_sha256: str
+    output_sha256: str | None = None
+    strategy: str | None = None
+    sources: tuple[AcceptanceSource, ...] = ()
+    used_fallback: bool = False
+    task_sha256: str | None = None
+    validators: tuple[ValidatorResult, ...] = ()
+    reasons: tuple[str, ...] = ()
+    scope: str = "output"
+    version: int = DELIVERY_ACCEPTANCE_VERSION
+    artifacts: tuple[AcceptanceArtifact, ...] = ()
+
+    def __post_init__(self) -> None:
+        if type(self.version) is not int or self.version not in SUPPORTED_DELIVERY_ACCEPTANCE_VERSIONS:
+            raise ValueError(
+                f"Unsupported delivery acceptance record version {self.version!r}; this build "
+                f"reads {list(SUPPORTED_DELIVERY_ACCEPTANCE_VERSIONS)}"
+            )
+        decision = _choice(AcceptanceDecision, self.decision, "delivery acceptance decision")
+        object.__setattr__(self, "decision", decision)
+        _require_sha256(self.policy_sha256, "policy_sha256")
+        for name in ("output_sha256", "task_sha256"):
+            if getattr(self, name) is not None:
+                _require_sha256(getattr(self, name), name)
+        if self.strategy is not None and (not isinstance(self.strategy, str) or not self.strategy):
+            raise ValueError("strategy must be a non-empty string or None")
+        if type(self.used_fallback) is not bool:
+            raise ValueError("used_fallback must be a bool")
+        # Check the type first: an unhashable scope cannot be looked up in a set.
+        if not isinstance(self.scope, str) or self.scope not in _SCOPES:
+            raise ValueError(f"Unknown delivery acceptance scope: {self.scope!r}")
+        sources = self._items("sources", AcceptanceSource)
+        validators = self._items("validators", ValidatorResult)
+        reasons = self._items("reasons", str)
+        if any(not reason for reason in reasons):
+            raise ValueError("reasons must be non-empty strings")
+        _unique([source.node_id for source in sources], "source node ids")
+        _unique([result.validator.name for result in validators], "validator names")
+        source_ids = {source.node_id for source in sources}
+        if any(item.node_id not in source_ids for item in self._items("artifacts", AcceptanceArtifact)):
+            raise ValueError("artifacts must be files that the record's sources delivered")
+        if decision is not AcceptanceDecision.NOT_EVALUATED:
+            if self.output_sha256 is None:
+                raise ValueError(f"a {decision.value} record must bind output_sha256")
+            if self.strategy is None:
+                raise ValueError(f"a {decision.value} record must name its synthesis strategy")
+        if decision is AcceptanceDecision.ACCEPTED:
+            if any(result.outcome is not ValidationOutcome.PASSED for result in validators):
+                raise ValueError("an accepted record cannot hold a validator outcome other than passed")
+        elif decision is not AcceptanceDecision.NOT_EVALUATED and not reasons:
+            raise ValueError(f"a {decision.value} record needs at least one reason")
+
+    def _items(self, name: str, kind: type) -> tuple[Any, ...]:
+        value = getattr(self, name)
+        if not isinstance(value, (list, tuple)) or any(not isinstance(item, kind) for item in value):
+            raise ValueError(f"{name} must be a sequence of {kind.__name__} values")
+        items = tuple(value)
+        object.__setattr__(self, name, items)
+        return items
+
+    @property
+    def accepted(self) -> bool:
+        """True only when the decision is ``accepted``."""
+        return self.decision is AcceptanceDecision.ACCEPTED
+
+    def to_dict(self) -> dict[str, Any]:
+        """The record as JSON data, stored under the ``delivery_acceptance`` key."""
+        return {
+            "version": self.version,
+            "decision": self.decision.value,
+            "reasons": list(self.reasons),
+            "output_sha256": self.output_sha256,
+            "strategy": self.strategy,
+            "sources": [source.to_dict() for source in self.sources],
+            "used_fallback": self.used_fallback,
+            "task_sha256": self.task_sha256,
+            "policy_sha256": self.policy_sha256,
+            "validators": [result.to_dict() for result in self.validators],
+            "scope": self.scope,
+            **({"artifacts": [item.to_dict() for item in self.artifacts]} if self.artifacts else {}),
+        }
+
+    @classmethod
+    def from_dict(cls, data: Any) -> DeliveryAcceptance:
+        """Read a record written by :meth:`to_dict`; raises ValueError for anything else."""
+        if not isinstance(data, dict):
+            raise ValueError("A delivery acceptance record must be a JSON object")
+        version = data.get("version")
+        if type(version) is not int or version not in SUPPORTED_DELIVERY_ACCEPTANCE_VERSIONS:
+            raise ValueError(
+                f"Unsupported delivery acceptance record version {version!r}; this build "
+                f"reads {list(SUPPORTED_DELIVERY_ACCEPTANCE_VERSIONS)}"
+            )
+        _require_keys(data, "delivery acceptance record", _RECORD_KEYS, frozenset({"artifacts"}))
+        if not isinstance(data["decision"], str):
+            raise ValueError(f"Unknown delivery acceptance decision: {data['decision']!r}")
+        for name in ("reasons", "sources", "validators", "artifacts"):
+            if not isinstance(data.get(name, []), list):
+                raise ValueError(f"delivery acceptance {name} must be a list")
+        return cls(
+            decision=data["decision"],
+            policy_sha256=data["policy_sha256"],
+            output_sha256=data["output_sha256"],
+            strategy=data["strategy"],
+            sources=tuple(AcceptanceSource.from_dict(item) for item in data["sources"]),
+            used_fallback=data["used_fallback"],
+            task_sha256=data["task_sha256"],
+            validators=tuple(ValidatorResult.from_dict(item) for item in data["validators"]),
+            reasons=tuple(data["reasons"]),
+            scope=data["scope"],
+            version=version,
+            artifacts=tuple(AcceptanceArtifact.from_dict(item) for item in data.get("artifacts", [])),
+        )
+
+
+def _unique(values: list[str], what: str) -> None:
+    duplicates = sorted({value for value in values if values.count(value) > 1})
+    if duplicates:
+        raise ValueError(f"delivery acceptance has duplicate {what}: {duplicates}")
+
+
+_OUTPUT_CHANGED = "the saved output does not match the digest its record bound"
+
+
+def _delivery_problems(
+    record: DeliveryAcceptance, output: Any, graph: ExecutionGraph, task: Task | None,
+) -> list[str]:
+    """What no longer matches a decided record, one reason per mismatch.
+
+    The saved *output* must still have the digest the record bound, the task
+    must be the one it bound, every source node must still be completed at
+    the generation it bound, and every file the record bound must still hold
+    its bytes. An empty list means the record still holds.
+    """
+    from smythe.graph import NodeStatus
+
+    problems = []
+    if not isinstance(output, str) or text_sha256(output) != record.output_sha256:
+        problems.append(_OUTPUT_CHANGED)
+    if record.task_sha256 != task_sha256(task):
+        problems.append("the saved task does not match the task its record bound")
+    nodes = {node.id: node for node in graph.nodes}
+    for source in record.sources:
+        node = nodes.get(source.node_id)
+        if (node is None or node.status is not NodeStatus.COMPLETED
+                or node_generation(node) != source.execution_generation):
+            problems.append(
+                f"node {source.node_id!r} no longer holds the generation its record bound"
+            )
+    files: dict[str, tuple[AcceptanceArtifact, ...]] = {}
+    for artifact in record.artifacts:
+        node = nodes.get(artifact.node_id)
+        if node is not None and node.id not in files:
+            files[node.id] = delivered_artifacts(node)[0]
+        if artifact not in files.get(artifact.node_id, ()):
+            problems.append(
+                f"file {artifact.name!r} of node {artifact.node_id!r} no longer holds the "
+                "bytes its record bound"
+            )
+    return problems
+
+
+def _clip(text: str) -> str:
+    return text[:300]
+
+
+def _final_check(
+    validator: Validator, identity: ValidatorIdentity, subject: ValidationSubject,
+    *, kind: str = "final validator",
+) -> tuple[ValidationOutcome, str]:
+    """Run one validator on *subject*; anything but a valid report is ``error``."""
+    name = f"{kind} {identity.name!r}"
+    try:
+        report = validator.validate(subject)
+    except Exception as exc:
+        return ValidationOutcome.ERROR, f"{name} raised {type(exc).__name__}"
+    if inspect.isawaitable(report):
+        if inspect.iscoroutine(report):
+            report.close()
+        return ValidationOutcome.ERROR, f"{name} returned an awaitable; validate() must be synchronous"
+    if not isinstance(report, ValidationReport):
+        return ValidationOutcome.ERROR, (
+            f"{name} returned {type(report).__name__}, not a ValidationReport"
+        )
+    if report.validator is not None and report.validator != identity:
+        return ValidationOutcome.ERROR, f"{name} returned a report for another validator"
+    if report.outcome is ValidationOutcome.PASSED:
+        return ValidationOutcome.PASSED, ""
+    findings = "; ".join(f"{item.code}: {item.message}" for item in report.findings[:4])
+    findings = f": {findings}" if findings else ""
+    if report.outcome is ValidationOutcome.REJECTED:
+        return ValidationOutcome.REJECTED, f"{name} rejected the output{findings}"
+    return ValidationOutcome.ERROR, f"{name} could not decide{findings}"
+
+
+def _unmet_obligations(
+    graph: ExecutionGraph, policy: AcceptancePolicy, strategy: str = "deliverable",
+) -> list[str]:
+    """Every reason a strict *policy* could not decide *graph*'s output, read from its structure.
+
+    Statuses and results are not read, so the answer holds for the whole run.
+    """
+    ids = {node.id for node in graph.nodes}
+    edges = {node.id: node.depends_on for node in graph.nodes}
+    gates = [node for node in graph.nodes if node.verifies]
+    problems = []
+    for gate in gates:
+        if gate.verifies == gate.id:
+            problems.append(f"gate {gate.id!r} verifies itself")
+        elif gate.verifies not in ids:
+            problems.append(f"gate {gate.id!r} verifies {gate.verifies!r}, which is not in the graph")
+        elif not _depends_on(edges, gate.id, gate.verifies):
+            problems.append(
+                f"gate {gate.id!r} does not depend on {gate.verifies!r}, the node it verifies, "
+                "so it could judge it before it runs"
+            )
+        if gate.failure_policy is FailurePolicy.SKIP:
+            problems.append(
+                f"gate {gate.id!r} has failure_policy SKIP, so a judge that fails would leave "
+                "the gate without a verdict"
+            )
+    if policy.final_validators:
+        return problems
+    # Without final validators only a gate can accept, and only DELIVERABLE
+    # output that is one gated node's result: the nodes deliverable_sources()
+    # would return once every node completed.
+    if strategy != "deliverable":
+        problems.append(f"{strategy} synthesis needs a final validator")
+        return problems
+    judges = {gate.id for gate in gates}
+    depended_on = {dep for node in graph.nodes if node.id not in judges for dep in node.depends_on}
+    delivered = [node for node in graph.nodes if node.id not in depended_on | judges]
+    if len(delivered) != 1:
+        shown = f"nodes {[node.id for node in delivered]} are all" if delivered else "no node is"
+        problems.append(
+            f"{shown} delivered, and a gate accepts only output that is one node's result, "
+            "so the output needs a final validator"
+        )
+        return problems
+    (node,) = delivered
+    covering = [gate for gate in gates if gate.verifies == node.id]
+    if not covering:
+        problems.append(
+            f"no gate judges {node.id!r}, the delivered node, and no final validator checks "
+            "the output"
+        )
+    elif not any(policy.counts_gate(gate) for gate in covering):
+        problems.append(
+            f"only a gate that a generated plan or a supervisor revision added judges "
+            f"{node.id!r}, the delivered node, and such a gate accepts nothing on its own "
+            "without a final validator or allow_generated_gates"
+        )
+    return problems
+
+
+def validate_acceptance_obligations(
+    graph: ExecutionGraph, policy: AcceptancePolicy, *, strategy: str = "deliverable",
+) -> None:
+    """Raise ValueError unless a strict *policy* can decide *graph*'s delivered output.
+
+    Read from the graph's structure before any node runs, these are the
+    obligations a strict run must meet:
+
+    - every gate verifies another node that is in the graph and that the
+      gate depends on, directly or through other nodes, so it judges its
+      target only after the target ran;
+    - no gate has ``FailurePolicy.SKIP``, which would leave it without a
+      verdict when its judge fails;
+    - the delivered output is covered: by the policy's final validators, or
+      without them by ``DELIVERABLE`` synthesis (*strategy*) of exactly one
+      deliverable node that a gate the policy counts judges
+      (:meth:`AcceptancePolicy.counts_gate`).
+
+    The error lists every unmet obligation.
+    """
+    if not isinstance(policy, AcceptancePolicy) or policy.mode is not AcceptanceMode.STRICT:
+        raise ValueError("validate_acceptance_obligations needs a strict AcceptancePolicy")
+    problems = _unmet_obligations(graph, policy, strategy)
+    if problems:
+        raise ValueError(
+            "The graph does not meet its strict delivery acceptance obligations: "
+            + "; ".join(problems)
+        )
+
+
+def evaluate_delivery(
+    policy: AcceptancePolicy,
+    graph: ExecutionGraph,
+    output: str,
+    *,
+    strategy: str,
+    sources: Sequence[Node],
+    used_fallback: bool = False,
+    task: Task | None = None,
+) -> DeliveryAcceptance:
+    """Decide delivery acceptance for exactly *output* under a strict *policy*.
+
+    *output* is the synthesized text as delivered; *strategy* names the
+    synthesis that produced it (``custom`` for a synthesizer other than
+    ``Synthesizer``), and *sources* are the nodes it came from. Every final
+    validator runs, with no provider call, on the UTF-8 bytes of *output*,
+    and every gate in *graph* is read from its recorded final verdict.
+
+    The decision is ``rejected`` when a final validator rejects the output,
+    then ``policy.on_exhausted`` when a gate's final verdict fails, then
+    ``policy.on_invalid`` when a validator or gate could not decide or a
+    source delivered files that are unchecked: not hashed, no longer holding
+    the bytes recorded with them, or not judged by a passed gate on that
+    source (final validators check only the text). Otherwise the output is
+    ``accepted`` when it has final validators, all passed, or when the
+    policy allows gate acceptance and it is, byte for byte, the result of the
+    single ``deliverable`` source a passed gate judged at its current
+    generation, where the policy counts that gate (:meth:`AcceptancePolicy.counts_gate`).
+    Any other output is covered by no check: ``policy.on_invalid``.
+    The record binds every delivered file whose bytes were verified.
+    """
+    if not isinstance(policy, AcceptancePolicy) or policy.mode is not AcceptanceMode.STRICT:
+        raise ValueError("evaluate_delivery needs a strict AcceptancePolicy")
+    if not isinstance(output, str):
+        raise TypeError(
+            f"strict delivery acceptance checks text output, not {type(output).__name__}"
+        )
+    subject = ValidationSubject.from_text(output)
+    rejected: list[str] = []
+    exhausted: list[str] = []
+    invalid: list[str] = []
+    results: list[ValidatorResult] = []
+    for validator, identity in zip(policy.final_validators, policy.validator_identities):
+        outcome, reason = _final_check(validator, identity, subject)
+        results.append(ValidatorResult(identity, outcome))
+        if outcome is ValidationOutcome.REJECTED:
+            rejected.append(reason)
+        elif outcome is ValidationOutcome.ERROR:
+            invalid.append(reason)
+    passed_targets: set[str] = set()
+    uncounted_targets: set[str] = set()
+    for node in graph.nodes:
+        if not node.verifies:
+            continue
+        outcome, reason = gate_disposition(node, graph)
+        if outcome == "passed":
+            (passed_targets if policy.counts_gate(node) else uncounted_targets).add(node.verifies)
+        elif outcome == "rejected":
+            exhausted.append(reason)
+        else:
+            invalid.append(reason)
+    artifacts: list[AcceptanceArtifact] = []
+    for node in sources:
+        if not node.metadata.get("artifacts"):
+            continue
+        bound, problems = delivered_artifacts(node)
+        artifacts.extend(bound)
+        invalid.extend(problems)
+        if problems:
+            continue
+        if not policy.allow_gate_acceptance:
+            invalid.append(
+                f"node {node.id!r} delivered files, which only a passed gate on that node "
+                "accepts, and this policy does not allow gate acceptance"
+            )
+        elif node.id not in passed_targets:
+            invalid.append(
+                f"no passed gate judged node {node.id!r}, whose files are delivered; final "
+                "validators check only the output text"
+            )
+    if rejected:
+        decision, reasons = AcceptanceDecision.REJECTED, rejected + exhausted + invalid
+    elif exhausted:
+        decision, reasons = policy.on_exhausted, exhausted + invalid
+    elif invalid:
+        decision, reasons = policy.on_invalid, invalid
+    elif results:
+        decision, reasons = AcceptanceDecision.ACCEPTED, ["every final validator passed"]
+    elif (policy.allow_gate_acceptance and strategy == "deliverable" and not used_fallback
+          and len(sources) == 1 and sources[0].result == output
+          and sources[0].id in passed_targets):
+        decision = AcceptanceDecision.ACCEPTED
+        reasons = [f"a passed gate judged {sources[0].id!r}, whose result is the delivered output"]
+    else:
+        decision = policy.on_invalid
+        if strategy != "deliverable" or used_fallback:
+            shown = "the deliverable fallback" if strategy == "deliverable" else f"{strategy} synthesis"
+            reasons = [f"{shown} needs a final validator; no final validator checked the output"]
+        elif len(sources) == 1 and sources[0].id in uncounted_targets - passed_targets:
+            reasons = [
+                f"only a gate that a generated plan or a supervisor revision added passed "
+                f"{sources[0].id!r}; without a final validator such a gate accepts only "
+                "under allow_generated_gates"
+            ]
+        else:
+            reasons = ["no final validator or passed gate covers the delivered output"]
+    return DeliveryAcceptance(
+        decision=decision,
+        policy_sha256=policy.sha256,
+        output_sha256=subject.sha256,
+        strategy=strategy,
+        sources=tuple(AcceptanceSource(node.id, node_generation(node)) for node in sources),
+        used_fallback=used_fallback,
+        task_sha256=task_sha256(task),
+        validators=tuple(results),
+        reasons=tuple(_clip(reason) for reason in reasons),
+        artifacts=tuple(artifacts),
+    )
+
+
+__all__ = [
+    "ACCEPTANCE_POLICY_VERSION",
+    "DELIVERY_ACCEPTANCE_VERSION",
+    "GENERATED_GATE_KEY",
+    "SUPPORTED_DELIVERY_ACCEPTANCE_VERSIONS",
+    "AcceptanceArtifact",
+    "AcceptanceDecision",
+    "AcceptanceMode",
+    "AcceptancePolicy",
+    "AcceptanceSource",
+    "DeliveryAcceptance",
+    "ValidationSubject",
+    "Validator",
+    "ValidatorResult",
+    "check_validator",
+    "delivered_artifacts",
+    "evaluate_delivery",
+    "task_sha256",
+    "text_sha256",
+    "validate_acceptance_obligations",
+]

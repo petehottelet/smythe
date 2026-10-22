@@ -25,7 +25,7 @@ from smythe.pricing import (
 )
 from smythe.provider import (
     CompletionResult, Provider, ProviderAccountingCancelledError, ProviderAccountingError,
-    ProviderResponseError,
+    ProviderFeatures, ProviderResponseError, _builtin_features,
 )
 from smythe.tools import ChatMessage, ToolCall, ToolSpec, wire_name
 
@@ -261,6 +261,12 @@ class OpenAIResponsesProvider(Provider):
 
     def requires_explicit_budget_estimate(self, model: str) -> bool:
         return True
+
+    def feature_support(self, model: str) -> ProviderFeatures:
+        """Models come from ``workflow_descriptor()``; text and function tools, no images."""
+        supported = model in self.workflow_descriptor()["supported_models"]
+        return _builtin_features(self, OpenAIResponsesProvider, model, model_supported=supported,
+                                 text=True, tools=True, attachments=False, image_output=False)
 
     def _get_client(self):
         if self._client is None:

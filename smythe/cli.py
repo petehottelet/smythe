@@ -14,6 +14,15 @@ import unicodedata
 from pathlib import Path, PurePosixPath
 from typing import Any, Sequence
 
+from smythe._run_inspection import (
+    NOT_ACCEPTED,
+    RunInspectionError,
+    RunNotFoundError,
+    inspect_run,
+    list_runs,
+    open_checkpoints,
+    open_journal,
+)
 from smythe.jobs.loading import load_manifest
 from smythe.jobs.models import JOB_MANIFEST_V1_JSON_SCHEMA, ManifestValidationError
 from smythe.jobs.preflight import ApprovalError, PreflightError, make_approval, preflight_job
@@ -63,6 +72,9 @@ EXIT_JOB_STATE = 6
 EXIT_LOCAL_ERROR = 7
 EXIT_OPTIMIZE_STATE = 8
 EXIT_OPTIMIZE_LIMIT = 9
+# runs inspect: the run completed, but its output was not accepted.
+EXIT_RUN_NOT_ACCEPTED = 10
+EXIT_RUN_INDETERMINATE = 11
 EXIT_INTERRUPTED = 130
 
 _FAILED_STATUSES = {"needs_attention", "partial", "failed", "budget_overrun"}
@@ -84,6 +96,10 @@ def _default_store() -> Path:
 
 def _default_optimize_ledger() -> Path:
     return Path.home() / ".smythe" / "optimize.sqlite3"
+
+
+def _default_checkpoints() -> Path:
+    return Path.home() / ".smythe" / "checkpoints"
 
 
 def _add_output_options(parser: argparse.ArgumentParser, *, inherited: bool) -> None:
@@ -129,6 +145,27 @@ def _add_optimize_output_options(
     )
 
 
+def _add_runs_output_options(parser: argparse.ArgumentParser, *, inherited: bool) -> None:
+    parser.add_argument(
+        "--checkpoints",
+        default=argparse.SUPPRESS if inherited else None,
+        metavar="DIRECTORY",
+        help="ordinary Swarm checkpoint directory (default: ~/.smythe/checkpoints)",
+    )
+    parser.add_argument(
+        "--journal",
+        default=argparse.SUPPRESS if inherited else None,
+        metavar="PATH",
+        help="durable workflow journal (SQLiteWorkflowStore) to read instead of checkpoints",
+    )
+    parser.add_argument(
+        "--json",
+        action="store_true",
+        default=argparse.SUPPRESS if inherited else False,
+        help="emit one compact JSON document on stdout",
+    )
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="smythe")
     root_commands = parser.add_subparsers(dest="root_command", required=True)
@@ -160,6 +197,8 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         help="must match the ceiling used by jobs plan",
     )
+    run.add_argument("--new-run", action="store_true",
+                     help="start another run with an approval already used by an earlier run")
     run.add_argument("--detach", action="store_true", help="start a worker independent of this terminal")
     run.add_argument("--startup-timeout-s", type=float, default=30.0,
                      help="detached worker readiness timeout (0.1-300 seconds; default: 30)")
@@ -251,6 +290,17 @@ def build_parser() -> argparse.ArgumentParser:
         metavar="N[,N...]",
         help="challenger concurrency (repeatable or comma-separated; default: 2,4,8,12,16)",
     )
+    concurrency.add_argument(
+        "--reference",
+        action="append",
+        default=None,
+        metavar="N[,N...]",
+        help=(
+            "reference concurrency compared with the selected challenger on "
+            "confirmation and holdout seeds and never promoted (repeatable or "
+            "comma-separated)"
+        ),
+    )
     concurrency.add_argument("--work-items", type=int, default=250)
     concurrency.add_argument("--provider-capacity", type=int, default=8)
     concurrency.add_argument("--base-latency-ms", type=float, default=120.0)
@@ -287,6 +337,23 @@ def build_parser() -> argparse.ArgumentParser:
     inspect.add_argument("--out", default=None, metavar="HTML_PATH",
                          help="publish a new standalone report without replacing existing files")
     _add_optimize_output_options(inspect, inherited=True)
+
+    runs = root_commands.add_parser(
+        "runs",
+        help="inspect saved Swarm checkpoints and durable workflow runs without changing them",
+    )
+    _add_runs_output_options(runs, inherited=False)
+    runs_commands = runs.add_subparsers(dest="runs_command", required=True)
+    run_inspection = runs_commands.add_parser(
+        "inspect",
+        help="show a run's execution, delivery acceptance, cost, timing and next action",
+    )
+    run_inspection.add_argument("run_id")
+    _add_runs_output_options(run_inspection, inherited=True)
+    run_listing = runs_commands.add_parser("list", help="list saved runs with their state and decision")
+    run_listing.add_argument("--limit", type=int, default=50, help="page size (1-500; default: 50)")
+    run_listing.add_argument("--offset", type=int, default=0, help="number of runs to skip (default: 0)")
+    _add_runs_output_options(run_listing, inherited=True)
     return parser
 
 
@@ -294,7 +361,10 @@ def _candidate_concurrencies(
     values: Sequence[str] | None,
     *,
     maximum_value: int = MAX_OPTIMIZE_CONCURRENCY,
+    role: str = "candidate",
 ) -> tuple[int, ...]:
+    if values is None and role == "reference":
+        return ()
     raw_values = ("2,4,8,12,16",) if values is None else tuple(values)
     parsed: list[int] = []
     seen: set[int] = set()
@@ -302,31 +372,30 @@ def _candidate_concurrencies(
         for token in raw_value.split(","):
             item = token.strip()
             if not item:
-                raise ValueError("candidate concurrency contains an empty value")
+                raise ValueError(f"{role} concurrency contains an empty value")
             try:
                 value = int(item)
             except ValueError as exc:
                 raise ValueError(
-                    f"candidate concurrency must be an integer, got {item!r}"
+                    f"{role} concurrency must be an integer, got {item!r}"
                 ) from exc
             if value < 1:
-                raise ValueError("candidate concurrency must be positive")
+                raise ValueError(f"{role} concurrency must be positive")
             if value == 1:
-                raise ValueError("candidate concurrency 1 is reserved for the incumbent")
+                raise ValueError(f"{role} concurrency 1 is reserved for the incumbent")
             if value > maximum_value:
                 raise ValueError(
-                    f"candidate concurrency must not exceed {maximum_value}"
+                    f"{role} concurrency must not exceed {maximum_value}"
                 )
             if value in seen:
-                raise ValueError(f"duplicate candidate concurrency: {value}")
+                raise ValueError(f"duplicate {role} concurrency: {value}")
             seen.add(value)
             parsed.append(value)
             if len(parsed) > MAX_OPTIMIZE_CANDIDATES:
-                raise ValueError(
-                    f"at most {MAX_OPTIMIZE_CANDIDATES} challenger candidates are allowed"
-                )
+                kind = "challenger candidates" if role == "candidate" else "references"
+                raise ValueError(f"at most {MAX_OPTIMIZE_CANDIDATES} {kind} are allowed")
     if not parsed:
-        raise ValueError("at least one candidate concurrency is required")
+        raise ValueError(f"at least one {role} concurrency is required")
     return tuple(parsed)
 
 
@@ -357,7 +426,15 @@ def _probability(value: float, name: str, *, confidence: bool = False) -> float:
 
 def _concurrency_campaign(
     args: argparse.Namespace,
-) -> tuple[ExperimentContract, Candidate, tuple[Candidate, ...], ConcurrencyScenario]:
+) -> tuple[
+    ExperimentContract,
+    Candidate,
+    tuple[Candidate, ...],
+    ConcurrencyScenario,
+    tuple[Candidate, ...],
+]:
+    """Build the contract, incumbent, challengers, scenario and references."""
+
     work_items = _positive_int(
         args.work_items,
         "work-items",
@@ -367,6 +444,14 @@ def _concurrency_campaign(
         args.candidate_concurrency,
         maximum_value=min(MAX_OPTIMIZE_CONCURRENCY, work_items),
     )
+    reference_values = _candidate_concurrencies(
+        args.reference,
+        maximum_value=min(MAX_OPTIMIZE_CONCURRENCY, work_items),
+        role="reference",
+    )
+    shared = sorted(set(reference_values) & set(challenger_values))
+    if shared:
+        raise ValueError(f"reference concurrency {shared[0]} is also a challenger")
     scenario = ConcurrencyScenario(
         work_items=work_items,
         provider_capacity=_positive_int(
@@ -402,7 +487,7 @@ def _concurrency_campaign(
     )
     if args.min_improvement < 0:
         raise ValueError("min-improvement must be non-negative")
-    max_candidates = 1 + len(challenger_values)
+    max_candidates = 1 + len(challenger_values) + len(reference_values)
     max_parallel = _positive_int(
         args.max_parallel_candidates,
         "max-parallel-candidates",
@@ -415,12 +500,16 @@ def _concurrency_campaign(
     )
     if max_parallel > max_candidates:
         raise ValueError(
-            "max-parallel-candidates cannot exceed the incumbent plus challengers"
+            "max-parallel-candidates cannot exceed the incumbent plus challengers "
+            "and references"
         )
 
-    # Every policy receives development evidence. Only the selected challenger
-    # and incumbent advance, so two policies consume each later paired split.
-    max_trials = max_candidates * development + 2 * (confirmation + holdout)
+    # The incumbent and every challenger receive development evidence. Only
+    # the selected challenger and the incumbent advance, beside each
+    # reference, so each later paired split runs 2 + references arms.
+    max_trials = (1 + len(challenger_values)) * development + (
+        2 + len(reference_values)
+    ) * (confirmation + holdout)
     simulated_operations = max_trials * scenario.work_items
     if simulated_operations > MAX_OPTIMIZE_SIMULATED_OPERATIONS:
         raise ValueError(
@@ -487,9 +576,18 @@ def _concurrency_campaign(
         )
         for value in challenger_values
     )
+    references = tuple(
+        Candidate(
+            contract=contract,
+            policy={"max_concurrency": value},
+            hypothesis=f"Concurrency {value} is a reference for the selected challenger",
+            parent=incumbent,
+        )
+        for value in reference_values
+    )
     # Validation above is deliberately eager; this keeps bad CLI input from
     # creating a durable campaign before the runner starts.
-    return contract, incumbent, challengers, scenario
+    return contract, incumbent, challengers, scenario, references
 
 
 def _plan(path: str) -> tuple[Any, Path]:
@@ -634,6 +732,7 @@ def _emit_job_inspection(value: dict[str, Any]) -> None:
         print(f"Operation {_terminal_text(operation['operation_key'])} "
               f"({_terminal_text(operation['operation_id'])}): {_terminal_text(operation['status'])}; "
               f"attempts {operation['attempt_count']}/{operation['max_attempts']}")
+        print(f"  Input digest: {_terminal_text(operation.get('input_digest') or 'unavailable')}")
         for attempt in value["attempts"]:
             if attempt["operation_id"] != operation["operation_id"]:
                 continue
@@ -659,12 +758,94 @@ def _emit_job_inspection(value: dict[str, Any]) -> None:
         print(f"HTML report: {_terminal_text(value['report_path'], limit=1000)}")
 
 
+def _yes(value: Any) -> str:
+    return "yes" if value else "no"
+
+
+def _emit_run_list(value: dict[str, Any]) -> None:
+    print(f"Runs: {value['returned']} of {value['total']} (offset {value['offset']}, limit {value['limit']})")
+    for run in value["runs"]:
+        if run["error"] is not None:
+            print(f"{_terminal_text(run['run_id'])}  unreadable: {_terminal_text(run['error'])}")
+            continue
+        decision = run["decision"] or "not recorded"
+        print(f"{_terminal_text(run['run_id'])}  {run['state']}  acceptance {decision}  "
+              f"next {run['next_action']}")
+    if not value["runs"]:
+        print("No runs matched.")
+    if value["has_more"]:
+        print(f"More runs: use --offset {value['offset'] + value['returned']}")
+
+
+def _emit_run_inspection(value: dict[str, Any]) -> None:
+    print(f"Run: {_terminal_text(value['run_id'])}")
+    saved = value["format"]
+    if value["store"] == "checkpoints":
+        print(f"Store: ordinary checkpoint, version {saved['checkpoint_version']}")
+    else:
+        print(f"Store: durable workflow journal, version {saved['journal_version']}; "
+              f"checkpoint revision {saved['revision']}")
+    execution = value["execution"]
+    blocked = f" ({_terminal_text(execution['blocked_reason'])})" if execution["blocked_reason"] else ""
+    print(f"Execution: {execution['state']}{blocked}; nodes: {json.dumps(execution['nodes'], sort_keys=True)}")
+    delivery = value["delivery"]
+    record = delivery["record"]
+    if record is None:
+        print("Delivery acceptance: not recorded")
+    else:
+        recorded = "" if record["decision"] == delivery["decision"] else f" (recorded {record['decision']})"
+        print(f"Delivery acceptance: {delivery['decision']}{recorded}")
+        for reason in delivery["reasons"]:
+            print(f"  Reason: {_terminal_text(reason)}")
+        if record["output_sha256"] is not None:
+            print(f"  Output: sha256 {record['output_sha256']}; {_terminal_text(record['strategy'])} "
+                  f"synthesis; integrity {delivery['integrity']}")
+        for result in record["validators"]:
+            identity = result["validator"]
+            print(f"  Validator {_terminal_text(identity['name'])} {_terminal_text(identity['version'])} "
+                  f"(config {identity['config_sha256'][:12]}): {result['outcome']}")
+        print(f"  Policy: {record['policy_sha256']}")
+    withheld = delivery["rejected_output"]
+    if withheld is not None:
+        print(f"Withheld output: {withheld['bytes']} bytes in the saved {withheld['field']} field; "
+              f"sha256 {withheld['sha256']}")
+    accounting = value["accounting"]
+    print(f"Cost: ${accounting['total_cost_usd']:.6f} ({accounting['cost_scope']}); "
+          f"complete: {_yes(accounting['cost_is_complete'])}; "
+          f"includes estimates: {_yes(accounting['cost_contains_estimates'])}")
+    exposure = accounting["unknown_exposure"]
+    if exposure is None:
+        print("Unknown exposure: not tracked for ordinary runs")
+    else:
+        print(f"Unknown exposure: {exposure['amount']} {exposure['unit']} on {exposure['calls']} calls")
+    if accounting["unknown_cost_nodes"]:
+        print(f"Unknown cost on nodes: {_terminal_text(', '.join(accounting['unknown_cost_nodes']))}")
+    for item in accounting["unresolved"]:
+        print(f"Unresolved: {_terminal_text(item)}")
+    timing = value["timing"]
+    if timing is None:
+        print("Timing: not recorded")
+    else:
+        print(f"Timing: {timing['elapsed_ms']} ms elapsed over {timing['segments']} "
+              f"segment(s), {timing['clock']} clock")
+        if timing["phases_ms"]:
+            phases = ", ".join(f"{name} {ms} ms" for name, ms in timing["phases_ms"].items() if ms)
+            print(f"Phases: {_terminal_text(phases or 'none measured')}")
+    action = value["next_action"]
+    print(f"Next action: {action['action']}: {_terminal_text(action['detail'], limit=1000)}")
+
+
 def _emit(args: argparse.Namespace, command: str, value: Any) -> None:
     payload = {"ok": True, "command": command, command: value}
     if args.json:
         print(json.dumps(payload, ensure_ascii=False, separators=(",", ":")))
         return
-    if command == "validate":
+    if args.root_command == "runs":
+        if command == "list":
+            _emit_run_list(value)
+        else:
+            _emit_run_inspection(value)
+    elif command == "validate":
         print(f"Valid job manifest: {value['name']}")
         print(f"Manifest: {value['manifest_hash']}")
         print(f"Plan: {value['plan_hash']}")
@@ -733,7 +914,7 @@ async def _run_optimize_concurrency(args: argparse.Namespace) -> dict[str, Any]:
     # of the optional optimization surface during rolling upgrades.
     from smythe.optimize.engine import OptimizationRunner, TrialOutcome
 
-    contract, incumbent, challengers, scenario = _concurrency_campaign(args)
+    contract, incumbent, challengers, scenario, references = _concurrency_campaign(args)
 
     async def evaluate(context: Any) -> Any:
         simulated = await asyncio.to_thread(
@@ -775,7 +956,7 @@ async def _run_optimize_concurrency(args: argparse.Namespace) -> dict[str, Any]:
             bootstrap_resamples=args.bootstrap_resamples,
             campaign_id=args.campaign_id,
         )
-        result = await runner.run(incumbent, challengers)
+        result = await runner.run(incumbent, challengers, references=references)
 
     candidates_by_id = {
         candidate.candidate_id: candidate
@@ -805,6 +986,7 @@ async def _run_optimize_concurrency(args: argparse.Namespace) -> dict[str, Any]:
             "optimization_plan_hash",
             "selected_candidate_id",
             "promoted",
+            "verdict",
         }
     }
     payload: dict[str, Any] = {
@@ -814,6 +996,7 @@ async def _run_optimize_concurrency(args: argparse.Namespace) -> dict[str, Any]:
         "contract_hash": contract.contract_hash,
         "ledger_durability": args.ledger_durability,
         "promoted": result.promoted,
+        "verdict": result.verdict,
         "selected_candidate": selected.to_dict() if selected is not None else None,
         "evidence": evidence,
         "ledger_snapshot": ledger_snapshot,
@@ -924,7 +1107,8 @@ def _dispatch_jobs(args: argparse.Namespace) -> int:
                 # Preserve start()'s local attachment/provider checks before
                 # creating the approved run. The worker revalidates on resume.
                 JobRunner(store)._validate_dispatch_inputs(plan, manifest_root)
-                run_id = store.create_run(plan, approval, manifest_root=manifest_root)
+                run_id = store.create_run(plan, approval, manifest_root=manifest_root,
+                                          allow_approval_reuse=args.new_run)
             launched = launch_worker(args.store, run_id, startup_timeout_s=args.startup_timeout_s)
             _emit(args, command, launched)
             return EXIT_OK
@@ -934,6 +1118,7 @@ def _dispatch_jobs(args: argparse.Namespace) -> int:
                     plan,
                     approval,
                     manifest_root=manifest_root,
+                    allow_approval_reuse=args.new_run,
                 )
             )
         _emit(args, command, snapshot)
@@ -1024,11 +1209,37 @@ def _dispatch_jobs(args: argparse.Namespace) -> int:
     return _job_exit(snapshot)
 
 
+def _dispatch_runs(args: argparse.Namespace) -> int:
+    if args.journal is not None and args.checkpoints is not None:
+        raise ValueError("Choose --checkpoints or --journal, not both")
+    if args.journal is not None:
+        store = open_journal(args.journal)
+    else:
+        store = open_checkpoints(args.checkpoints if args.checkpoints is not None else _default_checkpoints())
+    try:
+        if args.runs_command == "list":
+            _emit(args, "list", list_runs(store, limit=args.limit, offset=args.offset))
+            return EXIT_OK
+        value = inspect_run(store, args.run_id)
+    finally:
+        if args.journal is not None:
+            store.close()
+    _emit(args, "inspect", value)
+    decision = value["delivery"]["decision"]
+    if decision in NOT_ACCEPTED:
+        return EXIT_RUN_NOT_ACCEPTED
+    if decision == "indeterminate":
+        return EXIT_RUN_INDETERMINATE
+    return EXIT_OK
+
+
 def _dispatch(args: argparse.Namespace) -> int:
     if args.root_command == "jobs":
         return _dispatch_jobs(args)
     if args.root_command == "optimize":
         return _dispatch_optimize(args)
+    if args.root_command == "runs":
+        return _dispatch_runs(args)
     raise AssertionError(args.root_command)  # pragma: no cover
 
 
@@ -1066,9 +1277,12 @@ def main(argv: Sequence[str] | None = None) -> int:
     ) as exc:
         _emit_error(args, command, exc)
         return EXIT_OPTIMIZE_STATE
-    except (JobNotFoundError, InvalidTransitionError, RunLeaseError) as exc:
+    except (JobNotFoundError, InvalidTransitionError, RunLeaseError, RunNotFoundError) as exc:
         _emit_error(args, command, exc)
         return EXIT_JOB_STATE
+    except RunInspectionError as exc:
+        _emit_error(args, command, exc)
+        return EXIT_LOCAL_ERROR
     except (
         ProviderConfigurationError,
         ImportError,

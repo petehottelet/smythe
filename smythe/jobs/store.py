@@ -18,9 +18,10 @@ from pathlib import Path
 from typing import Any, Callable, Iterator
 from uuid import uuid4
 
+from smythe._money import MICROUSD
 from smythe._sqlite import enable_wal
 from smythe.jobs.artifact_io import MAX_ARTIFACT_BYTES, MAX_IMAGE_PIXELS
-from smythe.jobs.preflight import JobApprovalV1, JobPlanV1, verify_approval
+from smythe.jobs.preflight import ApprovalError, JobApprovalV1, JobPlanV1, verify_approval
 
 
 STORE_VERSION = 4
@@ -45,6 +46,11 @@ _SCHEMA_COLUMNS = {
 _FENCING_COLUMNS = {"runs": {"lease_epoch"}, "attempts": {"lease_owner_id", "lease_epoch"},
                     "run_leases": {"epoch"}}
 _ARTIFACT_COLUMNS = {"artifact_namespace", "artifact_owner_id"}
+# Events whose text ``reason`` explains the next attempt of their operation.
+_QUEUED_REASON_EVENTS = ("reroll_queued",)
+# Completion events, which carry a call's delivery decision when one was recorded.
+_COMPLETION_EVENTS = ("call_completed", "artifact_rejected")
+_DELIVERY_DECISIONS = frozenset({"accepted", "rejected", "indeterminate"})
 _IDENTITY_RE = re.compile(r"[0-9a-f]{32}\Z")
 _CONTROL_TABLE_SQL = """CREATE TABLE IF NOT EXISTS run_controls (
     run_id TEXT PRIMARY KEY REFERENCES runs(run_id) ON DELETE CASCADE,
@@ -222,6 +228,28 @@ def _read_json_object(value: object, field: str) -> dict[str, Any]:
         return result
     except (ValueError, TypeError, RecursionError) as exc:
         raise RunStoreError("Invalid stored JSON in " + field) from exc
+
+
+def _delivery_decision(record: object, accepted: bool,
+                       artifacts: Sequence[dict[str, Any]]) -> dict[str, Any]:
+    """A detached JSON copy of a delivery decision that matches its settlement."""
+    try:
+        decision = json.loads(json.dumps(record, allow_nan=False))
+    except (TypeError, ValueError, RecursionError) as exc:
+        raise ValueError("delivery_acceptance must be JSON data") from exc
+    if type(decision) is not dict:
+        raise ValueError("delivery_acceptance must be a JSON object")
+    if (decision.get("decision") not in _DELIVERY_DECISIONS
+            or (decision["decision"] == "accepted") is not bool(accepted)):
+        raise ValueError("delivery_acceptance decision does not match the call's acceptance")
+    subjects = decision.get("subjects")
+    published = {(item.get("path"), item.get("sha256")) for item in subjects
+                 if type(item) is dict and item.get("published") is True
+                 } if type(subjects) is list else set()
+    if any((artifact.get("relative_path"), artifact.get("sha256")) not in published
+           for artifact in artifacts):
+        raise ValueError("delivery_acceptance needs a published subject for every artifact")
+    return decision
 
 
 def _validate_read_row(row, table: str) -> None:
@@ -598,20 +626,54 @@ class SQLiteRunStore:
         *,
         manifest_root: str | Path,
         run_id: str | None = None,
+        allow_approval_reuse: bool = False,
     ) -> str:
+        """Create an approved run; by default each approval token creates one.
+
+        The token is derived only from the plan and ceiling, so repeating an
+        approval repeats its token. A token that already created a run in this
+        journal raises ``ApprovalError`` unless ``allow_approval_reuse`` is
+        true; the new run's ``run_created`` event then records the earlier run
+        IDs. Resume and reroll continue an existing run and are unaffected.
+        """
+        if type(allow_approval_reuse) is not bool:
+            raise TypeError("allow_approval_reuse must be a boolean")
         verify_approval(plan, approval)
         approved_microusd = _microusd(
             approval.approved_max_cost_microusd,
             field="approved_max_cost_microusd",
         )
         run_id = _safe_run_id(uuid4().hex if run_id is None else run_id)
-        plan_json = json.dumps(plan.to_dict(), sort_keys=True, separators=(",", ":"))
+        created = plan.to_dict()
+        plan_json = json.dumps(created, sort_keys=True, separators=(",", ":"))
         approval_json = json.dumps(
             approval.to_dict(), sort_keys=True, separators=(",", ":")
         )
         artifact_identity = uuid4().hex
         with self._transaction() as cursor:
             now = self._clock_ns()
+            # Checked under the write lock, so concurrent creators serialize.
+            prior = [row["run_id"] for row in cursor.execute(
+                "SELECT run_id FROM runs WHERE approval_token = ? ORDER BY created_at_ns, run_id",
+                (approval.token,),
+            )]
+            if prior and not allow_approval_reuse:
+                shown = ", ".join(repr(item) for item in prior[-5:])
+                if len(prior) > 5:
+                    shown = f"{len(prior)} runs, most recently {shown}"
+                else:
+                    shown = ("runs " if len(prior) > 1 else "run ") + shown
+                raise ApprovalError(
+                    f"approval token already created {shown}; continue with "
+                    f"'smythe jobs resume {prior[-1]}' on this Jobs database (the same "
+                    "--store), or acknowledge approval reuse "
+                    "(jobs run --new-run, allow_approval_reuse=True) to start another run"
+                )
+            if prior:
+                # Bounded, so repeated acknowledged reuse does not grow each event.
+                created = created | {"approval_reuse": {
+                    "prior_run_count": len(prior), "prior_run_ids": prior[-5:],
+                }}
             cursor.execute(
                 """
                 INSERT INTO runs (
@@ -663,7 +725,7 @@ class SQLiteRunStore:
                 ],
             )
             cursor.execute("INSERT INTO run_controls(run_id) VALUES (?)", (run_id,))
-            self._event(cursor, run_id, None, "run_created", plan.to_dict(), now)
+            self._event(cursor, run_id, None, "run_created", created, now)
         return run_id
 
     def acquire_run_lease(
@@ -985,6 +1047,7 @@ class SQLiteRunStore:
                                  "exposure_microusd", "reserved_microusd")} | {
                             "cost_is_complete": run["exposure_microusd"] == 0,
                             "cost_contains_estimates": bool(detail["cost_contains_estimates"]),
+                            "unit": MICROUSD,
                         },
                     })
                 return {"runs": summaries, "limit": limit, "offset": offset,
@@ -1032,6 +1095,9 @@ class SQLiteRunStore:
             # historical attempt numbers remain immutable and therefore advance
             # independently.
             attempt_number = previous["attempt_number"] + 1 if previous is not None else 1
+            if reason is None and previous is not None:
+                # Only an operation with an earlier attempt can be rerolled.
+                reason = self._queued_reason(cursor, run_id, operation_id)
             attempt_id = uuid4().hex
             cursor.execute(
                 """
@@ -1193,8 +1259,16 @@ class SQLiteRunStore:
         result_text: str,
         accepted: bool = True,
         error: str | None = None,
+        delivery_acceptance: dict[str, Any] | None = None,
         lease: RunLease | None = None,
     ) -> None:
+        """Settle a dispatched call with its cost, artifacts and decision.
+
+        ``delivery_acceptance``, when given, is the call's structured delivery
+        decision. It is stored in the completion event of the same
+        transaction, so it must agree with ``accepted`` and name the attempt
+        and a published subject for every artifact.
+        """
         cost_microusd = _microusd(cost_microusd, field="cost_microusd")
         if not isinstance(cost_is_complete, bool):
             raise TypeError("cost_is_complete must be a boolean")
@@ -1227,12 +1301,16 @@ class SQLiteRunStore:
                     or width * height > MAX_IMAGE_PIXELS
                 ):
                     raise ValueError("artifact dimensions exceed the persistence limits")
+        decision = (None if delivery_acceptance is None
+                    else _delivery_decision(delivery_acceptance, accepted, artifacts))
         with self._transaction() as cursor:
             now = self._clock_ns()
             call = self._call(cursor, call_id)
             self._assert_call_owner(cursor, call, lease, now)
             if call["status"] != "dispatched":
                 raise InvalidTransitionError("only a dispatched call can complete")
+            if decision is not None and decision.get("attempt_id") != call["attempt_id"]:
+                raise ValueError("delivery_acceptance names a different attempt than the call")
             attempt = cursor.execute(
                 "SELECT * FROM attempts WHERE attempt_id = ?", (call["attempt_id"],)
             ).fetchone()
@@ -1361,6 +1439,7 @@ class SQLiteRunStore:
                     "call_id": call_id,
                     "cost_microusd": cost_microusd,
                     "cost_is_complete": cost_is_complete,
+                    **({} if decision is None else {"delivery_acceptance": decision}),
                 },
                 now,
             )
@@ -1663,6 +1742,8 @@ class SQLiteRunStore:
                 "cost_contains_estimates": any(
                     row["cost_is_estimate"] for row in call_rows
                 ),
+                # The *_microusd amounts' unit; stored rows do not carry it.
+                "unit": MICROUSD,
             },
             "operations": [
                 {
@@ -1776,6 +1857,9 @@ class SQLiteRunStore:
                                                    schema_version=schema_version, control=control)
                 for call in calls:
                     _validate_read_row(call, "calls")
+                records = self._delivery_records(cursor, run_id, ids)
+                for attempt in result["attempts"]:
+                    attempt["delivery_acceptance"] = records.get(attempt["attempt_id"])
                 result.update(counts=counts, calls=[dict(row) for row in calls], lease=lease,
                               observed_at_ns=observed_at_ns, operation_filter=operation,
                               pagination={"limit": limit, "offset": offset, "total": total,
@@ -1786,6 +1870,40 @@ class SQLiteRunStore:
         except sqlite3.Error as exc:
             raise RunStoreError("Cannot read Jobs inspection snapshot") from exc
 
+    def delivery_records(self, run_id: str) -> dict[str, Any]:
+        """Return each attempt's recorded delivery decision, keyed by attempt ID.
+
+        Decisions are read from completion events. Attempts completed by
+        releases that recorded none are absent.
+        """
+        with self._read_transaction() as cursor:
+            if cursor.execute("SELECT 1 FROM runs WHERE run_id = ?", (run_id,)).fetchone() is None:
+                raise JobNotFoundError(run_id)
+            return self._delivery_records(cursor, run_id)
+
+    @staticmethod
+    def _delivery_records(cursor: sqlite3.Cursor, run_id: str,
+                          operation_ids: Sequence[str] | None = None) -> dict[str, Any]:
+        where, parameters = "run_id = ?", [run_id]
+        if operation_ids is not None:
+            if not operation_ids:
+                return {}
+            where += f" AND operation_id IN ({','.join('?' for _ in operation_ids)})"
+            parameters.extend(operation_ids)
+        attempts = {row["call_id"]: row["attempt_id"] for row in cursor.execute(
+            f"SELECT call_id, attempt_id FROM calls WHERE {where}", parameters)}
+        kinds = ",".join("?" for _ in _COMPLETION_EVENTS)
+        records: dict[str, Any] = {}
+        for row in cursor.execute(
+            f"""SELECT payload_json FROM events WHERE {where} AND event_type IN ({kinds})
+                ORDER BY sequence""", (*parameters, *_COMPLETION_EVENTS),
+        ):
+            payload = _read_json_object(row["payload_json"], "events.payload_json")
+            attempt_id = attempts.get(payload.get("call_id"))
+            if attempt_id is not None and "delivery_acceptance" in payload:
+                records[attempt_id] = payload["delivery_acceptance"]
+        return records
+
     def manifest_record(self, run_id: str) -> dict[str, Any]:
         run = self.get_run(run_id)
         _validate_read_row(run, "runs")
@@ -1794,6 +1912,27 @@ class SQLiteRunStore:
             "manifest_root": run["manifest_root"],
             "approval": _read_json_object(run["approval_json"], "runs.approval_json"),
         }
+
+    def plan_attachments(self, run_id: str) -> list[dict[str, Any]]:
+        """Return the attachment fingerprints recorded in a run's plan.
+
+        Only the plan's ``attachments`` array is decoded, not its operations.
+        """
+        with self._read_transaction() as cursor:
+            row = cursor.execute("""SELECT json_extract(plan_json,'$.attachments') AS attachments,
+                json_type(plan_json,'$.attachments') AS kind FROM runs WHERE run_id=?""",
+                                 (run_id,)).fetchone()
+        if row is None:
+            raise JobNotFoundError(run_id)
+        if row["kind"] != "array":
+            raise RunStoreError("Invalid stored plan attachments")
+        attachments = _read_json_object('{"attachments":' + row["attachments"] + "}",
+                                        "runs.plan_json")["attachments"]
+        if any(type(item) is not dict or any(type(item.get(field)) is not str for field in
+                                             ("relative_path", "sha256", "mime_type"))
+               for item in attachments):
+            raise RunStoreError("Invalid stored plan attachments")
+        return attachments
 
     def _call_rows(self, run_id: str) -> list[sqlite3.Row]:
         with self._lock:
@@ -2104,6 +2243,27 @@ class SQLiteRunStore:
             {"call_id": call["call_id"], "error": error},
             now,
         )
+
+    @staticmethod
+    def _queued_reason(cursor: sqlite3.Cursor, run_id: str, operation_id: str) -> str | None:
+        """Return the reason queued for an operation's next attempt, if any.
+
+        Only the latest queued-reason event written after the operation's last
+        ``attempt_started`` applies. Scanning newest first stops at the first
+        match, so the read covers only events since that attempt began.
+        """
+        kinds = ("attempt_started", *_QUEUED_REASON_EVENTS)
+        selected = ",".join("?" for _ in kinds)
+        row = cursor.execute(
+            f"""SELECT event_type, payload_json FROM events
+               WHERE run_id = ? AND operation_id = ? AND event_type IN ({selected})
+               ORDER BY sequence DESC LIMIT 1""",
+            (run_id, operation_id, *kinds),
+        ).fetchone()
+        if row is None or row["event_type"] == "attempt_started":
+            return None
+        reason = _read_json_object(row["payload_json"], "events.payload_json").get("reason")
+        return reason if type(reason) is str else None
 
     @staticmethod
     def _event(

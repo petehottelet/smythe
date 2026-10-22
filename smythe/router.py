@@ -88,10 +88,14 @@ class WhiteRabbit:
 
     def workflow_providers(self) -> tuple[Provider, ...]:
         providers = [self._classifier_provider] if self._classifier_provider else []
-        for tier in (*self._deterministic.values(), self._constrained, self._autonomous):
-            if tier is not None:
-                providers.extend(tier.workflow_providers())
+        for tier in self._architects():
+            providers.extend(tier.workflow_providers())
         return tuple(providers)
+
+    def _architects(self) -> tuple[Architect, ...]:
+        """Every configured architect, which are the only ones routing can return."""
+        return tuple(tier for tier in (*self._deterministic.values(), self._constrained, self._autonomous)
+                     if tier is not None)
 
     def bind_run(self, binding: ComponentBinding) -> WhiteRabbit:
         self.workflow_description(default_provider=binding.default_provider,
