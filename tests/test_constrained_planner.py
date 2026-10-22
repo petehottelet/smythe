@@ -290,6 +290,31 @@ def test_default_node_cap_admits_64_nodes():
         ConstrainedArchitect(provider=over, templates=templates, max_retries=0).plan(Task(goal="Over"))
 
 
+def test_templates_are_copied_at_construction():
+    """The architect kept the caller's list, so changing that list later
+    changed the menu the model saw but not the templates it could build."""
+    templates = list(TEMPLATES)
+    provider = MockConstrainedProvider([json.dumps([{"template": "research"}])])
+    planner = ConstrainedArchitect(provider=provider, templates=templates)
+
+    templates.pop(0)
+    templates.append(SubGraphTemplate(name="late", description="Added later", builder=_draft_builder))
+    graph, _ = planner.plan(Task(goal="Research"))
+
+    menu = provider.prompts_received[0]
+    assert '"name": "research"' in menu
+    assert '"name": "late"' not in menu
+    assert [n.id for n in graph.nodes] == ["research-0-search", "research-0-summarize"]
+
+
+def test_duplicate_template_names_are_rejected():
+    """The menu listed both templates, but only the last one with the name
+    could ever be built."""
+    duplicate = SubGraphTemplate(name="draft", description="Research instead", builder=_research_builder)
+    with pytest.raises(ValueError, match="Template names must be unique; 'draft' appears more than once"):
+        ConstrainedArchitect(provider=MockConstrainedProvider([]), templates=[*TEMPLATES, duplicate])
+
+
 @pytest.mark.parametrize("value", [0, -1, True, 1.5, "64", None])
 def test_node_cap_must_be_a_positive_integer(value):
     with pytest.raises(ValueError, match="max_nodes"):

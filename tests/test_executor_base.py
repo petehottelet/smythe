@@ -2,6 +2,8 @@
 
 import os
 
+import pytest
+
 from smythe.executor_base import ExecutorBase
 from smythe.graph import ExecutionGraph, Node, NodeStatus, Topology
 from smythe.provider import CompletionResult, Provider
@@ -349,6 +351,33 @@ def test_retry_backoff_grows_with_attempts():
             assert 0.0 <= d <= ceiling
 
 
+@pytest.mark.parametrize(
+    "value",
+    [True, False, float("nan"), float("inf"), float("-inf"), 10**400, -0.5, "0.5", None],
+    ids=["true", "false", "nan", "inf", "-inf", "huge-int", "negative", "string", "none"],
+)
+def test_retry_backoff_rejects_values_that_are_not_finite_non_negative_numbers(value):
+    """True was accepted as a one-second backoff, NaN made every retry delay
+    NaN, and infinity made a retry sleep forever."""
+    from smythe.async_executor import AsyncExecutor
+
+    for executor_type in (ExecutorBase, Executor, AsyncExecutor):
+        with pytest.raises(ValueError, match="retry_backoff_s must be a finite non-negative number"):
+            executor_type(
+                provider=DummyProvider(), registry=Registry(), tracer=Tracer(),
+                retry_backoff_s=value,
+            )
+
+
+@pytest.mark.parametrize("value", [0, 0.0, 2, 0.25])
+def test_retry_backoff_accepts_finite_non_negative_numbers(value):
+    base = ExecutorBase(
+        provider=DummyProvider(), registry=Registry(), tracer=Tracer(),
+        retry_backoff_s=value,
+    )
+    assert 0.0 <= base.retry_delay_s(2) <= 2 * value
+
+
 # ---------------------------------------------------------------------------
 # Vision judge: attach_dep_artifacts
 # ---------------------------------------------------------------------------
@@ -409,6 +438,50 @@ def test_attach_disabled_sends_no_attachments(tmp_path):
     ).run(graph)
     (attachments,) = provider.seen_attachments
     assert attachments == []
+
+
+def _mocked_openai_image_provider():
+    import base64
+    from unittest.mock import AsyncMock, MagicMock
+
+    from smythe.provider import OpenAIImageProvider
+
+    item = MagicMock()
+    item.b64_json = base64.b64encode(b"generated").decode()
+    response = MagicMock(data=[item], usage=MagicMock(input_tokens=1, output_tokens=1))
+    provider = OpenAIImageProvider(api_key="fake")
+    provider._client = MagicMock()
+    provider._client.images.generate = AsyncMock(return_value=response)
+    return provider
+
+
+def test_image_node_fails_instead_of_dropping_attached_dependency_images(tmp_path):
+    """A node that attaches its dependencies' images must not reach the
+    Image API without them."""
+    graph, node = _graph_with_image_dep(tmp_path, attach=True)
+    node.metadata["model"] = "gpt-image-2"
+    provider = _mocked_openai_image_provider()
+
+    with pytest.raises(ValueError, match="must not silently discard their inputs"):
+        Executor(
+            provider=provider, registry=Registry(), tracer=Tracer(), artifact_dir=None,
+        ).run(graph)
+
+    assert node.status is NodeStatus.FAILED
+    provider._client.images.generate.assert_not_called()
+
+
+def test_image_node_without_attached_dependency_images_still_generates(tmp_path):
+    graph, node = _graph_with_image_dep(tmp_path, attach=False)
+    node.metadata["model"] = "gpt-image-2"
+    provider = _mocked_openai_image_provider()
+
+    Executor(
+        provider=provider, registry=Registry(), tracer=Tracer(), artifact_dir=None,
+    ).run(graph)
+
+    assert node.status is NodeStatus.COMPLETED
+    provider._client.images.generate.assert_called_once()
 
 
 def test_missing_and_non_image_artifacts_are_skipped(tmp_path):

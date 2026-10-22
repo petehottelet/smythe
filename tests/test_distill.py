@@ -5,10 +5,13 @@ from __future__ import annotations
 import pytest
 
 from smythe.agent import Agent, AgentProfile
-from smythe.constrained_planner import SubGraphTemplate
+from smythe.constrained_planner import ConstrainedArchitect, SubGraphTemplate
 from smythe.distill import DistillationError, distill_template
-from smythe.graph import ExecutionGraph, Node, NodeStatus, Topology
+from smythe.graph import ExecutionGraph, FailurePolicy, Node, NodeStatus, Topology
+from smythe.provider import CompletionResult, Provider
 from smythe.registry import Registry
+from smythe.swarm import Swarm
+from smythe.synthesizer import SynthesisStrategy, Synthesizer
 from smythe.task import Task
 
 
@@ -237,3 +240,138 @@ def test_model_params_named_like_the_builder_arguments_are_ignored():
     assert provider.calls == 1
     assert [n.id for n in built.nodes] == ["learned-0-research", "learned-0-review"]
     assert all("A brand new task" in n.label for n in built.nodes)
+
+
+WRITER = "You write the memo."
+JUDGE = "You judge the memo."
+
+
+def _completed_gated_graph():
+    """A run whose judge gated the memo, with tuned execution policies."""
+    registry = Registry()
+    writer = Agent(profile=AgentProfile(name="Writer", persona=WRITER, capabilities=["writing"]))
+    judge = Agent(profile=AgentProfile(name="Judge", persona=JUDGE, capabilities=["review"]))
+    registry.register(writer)
+    registry.register(judge)
+    draft = Node(
+        id="draft", label="Draft the memo", agent_id=writer.id,
+        required_capabilities=["writing"], failure_policy=FailurePolicy.RETRY,
+        max_retries=3, timeout_s=90.0, metadata={"role": "author"},
+    )
+    check = Node(
+        id="check", label="Check the memo; answer PASS or FAIL", depends_on=["draft"],
+        agent_id=judge.id, required_capabilities=["review"], verifies="draft",
+        max_regenerations=2, failure_policy=FailurePolicy.SKIP, max_retries=0,
+        attach_dep_artifacts=True, metadata={"role": "adversarial"},
+    )
+    for node, result in ((draft, "the memo"), (check, "PASS")):
+        node.status = NodeStatus.COMPLETED
+        node.result = result
+        # Execution history, not structure.
+        node.metadata.update(model="old-model", cost_usd=0.01)
+    check.metadata["regenerations_used"] = 1
+    graph = ExecutionGraph(topology=[Topology.ADVERSARIAL], nodes=[draft, check])
+    return graph, registry
+
+
+class _Selects(Provider):
+    """A template-selection model that always picks one template."""
+
+    def __init__(self, name: str) -> None:
+        self._name = name
+
+    async def complete(self, system, prompt, model):
+        return CompletionResult(text=f'[{{"template": "{self._name}"}}]')
+
+
+class _PersonaScript(Provider):
+    """Answers each agent from its own queue and counts its calls."""
+
+    def __init__(self, script: dict[str, list[str]]) -> None:
+        self._script = {persona: list(replies) for persona, replies in script.items()}
+        self.runs: dict[str, int] = {}
+
+    async def complete(self, system, prompt, model):
+        self.runs[system] = self.runs.get(system, 0) + 1
+        queue = self._script[system]
+        text = queue.pop(0) if len(queue) > 1 else queue[0]
+        return CompletionResult(text=text, prompt_tokens=1, completion_tokens=1)
+
+
+def test_gates_and_execution_policies_survive_distillation():
+    """A judge that loses 'verifies' stops gating, and its verdict becomes the output."""
+    graph, registry = _completed_gated_graph()
+    template = distill_template(graph, name="t", registry=registry)
+    graph.nodes[1].verifies = None  # The template is a snapshot.
+
+    (draft, check), _ = template.builder(Task(goal="Summarize the quarter"))
+
+    assert check.verifies == "draft"
+    assert check.depends_on == ["draft"]
+    assert check.max_regenerations == 2
+    assert check.attach_dep_artifacts is True
+    assert draft.attach_dep_artifacts is False
+    assert [(n.failure_policy, n.max_retries, n.timeout_s) for n in (draft, check)] == [
+        (FailurePolicy.RETRY, 3, 90.0), (FailurePolicy.SKIP, 0, None),
+    ]
+    # The role describes the shape; model, cost and verification history stay behind.
+    assert draft.metadata == {"role": "author"}
+    assert check.metadata == {"role": "adversarial"}
+
+
+def test_distilled_metadata_is_independent_between_builds():
+    graph, registry = _completed_gated_graph()
+    template = distill_template(graph, name="t", registry=registry)
+    first, _ = template.builder(Task(goal="a"))
+    first[1].metadata["role"] = "changed"
+    second, _ = template.builder(Task(goal="b"))
+    assert second[1].metadata == {"role": "adversarial"}
+
+
+def test_composed_template_keeps_its_gate():
+    graph, registry = _completed_gated_graph()
+    template = distill_template(graph, name="memo", registry=registry)
+    architect = ConstrainedArchitect(provider=_Selects("memo"), templates=[template], max_retries=0)
+
+    built, _ = architect.plan(Task(goal="Summarize the quarter"))
+
+    check = next(n for n in built.nodes if n.id == "memo-0-check")
+    assert check.verifies == "memo-0-draft"
+    assert check.depends_on == ["memo-0-draft"]
+    assert check.max_regenerations == 2
+
+
+def test_distilled_gate_still_gates_and_returns_its_target_as_the_deliverable():
+    """Executing the learned shape must regenerate a rejected draft and
+    return the approved memo, not the judge's verdict."""
+    graph, registry = _completed_gated_graph()
+    template = distill_template(graph, name="memo", registry=registry)
+    provider = _PersonaScript({
+        WRITER: ["first memo", "THE REVISED MEMO"],
+        JUDGE: ["FAIL: cites no sources", "PASS"],
+    })
+    swarm = Swarm(
+        provider=provider,
+        architect=ConstrainedArchitect(provider=_Selects("memo"), templates=[template], max_retries=0),
+        synthesizer=Synthesizer(SynthesisStrategy.DELIVERABLE),
+        artifact_dir=None,
+    )
+
+    result = swarm.execute(Task(goal="Summarize the quarter"))
+
+    assert result.output == "THE REVISED MEMO"
+    assert provider.runs == {WRITER: 2, JUDGE: 2}
+
+
+def test_refuses_a_gate_whose_target_is_not_in_the_graph():
+    graph, registry = _completed_gated_graph()
+    graph.nodes[1].verifies = "ghost"
+    with pytest.raises(DistillationError, match="'check'.*'ghost'"):
+        distill_template(graph, name="t", registry=registry)
+
+
+def test_refuses_a_gate_that_verifies_itself():
+    graph, registry = _completed_gated_graph()
+    graph.nodes[1].verifies = "check"
+    with pytest.raises(DistillationError, match="'check'.*itself"):
+        distill_template(graph, name="t", registry=registry)

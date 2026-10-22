@@ -129,10 +129,13 @@ def test_openai_reference_inputs_fail_before_provider_construction(tmp_path):
         ProviderPool().get(operation)
 
 
-def _provider_operation(tmp_path, *, provider, model, options=None):
-    data = _manifest(provider=provider)
+def _provider_operation(tmp_path, *, provider, model, options=None, artifact=None,
+                        attachments=None):
+    data = _manifest(provider=provider, attachments=attachments)
     data["profiles"][0]["model"] = model
     data["profiles"][0]["options"] = options or {}
+    if artifact is not None:
+        data["operations"][0]["artifact"] = artifact
     manifest = load_manifest(_write_json(tmp_path / "provider.json", data))[0]
     return preflight_job(manifest, manifest_root=tmp_path).operations[0]
 
@@ -281,6 +284,73 @@ def test_gemini_image_profile_requires_image_modality(tmp_path):
         )
 
     assert caught.value.kind is ProviderPreflightKind.LOCAL
+
+
+@pytest.mark.parametrize("mime_type", ["application/pdf", "application/octet-stream", "text/plain"])
+def test_gemini_image_profile_rejects_an_artifact_it_cannot_return(tmp_path, mime_type):
+    operation = _provider_operation(
+        tmp_path,
+        provider="gemini_image",
+        model="gemini-3.1-flash-image",
+        artifact={"mime_type": mime_type},
+    )
+
+    with pytest.raises(ProviderPreflightError, match="mime_type") as caught:
+        preflight_provider_operation(
+            operation,
+            environ={"GOOGLE_API_KEY": "secret"},
+            module_available=lambda _name: True,
+        )
+
+    assert caught.value.kind is ProviderPreflightKind.LOCAL
+
+
+@pytest.mark.parametrize("mime_type", ["image/png", "image/jpeg", "image/webp", "image/gif"])
+def test_gemini_image_profile_accepts_raster_artifacts_and_reference_images(tmp_path, mime_type):
+    (tmp_path / "logo.png").write_bytes(_png_bytes((4, 4)))
+    operation = _provider_operation(
+        tmp_path,
+        provider="gemini_image",
+        model="gemini-3.1-flash-image",
+        artifact={"mime_type": mime_type, "width": 1024, "height": 1024},
+        attachments=["logo.png"],
+    )
+
+    preflight_provider_operation(
+        operation,
+        environ={"GOOGLE_API_KEY": "secret"},
+        module_available=lambda name: name == "google.genai",
+    )
+
+
+@pytest.mark.parametrize("artifact", [
+    {"mime_type": "image/jpeg"},
+    {"mime_type": "image/webp", "width": 1, "height": 1},
+    {"mime_type": "application/octet-stream"},
+    {"mime_type": "image/png", "width": 1024, "height": 1024},
+    {"mime_type": "image/png", "width": 1, "height": 2},
+], ids=["jpeg", "webp", "binary", "1024x1024", "1x2"])
+def test_offline_profile_rejects_an_artifact_other_than_a_1x1_png(tmp_path, artifact):
+    operation = _provider_operation(
+        tmp_path, provider="offline", model="offline-image", artifact=artifact,
+    )
+
+    with pytest.raises(ProviderPreflightError, match="offline profile") as caught:
+        preflight_provider_operation(operation, environ={}, module_available=lambda _name: False)
+
+    assert caught.value.kind is ProviderPreflightKind.LOCAL
+
+
+@pytest.mark.parametrize("artifact", [
+    None, {"mime_type": "image/png"}, {"mime_type": "image/png", "width": 1, "height": 1},
+])
+def test_offline_profile_accepts_a_png_with_no_or_1x1_dimensions(tmp_path, artifact):
+    operation = _provider_operation(
+        tmp_path, provider="offline", model="offline-image", artifact=artifact,
+    )
+
+    preflight_provider_operation(operation, environ={}, module_available=lambda _name: False)
+    assert isinstance(ProviderPool().get(operation), OfflineProvider)
 
 
 def test_inspect_png_uses_content_not_declared_mime():

@@ -86,9 +86,18 @@ class ConstrainedArchitect(Architect):
     ) -> None:
         if type(max_nodes) is not int or max_nodes < 1:
             raise ValueError(f"max_nodes must be a positive integer, got {max_nodes!r}")
+        # Copy the menu so a later change to the caller's list cannot make the
+        # menu shown to the model disagree with the templates it can select.
+        template_list = list(templates)
+        self._templates: dict[str, SubGraphTemplate] = {}
+        for template in template_list:
+            if template.name in self._templates:
+                raise ValueError(
+                    f"Template names must be unique; {template.name!r} appears more than once"
+                )
+            self._templates[template.name] = template
         self._provider = provider
-        self._templates = {t.name: t for t in templates}
-        self._template_list = templates
+        self._template_list = template_list
         self._model = model
         self._max_retries = max_retries
         self._max_nodes = max_nodes

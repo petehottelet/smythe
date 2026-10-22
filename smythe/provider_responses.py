@@ -21,7 +21,7 @@ from typing import Any
 
 from smythe._errors import PicklableError
 from smythe.pricing import (
-    PRICE_VERSION, NativeReceipt, conservative_quote, price_native_response,
+    PRICE_VERSION, NativeReceipt, conservative_quote, price_native_response, price_table,
 )
 from smythe.provider import (
     CompletionResult, Provider, ProviderAccountingCancelledError, ProviderAccountingError,
@@ -29,7 +29,8 @@ from smythe.provider import (
 )
 from smythe.tools import ChatMessage, ToolCall, ToolSpec, wire_name
 
-MODELS = frozenset({"gpt-6-astra", "gpt-5.6-sol"})
+# The models the current price version prices.
+MODELS = frozenset(price_table().models)
 _EFFORTS = frozenset({"low", "medium", "high", "xhigh", "max"})
 _ENDPOINT = "https://api.openai.com/v1"
 _NAMESPACE = "openai_responses"
@@ -526,13 +527,19 @@ class OpenAIResponsesProvider(Provider):
                              cost, PRICE_VERSION, envelope)
 
     @staticmethod
-    def extract_receipt(envelope: RawResponseEnvelope) -> NativeReceipt:
-        """Pure raw-JSON pricing; callers can persist the envelope before this."""
+    def extract_receipt(envelope: RawResponseEnvelope,
+                        price_version: str | None = None) -> NativeReceipt:
+        """Pure raw-JSON pricing; callers can persist the envelope before this.
+
+        ``price_version`` selects a registered price table, such as the one a
+        journaled call recorded; the default is the current version.
+        """
         try:
             raw = envelope.json()
         except ValueError:
             raw = {}
-        return price_native_response(raw, requested_model=envelope.request.model)
+        return price_native_response(raw, requested_model=envelope.request.model,
+                                     price_version=price_version)
 
     @staticmethod
     def _summary(envelope: RawResponseEnvelope, receipt: NativeReceipt) -> dict:
@@ -547,9 +554,13 @@ class OpenAIResponsesProvider(Provider):
         return summary
 
     @staticmethod
-    def decode(envelope: RawResponseEnvelope, receipt: NativeReceipt | None = None) -> CompletionResult:
-        """Return usable output or raise an error retaining its incurred bill."""
-        extracted = OpenAIResponsesProvider.extract_receipt(envelope)
+    def decode(envelope: RawResponseEnvelope, receipt: NativeReceipt | None = None, *,
+               price_version: str | None = None) -> CompletionResult:
+        """Return usable output or raise an error retaining its incurred bill.
+
+        ``price_version`` prices the bill as ``extract_receipt`` does.
+        """
+        extracted = OpenAIResponsesProvider.extract_receipt(envelope, price_version)
         mismatched_receipt = receipt is not None and (
             not isinstance(receipt, NativeReceipt) or receipt != extracted
         )

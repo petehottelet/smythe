@@ -23,8 +23,8 @@ flowchart LR
         synthesizer["Synthesizer<br/>final deliverable"]
     end
 
-    result["SwarmResult<br/>output 路 graph 路 trace 路 cost"]
-    memory["PlannerMemory<br/>outcomes + distilled templates"]
+    result["SwarmResult<br/>output 路 graph 路 trace 路 cost 路 timing"]
+    memory["PlannerMemory<br/>recorded run outcomes"]
 
     task --> router --> architect --> dag --> executor --> synthesizer --> result
     executor <--> sentinel
@@ -83,10 +83,12 @@ trace entries.
 
 `ConstrainedArchitect` limits the composed graph to 64 nodes by default
 (`ConstrainedArchitect(max_nodes=...)`) and retries a selection over the limit.
-Template builders receive model-chosen `params` and must bound them: the limit
-is checked when each builder call returns. In a durable run, the LLM and
-constrained architects also check each plan against the run's graph policy,
-plain-text node rules and journal node-id rule before planning is saved
+It copies its template list when constructed, so later changes to the caller's
+list do not change its menu, and it rejects duplicate template names with
+`ValueError`. Template builders receive model-chosen `params` and must bound
+them: the limit is checked when each builder call returns. In a durable run,
+the LLM and constrained architects also check each plan against the run's graph
+policy, plain-text node rules and journal node-id rule before planning is saved
 ([durable planning](workflow-accounting.md#freeze-graph-limits)). A durable
 run's template builders must return the same nodes, with the same ids, for the
 same task and params: resume rebuilds each saved selection, and a repair prompt
@@ -144,9 +146,13 @@ See [Verification](verifier.md#recovery-and-concurrent-work).
 
 ## Artifacts and jobs
 
-Provider responses can include artifacts as well as text. Execution-scoped
-artifact stores write bytes atomically and keep hashes in the graph state.
-Nodes can receive dependency images as native vision inputs.
+Provider responses can include artifacts as well as text. Each execution
+writes artifact bytes atomically into its own directory under `artifact_dir`
+and records each file's absolute path and MIME type in the node's metadata.
+These records hold no content hashes; Jobs artifact records carry a SHA-256
+digest. Nodes can receive dependency images as native vision inputs.
+`OpenAIImageProvider` does not accept image inputs yet, so it raises
+`ValueError` for a request with attachments instead of generating without them.
 
 The Jobs surface adds a manifest and operator protocol for high-fan-out work:
 complete worst-case preflight, approval bound to the exact plan and ceiling,
@@ -168,10 +174,23 @@ graph around capabilities that actually exist.
 
 ## Learning loop
 
-`PlannerMemory` records the task, topology, cost, summed node time, and outcome
-of each completed run and recalls relevant outcomes into later planning prompts.
-Its `total_duration_ms` field sums recorded spans; overlapping nodes contribute
-their individual durations, so this value is not elapsed wall time.
+`PlannerMemory` records the task, topology, cost, summed node time, elapsed
+time, and outcome of each completed run and recalls relevant outcomes into
+later planning prompts. Its `total_duration_ms` field sums recorded spans;
+overlapping nodes contribute their individual durations, so this value is not
+elapsed wall time. Each attempt records its own span, including retries,
+regenerated work and an `LLM_MERGE` synthesis call; a node's recorded duration
+is that of its final attempt.
+
+`elapsed_ms` is the elapsed time of the call that recorded the run, from
+[`SwarmResult.timing`](execution.md#timing). A resumed run records only the
+resuming call's spans and elapsed time, with `resumed` true and
+`latency_complete` false. Each record also keeps the result's
+`cost_is_complete` and `cost_contains_estimates` flags, and `acceptance` is
+`not_evaluated`: delivery acceptance is not evaluated yet. Records written
+before these fields existed recall with them `null`, meaning not recorded, and
+recall skips rows where they are malformed. Planner prompts still show only the
+summed node time.
 
 **Added in 0.8.0:** recalled topology, success, cost, and duration fields
 are validated before ranking. Malformed records are skipped without rewriting
@@ -180,7 +199,10 @@ unchanged. Planner prompts label the recorded duration as 鈥淪ummed node time.鈥
 
 `distill_template` turns a successful completed graph into a reusable
 `SubGraphTemplate`, moving a proven topology from autonomous planning into the
-constrained tier.
+constrained tier. The template keeps the graph's dependency edges,
+verification gates, and node failure policies, retries, and timeouts; results,
+costs, and statuses stay behind. The template is an in-memory object that you
+pass to `ConstrainedArchitect`; `PlannerMemory` does not store templates.
 
 This keeps learning reviewable: execution history informs future choices, and
 promoted graph structure becomes an explicit template rather than an invisible
@@ -193,10 +215,12 @@ prompt mutation.
   verification control transitions form the checkpoint boundaries.
 - Without `run_store`, the ordinary Swarm budget governs execution and synthesis;
   model-based routing, planning, and successful supervision remain outside it.
-- With `run_store=SQLiteWorkflowStore(...)`, supported text workflows share one
-  durable ledger across routing, planning, execution, verification, supervision,
-  and synthesis. Request-bound quotes, fenced dispatch, and retained response
-  evidence govern admission and recovery. See [managed scope](workflow-accounting.md#supported-scope).
+- With `run_store=SQLiteWorkflowStore(...)`, supported text workflows on the
+  native Responses or Claude Messages provider, or a stateless
+  `OfflineProvider`, share one durable ledger across routing, planning,
+  execution, verification, supervision, and synthesis. Request-bound quotes,
+  fenced dispatch, and retained response evidence govern admission and
+  recovery. See [managed scope](workflow-accounting.md#supported-scope).
 - A supervisor may change only pending work. It cannot drop a verification
   gate or the node it judges, or leave the gate no longer depending on that
   node; a step it adds after that node is not judged by the gate. One

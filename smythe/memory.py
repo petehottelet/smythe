@@ -14,12 +14,37 @@ from typing import Any
 
 from smythe.task import Task, snapshot_task
 
+# Delivery acceptance decisions an outcome can record.
+_ACCEPTANCE_VALUES = frozenset({
+    "not_evaluated", "accepted", "rejected", "needs_review", "indeterminate",
+})
+
+
+def _is_duration(value: Any) -> bool:
+    """True for a finite, non-negative int or float."""
+    try:
+        return type(value) in (int, float) and math.isfinite(value) and value >= 0
+    except OverflowError:
+        return False
+
+
+def _flag(value: Any) -> bool | None:
+    return value if type(value) is bool else None
+
 
 @dataclass
 class ExecutionOutcome:
     """Record of a single task execution for planner feedback.
 
     ``total_duration_ms`` sums recorded node-span times; it is not wall time.
+    A node outcome's ``duration_ms`` is the time of that node's final attempt.
+
+    ``elapsed_ms`` is the elapsed time of the call that recorded the outcome.
+    ``latency_complete`` is False and ``resumed`` True when that call resumed
+    a checkpoint, so ``elapsed_ms`` covers only part of the run. The cost
+    flags copy the result's. ``acceptance`` is ``"not_evaluated"`` for new
+    records. These fields are None when not recorded, as in history written
+    before they existed.
     """
 
     task_goal: str
@@ -33,6 +58,12 @@ class ExecutionOutcome:
     timestamp: str = ""
     task_context: dict[str, Any] = field(default_factory=dict)
     task_done_when: list[str] = field(default_factory=list)
+    elapsed_ms: float | None = None
+    latency_complete: bool | None = None
+    resumed: bool | None = None
+    cost_is_complete: bool | None = None
+    cost_contains_estimates: bool | None = None
+    acceptance: str | None = None
 
 
 class PlannerMemory:
@@ -67,6 +98,9 @@ class PlannerMemory:
 
         trace = getattr(result, "trace", [])
         total_duration = sum(s.get("duration_ms", 0) for s in trace)
+        # Each attempt records its own span. A node's duration is its final
+        # attempt's, so a retried node reports the attempt that settled it.
+        final_spans = {s.get("node_id"): s for s in trace}
 
         node_outcomes: list[dict[str, Any]] = []
         for node in graph.nodes:
@@ -75,11 +109,9 @@ class PlannerMemory:
                 "label": node.label,
                 "status": node.status.value if hasattr(node.status, "value") else str(node.status),
             }
-            matching_span = next(
-                (s for s in trace if s.get("node_id") == node.id), None
-            )
-            if matching_span:
-                node_outcome["duration_ms"] = matching_span.get("duration_ms", 0)
+            final_span = final_spans.get(node.id)
+            if final_span:
+                node_outcome["duration_ms"] = final_span.get("duration_ms", 0)
             cost = node.metadata.get("cost_usd")
             if cost is not None:
                 node_outcome["cost_usd"] = cost
@@ -88,6 +120,9 @@ class PlannerMemory:
         all_completed = all(
             n.status == NodeStatus.COMPLETED for n in graph.nodes
         )
+        timing = getattr(result, "timing", None)
+        timing = timing if isinstance(timing, dict) else {}
+        elapsed = timing.get("elapsed_ms")
 
         outcome = ExecutionOutcome(
             task_goal=saved_task.goal if hasattr(saved_task, "goal") else str(saved_task),
@@ -101,6 +136,13 @@ class PlannerMemory:
             timestamp=datetime.now(timezone.utc).isoformat(),
             task_context=saved_task.context if isinstance(saved_task, Task) else {},
             task_done_when=list(getattr(saved_task, "done_when", [])),
+            elapsed_ms=elapsed if _is_duration(elapsed) else None,
+            latency_complete=_flag(timing.get("latency_complete")),
+            resumed=_flag(timing.get("resumed")),
+            cost_is_complete=_flag(getattr(result, "cost_is_complete", None)),
+            cost_contains_estimates=_flag(getattr(result, "cost_contains_estimates", None)),
+            # No run evaluates delivery acceptance yet; None means not recorded.
+            acceptance="not_evaluated",
         )
 
         line = (json.dumps(asdict(outcome)) + "\n").encode("utf-8")
@@ -165,6 +207,18 @@ class PlannerMemory:
                 if any(
                     type(value) not in (int, float) or not math.isfinite(value) or value < 0
                     for value in (outcome.total_cost_usd, outcome.total_duration_ms)
+                ):
+                    continue
+                if outcome.elapsed_ms is not None and not _is_duration(outcome.elapsed_ms):
+                    continue
+                if any(value is not None and type(value) is not bool for value in (
+                    outcome.latency_complete, outcome.resumed,
+                    outcome.cost_is_complete, outcome.cost_contains_estimates,
+                )):
+                    continue
+                if outcome.acceptance is not None and (
+                    type(outcome.acceptance) is not str
+                    or outcome.acceptance not in _ACCEPTANCE_VALUES
                 ):
                     continue
             except (ValueError, TypeError, KeyError, OverflowError):

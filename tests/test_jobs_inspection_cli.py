@@ -13,6 +13,7 @@ from types import SimpleNamespace
 
 import pytest
 
+import smythe.provider as provider_module
 from smythe.cli import (
     EXIT_INVALID_INPUT, EXIT_JOB_FAILED, EXIT_JOB_STATE, EXIT_LOCAL_ERROR, EXIT_OK,
     build_parser, main,
@@ -20,7 +21,7 @@ from smythe.cli import (
 from smythe.jobs.loading import load_manifest
 from smythe.jobs.preflight import make_approval, preflight_job
 from smythe.jobs.store import SQLiteRunStore
-from test_jobs_cli import _manifest
+from test_jobs_cli import _jpeg_bytes, _manifest
 
 
 def output(capsys):
@@ -30,8 +31,12 @@ def output(capsys):
     return json.loads(captured.out, parse_constant=lambda value: pytest.fail(f"Nonfinite JSON: {value}"))
 
 
-def seed_job(tmp_path, capsys, *, rejected=False):
-    manifest = _manifest(tmp_path, mime_type="image/jpeg" if rejected else "image/png", attempts=2)
+def seed_job(tmp_path, capsys, *, rejected=False, monkeypatch=None):
+    if rejected:
+        # Preflight accepts the manifest; the provider then returns a JPEG
+        # where the operation declared a PNG, so every attempt is rejected.
+        monkeypatch.setattr(provider_module, "_OFFLINE_PNG", _jpeg_bytes())
+    manifest = _manifest(tmp_path, attempts=2)
     path = tmp_path / "jobs.sqlite3"
     assert main(["jobs", "plan", str(manifest), "--json"]) == EXIT_OK
     token = output(capsys)["plan"]["approval"]["token"]
@@ -149,8 +154,8 @@ def test_missing_run_and_operation_have_stable_error_outputs(job, capsys):
     assert output(capsys)["ok"] is False
 
 
-def test_inspecting_failed_job_succeeds_but_status_exit_is_unchanged(tmp_path, capsys):
-    job = seed_job(tmp_path, capsys, rejected=True)
+def test_inspecting_failed_job_succeeds_but_status_exit_is_unchanged(tmp_path, capsys, monkeypatch):
+    job = seed_job(tmp_path, capsys, rejected=True, monkeypatch=monkeypatch)
     operation = job.run["operations"][0]["operation_key"]
     assert main(["jobs", "reroll", job.run["run_id"], operation, "--reason", "MIME check",
                  "--store", str(job.path), "--json"]) == EXIT_JOB_FAILED

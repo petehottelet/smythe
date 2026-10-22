@@ -8,6 +8,8 @@ from unittest.mock import AsyncMock
 
 import pytest
 
+from fakes import release_price_version
+from smythe import pricing_anthropic
 from smythe.pricing_anthropic import MODEL, messages_quote_nanousd, price_messages_response
 from smythe.provider import ProviderAccountingError, ProviderAccountingCancelledError, ProviderResponseError
 from smythe.provider_messages import AnthropicMessagesProvider
@@ -122,6 +124,26 @@ def test_quote_covers_output_cap_and_expensive_input_categories():
             messages_quote_nanousd(count, 8192)
 
 
+def test_earlier_messages_price_versions_keep_their_rates_receipts_and_quotes(monkeypatch):
+    recorded = pricing_anthropic.PRICE_VERSION
+    before = price_messages_response(response()).safe_summary()
+    quote = messages_quote_nanousd(100, 8192)
+    rates = {MODEL: {**pricing_anthropic.RATES, "output": 100_000}}
+    release_price_version(monkeypatch, "anthropic_messages", version="anthropic-test-v2", rates=rates)
+    historical = price_messages_response(response(), price_version=recorded)
+    assert historical.safe_summary() == before
+    current = price_messages_response(response())
+    assert current.cost_nanousd == 2_535_000 + 20 * 50_000
+    assert current.safe_summary()["price_version"] == "anthropic-test-v2"
+    assert current.safe_summary()["categories"]["output"]["rate_nanousd_per_token"] == 100_000
+    assert messages_quote_nanousd(100, 8192, price_version=recorded) == quote
+    assert messages_quote_nanousd(100, 8192) == quote + 8192 * 50_000
+    descriptor = AnthropicMessagesProvider(api_key="test-secret").workflow_descriptor()
+    assert descriptor["price_version"] == "anthropic-test-v2" and descriptor["supported_models"] == [MODEL]
+    with pytest.raises(ValueError, match="not registered"):
+        price_messages_response(response(), price_version="anthropic-unknown-v9")
+
+
 def test_prepare_is_strict_detached_and_secret_free():
     provider = AnthropicMessagesProvider(api_key="test-secret")
     desc = describe_provider(provider)
@@ -142,11 +164,11 @@ def test_saved_bytes_settled_before_decode_and_no_paid_replay(journal, transport
     store, lease = journal
     original = AnthropicMessagesProvider.decode
 
-    def decode(envelope):
+    def decode(envelope, **kwargs):
         call = store.lookup_call(lease.run_id, CallKey("execution", "node"))
         assert call["billing_state"] == "known"
         assert store.load_replay(call["call_id"])["evidence"]["body"] == envelope.body
-        return original(envelope)
+        return original(envelope, **kwargs)
 
     monkeypatch.setattr(AnthropicMessagesProvider, "decode", staticmethod(decode))
     first = asyncio.run(invoke(journal))

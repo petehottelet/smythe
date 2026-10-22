@@ -6,18 +6,24 @@ import tempfile
 
 import pytest
 
+from fakes import ManualClock
 from helpers import (
+    SIMPLE_PLAN_JSON,
     ClassifierMockProvider,
     FixedArchitect,
     MockProvider,
     PlanningMockProvider,
 )
 from smythe import Swarm, Task
+from smythe.checkpoint import FileCheckpointStore
 from smythe.graph import ExecutionGraph, Node, Topology
 from smythe.memory import PlannerMemory
 from smythe.planner import LLMArchitect, SimpleArchitect
+from smythe.prompts import PLANNING_SYSTEM_PROMPT
 from smythe.provider import CompletionResult, Provider
 from smythe.router import WhiteRabbit
+from smythe.swarm import SwarmResult
+from smythe.tracer import Tracer
 
 
 def test_swarm_construction():
@@ -497,3 +503,270 @@ def test_durable_paths_record_the_parallel_concurrency(tmp_path, parallel, expec
 
         for result in (executed, awaited, resumed):
             assert saved(result.execution_id) == expected
+
+
+# ---------------------------------------------------------------------------
+# Execution policy is validated before any routing or planning call
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("policy,match", [
+    ({"max_concurrency": 0}, "max_concurrency"),
+    ({"max_concurrency": -1}, "max_concurrency"),
+    ({"max_revisions": -1}, "max_revisions"),
+    ({"retry_backoff_s": -1}, "retry_backoff_s"),
+    ({"retry_backoff_s": float("nan")}, "retry_backoff_s"),
+    ({"retry_backoff_s": float("inf")}, "retry_backoff_s"),
+    ({"retry_backoff_s": True}, "retry_backoff_s"),
+])
+def test_invalid_execution_policy_is_rejected_before_routing_or_planning(policy, match):
+    """These values used to fail only when the executor was built, after the
+    router's classifier and the planner had already been paid."""
+    classifier = ClassifierMockProvider("autonomous")
+    planner = PlanningMockProvider()
+    router = WhiteRabbit(
+        autonomous=LLMArchitect(provider=planner, planning_model="planner"),
+        classifier_provider=classifier, classifier_model="classifier",
+    )
+
+    with pytest.raises(ValueError, match=match):
+        Swarm(model="m", provider=planner, router=router, parallel=True,
+              artifact_dir=None, **policy).execute(Task(goal="Plan this"))
+
+    assert classifier.calls == []
+    assert planner.calls == []
+
+
+@pytest.mark.parametrize("parallel", [False, True])
+@pytest.mark.parametrize("policy", [
+    {},
+    {"max_concurrency": None},
+    {"max_concurrency": 1},
+    {"retry_backoff_s": 0},
+    {"retry_backoff_s": 1.5},
+    {"max_revisions": 2},
+])
+def test_valid_execution_policies_still_run(policy, parallel):
+    swarm = Swarm(provider=MockProvider(), architect=SimpleArchitect(),
+                  parallel=parallel, artifact_dir=None, **policy)
+
+    result = swarm.execute(Task(goal="Do something"))
+
+    assert result.graph.nodes[0].result is not None
+
+
+# ---------------------------------------------------------------------------
+# Elapsed time, phases and per-process timing segments
+# ---------------------------------------------------------------------------
+
+
+def _clocked(swarm: Swarm, clock: ManualClock) -> Swarm:
+    """Measure this Swarm's calls with a manual clock."""
+    swarm._tracer_factory = lambda: Tracer(
+        clock=clock.monotonic, wall_clock=lambda: clock.time_ns() / 1e9,
+    )
+    return swarm
+
+
+class _ClockedProvider(Provider):
+    """Planning takes 2s, classification 0.5s and every node call 1s."""
+
+    def __init__(self, clock: ManualClock, crash_on: str | None = None) -> None:
+        self.clock = clock
+        self.crash_on = crash_on
+
+    async def complete(self, system, prompt, model):
+        if system == PLANNING_SYSTEM_PROMPT:
+            self.clock.advance(2)
+            return CompletionResult(text=SIMPLE_PLAN_JSON, prompt_tokens=1, completion_tokens=1)
+        if system.startswith("You are a task classifier."):
+            self.clock.advance(0.5)
+            return CompletionResult(text="autonomous", prompt_tokens=1, completion_tokens=1)
+        label = prompt.splitlines()[0]
+        self.clock.advance(1)
+        if label == self.crash_on:
+            raise RuntimeError("process died")
+        return CompletionResult(text=f"done: {label}", prompt_tokens=1, completion_tokens=1)
+
+
+def _chain() -> ExecutionGraph:
+    return ExecutionGraph(topology=[Topology.SERIAL], nodes=[
+        Node(id="a", label="A"), Node(id="b", label="B", depends_on=["a"]),
+        Node(id="c", label="C", depends_on=["b"]),
+    ])
+
+
+def test_swarm_result_timing_defaults_to_none_for_positional_construction():
+    graph = _chain()
+    assert SwarmResult("done", graph).timing is None
+
+
+@pytest.mark.parametrize("parallel", [False, True])
+def test_execute_task_reports_elapsed_time_phases_and_one_segment(tmp_path, parallel):
+    clock = ManualClock()
+    store = FileCheckpointStore(tmp_path)
+    swarm = _clocked(Swarm(model="m", provider=_ClockedProvider(clock), parallel=parallel,
+                           checkpoint_store=store, artifact_dir=None), clock)
+
+    result = swarm.execute(Task(goal="Do the thing"))
+
+    timing = result.timing
+    assert timing["clock"] == "monotonic"
+    assert timing["elapsed_ms"] == 3000
+    assert timing["summed_node_ms"] == 1000
+    assert timing["phases_ms"] == {
+        "routing": None, "planning": 2000.0, "recovery": None, "execution": 1000.0,
+        "verification": 0.0, "synthesis": 0.0, "supervision": 0.0, "checkpoint": 0.0,
+        "waiting": 0.0,
+    }
+    assert (timing["latency_complete"], timing["resumed"]) == (True, False)
+    [segment] = timing["segments"]
+    assert segment["started_at"] == 1000.0
+    assert segment["ended_at"] == 1003.0
+    assert segment["elapsed_ms"] == 3000
+    assert segment["resumed"] is False
+    saved = store.load(result.execution_id)
+    assert saved["version"] == 4
+    assert saved["timing"] == {"version": 1, "clock": "monotonic", "segments": [segment]}
+
+
+def test_router_time_is_reported_when_execute_routes_in_the_same_call():
+    clock = ManualClock()
+    provider = _ClockedProvider(clock)
+    router = WhiteRabbit(
+        autonomous=LLMArchitect(provider=provider, planning_model="planner"),
+        classifier_provider=provider, classifier_model="classifier",
+    )
+    swarm = _clocked(Swarm(model="m", provider=provider, router=router, artifact_dir=None), clock)
+
+    timing = swarm.execute(Task(goal="Do the thing")).timing
+
+    assert timing["phases_ms"]["routing"] == 500
+    assert timing["phases_ms"]["planning"] == 2000
+    assert timing["elapsed_ms"] == 3500
+
+
+@pytest.mark.parametrize("parallel", [False, True])
+def test_execute_plans_a_task_through_an_overridden_plan_method(parallel):
+    class ReviewedSwarm(Swarm):
+        def plan(self, task):
+            self.planned.append(task.goal)
+            graph = ExecutionGraph(topology=[Topology.SERIAL], nodes=[Node(id="reviewed", label="Reviewed step")])
+            graph.task = task
+            return graph
+
+        async def aplan(self, task):
+            return self.plan(task)
+
+    swarm = ReviewedSwarm(model="m", provider=MockProvider(), parallel=parallel, artifact_dir=None)
+    swarm.planned = []
+
+    result = swarm.execute(Task(goal="Do the thing"))
+
+    assert swarm.planned == ["Do the thing"]
+    assert [node.id for node in result.graph.nodes] == ["reviewed"]
+    assert result.timing["phases_ms"]["planning"] is not None
+
+
+@pytest.mark.parametrize("parallel", [False, True])
+def test_a_graph_planned_in_another_call_reports_planning_as_not_measured(parallel):
+    clock = ManualClock()
+    swarm = _clocked(Swarm(model="m", provider=_ClockedProvider(clock), parallel=parallel,
+                           artifact_dir=None), clock)
+    graph = swarm.plan(Task(goal="Do the thing"))
+    clock.advance(60)
+
+    timing = swarm.execute(graph).timing
+
+    assert (timing["phases_ms"]["routing"], timing["phases_ms"]["planning"]) == (None, None)
+    assert timing["elapsed_ms"] == 1000
+
+
+def test_checkpoint_writes_are_measured_as_checkpoint_time(tmp_path):
+    clock = ManualClock()
+
+    class SlowStore(FileCheckpointStore):
+        def save(self, execution_id, state):
+            clock.advance(0.25)
+            super().save(execution_id, state)
+
+    store = SlowStore(tmp_path)
+    swarm = _clocked(Swarm(model="m", provider=_ClockedProvider(clock), parallel=True,
+                           checkpoint_store=store, artifact_dir=None), clock)
+
+    result = swarm.execute(_chain())
+
+    # The initial save, one per node, and the completed save.
+    assert result.timing["phases_ms"]["checkpoint"] == 1250
+    assert result.timing["elapsed_ms"] == 4250
+
+
+def _crash_then_resume(tmp_path, *, parallel=True):
+    store = FileCheckpointStore(tmp_path)
+    first = ManualClock(start_ns=1_000 * 10**9, monotonic_ns=7_000_000 * 10**9)
+    crashed = _clocked(Swarm(model="m", provider=_ClockedProvider(first, crash_on="B"),
+                             parallel=parallel, checkpoint_store=store, artifact_dir=None), first)
+    with pytest.raises(RuntimeError, match="process died"):
+        crashed.execute(_chain())
+    [execution_id] = store.list_ids()
+    # A new process: a later wall clock, and a monotonic clock that starts
+    # far below the first process's readings.
+    second = ManualClock(start_ns=4_600 * 10**9, monotonic_ns=0)
+    resumed = _clocked(Swarm(model="m", provider=_ClockedProvider(second), parallel=parallel,
+                             checkpoint_store=store, artifact_dir=None), second)
+    return store, execution_id, resumed
+
+
+def test_resume_records_a_separate_segment_without_comparing_process_clocks(tmp_path):
+    store, execution_id, resumed = _crash_then_resume(tmp_path)
+    crashed_segments = store.load(execution_id)["timing"]["segments"]
+
+    result = resumed.resume(execution_id)
+
+    first, second = result.timing["segments"]
+    assert first == crashed_segments[0]
+    assert (first["started_at"], first["ended_at"], first["elapsed_ms"]) == (1000.0, 1002.0, 2000)
+    assert first["resumed"] is False
+    assert first["phases_ms"]["execution"] == 2000  # A, and B's failed attempt
+    assert (second["started_at"], second["ended_at"], second["elapsed_ms"]) == (4600.0, 4602.0, 2000)
+    assert second["resumed"] is True
+    assert second["phases_ms"]["recovery"] == 0
+    timing = result.timing
+    assert timing["elapsed_ms"] == 2000
+    assert (timing["latency_complete"], timing["resumed"]) == (False, True)
+    assert store.load(execution_id)["timing"]["segments"] == [first, second]
+
+
+def test_resuming_a_completed_checkpoint_reports_this_call_without_saving(tmp_path):
+    store, execution_id, resumed = _crash_then_resume(tmp_path)
+    resumed.resume(execution_id)
+    saved = store.load(execution_id)
+
+    again = resumed.resume(execution_id)
+
+    assert again.timing["resumed"] is True
+    assert again.timing["latency_complete"] is False
+    assert again.timing["phases_ms"]["recovery"] == 0
+    assert again.timing["segments"][:2] == saved["timing"]["segments"]
+    assert len(again.timing["segments"]) == 3
+    assert store.load(execution_id) == saved
+
+
+@pytest.mark.parametrize("block", [
+    "missing", None, "garbage", {"version": 2, "segments": []},
+    {"version": 1, "segments": "garbage"}, {"version": 1, "segments": [1]},
+])
+def test_resume_starts_new_timing_when_the_saved_block_is_missing_or_unreadable(tmp_path, block):
+    store, execution_id, resumed = _crash_then_resume(tmp_path)
+    state = store.load(execution_id)
+    if block == "missing":
+        del state["timing"]
+    else:
+        state["timing"] = block
+    store.save(execution_id, state)
+
+    result = resumed.resume(execution_id)
+
+    [segment] = result.timing["segments"]
+    assert segment["resumed"] is True
+    assert store.load(execution_id)["timing"]["segments"] == [segment]

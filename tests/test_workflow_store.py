@@ -12,10 +12,12 @@ import threading
 
 import pytest
 
-from smythe.pricing import PRICE_VERSION
+from fakes import MessagesTransport, release_price_version
+from smythe import pricing_anthropic
+from smythe.pricing import PRICE_VERSION, price_table
 from smythe.workflow_store import (
     CallKey, OFFLINE_PRICE_VERSION, SQLiteWorkflowStore, WorkflowBudgetError,
-    WorkflowConflictError, WorkflowCorruptionError, WorkflowLeaseError,
+    WorkflowConflictError, WorkflowCorruptionError, WorkflowLeaseError, WorkflowNotFoundError,
     WorkflowStateError, WorkflowValidationError,
 )
 
@@ -44,14 +46,17 @@ def journal(tmp_path):
     store.close()
 
 
-def prepare(store, lease, scope="worker", *, offline=False, output_cap=100):
+def prepare(store, lease, scope="worker", *, offline=False, output_cap=100, model="gpt-6-astra",
+            price_version=None):
     provider = {"kind": "offline" if offline else "openai_responses",
                 "adapter_version": "test-v1", "decoder_version": "test-v1"}
-    request = {"model": "gpt-6-astra", "service_tier": "default", "max_output_tokens": output_cap,
+    request = {"model": model, "service_tier": "default", "max_output_tokens": output_cap,
                "instructions": "test", "reasoning": {"effort": "medium"}, "store": False,
                "truncation": "disabled", "input": [{"role": "user", "content": "PRIVATE REQUEST encrypted_content secret"}]}
+    if price_version is None:
+        price_version = OFFLINE_PRICE_VERSION if offline else PRICE_VERSION
     return store.prepare_call(lease, CallKey("execution", scope), request_json=canonical(request),
-                              provider=provider, price_version=OFFLINE_PRICE_VERSION if offline else PRICE_VERSION)
+                              provider=provider, price_version=price_version)
 
 
 def envelope(call, raw, operation="response", **metadata):
@@ -813,3 +818,246 @@ def test_later_call_lookup_covers_later_attempts_and_turns_of_one_invocation(jou
     assert not store.has_later_call("run", CallKey("verification", "worker"))
     with pytest.raises(WorkflowValidationError):
         store.has_later_call("run", {"phase": "execution", "scope_id": "worker"})
+
+
+NEXT_VERSION = "openai-native-standard-global-2099-01-01-v2"
+
+
+def release_next_prices(monkeypatch, change):
+    """Release a price version that doubles Astra's rates, or one without Astra."""
+    rates = dict(price_table().rates)
+    if change == "price":
+        rates["gpt-6-astra"] = replace(rates["gpt-6-astra"], ordinary=20_000, output=100_000)
+    else:
+        del rates["gpt-6-astra"]
+        rates["gpt-7-test"] = rates["gpt-5.6-sol"]
+    return release_price_version(monkeypatch, version=NEXT_VERSION, rates=rates)
+
+
+def stored_receipts(store):
+    with closing(sqlite3.connect(store.path)) as db, db:
+        return dict(db.execute("SELECT call_id, receipt_json FROM workflow_calls").fetchall())
+
+
+@pytest.mark.parametrize("change", ["price", "models"])
+def test_saved_calls_stay_readable_and_settle_at_their_price_version_after_a_release(
+    journal, monkeypatch, change,
+):
+    store, lease, _ = journal
+    applied = accepted(store, lease, "applied")
+    store.save_checkpoint(lease, 0, {}, consumed_call_ids=[applied["call_id"]])
+    reserved = prepare(store, lease, "reserved")
+    store.reserve_call(lease, reserved["call_id"], quote(store, lease, reserved)["quote_id"])
+    saved = prepare(store, lease, "saved")
+    evidence_id = store.append_response(dispatch(store, lease, saved), envelope(saved, response()))
+    receipts = stored_receipts(store)
+    release_next_prices(monkeypatch, change)
+
+    assert store.lookup_call("run", CallKey("execution", "applied"))["price_version"] == PRICE_VERSION
+    inspected = store.inspect_run("run")
+    assert inspected["call_count"] == 3 and inspected["confirmed_nanousd"] == 1_060_000
+    # Each saved quote is recomputed at the rates of the version it recorded.
+    assert store.audit("run")["reserved_nanousd"] == 2 * 6_250_000
+    assert store.load_replay(applied["call_id"])["decoded_result"] == {"text": "PRIVATE DECODED"}
+    with SQLiteWorkflowStore(store.path, read_only=True) as reader:
+        assert reader.audit("run")["call_count"] == 3
+    assert store.recover(lease)["settle"] == [saved["call_id"]]
+    # Settling a known call again compares its stored receipt byte for byte.
+    assert store.settle_call(lease, applied["call_id"], applied["evidence_id"])["receipt"] == applied["receipt"]
+    record = store.settle_call(lease, saved["call_id"], evidence_id)
+    assert record["cost_nanousd"] == 1_060_000 and record["receipt"]["price_version"] == PRICE_VERSION
+    assert stored_receipts(store)[applied["call_id"]] == receipts[applied["call_id"]]
+
+    # Only a new call needs the current version and a model it prices.
+    with pytest.raises(WorkflowValidationError, match="price version"):
+        prepare(store, lease, "new-at-old-version")
+    if change == "price":
+        new = prepare(store, lease, "new", price_version=NEXT_VERSION)
+        assert quote(store, lease, new)["ceiling_nanousd"] == 12_000_000
+    else:
+        with pytest.raises(WorkflowValidationError, match="billing identity"):
+            prepare(store, lease, "new", price_version=NEXT_VERSION)
+        new = prepare(store, lease, "new", price_version=NEXT_VERSION, model="gpt-7-test")
+        assert quote(store, lease, new)["ceiling_nanousd"] == 2_500_000
+    assert store.audit("run")["call_count"] == 4
+
+
+def test_retired_model_admits_no_new_call_while_saved_calls_replay(journal, monkeypatch):
+    store, lease, clock = journal
+    call = accepted(store, lease)
+    # The journal clock reads 1970-01-01; Astra retires the next day.
+    release_price_version(monkeypatch, version=NEXT_VERSION, retired_on={"gpt-6-astra": "1970-01-02"})
+    assert prepare(store, lease, "before", price_version=NEXT_VERSION)["state"] == "prepared"
+    clock.advance(86_400)
+    lease = store.acquire_lease("run", "owner")
+    with pytest.raises(WorkflowValidationError, match="retired"):
+        prepare(store, lease, "after", price_version=NEXT_VERSION)
+    assert prepare(store, lease, "other", price_version=NEXT_VERSION, model="gpt-5.6-sol")["state"] == "prepared"
+    assert prepare(store, lease)["call_id"] == call["call_id"]
+    assert store.settle_call(lease, call["call_id"], call["evidence_id"])["cost_nanousd"] == 1_060_000
+    assert store.audit("run")["call_count"] == 3
+
+
+def test_saved_call_never_sent_is_not_sent_after_its_model_retires(journal, monkeypatch):
+    store, lease, clock = journal
+    applied = accepted(store, lease, "applied")
+    sent = prepare(store, lease, "sent")
+    evidence_id = store.append_response(dispatch(store, lease, sent), envelope(sent, response()))
+    prepared = prepare(store, lease, "prepared")
+    quoted = prepare(store, lease, "quoted")
+    quoted_id = quote(store, lease, quoted)["quote_id"]
+    reserved = prepare(store, lease, "reserved")
+    store.reserve_call(lease, reserved["call_id"], quote(store, lease, reserved)["quote_id"])
+    released = prepare(store, lease, "released")
+    released_id = quote(store, lease, released)["quote_id"]
+    store.release_before_dispatch(lease, released["call_id"], "test")
+    unsent = {"prepared": prepared, "quoted": quoted, "reserved": reserved, "released": released}
+    # The journal clock reads 1970-01-01; Astra retires the next day.
+    release_price_version(monkeypatch, version=NEXT_VERSION, retired_on={"gpt-6-astra": "1970-01-02"})
+    assert prepare(store, lease, "prepared", price_version=NEXT_VERSION)["call_id"] == prepared["call_id"]
+    clock.advance(86_400)
+    lease = store.acquire_lease("run", "owner")
+
+    for scope in unsent:
+        for version in (PRICE_VERSION, NEXT_VERSION):
+            with pytest.raises(WorkflowValidationError, match="retired"):
+                prepare(store, lease, scope, price_version=version)
+    for call, quote_id in ((quoted, quoted_id), (released, released_id)):
+        with pytest.raises(WorkflowValidationError, match="retired"):
+            store.reserve_call(lease, call["call_id"], quote_id)
+    with pytest.raises(WorkflowValidationError, match="retired"):
+        store.claim_dispatch(lease, reserved["call_id"], reserved["request_sha256"])
+    for scope, call in unsent.items():
+        record = store.lookup_call("run", CallKey("execution", scope))
+        assert (record["state"], record["price_version"]) == (scope, PRICE_VERSION)
+    assert set(store.recover(lease)["undispatched"]) == {call["call_id"] for call in unsent.values()}
+    store.release_before_dispatch(lease, reserved["call_id"], "model retired")
+
+    # Calls already sent still replay and settle at the version they recorded.
+    assert prepare(store, lease, "applied", price_version=NEXT_VERSION)["call_id"] == applied["call_id"]
+    assert prepare(store, lease, "sent", price_version=NEXT_VERSION)["state"] == "response_saved"
+    record = store.settle_call(lease, sent["call_id"], evidence_id)
+    assert record["cost_nanousd"] == 1_060_000 and record["receipt"]["price_version"] == PRICE_VERSION
+    audit = store.audit("run")
+    assert (audit["call_count"], audit["confirmed_nanousd"], audit["reserved_nanousd"]) == (6, 2_120_000, 0)
+
+
+def test_saved_messages_call_settles_at_its_recorded_price_version(journal, monkeypatch):
+    store, lease, _ = journal
+    recorded = pricing_anthropic.PRICE_VERSION
+    request = {"model": pricing_anthropic.MODEL, "system": "test", "max_tokens": 100,
+               "messages": [{"role": "user", "content": "PRIVATE REQUEST"}],
+               "service_tier": "standard_only", "output_config": {"effort": "medium"}}
+    provider = {"kind": "anthropic_messages", "adapter_version": "anthropic-messages-v1",
+                "decoder_version": "anthropic-messages-v1", "endpoint_scope": "global"}
+    call = store.prepare_call(lease, CallKey("execution", "messages"), request_json=canonical(request),
+                              provider=provider, price_version=recorded)
+    ceiling = quote(store, lease, call, count=170)
+    assert ceiling["ceiling_nanousd"] == 29_220_000
+    store.reserve_call(lease, call["call_id"], ceiling["quote_id"])
+    permit = store.claim_dispatch(lease, call["call_id"], call["request_sha256"])
+    raw = MessagesTransport._response(1, request, "PRIVATE OUTPUT")
+    evidence_id = store.append_response(permit, envelope(call, raw))
+    rates = {pricing_anthropic.MODEL: {**pricing_anthropic.RATES, "output": 100_000}}
+    release_price_version(monkeypatch, "anthropic_messages", version="anthropic-test-v2", rates=rates)
+    record = store.settle_call(lease, call["call_id"], evidence_id)
+    assert record["cost_nanousd"] == 2_535_000 and record["receipt"]["price_version"] == recorded
+    assert record["receipt"]["categories"]["output"]["rate_nanousd_per_token"] == 50_000
+    audit = store.audit("run")
+    assert (audit["confirmed_nanousd"], audit["reserved_nanousd"]) == (2_535_000, 0)
+    with pytest.raises(WorkflowValidationError, match="price version"):
+        store.prepare_call(lease, CallKey("execution", "messages-new"), request_json=canonical(request),
+                           provider=provider, price_version=recorded)
+
+
+def test_saved_call_replays_under_its_recorded_price_version_after_a_release(journal, monkeypatch):
+    store, lease, _ = journal
+    request_json = prepare(store, lease)["request_json"]
+    described = {"kind": "openai_responses", "adapter_version": "test-v1", "decoder_version": "test-v1",
+                 "endpoint_scope": "global", "price_version": PRICE_VERSION,
+                 "supported_models": ["gpt-5.6-sol", "gpt-6-astra"], "config": {"max_output_tokens": 100}}
+
+    def call(scope, provider, version, body=request_json):
+        return store.prepare_call(lease, CallKey("execution", scope), request_json=body,
+                                  provider=provider, price_version=version)
+
+    saved = call("saved", described, PRICE_VERSION)
+    evidence_id = store.append_response(dispatch(store, lease, saved), envelope(saved, response()))
+    unsent = call("unsent", described, PRICE_VERSION)
+    release_next_prices(monkeypatch, "price")
+    current = {**described, "price_version": NEXT_VERSION}
+    for scope, original in (("saved", saved), ("unsent", unsent)):
+        replayed = call(scope, current, NEXT_VERSION)
+        assert replayed["call_id"] == original["call_id"] and replayed["price_version"] == PRICE_VERSION
+        assert replayed["binding_sha256"] == original["binding_sha256"]
+    # A call that was never sent is still quoted at the version it recorded.
+    assert quote(store, lease, unsent)["ceiling_nanousd"] == 6_250_000
+    assert store.settle_call(lease, saved["call_id"], evidence_id)["cost_nanousd"] == 1_060_000
+    changed_request = canonical({**json.loads(request_json), "instructions": "changed"})
+    for provider, version, body in (
+        ({**current, "adapter_version": "test-v2"}, NEXT_VERSION, request_json),
+        ({**current, "config": {"max_output_tokens": 50}}, NEXT_VERSION, request_json),
+        ({**current, "price_version": "unregistered"}, "unregistered", request_json),
+        (current, NEXT_VERSION, changed_request),
+    ):
+        with pytest.raises(WorkflowConflictError):
+            call("saved", provider, version, body)
+    assert store.audit("run")["call_count"] == 3
+
+
+def test_superseded_node_calls_lists_settled_calls_of_earlier_generations(journal):
+    store, lease, _ = journal
+    template = prepare(store, lease, "template")
+
+    def node_call(phase, scope, generation, result, invocation=0):
+        call = store.prepare_call(lease, CallKey(phase, scope, generation, invocation),
+                                  request_json=template["request_json"], provider=template["provider"],
+                                  price_version=PRICE_VERSION)
+        if result != "prepared":
+            evidence_id = store.append_response(dispatch(store, lease, call), envelope(call, response()))
+            store.settle_call(lease, call["call_id"], evidence_id)
+        if result == "accepted":
+            store.accept_result(lease, call["call_id"], {"text": "ok"}, "test-v1")
+        elif result == "rejected":
+            store.reject_result(lease, call["call_id"], "unusable")
+        return call["call_id"]
+
+    applied = node_call("execution", "node/a", 0, "accepted")
+    store.save_checkpoint(lease, 0, {}, consumed_call_ids=[applied])
+    expected = {applied, node_call("execution", "node/a", 0, "accepted", invocation=1),
+                node_call("verification", "node/a", 0, "rejected")}
+    node_call("execution", "node/a", 0, "settled", invocation=2)
+    node_call("execution", "node/a", 0, "prepared", invocation=3)
+    node_call("execution", "node/a", 1, "accepted")
+    node_call("supervision", "node/a", 0, "accepted")
+    node_call("execution", "node/b", 0, "accepted")
+    node_call("execution", "node/removed", 0, "accepted")
+    assert set(store.superseded_node_calls("run", {"a": 1, "b": 0})) == expected
+    # Journal order; this clock never advances, so creation times tie.
+    later = store.superseded_node_calls("run", {"a": 2, "b": 1})
+    assert len(later) == 5 and later == sorted(later)
+    # Before any regeneration there is nothing to read, even for another run.
+    assert store.superseded_node_calls("missing", {"a": 0}) == []
+    with pytest.raises(WorkflowNotFoundError):
+        store.superseded_node_calls("missing", {"a": 1})
+    for invalid in ([("a", 1)], {"a": True}, {"a": -1}):
+        with pytest.raises(WorkflowValidationError):
+            store.superseded_node_calls("run", invalid)
+def test_lease_sessions_report_journal_clock_bounds_without_writing(journal):
+    store, lease, clock = journal
+    clock.advance(5)
+    store.release_lease(lease)
+    clock.advance(10)
+    store.acquire_lease("run", "lost", ttl_s=30)  # Never released: its process died.
+    clock.advance(40)
+    store.acquire_lease("run", "next", ttl_s=30)
+    clock.advance(2)
+
+    with SQLiteWorkflowStore(store.path, read_only=True, clock_ns=clock) as reader:
+        record = reader.lease_sessions("run")
+
+    assert record == {"created_ns": 1_000_000_000, "now_ns": 58_000_000_000, "sessions": [
+        {"epoch": 1, "started_ns": 1_000_000_000, "ended_ns": 6_000_000_000, "interrupted": False},
+        {"epoch": 2, "started_ns": 16_000_000_000, "ended_ns": 16_000_000_000, "interrupted": True},
+        {"epoch": 3, "started_ns": 56_000_000_000, "ended_ns": 58_000_000_000, "interrupted": False},
+    ]}

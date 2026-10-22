@@ -1,19 +1,24 @@
 """Offline native billing fixtures; no SDK object coercions or provider calls."""
 
 from copy import deepcopy
-from dataclasses import FrozenInstanceError
+from dataclasses import FrozenInstanceError, replace
+from datetime import date
 from decimal import Decimal, Inexact, localcontext
 import json
+from types import MappingProxyType
 
 import pytest
 
+from fakes import release_price_version
 from smythe.pricing import (
     LONG_CONTEXT_THRESHOLD,
     PRICE_SOURCES,
     PRICE_VERSION,
     SUPPORTED_MODELS,
+    PriceTable,
     conservative_quote,
     price_native_response,
+    price_table,
 )
 
 
@@ -366,3 +371,38 @@ def test_known_text_charge_survives_adapter_semantic_output_validation(output):
     raw = response()
     raw["output"] = output
     assert price_native_response(raw).cost_is_complete
+
+
+def test_earlier_price_versions_keep_their_rates_receipts_and_quotes(monkeypatch):
+    before = price_native_response(response()).safe_summary()
+    quote = conservative_quote(100, 10, "gpt-6-astra")
+    old = price_table()
+    rates = {**old.rates, "gpt-6-astra": replace(old.rates["gpt-6-astra"], output=100_000)}
+    new = release_price_version(monkeypatch, version="openai-test-v2", rates=rates)
+    assert price_table() is new and price_table(PRICE_VERSION) is old
+    historical = price_native_response(response(), price_version=PRICE_VERSION)
+    assert historical.safe_summary() == before
+    assert historical.sources == PRICE_SOURCES and historical.price_checked_on == "2026-09-07"
+    current = price_native_response(response())
+    assert current.cost_nanousd == before["cost_nanousd"] + 40 * 50_000
+    assert current.safe_summary()["price_version"] == "openai-test-v2"
+    assert conservative_quote(100, 10, "gpt-6-astra", price_version=PRICE_VERSION) == quote
+    assert conservative_quote(100, 10, "gpt-6-astra") == quote + Decimal("0.0005")
+    for unregistered in ("openai-unknown-v9", 1):
+        with pytest.raises(ValueError, match="not registered"):
+            price_native_response(response(), price_version=unregistered)
+        with pytest.raises(ValueError, match="not registered"):
+            conservative_quote(1, 1, "gpt-6-astra", price_version=unregistered)
+
+
+def test_retirement_dates_gate_admission_without_removing_prices():
+    card = price_table().rates["gpt-6-astra"]
+    table = PriceTable("test-v1", "2026-01-01", (), MappingProxyType({"model": card}),
+                       MappingProxyType({"model": "2026-10-01"}))
+    assert table.models == ("model",) and table.prices("model")
+    assert table.admits("model", date(2026, 9, 30))
+    assert not table.admits("model", date(2026, 10, 1))
+    assert not table.admits("other", date(2026, 1, 1))
+    assert not table.admits(["model"], date(2026, 1, 1)) and not table.prices(None)
+    assert price_table().admits("gpt-6-astra", date(2100, 1, 1))
+    assert SUPPORTED_MODELS == price_table().models

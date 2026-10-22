@@ -24,6 +24,64 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
 
 ## [Unreleased]
 
+### Added
+
+- Shared offline test fakes. `tests/fakes.py` has Responses and Messages SDK
+  wire fakes with request logs and failure schedules, a manual clock, crash
+  images and helpers that hard-kill a child process.
+  `tests/fixture_service.py` is a fake external service that can commit a
+  request and lose its acknowledgement, receive duplicate or reordered
+  deliveries, and report its own state for comparison with what the caller
+  saw.
+- A [support matrix](docs/support-matrix.md) lists the providers, verifiers,
+  tools, stores and Jobs profiles that ordinary runs, durable text workflows
+  and Jobs accept, how each path records cost and who calls again after a
+  failure, and names the test behind each cell.
+  `tests/test_support_matrix.py` checks that every unsupported provider or
+  component on a durable run, and every artifact a Jobs profile cannot
+  produce, is refused before any provider call, and runs an ordinary `Swarm`
+  with `AnthropicMessagesProvider`. A repository test checks that every test
+  the page cites exists.
+- Elapsed-time records for ordinary runs. `SwarmResult.timing` reports a
+  call's elapsed time on a monotonic clock beside its summed node time, the
+  time spent in routing, planning, recovery, execution, verification,
+  supervision, synthesis, checkpoint writes and waiting, and waits for retry
+  backoff, admission and supervisor reviews. Routing and planning are
+  measured only when `execute(Task)` plans in the same call. Checkpoints keep
+  one segment per call in a new top-level `timing` block and stay at version
+  4; a resumed run adds its own segment rather than comparing clocks across
+  processes. Trace spans record their attempt index, phase and outcome, and
+  `Tracer.timing()` and `Tracer(clock=..., wall_clock=...)` expose the
+  measurements and clocks. `Tracer.summary()` and `SwarmResult.trace` keep
+  their keys.
+- `PlannerMemory` records each run's elapsed time beside its summed node
+  time. New `ExecutionOutcome` fields `elapsed_ms`, `latency_complete`,
+  `resumed`, `cost_is_complete`, `cost_contains_estimates` and `acceptance`
+  default to `None`, meaning not recorded, so existing history recalls
+  unchanged; new records set `acceptance` to `"not_evaluated"`. Recall skips
+  rows whose new fields are malformed. `total_duration_ms` and the planner
+  prompt's "Summed node time" are unchanged.
+- Durable `run_store` results report `SwarmResult.timing` from the journal's
+  wall-clock event times, which relate calls in different processes: one
+  segment per lease session, the call's elapsed time, the wall time since the
+  run was created, and whether a session ended without releasing its lease.
+  `SQLiteWorkflowStore.lease_sessions()` returns the same session bounds.
+
+### Changed
+
+- A durable run's `WorkflowBindingError` names the argument it refuses:
+  `run_store` and `verifier`, with the type that was passed, `memory`,
+  `tool_runtime` or `checkpoint_store`. One message used to cover memory,
+  tools and the checkpoint store. The exception is still a `ValueError`.
+- Trace span durations come from a monotonic clock, so a wall-clock
+  adjustment during an attempt no longer distorts a span's `duration_ms` or
+  `PlannerMemory`'s summed node time. `start_time` and `end_time` remain
+  wall-clock seconds.
+- The package audit's size limits are 600,000 bytes for the wheel and
+  2,000,000 bytes for the compressed source archive, up from 400,000 and
+  1,000,000, to fit delivery acceptance, recorded tools and context, and
+  their tests.
+
 ### Fixed
 
 - Nine retained evidence archives no longer carry local user paths: the Astra
@@ -42,6 +100,116 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   the arm cost totals; the analysis now adds those values left to right, as
   earlier Pythons did. A test recomputes the committed analysis from the
   archive and requires an exact match.
+- The durable workflow guide lists `AnthropicMessagesProvider` with
+  `claude-fable-5-1` among its supported providers instead of calling that
+  support planned. The verification guide states that a gate node makes its
+  own provider call even when a `CallableVerifier` computes the verdict. The
+  architecture guide no longer says that `PlannerMemory` keeps distilled
+  templates or that ordinary artifact records carry hashes, and the Jobs guide
+  states that the per-attempt idempotency key is a local correlation key sent
+  to no provider. The MCP guide states that a serial run checks the budget cap
+  after each billed tool-loop turn, so the turn that crosses the cap is paid
+  for.
+- `CallableVerifier` fails closed. Only `True`, `False`, a `Verdict` whose
+  `passed` is a bool, or an object with a bool `passed` attribute, such as a
+  `ValidationReport`, decides a gate. Any other result used to count as a pass
+  when truthy, so the string `"FAIL"`, a non-empty list of findings, a
+  `ValidationReport` with hard findings, and an `async def` function's
+  unawaited coroutine all passed. Such results now fail, and the verdict's
+  reason names the returned type; the coroutine is closed. A function that
+  returned a truthy non-bool to pass, such as `1` or a NumPy boolean, must
+  now return `bool(...)`.
+- A gate passes only when its verifier's verdict has `passed` exactly `True`.
+  The executor tested truthiness, so a custom verifier's
+  `Verdict(passed="false")` passed. Any other value is now a failed verdict,
+  and its reason states that `passed` must be a bool.
+- A custom verifier whose failed `Verdict` has no text reason, such as
+  `Verdict(passed=False, reason=None)`, sends its target back for another
+  try. The run used to stop with `VerificationRecoveryError` because the
+  saved regeneration intent required a text reason; a missing reason is now
+  empty and any other value is described by its type.
+- A failed attempt's trace span now has status `failed` instead of `running`.
+  Serial and parallel execution recorded every attempt that raised as still
+  running, whether the node then retried, was skipped or stopped the run, and
+  serial execution did the same for terminal errors such as a budget alert.
+  The node itself still counts as running between retries, and the keys of
+  `Tracer.summary()` are unchanged.
+- `PlannerMemory` takes each node's `duration_ms` from that node's final
+  attempt, so a retried node no longer reports the time of its first, failed
+  attempt. `total_duration_ms` still sums every recorded span, and planner
+  prompts still label it "Summed node time".
+- Executors accept only a finite, non-negative number for `retry_backoff_s`
+  and raise `ValueError` otherwise, as durable workflows already did. `True`
+  used to act as a one-second backoff, and NaN or infinity failed a serial
+  retry or stalled an async retry indefinitely.
+- `Swarm` without a `run_store` rejects an invalid `max_concurrency`,
+  `max_revisions` or `retry_backoff_s` with `ValueError` when it is
+  constructed, using the executor's rules. Such a value used to surface only
+  when the executor was built, after the router's classifier and the planner
+  had already been called. Durable runs already rejected these values before
+  routing or planning. A serial `Swarm` (`parallel=False`) with
+  `max_concurrency=0` used to run because serial execution ignores that value;
+  it is now rejected too.
+- `OpenAIImageProvider` raises `ValueError` for a request with image
+  attachments, such as a node with `attach_dep_artifacts=True` whose
+  dependencies produced images, instead of sending, and paying for, the
+  request without them. The message matches the one Jobs already gives when
+  it refuses OpenAI image attachments.
+- `ConstrainedArchitect` copies its template list when it is constructed and
+  raises `ValueError` for duplicate template names. It used to keep the
+  caller's list, so changing that list later changed the menu shown to the
+  model but not the templates it could select, and a selection from the
+  changed menu failed and was retried as a new paid call. With duplicate
+  names, the menu listed every template, but only the last one with a name
+  could be built.
+- `distill_template` keeps verification gates and execution policies. A
+  distilled node now carries its `verifies` target, `max_regenerations`,
+  `failure_policy`, `max_retries`, `timeout_s`, `attach_dep_artifacts` and
+  metadata `role`. Previously a distilled judge stopped gating, so its
+  target was never regenerated and `DELIVERABLE` synthesis returned the
+  verdict instead of the approved output. Distilling a graph in which a node
+  verifies a missing node or itself raises `DistillationError`.
+- Jobs preflight rejects an artifact the profile cannot produce, so
+  `jobs validate`, `jobs plan` and `jobs run` fail before a run is created.
+  An `offline` profile emits 1x1 PNGs and now requires `image/png` with no
+  dimensions or 1x1; another MIME type or size used to pass preflight and
+  then fail every attempt. A `gemini_image` profile now requires a PNG,
+  JPEG, GIF or WebP artifact; a manifest declaring, for example,
+  `application/pdf` used to be approved and then had every paid image
+  rejected.
+- A durable workflow journal stays readable after a release adds a price
+  version or changes the supported models. Every saved call was checked
+  against the current price version, model list and request rules, so after
+  such a change `lookup_call`, `inspect_run`, `audit` and recovery raised
+  `WorkflowCorruptionError` for every existing run. A saved call is now
+  verified by recomputing its stored binding, needs only a registered price
+  version that prices its model, and is quoted and settled at that version's
+  rates; its stored receipt is unchanged. Price tables are registered by
+  version in `smythe.pricing.PRICE_TABLES` and
+  `smythe.pricing_anthropic.PRICE_TABLES`, and the providers' model lists
+  come from the current table. A new call still needs the current version.
+  A retirement date in the current table stops new calls to that model and
+  the sending of saved calls to it that were never sent; calls already sent
+  still settle and replay.
+- A durable run saved before a release that adds a price version or a
+  supported model resumes. The saved recipe embeds each provider's price
+  version and model list, and resume compared the recipe exactly, so it
+  raised `WorkflowConflictError`; a call prepared before the release raised
+  the same error when its node ran again. A saved provider description may
+  now name any registered price version and a different model list, while
+  every other recipe field still compares exactly. Saved calls replay and
+  decode at the price version they recorded, including calls not yet sent
+  to a model that has not retired, and new calls use the current version.
+  Recipes keep their bytes.
+- Saving a durable checkpoint no longer audits the whole journal. Each save
+  called `inspect_run`, which verified every call, evidence row and earlier
+  checkpoint and loaded every event, so checkpoint cost grew with the run's
+  history and a long run's total grew quadratically or worse. To find the
+  calls of regenerated nodes, a save now reads only the keys of settled
+  calls, through the new `SQLiteWorkflowStore.superseded_node_calls`, and
+  reads nothing until a node has been regenerated. It consumes the same
+  calls as before, and each plan, execute or resume entry still audits the
+  journal once when it starts.
 
 ## [0.9.1] - 2026-09-29
 

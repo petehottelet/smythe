@@ -8,6 +8,8 @@ from unittest.mock import AsyncMock
 
 import pytest
 
+from fakes import release_price_version
+from smythe.pricing import PRICE_VERSION, price_table
 from smythe.provider import (
     OfflineProvider, OpenAIProvider, ProviderAccountingCancelledError,
     ProviderAccountingError, ProviderResponseError,
@@ -20,7 +22,7 @@ from smythe.workflow_provider import (
 )
 from smythe.workflow_store import (
     CallKey, SQLiteWorkflowStore, WorkflowBudgetError, WorkflowConflictError, WorkflowError,
-    WorkflowLeaseError,
+    WorkflowLeaseError, WorkflowValidationError,
 )
 
 MODEL = "gpt-6-astra"
@@ -103,6 +105,55 @@ async def invoke(journal, source=None, *, key=KEY, prompt="Question", model=MODE
         return await context.for_call("main", key).complete("System", prompt, model)
 
 
+def test_saved_response_decodes_at_its_recorded_price_version_after_a_release(journal, transport, monkeypatch):
+    store, lease = journal
+    original = OpenAIResponsesProvider.decode
+
+    def stopped(envelope, *args, **kwargs):
+        raise RuntimeError("Process stopped before decoding")
+
+    monkeypatch.setattr(OpenAIResponsesProvider, "decode", staticmethod(stopped))
+    with pytest.raises(ProviderAccountingError):
+        asyncio.run(invoke(journal))
+    monkeypatch.setattr(OpenAIResponsesProvider, "decode", staticmethod(original))
+    saved = store.lookup_call(lease.run_id, KEY)
+    assert (saved["billing_state"], saved["result_state"]) == ("known", "pending")
+    # A release doubles the output price of the model.
+    rates = dict(price_table().rates)
+    rates[MODEL] = replace(rates[MODEL], output=100_000)
+    release_price_version(monkeypatch, version="openai-test-v2", rates=rates)
+    result = asyncio.run(invoke(journal))
+    assert result.text == "Accepted output." and result.cost_usd == .0015
+    assert result.native_receipt["price_version"] == PRICE_VERSION
+    assert result.native_receipt["workflow_replayed"] is True
+    assert store.lookup_call(lease.run_id, KEY)["price_version"] == PRICE_VERSION
+    assert transport.generation.await_count == 1
+    fresh = asyncio.run(invoke(journal, key=CallKey("execution", "node-b")))
+    assert fresh.cost_usd == .002 and fresh.native_receipt["price_version"] == "openai-test-v2"
+    assert store.audit(lease.run_id)["confirmed_nanousd"] == 3_500_000
+
+
+def test_quoted_call_is_not_sent_after_its_model_retires(journal, transport, monkeypatch):
+    store, lease = journal
+    reserve = store.reserve_call
+
+    def stopped(*args, **kwargs):
+        raise RuntimeError("Process stopped before reserving")
+
+    monkeypatch.setattr(store, "reserve_call", stopped)
+    with pytest.raises(RuntimeError, match="before reserving"):
+        asyncio.run(invoke(journal))
+    monkeypatch.setattr(store, "reserve_call", reserve)
+    assert store.lookup_call(lease.run_id, KEY)["state"] == "quoted"
+    # A release retires the model on a day the journal clock has passed.
+    release_price_version(monkeypatch, version="openai-test-v2", retired_on={MODEL: "2000-01-01"})
+    with pytest.raises(WorkflowValidationError, match="retired"):
+        asyncio.run(invoke(journal))
+    assert (transport.count.await_count, transport.generation.await_count) == (1, 0)
+    saved = store.lookup_call(lease.run_id, KEY)
+    assert (saved["state"], saved["price_version"]) == ("quoted", PRICE_VERSION)
+
+
 def test_descriptor_snapshot_is_local_detached_and_secret_free(monkeypatch):
     monkeypatch.setattr(OpenAIResponsesProvider, "_get_client", lambda _: pytest.fail("SDK created"))
     source = native()
@@ -146,11 +197,11 @@ def test_native_call_is_reserved_and_raw_saved_before_decode(journal, transport,
     store, lease = journal
     original = OpenAIResponsesProvider.decode
 
-    def check_decode(envelope, receipt=None):
+    def check_decode(envelope, receipt=None, **kwargs):
         record = store.lookup_call(lease.run_id, KEY)
         assert record["state"] == "settled" and record["billing_state"] == "known"
         assert store.load_replay(record["call_id"])["evidence"]["body"] == envelope.body
-        return original(envelope, receipt)
+        return original(envelope, receipt, **kwargs)
 
     monkeypatch.setattr(OpenAIResponsesProvider, "decode", staticmethod(check_decode))
     result = asyncio.run(invoke(journal))

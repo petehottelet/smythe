@@ -25,6 +25,7 @@ attempt goes through the normal budget reservation.
 from __future__ import annotations
 
 import bisect
+import inspect
 import json
 import re
 from abc import ABC, abstractmethod
@@ -518,11 +519,80 @@ class TokenVerifier(Verifier):
         return _decide(evidence, first_line[:150])
 
 
+# ---------------------------------------------------------------------------
+# Reading a function's result
+# ---------------------------------------------------------------------------
+# A gate's function and a custom verifier are caller code, so only an
+# explicit bool decides a gate.  Truthiness would let "FAIL", a list of
+# findings, an unawaited coroutine or ``Verdict(passed="false")`` pass.
+
+_NO_PASSED = object()  # the result has no ``passed`` attribute
+
+
+def _type_name(value: object) -> str:
+    kind = type(value)
+    if kind.__module__ == "builtins":
+        return kind.__qualname__
+    return f"{kind.__module__}.{kind.__qualname__}"
+
+
+def _shown(value: object) -> str:
+    if isinstance(value, (str, int, float, type(None))):
+        return repr(value)[:60]
+    return _type_name(value)
+
+
+def _report_reason(result: object, passed: bool) -> str:
+    """The reason a report such as ``ValidationReport`` gives for its verdict."""
+    for name in ("reason", "summary"):
+        text = getattr(result, name, None)
+        if isinstance(text, str) and text:
+            return _clip(text)
+    findings = getattr(result, "hard_findings", None)
+    if passed or not isinstance(findings, (tuple, list)):
+        return ""
+    shown = []
+    for finding in findings[:4]:
+        code, message = getattr(finding, "code", None), getattr(finding, "message", None)
+        if isinstance(message, str):
+            shown.append(f"{code}: {message}" if isinstance(code, str) else message)
+    return _clip("; ".join(shown))
+
+
+def rejection_reason(verdict: Verdict) -> str:
+    """Why a verdict that is not exactly ``passed=True`` fails its gate.
+
+    ``passed`` must be a bool.  A custom verifier's truthy ``"false"`` or
+    ``1`` is a failed verdict, never a pass, and its reason says so.  The
+    reason is always text: a missing reason is empty and any other value is
+    shown by type, so a regeneration intent can always be saved.
+    """
+    if verdict.passed is False:
+        if isinstance(verdict.reason, str):
+            return verdict.reason
+        if verdict.reason is None:
+            return ""
+        return _clip(f"verdict reason must be text, got {_shown(verdict.reason)}")
+    reason = f"verdict 'passed' must be a bool, got {_shown(verdict.passed)}"
+    if isinstance(verdict.reason, str) and verdict.reason:
+        reason += f": {verdict.reason}"
+    return _clip(reason)
+
+
 class CallableVerifier(Verifier):
     """Adapts a plain function into a Verifier.
 
-    Useful for objective gates that need no model at all — image
+    Useful for objective gates whose verdict needs no model — image
     dimensions, JSON schema conformance, a required section heading.
+
+    The function returns a bool, a :class:`Verdict`, or an object with a
+    bool ``passed`` attribute such as ``smythe.assets.ValidationReport``,
+    whose ``reason`` or ``summary`` (or, for a failing report, its hard
+    findings) becomes the verdict's reason.  Anything else **fails**,
+    naming the returned type: ``"FAIL"``, a list of findings, ``None``, and
+    a ``passed`` that is not a bool are not verdicts.  The function is
+    called synchronously; a coroutine from an ``async def`` function is
+    closed without running and fails.
     """
 
     def __init__(self, fn) -> None:
@@ -530,6 +600,23 @@ class CallableVerifier(Verifier):
 
     def verdict(self, verifier_node: Node, verified_node: Node) -> Verdict:
         result = self._fn(verifier_node, verified_node)
+        if type(result) is bool:
+            return Verdict(passed=result)
+        if inspect.isawaitable(result):
+            if inspect.iscoroutine(result):
+                result.close()
+            return _rejected(
+                f"verifier returned {_type_name(result)}, which CallableVerifier "
+                "never awaits; pass a synchronous function"
+            )
+        passed = getattr(result, "passed", _NO_PASSED)
+        if passed is _NO_PASSED:
+            return _rejected(f"verifier returned {_type_name(result)}")
+        if type(passed) is not bool:
+            return _rejected(
+                f"verifier returned {_type_name(result)} whose 'passed' is not a bool: "
+                f"{_shown(passed)}"
+            )
         if isinstance(result, Verdict):
             return result
-        return Verdict(passed=bool(result))
+        return Verdict(passed=passed, reason=_report_reason(result, passed))

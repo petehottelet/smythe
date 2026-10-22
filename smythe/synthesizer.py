@@ -281,7 +281,7 @@ class Synthesizer:
 
         synth_node = Node(label="Synthesis merge", id=SYNTHESIS_NODE_ID)
         if resolved_tracer:
-            resolved_tracer.on_node_start(synth_node)
+            resolved_tracer.on_node_start(synth_node, phase="synthesis")
 
         try:
             result = await resolved_provider.complete(

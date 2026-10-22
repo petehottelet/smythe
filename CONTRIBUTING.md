@@ -129,6 +129,14 @@ notes always belong in gitignored `00_project_files/`.
   a regression test that fails without the fix.
 - **Shared test fixtures** live in [tests/helpers.py](tests/helpers.py).
   Prefer reusing them over re-defining mock providers.
+- **Shared fakes** live in [tests/fakes.py](tests/fakes.py): SDK wire fakes
+  for the Responses and Messages providers with request logs and failure
+  schedules, a manual clock for `clock_ns=`, crash images, and helpers that
+  launch and hard-kill an offline child process. Durable runs accept only the
+  built-in provider types, so replace the SDK client instead of subclassing a
+  provider. [tests/fixture_service.py](tests/fixture_service.py) fakes an
+  external service whose `snapshot()` shows every committed effect, including
+  one whose acknowledgement the caller lost.
 
 ## Pull request workflow
 

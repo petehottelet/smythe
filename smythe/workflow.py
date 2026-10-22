@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Mapping
 from contextlib import asynccontextmanager
 from contextvars import ContextVar
 from decimal import Decimal
 import hashlib
 import json
 import math
+from types import MappingProxyType
 from uuid import uuid4
 
 from smythe.budget import BudgetValidationError, Sentinel, validate_completion_usage
@@ -34,16 +36,72 @@ from smythe.workflow_provider import (
 from smythe.workflow_policy import snapshot_graph_policy
 from smythe.workflow_store import (
     CallKey, SQLiteWorkflowStore, WorkflowConflictError, WorkflowError, WorkflowLeaseError,
-    WorkflowStateError, WorkflowValidationError, _is_http_rejection,
+    WorkflowStateError, WorkflowValidationError, _is_http_rejection, _registered_price_version,
 )
 
 # Journal keys that embed a node id stop at 512 characters. Capping durable node
 # ids well below that leaves room for "supervision/<id>/<generation>".
 MAX_NODE_ID_CHARS = 256
 
+# Recipe compatibility. Plan, execute and resume compare a saved recipe with
+# the current one exactly, field by field, except for two kinds of field:
+#
+# - Pricing metadata. A provider description's price_version and
+#   supported_models follow the price registry, which a release extends. The
+#   saved description may name any registered price version for its kind,
+#   and its model list may differ; its other fields still compare exactly.
+#   Saved calls keep the price version they recorded, and admission checks
+#   each new call against the current version.
+# - Behavior-version fields, which select a versioned behavior such as a
+#   prompt-assembly version. This maps each field to (absent, default): the
+#   value a recipe without the field means, and the value a new run records
+#   unless WorkflowRuntime's behavior_settings argument configures another.
+#   A recipe records the field only when its value differs from `absent`, so
+#   existing recipes keep their bytes. Resume reads the value from the saved
+#   recipe into WorkflowRuntime.behavior, so a changed default applies only to
+#   new runs; a value configured explicitly must equal the saved one. The
+#   settings are read-only after construction, which builds the recipe a new
+#   run records from them. No such field exists yet.
+RECIPE_BEHAVIOR_FIELDS = MappingProxyType({})
+_PROVIDER_FIELDS = frozenset({"kind", "adapter_version", "decoder_version", "endpoint_scope",
+                              "price_version", "supported_models", "config"})
+
 
 def _canonical(value):
     return json.dumps(json_snapshot(value), sort_keys=True, separators=(",", ":"), allow_nan=False)
+
+
+def _without_pricing(value, *, saved=False):
+    """Copy a recipe without its provider descriptions' pricing metadata.
+
+    A saved description keeps its fields when its price version is no longer
+    registered, so it cannot match a current one.
+    """
+    if isinstance(value, list):
+        return [_without_pricing(item, saved=saved) for item in value]
+    if not isinstance(value, dict):
+        return value
+    result = {}
+    for key, item in value.items():
+        if (key == "provider" and isinstance(item, dict) and item.keys() == _PROVIDER_FIELDS
+                and (not saved or _registered_price_version(item["kind"], item["price_version"]))):
+            result[key] = {name: field for name, field in item.items()
+                           if name not in ("price_version", "supported_models")}
+        else:
+            result[key] = _without_pricing(item, saved=saved)
+    return result
+
+
+def _snapshot_behavior_settings(settings):
+    if settings is None:
+        settings = {}
+    if not isinstance(settings, Mapping):
+        raise WorkflowBindingError("behavior_settings must be a mapping")
+    settings = json_snapshot(dict(settings))
+    unknown = sorted(set(settings) - set(RECIPE_BEHAVIOR_FIELDS))
+    if unknown:
+        raise WorkflowBindingError("Unknown workflow behavior version: " + ", ".join(unknown))
+    return MappingProxyType(settings)
 
 
 def _hash(value):
@@ -128,16 +186,33 @@ class WorkflowRuntime:
     def __init__(self, *, store, model, max_budget_usd, provider, architect, registry,
                  router, synthesizer, supervisor, max_revisions, verifier, memory,
                  tool_runtime, checkpoint_store, checkpoint_every_n_nodes, retry_backoff_s,
-                 max_concurrency, graph_policy=None):
+                 max_concurrency, graph_policy=None, behavior_settings=None):
         if type(store) is not SQLiteWorkflowStore:
-            raise WorkflowBindingError("run_store must be SQLiteWorkflowStore")
-        Sentinel(max_budget_usd)
-        if memory is not None or tool_runtime is not None or checkpoint_store is not None:
             raise WorkflowBindingError(
-                "Durable text workflows own their checkpoints and require no live memory or tools"
+                f"run_store must be SQLiteWorkflowStore itself, not {type(store).__name__}"
+            )
+        Sentinel(max_budget_usd)
+        # Each unsupported argument is named, so a caller knows what to remove.
+        if memory is not None:
+            raise WorkflowBindingError(
+                "memory is not supported by durable text workflows; planner memory "
+                "needs an ordinary Swarm run without run_store"
+            )
+        if tool_runtime is not None:
+            raise WorkflowBindingError(
+                "tool_runtime is not supported by durable text workflows, which send "
+                "plain text without tools; tools need an ordinary Swarm run"
+            )
+        if checkpoint_store is not None:
+            raise WorkflowBindingError(
+                "checkpoint_store is not supported by durable text workflows, which "
+                "save their checkpoints in run_store"
             )
         if verifier is not None and type(verifier) is not TokenVerifier:
-            raise WorkflowBindingError("Durable text workflows require the built-in TokenVerifier")
+            raise WorkflowBindingError(
+                "verifier must be the built-in TokenVerifier in durable text workflows, "
+                f"not {type(verifier).__name__}"
+            )
         if type(max_revisions) is not int or max_revisions < 0:
             raise WorkflowBindingError("max_revisions must be a non-negative integer")
         if type(max_concurrency) is not int or max_concurrency < 1:
@@ -155,6 +230,11 @@ class WorkflowRuntime:
         self.retry_backoff_s = retry_backoff_s
         self.checkpoint_every_n_nodes = checkpoint_every_n_nodes
         self.graph_policy = snapshot_graph_policy(graph_policy)
+        # Explicitly configured behavior versions (see RECIPE_BEHAVIOR_FIELDS),
+        # which the recipe below records for a new run, and, once a run is
+        # bound, the versions that run uses.
+        self._behavior_settings = _snapshot_behavior_settings(behavior_settings)
+        self.behavior = {}
         self.recipe = self._describe()
         self.graph = None
         self.executor = None
@@ -165,6 +245,11 @@ class WorkflowRuntime:
         self._pending_operations = set()
         self._updates = 0
         self.trace = Tracer()
+
+    @property
+    def behavior_settings(self):
+        """Read-only behavior versions configured for this runtime."""
+        return self._behavior_settings
 
     def _describe(self):
         validate_workflow_model(self.provider, self.model)
@@ -182,7 +267,25 @@ class WorkflowRuntime:
         # change their identity and prevent otherwise compatible recovery.
         if self.graph_policy is not None:
             recipe["graph_policy"] = self.graph_policy.to_dict()
+        for name, (absent, default) in RECIPE_BEHAVIOR_FIELDS.items():
+            value = self.behavior_settings.get(name, default)
+            if _canonical(value) != _canonical(absent):
+                recipe[name] = value
         return json_snapshot(recipe)
+
+    def _adopt_recipe(self, saved):
+        """Check a saved recipe against this runtime; bind its behavior versions."""
+        saved, current = dict(saved), dict(self.recipe)
+        behavior = {}
+        for name, (absent, _) in RECIPE_BEHAVIOR_FIELDS.items():
+            current.pop(name, None)
+            behavior[name] = saved.pop(name, absent)
+            if (name in self.behavior_settings
+                    and _canonical(self.behavior_settings[name]) != _canonical(behavior[name])):
+                raise WorkflowConflictError(f"Workflow {name} differs from the saved recipe")
+        if _canonical(_without_pricing(saved, saved=True)) != _canonical(_without_pricing(current)):
+            raise WorkflowConflictError("Workflow components or budget differ from the saved recipe")
+        self.behavior = behavior
 
     def _reference(self):
         return {"version": 1, "store_id": self.store.store_id, "run_id": self.run_id,
@@ -257,9 +360,9 @@ class WorkflowRuntime:
     @asynccontextmanager
     async def _session(self, run):
         self.run, self.run_id = run, run["run_id"]
-        if (_canonical(run["config"]) != _canonical(self.recipe)
-                or run["budget_nanousd"] != _nanousd(self.max_budget_usd)):
+        if run["budget_nanousd"] != _nanousd(self.max_budget_usd):
             raise WorkflowConflictError("Workflow components or budget differ from the saved recipe")
+        self._adopt_recipe(run["config"])
         self._bind()
         lease = self.store.acquire_lease(self.run_id, uuid4().hex, ttl_s=60)
         self.context = WorkflowProviderContext(self.store, lease, self.providers)
@@ -385,21 +488,15 @@ class WorkflowRuntime:
         self._validate_graph_policy(self.graph)
         self.registry.workflow_description()
         calls = []
-        nodes = {node.id: node for node in self.graph.nodes}
         for node in self.graph.nodes:
             if node.status in {NodeStatus.COMPLETED, NodeStatus.FAILED, NodeStatus.SKIPPED}:
                 calls.extend(self._call_ids(self._worker_keys.get((node.id, node_generation(node)), ())))
         # Regeneration can discard an accepted descendant during cancellation
         # after the previous batched snapshot. Consume that settled call with
-        # the checkpoint that durably advances its node generation.
-        for call in self.store.inspect_run(self.run_id)["calls"]:
-            key = call["key"]
-            node = nodes.get(key["scope_id"].removeprefix("node/"))
-            if (key["phase"] in {"execution", "verification"} and key["scope_id"].startswith("node/")
-                    and node is not None and key["generation"] < node_generation(node)
-                    and call["billing_state"] == "known"
-                    and call["result_state"] in {"accepted", "rejected", "applied"}):
-                calls.append(call["call_id"])
+        # the checkpoint that durably advances its node generation. The query
+        # reads only those calls, so a save's cost does not grow with history.
+        calls.extend(self.store.superseded_node_calls(
+            self.run_id, {node.id: node_generation(node) for node in self.graph.nodes}))
         checkpoint = {
             "version": 1, "status": status, "graph": graph_to_dict(self.graph),
             "registry": self.registry.workflow_description(), "output": output,
@@ -644,7 +741,27 @@ class WorkflowRuntime:
             workflow_accounting={key: accounting[key] for key in (
                 "confirmed_nanousd", "reserved_nanousd", "unknown_nanousd", "unknown_calls", "call_count",
             )},
+            timing=self._timing(),
         )
+
+    def _timing(self):
+        """Timing from journal wall-clock timestamps, which relate processes.
+
+        Each lease session is one segment. This call's monotonic clock is not
+        used: an earlier session may have run in another process.
+        """
+        record = self.store.lease_sessions(self.run_id)
+        segments = [{
+            "started_at": session["started_ns"] / 1e9, "ended_at": session["ended_ns"] / 1e9,
+            "elapsed_ms": round((session["ended_ns"] - session["started_ns"]) / 1e6, 1),
+            "interrupted": session["interrupted"],
+        } for session in record["sessions"]]
+        resumed = len(segments) > 1
+        return {
+            "clock": "wall", "elapsed_ms": segments[-1]["elapsed_ms"] if segments else 0.0,
+            "run_wall_ms": round((record["now_ns"] - record["created_ns"]) / 1e6, 1),
+            "latency_complete": not resumed, "resumed": resumed, "segments": segments,
+        }
 
 
 class _WorkflowSupervisor:

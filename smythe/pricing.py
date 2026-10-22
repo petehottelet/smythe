@@ -9,12 +9,14 @@ their own accounting and are outside this module's supported request scope.
 from __future__ import annotations
 
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from datetime import date
 from decimal import Decimal
 from types import MappingProxyType
 from typing import Any
 
 
+# The current version. Earlier versions stay registered in PRICE_TABLES.
 PRICE_VERSION = "openai-native-standard-global-2026-09-07-v1"
 PRICE_CHECKED_ON = "2026-09-07"
 LONG_CONTEXT_THRESHOLD = 272_000
@@ -41,13 +43,68 @@ class _RateCard:
         return self.ordinary, self.cached, self.cache_write, self.output
 
 
+@dataclass(frozen=True, slots=True)
+class PriceTable:
+    """One dated price version: each model's rates and optional retirement.
+
+    ``rates`` maps a model to its provider-specific rate card. ``retired_on``
+    maps a model to the first day, as an ISO date, on which a durable workflow
+    admits no new call to it and sends no saved call that was never sent.
+    Retirement never affects pricing: saved receipts and journaled calls keep
+    the rates of the version they recorded.
+    """
+
+    price_version: str
+    checked_on: str
+    sources: tuple[str, ...]
+    rates: Mapping[str, Any]
+    retired_on: Mapping[str, str] = field(default_factory=lambda: MappingProxyType({}))
+
+    @property
+    def models(self) -> tuple[str, ...]:
+        return tuple(self.rates)
+
+    def prices(self, model: object) -> bool:
+        return type(model) is str and model in self.rates
+
+    def admits(self, model: object, on: date) -> bool:
+        """Whether a new call to ``model`` may be admitted on day ``on``."""
+        if not self.prices(model):
+            return False
+        retired = self.retired_on.get(model)
+        return retired is None or on.isoformat() < retired
+
+
+def registered_table(tables: Mapping[str, PriceTable], current: str,
+                     price_version: str | None) -> PriceTable:
+    """Return a registered table; ``None`` selects ``current``."""
+    version = current if price_version is None else price_version
+    table = tables.get(version) if type(version) is str else None
+    if table is None:
+        raise ValueError("Price version is not registered")
+    return table
+
+
+# Every version a saved receipt or journaled call can name. A price or model
+# change adds a version and points PRICE_VERSION at it; registered versions
+# are never edited or removed. Retire a model with a date instead of removing
+# it, so saved runs that use it keep resolving it.
 # These exact IDs are the complete snapshot lists on the model pages above.
 # Do not infer prices from a model-name prefix or an undocumented dated ID.
-_RATE_CARDS = MappingProxyType({
-    "gpt-6-astra": _RateCard(10_000, 1_000, 12_500, 50_000),
-    "gpt-5.6-sol": _RateCard(4_000, 400, 5_000, 20_000),
+PRICE_TABLES = MappingProxyType({
+    PRICE_VERSION: PriceTable(PRICE_VERSION, PRICE_CHECKED_ON, PRICE_SOURCES, MappingProxyType({
+        "gpt-6-astra": _RateCard(10_000, 1_000, 12_500, 50_000),
+        "gpt-5.6-sol": _RateCard(4_000, 400, 5_000, 20_000),
+    })),
 })
-SUPPORTED_MODELS = tuple(_RATE_CARDS)
+
+
+def price_table(price_version: str | None = None) -> PriceTable:
+    """Return a registered Responses price table; ``None`` selects the current one."""
+    return registered_table(PRICE_TABLES, PRICE_VERSION, price_version)
+
+
+SUPPORTED_MODELS = price_table().models
 _CATEGORIES = ("ordinary_input", "cached_input", "cache_write_input", "output")
 _MISSING = object()
 
@@ -90,6 +147,7 @@ class NativeReceipt:
     cost_nanousd: int | None = None
     price_version: str = PRICE_VERSION
     sources: tuple[str, ...] = PRICE_SOURCES
+    price_checked_on: str = PRICE_CHECKED_ON
 
     @property
     def cost_usd(self) -> Decimal | None:
@@ -123,7 +181,7 @@ class NativeReceipt:
         return {
             "version": 1,
             "price_version": self.price_version,
-            "price_checked_on": PRICE_CHECKED_ON,
+            "price_checked_on": self.price_checked_on,
             "pricing_scope": "model_text_tokens",
             "actual_model": self.actual_model,
             "service_tier": self.service_tier,
@@ -215,13 +273,16 @@ def price_native_response(
     *,
     requested_model: str | None = None,
     endpoint_scope: str = "global",
+    price_version: str | None = None,
 ) -> NativeReceipt:
     """Price validated native usage or retain an explicit unknown-cost receipt.
 
     A missing cache counter is not zero. Reasoning and total-token details are
     optional, but when supplied they must agree with aggregate output/usage.
     The long-context multiplier applies to every category of the full request.
+    ``price_version`` selects a registered table; the default is the current one.
     """
+    table = price_table(price_version)
     errors: list[str] = []
     if not isinstance(raw, Mapping):
         errors.append("Native response must be a JSON object")
@@ -229,7 +290,7 @@ def price_native_response(
     actual_model = _string(raw.get("model"))
     service_tier = _string(raw.get("service_tier"))
     scope = _string(endpoint_scope)
-    card = _RATE_CARDS.get(actual_model) if actual_model is not None else None
+    card = table.rates.get(actual_model) if actual_model is not None else None
     if actual_model is None:
         errors.append("Missing or invalid returned model")
     elif card is None:
@@ -322,6 +383,9 @@ def price_native_response(
         long_context=None if inputs is None else inputs > LONG_CONTEXT_THRESHOLD,
         charges=charges,
         cost_nanousd=cost,
+        price_version=table.price_version,
+        sources=table.sources,
+        price_checked_on=table.checked_on,
     )
 
 
@@ -332,16 +396,19 @@ def conservative_quote(
     *,
     service_tier: str = "default",
     endpoint_scope: str = "global",
+    price_version: str | None = None,
 ) -> Decimal:
     """Bound token cost with every input charged at the highest applicable rate.
 
     The caller must supply a defensible input bound and an enforced output cap
     for this exact model/tier/endpoint. This does not quote hosted tool charges.
+    ``price_version`` selects a registered table; the default is the current one.
     """
+    table = price_table(price_version)
     errors: list[str] = []
     inputs = _count(input_tokens, "input_tokens", errors)
     outputs = _count(max_output_tokens, "max_output_tokens", errors)
-    card = _RATE_CARDS.get(model) if type(model) is str else None
+    card = table.rates.get(model) if type(model) is str else None
     if card is None:
         errors.append("Quote model is outside the versioned price table")
     if type(service_tier) is not str or service_tier != "default":

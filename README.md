@@ -320,6 +320,8 @@ Next priorities are strict acceptance of the exact delivered output, a tested
 matrix of supported configurations, and broader external-task benchmarks,
 including separately controlled Astra scheduler and framework studies.
 See the [roadmap](ROADMAP.md) for status and acceptance criteria.
+The [support matrix](docs/support-matrix.md) shows what each execution path
+accepts today, with the test behind each cell.
 
 The [Noumenon screensaver](https://github.com/petehottelet/noumenon) renders
 Smythe's glyph catalog, with a web explorer and native Windows, macOS and Linux

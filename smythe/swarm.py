@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 from uuid import uuid4
 
 from smythe.budget import BudgetValidationError, Sentinel
@@ -23,7 +24,13 @@ from smythe.checkpoint import (
     task_from_dict,
 )
 from smythe.executor import Executor
-from smythe.executor_base import DEFAULT_MAX_TOOL_ITERATIONS, ExecutorBase
+from smythe.executor_base import (
+    DEFAULT_MAX_TOOL_ITERATIONS,
+    ExecutorBase,
+    validate_max_concurrency,
+    validate_max_revisions,
+    validate_retry_backoff_s,
+)
 from smythe.graph import ExecutionGraph
 from smythe.memory import PlannerMemory
 from smythe.tools import ToolRuntime
@@ -69,6 +76,9 @@ class SwarmResult:
             opt-in complete text workflow.
         workflow_accounting: Exact confirmed, reserved, and unknown nanoUSD
             balances and call counts for a managed text workflow.
+        timing: Where the call's time went: elapsed time, phase totals and
+            waits, with one segment per call that worked on the execution.
+            None for a result built by hand.
     """
 
     output: str
@@ -80,6 +90,57 @@ class SwarmResult:
     cost_contains_estimates: bool = False
     cost_scope: str = "execution_and_synthesis"
     workflow_accounting: dict[str, Any] | None = None
+    timing: dict[str, Any] | None = None
+
+
+class _RunTiming:
+    """This call's timing segment, after any segments earlier calls saved.
+
+    Each segment holds durations from one process's monotonic clock and
+    wall-clock start and end times. Durations from different processes are
+    never subtracted from each other; only the wall times relate segments.
+    """
+
+    def __init__(
+        self, tracer: Tracer, *, resumed: bool = False,
+        previous: list[dict[str, Any]] | None = None,
+    ) -> None:
+        self.tracer = tracer
+        self.resumed = resumed
+        self.previous = previous or []
+
+    def _segments(self, timing: dict[str, Any]) -> list[dict[str, Any]]:
+        segment = {
+            "started_at": self.tracer.started_at, "ended_at": self.tracer.wall_time(),
+            "resumed": self.resumed,
+        }
+        segment.update((key, value) for key, value in timing.items() if key != "clock")
+        return [*self.previous, segment]
+
+    def checkpoint_block(self) -> dict[str, Any]:
+        return {"version": 1, "clock": "monotonic", "segments": self._segments(self.tracer.timing())}
+
+    def result(self) -> dict[str, Any]:
+        timing = self.tracer.timing()
+        return {**timing, "latency_complete": not self.resumed, "resumed": self.resumed,
+                "segments": self._segments(timing)}
+
+
+def _saved_segments(state: dict[str, Any]) -> list[dict[str, Any]]:
+    """Timing segments an earlier call saved; none if the block is unreadable.
+
+    Timing is informational, so an unreadable block never stops a resume.
+    """
+    block = state.get("timing")
+    if not isinstance(block, dict) or type(block.get("version")) is not int or block["version"] != 1:
+        return []
+    segments = block.get("segments")
+    if not isinstance(segments, list) or not all(isinstance(item, dict) for item in segments):
+        return []
+    try:
+        return json.loads(json.dumps(segments, allow_nan=False))
+    except (TypeError, ValueError, RecursionError):
+        return []
 
 
 def _auto_detect_provider(model: str) -> Provider:
@@ -135,6 +196,13 @@ class Swarm:
         Sentinel(max_budget_usd)  # Reject malformed policy before planning can call a provider.
         if graph_policy is not None and run_store is None:
             raise WorkflowBindingError("graph_policy requires a durable run_store")
+        # An ordinary run builds its executor only after routing and planning,
+        # so check the executor's limits now. A durable run checks its own,
+        # stricter limits before routing or planning on every entry point.
+        if run_store is None:
+            validate_retry_backoff_s(retry_backoff_s)
+            validate_max_concurrency(max_concurrency)
+            validate_max_revisions(max_revisions)
         self._graph_policy = snapshot_graph_policy(graph_policy)
         self.model = model
         self.max_budget_usd = max_budget_usd
@@ -168,6 +236,8 @@ class Swarm:
         self._synthesizer = synthesizer or Synthesizer()
         self._yaml_graph: ExecutionGraph | None = None
         self._router = router
+        # Each execute or resume call measures its time with a new tracer.
+        self._tracer_factory: Callable[[], Tracer] = Tracer
 
         if architect is not None:
             self._architect = architect
@@ -191,29 +261,54 @@ class Swarm:
         """
         if self._run_store is not None:
             return asyncio.run(self._workflow_runtime().plan(task))
+        return self._plan(task, Tracer())
+
+    def _plan_for_execution(self, task: Task, tracer: Tracer) -> ExecutionGraph:
+        """Plan *task* for execute(); a subclass's plan() stays authoritative."""
+        if type(self).plan is not Swarm.plan:
+            with tracer.phase("planning"):
+                return self.plan(task)
+        return self._plan(task, tracer)
+
+    async def _aplan_for_execution(self, task: Task, tracer: Tracer) -> ExecutionGraph:
+        """Async _plan_for_execution(); a subclass's aplan() stays authoritative."""
+        if type(self).aplan is not Swarm.aplan:
+            with tracer.phase("planning"):
+                return await self.aplan(task)
+        return await self._aplan(task, tracer)
+
+    def _plan(self, task: Task, tracer: Tracer) -> ExecutionGraph:
+        """Plan *task*, measuring routing and planning on *tracer*."""
         Sentinel(self.max_budget_usd)
         task = snapshot_task(task)
+        started = tracer.now()
         architect = self._select_architect(snapshot_task(task))
-        graph, architect_registry = architect.plan(snapshot_task(task))
-
-        for agent in architect_registry.list_agents():
-            self._registry.register(agent)
-
-        graph = self._registry.assign(graph)
-        graph.task = task
-        self._stamp_model(graph)
-        self._stamp_task_context(graph, task)
-        return graph
+        if self._router is not None:
+            tracer.add_phase("routing", tracer.since(started))
+        with tracer.phase("planning"):
+            graph, architect_registry = architect.plan(snapshot_task(task))
+            return self._adopt_plan(graph, architect_registry, task)
 
     async def aplan(self, task: Task) -> ExecutionGraph:
         """Async variant of plan() — safe to call from a running event loop."""
         if self._run_store is not None:
             return await self._workflow_runtime().plan(task)
+        return await self._aplan(task, Tracer())
+
+    async def _aplan(self, task: Task, tracer: Tracer) -> ExecutionGraph:
+        """Async _plan()."""
         Sentinel(self.max_budget_usd)
         task = snapshot_task(task)
+        started = tracer.now()
         architect = await self._aselect_architect(snapshot_task(task))
-        graph, architect_registry = await architect.aplan(snapshot_task(task))
+        if self._router is not None:
+            tracer.add_phase("routing", tracer.since(started))
+        with tracer.phase("planning"):
+            graph, architect_registry = await architect.aplan(snapshot_task(task))
+            return self._adopt_plan(graph, architect_registry, task)
 
+    def _adopt_plan(self, graph: ExecutionGraph, architect_registry: Registry, task: Task) -> ExecutionGraph:
+        """Register the plan's agents and stamp its nodes for execution."""
         for agent in architect_registry.list_agents():
             self._registry.register(agent)
 
@@ -282,12 +377,13 @@ class Swarm:
             )
         from smythe.async_executor import AsyncExecutor
 
-        tracer = Tracer()
+        tracer = self._tracer_factory()
+        timing = _RunTiming(tracer)
         budget = Sentinel(self.max_budget_usd)
 
         self._active_executor = None
         if isinstance(task_or_graph, Task):
-            graph = await self.aplan(task_or_graph)
+            graph = await self._aplan_for_execution(task_or_graph, tracer)
         else:
             graph = self._prepare_graph(task_or_graph)
         task = snapshot_task(graph.task) if graph.task is not None else None
@@ -295,7 +391,7 @@ class Swarm:
         execution_id = uuid4().hex
         created_at = time.time()
         self._save_checkpoint(
-            execution_id, "running", graph, budget, task, created_at,
+            execution_id, "running", graph, budget, task, created_at, timing,
         )
 
         executor = AsyncExecutor(
@@ -310,32 +406,33 @@ class Swarm:
             task=task,
             verifier=self.verifier,
             on_node_update=self._checkpointer(
-                execution_id, graph, budget, task, created_at,
+                execution_id, graph, budget, task, created_at, timing,
             ),
             on_control_update=self._control_checkpointer(
-                execution_id, graph, budget, task, created_at,
+                execution_id, graph, budget, task, created_at, timing,
             ),
         )
         self._active_executor = executor
         try:
             graph = await executor.run(graph)
-            output = await self._synthesizer.asynthesize(
-                graph,
-                provider=self._provider,
-                model=self.model,
-                budget=budget,
-                tracer=tracer,
-            )
+            with tracer.phase("synthesis"):
+                output = await self._synthesizer.asynthesize(
+                    graph,
+                    provider=self._provider,
+                    model=self.model,
+                    budget=budget,
+                    tracer=tracer,
+                )
         except BaseException as exc:
             self._save_checkpoint(
-                execution_id, "failed", graph, budget, task, created_at,
+                execution_id, "failed", graph, budget, task, created_at, timing,
                 accounting_error=str(exc) if isinstance(exc, BudgetValidationError) else None,
                 response_error=_response_error_marker(exc),
             )
             raise
 
         self._save_checkpoint(
-            execution_id, "completed", graph, budget, task, created_at,
+            execution_id, "completed", graph, budget, task, created_at, timing,
             output=output,
         )
 
@@ -347,6 +444,7 @@ class Swarm:
             cost_is_complete=budget.cost_is_complete,
             cost_contains_estimates=budget.cost_contains_estimates,
             execution_id=execution_id,
+            timing=timing.result(),
         )
 
         if self._memory is not None and task is not None:
@@ -356,12 +454,13 @@ class Swarm:
 
     def _execute_sync(self, task_or_graph: Task | ExecutionGraph) -> SwarmResult:
         """Serial execution using the standard Executor."""
-        tracer = Tracer()
+        tracer = self._tracer_factory()
+        timing = _RunTiming(tracer)
         budget = Sentinel(self.max_budget_usd)
 
         self._active_executor = None
         if isinstance(task_or_graph, Task):
-            graph = self.plan(task_or_graph)
+            graph = self._plan_for_execution(task_or_graph, tracer)
         else:
             graph = self._prepare_graph(task_or_graph)
         task = snapshot_task(graph.task) if graph.task is not None else None
@@ -369,7 +468,7 @@ class Swarm:
         execution_id = uuid4().hex
         created_at = time.time()
         self._save_checkpoint(
-            execution_id, "running", graph, budget, task, created_at,
+            execution_id, "running", graph, budget, task, created_at, timing,
         )
 
         executor = Executor(
@@ -384,32 +483,33 @@ class Swarm:
             task=task,
             verifier=self.verifier,
             on_node_update=self._checkpointer(
-                execution_id, graph, budget, task, created_at,
+                execution_id, graph, budget, task, created_at, timing,
             ),
             on_control_update=self._control_checkpointer(
-                execution_id, graph, budget, task, created_at,
+                execution_id, graph, budget, task, created_at, timing,
             ),
         )
         self._active_executor = executor
         try:
             graph = executor.run(graph)
-            output = self._synthesizer.synthesize(
-                graph,
-                provider=self._provider,
-                model=self.model,
-                budget=budget,
-                tracer=tracer,
-            )
+            with tracer.phase("synthesis"):
+                output = self._synthesizer.synthesize(
+                    graph,
+                    provider=self._provider,
+                    model=self.model,
+                    budget=budget,
+                    tracer=tracer,
+                )
         except BaseException as exc:
             self._save_checkpoint(
-                execution_id, "failed", graph, budget, task, created_at,
+                execution_id, "failed", graph, budget, task, created_at, timing,
                 accounting_error=str(exc) if isinstance(exc, BudgetValidationError) else None,
                 response_error=_response_error_marker(exc),
             )
             raise
 
         self._save_checkpoint(
-            execution_id, "completed", graph, budget, task, created_at,
+            execution_id, "completed", graph, budget, task, created_at, timing,
             output=output,
         )
 
@@ -421,6 +521,7 @@ class Swarm:
             cost_is_complete=budget.cost_is_complete,
             cost_contains_estimates=budget.cost_contains_estimates,
             execution_id=execution_id,
+            timing=timing.result(),
         )
 
         if self._memory is not None and task is not None:
@@ -436,6 +537,7 @@ class Swarm:
         budget: Sentinel,
         task: Task | None,
         created_at: float,
+        timing: _RunTiming,
         output: str | None = None,
         accounting_error: str | None = None,
         response_error: dict | None = None,
@@ -443,28 +545,30 @@ class Swarm:
         """Persist full execution state, if a checkpoint store is configured."""
         if self._checkpoint_store is None:
             return
-        state = build_state(
-            control={
-                "revisions_used": getattr(
-                    self._active_executor, "revisions_used", 0,
-                ),
-            },
-            execution_id=execution_id,
-            status=status,
-            model=self.model,
-            graph=graph,
-            registry=self._registry,
-            task=task,
-            max_budget_usd=budget.max_budget_usd,
-            node_costs=budget.breakdown(),
-            output=output,
-            created_at=created_at,
-        )
-        if accounting_error is not None:
-            state["budget"]["accounting_error"] = accounting_error
-        if response_error is not None:
-            state["control"]["response_error"] = response_error
-        self._checkpoint_store.save(execution_id, state)
+        with timing.tracer.phase("checkpoint"):
+            state = build_state(
+                control={
+                    "revisions_used": getattr(
+                        self._active_executor, "revisions_used", 0,
+                    ),
+                },
+                execution_id=execution_id,
+                status=status,
+                model=self.model,
+                graph=graph,
+                registry=self._registry,
+                task=task,
+                max_budget_usd=budget.max_budget_usd,
+                node_costs=budget.breakdown(),
+                output=output,
+                created_at=created_at,
+                timing=timing.checkpoint_block(),
+            )
+            if accounting_error is not None:
+                state["budget"]["accounting_error"] = accounting_error
+            if response_error is not None:
+                state["control"]["response_error"] = response_error
+            self._checkpoint_store.save(execution_id, state)
 
     def _checkpointer(
         self,
@@ -473,6 +577,7 @@ class Swarm:
         budget: Sentinel,
         task: Task | None,
         created_at: float,
+        timing: _RunTiming,
     ):
         """Build the optionally batched node-update checkpoint hook.
 
@@ -493,19 +598,19 @@ class Swarm:
                 return
             completed_since_save = 0
             self._save_checkpoint(
-                execution_id, "running", graph, budget, task, created_at,
+                execution_id, "running", graph, budget, task, created_at, timing,
             )
 
         return _on_node_update
 
-    def _control_checkpointer(self, execution_id, graph, budget, task, created_at):
+    def _control_checkpointer(self, execution_id, graph, budget, task, created_at, timing):
         """Control transitions must be durable even with batched node saves."""
         if self._checkpoint_store is None:
             return None
 
         def _on_control_update() -> None:
             self._save_checkpoint(
-                execution_id, "running", graph, budget, task, created_at,
+                execution_id, "running", graph, budget, task, created_at, timing,
             )
 
         return _on_control_update
@@ -534,6 +639,8 @@ class Swarm:
             raise ValueError(
                 "Cannot resume: this Swarm has no checkpoint_store configured."
             )
+        tracer = self._tracer_factory()
+        recovery_started = tracer.now()
         state = self._checkpoint_store.load(execution_id)
         if state is None:
             raise KeyError(f"No checkpoint found for execution {execution_id!r}")
@@ -591,7 +698,9 @@ class Swarm:
 
         completed = state.get("status") == "completed" and state.get("output") is not None
         validate_verification_checkpoint(graph, version=version, completed=completed)
+        timing = _RunTiming(tracer, resumed=True, previous=_saved_segments(state))
         if completed and not verification_pending(graph):
+            tracer.add_phase("recovery", tracer.since(recovery_started))
             return SwarmResult(
                 output=state["output"],
                 graph=graph,
@@ -600,6 +709,7 @@ class Swarm:
                 cost_is_complete=budget.cost_is_complete,
                 cost_contains_estimates=budget.cost_contains_estimates,
                 execution_id=execution_id,
+                timing=timing.result(),
             )
 
         from smythe.async_executor import AsyncExecutor
@@ -618,7 +728,6 @@ class Swarm:
         graph.validate()
         self._stamp_model(graph)
 
-        tracer = Tracer()
         created_at = state.get("created_at", time.time())
 
         executor = AsyncExecutor(
@@ -637,32 +746,34 @@ class Swarm:
             task=task,
             verifier=self.verifier,
             on_node_update=self._checkpointer(
-                execution_id, graph, budget, task, created_at,
+                execution_id, graph, budget, task, created_at, timing,
             ),
             on_control_update=self._control_checkpointer(
-                execution_id, graph, budget, task, created_at,
+                execution_id, graph, budget, task, created_at, timing,
             ),
         )
         self._active_executor = executor
+        tracer.add_phase("recovery", tracer.since(recovery_started))
         try:
             graph = await executor.run(graph)
-            output = await self._synthesizer.asynthesize(
-                graph,
-                provider=self._provider,
-                model=self.model,
-                budget=budget,
-                tracer=tracer,
-            )
+            with tracer.phase("synthesis"):
+                output = await self._synthesizer.asynthesize(
+                    graph,
+                    provider=self._provider,
+                    model=self.model,
+                    budget=budget,
+                    tracer=tracer,
+                )
         except BaseException as exc:
             self._save_checkpoint(
-                execution_id, "failed", graph, budget, task, created_at,
+                execution_id, "failed", graph, budget, task, created_at, timing,
                 accounting_error=str(exc) if isinstance(exc, BudgetValidationError) else None,
                 response_error=_response_error_marker(exc),
             )
             raise
 
         self._save_checkpoint(
-            execution_id, "completed", graph, budget, task, created_at,
+            execution_id, "completed", graph, budget, task, created_at, timing,
             output=output,
         )
 
@@ -674,6 +785,7 @@ class Swarm:
             cost_is_complete=budget.cost_is_complete,
             cost_contains_estimates=budget.cost_contains_estimates,
             execution_id=execution_id,
+            timing=timing.result(),
         )
 
         if self._memory is not None and task is not None:
@@ -766,8 +878,12 @@ class Swarm:
             return None
         return Path(self.artifact_dir) / execution_id[:12]
 
-    def _workflow_runtime(self):
-        """Pass explicit component dependencies into an isolated durable run."""
+    def _workflow_runtime(self, *, behavior_settings=None):
+        """Pass explicit component dependencies into an isolated durable run.
+
+        ``behavior_settings`` configures behavior versions that a new run
+        records (see ``smythe.workflow.RECIPE_BEHAVIOR_FIELDS``).
+        """
         from smythe.workflow import WorkflowRuntime
 
         return WorkflowRuntime(
@@ -780,5 +896,5 @@ class Swarm:
             checkpoint_every_n_nodes=self.checkpoint_every_n_nodes,
             retry_backoff_s=self.retry_backoff_s,
             max_concurrency=self.max_concurrency,
-            graph_policy=self._graph_policy,
+            graph_policy=self._graph_policy, behavior_settings=behavior_settings,
         )

@@ -78,6 +78,9 @@ a dollar. Reasoning tokens are part of billed output and are counted once.
 Long-context rates apply to the entire request when input exceeds 272,000
 tokens. These are dated published list prices, not an account-specific invoice.
 [Price schedule and formula](../benchmarks/astra_benchmark_plan.md#published-prices-and-cost-formula).
+Later versions are added beside this one in `smythe.pricing.PRICE_TABLES`, so
+a saved receipt or journaled call keeps the rates of the
+[version it recorded](workflow-accounting.md#price-versions).
 
 Pricing uses the returned model and effective service tier. Missing cache
 counters, invalid numeric types, unsupported model identities or tiers, and

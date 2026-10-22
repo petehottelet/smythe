@@ -139,6 +139,11 @@ dispatching an artifact call:
 smythe jobs validate job.yaml
 ```
 
+Validation also rejects an artifact the profile cannot produce. An `offline`
+profile emits 1x1 PNGs, so it accepts only `image/png` with no dimensions or
+1x1. A `gemini_image` profile accepts only PNG, JPEG, GIF or WebP. The
+[support matrix](support-matrix.md) lists every profile's checks.
+
 Planning prints the expanded plan and an approval token:
 
 ```bash
@@ -220,9 +225,9 @@ with file hard-link support. An unsupported filesystem, conflicting owner, or
 existing destination fails without replacing earlier bytes. A collision found
 after a provider response remains an unknown outcome for explicit investigation.
 
-The local journal derives an idempotency key for every attempt, but Jobs v1
-does not yet transmit that key to every upstream provider. It is durable local
-identity, not a claim that an external API will deduplicate a repeated call.
+The local journal derives an idempotency key for every attempt from its run,
+operation, and attempt number. It is a local correlation key: Jobs transmits it
+to no provider, so no external API can use it to deduplicate a repeated call.
 
 Inspect current state and, optionally, the append-only event sequence:
 

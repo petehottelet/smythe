@@ -3,17 +3,19 @@
 from __future__ import annotations
 
 import asyncio
+import inspect
 import time
 
 import pytest
 
+from smythe.assets import ValidationReport, advisory_finding, hard_finding
 from smythe.async_executor import AsyncExecutor
 from smythe.executor import Executor
 from smythe.graph import ExecutionGraph, Node, NodeStatus, Topology
 from smythe.provider import CompletionResult, Provider
 from smythe.registry import Registry
 from smythe.tracer import Tracer
-from smythe.verifier import CallableVerifier, TokenVerifier, Verdict
+from smythe.verifier import CallableVerifier, TokenVerifier, Verdict, Verifier
 
 
 class ScriptedProvider(Provider):
@@ -375,6 +377,97 @@ def test_callable_verifier_accepts_bool_or_verdict():
     assert verdict.reason == "too short"
 
 
+def _callable_verdict(result):
+    return CallableVerifier(lambda v, t: result).verdict(
+        Node(id="j", label="j"), Node(id="t", label="t"),
+    )
+
+
+@pytest.mark.parametrize(("result", "kind"), [
+    pytest.param("FAIL", "str", id="string-FAIL"),
+    pytest.param("PASS", "str", id="string-PASS"),
+    pytest.param(["missing heading"], "list", id="findings"),
+    pytest.param([], "list", id="no-findings"),
+    pytest.param(1, "int", id="one"),
+    pytest.param(None, "NoneType", id="none"),
+    pytest.param({"passed": True}, "dict", id="dict"),
+])
+def test_callable_verifier_fails_closed_on_other_results(result, kind):
+    """Only a bool or a bool ``passed`` attribute decides a gate; truthiness does not."""
+    verdict = _callable_verdict(result)
+    assert verdict.passed is False
+    assert verdict.reason == f"verifier returned {kind}"
+
+
+def test_callable_verifier_maps_a_validation_report():
+    failing = ValidationReport("ad.png", (
+        advisory_finding("palette_drift", "palette drifts from the brand"),
+        hard_finding("size_mismatch", "image is 512x512, expected 1024x1024"),
+        hard_finding("blank_image", "image is blank"),
+    ))
+    verdict = _callable_verdict(failing)
+    assert verdict.passed is False
+    assert verdict.reason == (
+        "size_mismatch: image is 512x512, expected 1024x1024; blank_image: image is blank"
+    )
+
+    advisory_only = ValidationReport("ad.png", (
+        advisory_finding("palette_drift", "palette drifts from the brand"),
+    ))
+    assert _callable_verdict(advisory_only) == Verdict(passed=True)
+
+
+class _Report:
+    def __init__(self, passed, **fields) -> None:
+        self.passed = passed
+        self.__dict__.update(fields)
+
+
+@pytest.mark.parametrize(("result", "expected"), [
+    pytest.param(_Report(False, reason="two claims lack sources"),
+                 Verdict(passed=False, reason="two claims lack sources"), id="reason"),
+    pytest.param(_Report(False, summary="1 hard finding"),
+                 Verdict(passed=False, reason="1 hard finding"), id="summary"),
+    pytest.param(_Report(True), Verdict(passed=True), id="pass"),
+])
+def test_callable_verifier_reads_a_bool_passed_attribute(result, expected):
+    assert _callable_verdict(result) == expected
+
+
+@pytest.mark.parametrize(("result", "reason"), [
+    pytest.param(Verdict(passed="no"),
+                 "verifier returned smythe.verifier.Verdict whose 'passed' is not a bool: 'no'",
+                 id="verdict-string"),
+    pytest.param(Verdict(passed=1),
+                 "verifier returned smythe.verifier.Verdict whose 'passed' is not a bool: 1",
+                 id="verdict-int"),
+    pytest.param(_Report("false"),
+                 f"verifier returned {__name__}._Report whose 'passed' is not a bool: 'false'",
+                 id="report-string"),
+])
+def test_callable_verifier_rejects_a_passed_value_that_is_not_a_bool(result, reason):
+    assert _callable_verdict(result) == Verdict(passed=False, reason=reason)
+
+
+def test_callable_verifier_closes_and_fails_a_coroutine():
+    """An async function's coroutine is never awaited, so it cannot pass a gate."""
+    async def judge(verifier_node, target):
+        return True
+
+    created = []
+
+    def call(verifier_node, target):
+        created.append(judge(verifier_node, target))
+        return created[-1]
+
+    node, target = Node(id="j", label="j"), Node(id="t", label="t")
+    verdict = CallableVerifier(call).verdict(node, target)
+    assert verdict.passed is False
+    assert verdict.reason.startswith("verifier returned coroutine")
+    assert inspect.getcoroutinestate(created[0]) == inspect.CORO_CLOSED
+    assert CallableVerifier(judge).verdict(node, target).passed is False
+
+
 # ---------------------------------------------------------------------------
 # Regeneration
 # ---------------------------------------------------------------------------
@@ -469,6 +562,64 @@ def test_custom_verifier_gates_objectively():
 
     assert provider.runs["draft"] == 2
     assert graph.nodes[0].result.startswith("a much longer")
+
+
+def test_callable_verifier_findings_send_the_target_back():
+    """A non-empty list of findings is a failure, not a truthy pass."""
+    graph = _gated_graph(max_regenerations=1)
+    provider = ScriptedProvider({"draft": ["v1", "v2"], "judge": ["anything"]})
+    verifier = CallableVerifier(
+        lambda v, target: ["missing heading"] if target.result == "v1" else True,
+    )
+    _run(graph, provider, verifier=verifier)
+
+    assert provider.runs["draft"] == 2
+    assert graph.nodes[0].result == "v2"
+
+
+class _QueuedVerifier(Verifier):
+    """Returns queued verdicts in order, whatever the judge wrote."""
+
+    def __init__(self, *verdicts: Verdict) -> None:
+        self._verdicts = list(verdicts)
+
+    def verdict(self, verifier_node, verified_node) -> Verdict:
+        return self._verdicts.pop(0)
+
+
+@pytest.mark.parametrize("sync", [False, True])
+@pytest.mark.parametrize("passed", ["false", "no", 1, None])
+def test_verdict_passed_must_be_exactly_true(passed, sync):
+    """A truthy ``passed`` such as the string "false" is a failed verdict."""
+    graph = _gated_graph(max_regenerations=2)
+    tracer = Tracer()
+    provider = ScriptedProvider({"draft": ["v1", "v2"], "judge": ["anything"]})
+    verifier = _QueuedVerifier(
+        Verdict(passed=passed, reason="judge said no"), Verdict(passed=True, reason="fine"),
+    )
+    _run(graph, provider, tracer=tracer, verifier=verifier, sync=sync)
+
+    assert provider.runs["draft"] == 2
+    assert graph.nodes[0].result == "v2"
+    judge = graph.nodes[1].metadata
+    assert judge["regenerations_used"] == 1
+    assert judge["verification_receipt"]["passed"] is True
+    [event] = [s for s in tracer.summary() if "regeneration" in s]
+    assert event["label"] == f"verdict 'passed' must be a bool, got {passed!r}: judge said no"
+
+
+@pytest.mark.parametrize("sync", [False, True])
+@pytest.mark.parametrize("reason", [None, ["missing heading"]])
+def test_failed_verdict_without_a_text_reason_still_regenerates(reason, sync):
+    """A custom verifier's missing or non-text reason sends work back, not the run down."""
+    graph = _gated_graph(max_regenerations=2)
+    provider = ScriptedProvider({"draft": ["v1", "v2"], "judge": ["anything"]})
+    verifier = _QueuedVerifier(Verdict(passed=False, reason=reason), Verdict(passed=True, reason="fine"))
+    _run(graph, provider, verifier=verifier, sync=sync)
+
+    assert provider.runs["draft"] == 2
+    assert graph.nodes[0].result == "v2"
+    assert graph.nodes[1].metadata["verification_receipt"]["passed"] is True
 
 
 def test_sync_executor_regenerates():

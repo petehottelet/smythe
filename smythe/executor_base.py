@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+import math
 import os
 import random
 import re
@@ -31,8 +32,8 @@ from smythe.task import render_task, snapshot_task
 from smythe.tools import ChatMessage, ToolLoopLimitError, ToolResult, ToolRuntime
 from smythe.tracer import Tracer
 from smythe.verifier import (
-    TokenVerifier, Verifier, VerificationRecoveryError, node_generation, verification_integer,
-    validate_verification_receipt,
+    TokenVerifier, Verifier, VerificationRecoveryError, node_generation, rejection_reason,
+    verification_integer, validate_verification_receipt,
 )
 from smythe.workflow_store import WorkflowError
 
@@ -53,6 +54,39 @@ def _raise_workflow_error(error: BaseException) -> None:
                 _raise_workflow_error(child)
             except WorkflowError as found:
                 raise found from error
+
+
+def validate_retry_backoff_s(value: float) -> float:
+    """Accept a finite, non-negative retry backoff in seconds.
+
+    A bool is not a number here. NaN would make every retry delay NaN, and
+    infinity (or an integer too large for a float) would make a retry sleep
+    forever or overflow when the delay is drawn.
+    """
+    message = f"retry_backoff_s must be a finite non-negative number, got {value!r}"
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise ValueError(message)
+    try:
+        finite = math.isfinite(value)
+    except OverflowError:
+        finite = False
+    if not finite or value < 0:
+        raise ValueError(message)
+    return value
+
+
+def validate_max_revisions(value: int) -> int:
+    """Accept a non-negative cap on supervisor revisions."""
+    if value < 0:
+        raise ValueError(f"max_revisions must be >= 0, got {value}")
+    return value
+
+
+def validate_max_concurrency(value: int | None) -> int | None:
+    """Accept a positive node concurrency cap, or None for unlimited."""
+    if value is not None and value < 1:
+        raise ValueError(f"max_concurrency must be >= 1, got {value}")
+    return value
 
 
 class NodeFinalizationError(PicklableError, RuntimeError):
@@ -171,13 +205,9 @@ class ExecutorBase:
         self._prepared_graph: ExecutionGraph | None = None
         self._node_lookup: dict[str, Node] = {}
         self._dependent_ids: set[str] = set()
-        if retry_backoff_s < 0:
-            raise ValueError(f"retry_backoff_s must be >= 0, got {retry_backoff_s}")
-        self._retry_backoff_s = retry_backoff_s
-        if max_revisions < 0:
-            raise ValueError(f"max_revisions must be >= 0, got {max_revisions}")
+        self._retry_backoff_s = validate_retry_backoff_s(retry_backoff_s)
+        self._max_revisions = validate_max_revisions(max_revisions)
         self._supervisor = supervisor
-        self._max_revisions = max_revisions
         self._default_task = snapshot_task(task) if task is not None else None
         self._task = snapshot_task(self._default_task) if self._default_task is not None else None
         # Restored from the checkpoint on resume: the revision cap is a
@@ -205,6 +235,7 @@ class ExecutorBase:
         if remaining <= 0:
             return False
 
+        started = self._tracer.now()
         try:
             revision = await self._supervisor.review(
                 graph, node, task=snapshot_task(self._task) if self._task is not None else None,
@@ -238,6 +269,8 @@ class ExecutorBase:
             )
             self.notify_supervision_update(node, False)
             return False
+        finally:
+            self._tracer.add_phase("supervision", self._tracer.since(started))
         if revision is None or revision.is_empty:
             self.notify_supervision_update(node, False)
             return False
@@ -357,13 +390,14 @@ class ExecutorBase:
             self.notify_control_update(node)
             return None
         verdict = self._verifier.verdict(node, target)
-        if verdict.passed:
+        # Only an exact True passes; a truthy "false" from a custom verifier fails.
+        if verdict.passed is True:
             node.metadata["verification_receipt"] = dict(receipt, state="consumed", passed=True, reason=verdict.reason)
             self.notify_control_update(node)
             return None
         intent = {
             "version": 1, "target_id": target.id, "target_generation": node_generation(target),
-            "judge_generation": node_generation(node), "reason": verdict.reason,
+            "judge_generation": node_generation(node), "reason": rejection_reason(verdict),
             "regenerations_used": used + 1,
             "affected_generations": {n.id: node_generation(n) for n in self._affected_nodes(target, graph)},
         }
@@ -497,6 +531,19 @@ class ExecutorBase:
             return 0.0
         ceiling = self._retry_backoff_s * (2 ** (attempt - 1))
         return random.uniform(0, ceiling)
+
+    def _end_failed_attempt(self, node: Node) -> None:
+        """Close the span of an attempt that raised, recording it as failed.
+
+        The node itself stays in flight until its failure policy settles
+        it, so a retry backoff or a cancellation still sees it running.
+        """
+        status = node.status
+        node.status = NodeStatus.FAILED
+        try:
+            self._tracer.on_node_end(node)
+        finally:
+            node.status = status
 
     def _reserve_node(self, node: Node) -> None:
         """Reserve this executor's pre-call estimate for one node."""

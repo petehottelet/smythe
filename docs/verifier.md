@@ -5,9 +5,11 @@ is an ordinary node: planned, budgeted, traced, and checkpointed. It declares
 which node it judges:
 
 > **Lead with objective checks.** Image dimensions, schema conformance,
-> required sections, hashes, and domain rules have definitive verdicts and no
-> judging cost. Use `CallableVerifier` for those contracts. Reserve
-> `TokenVerifier` for a criterion that genuinely requires model judgment; the
+> required sections, hashes, and domain rules have definitive verdicts that a
+> local function can compute. Use `CallableVerifier` for those contracts. Only
+> the verdict is model-free: the gate node still runs like any other node and
+> makes its own provider call ([cost](#cost)). Reserve `TokenVerifier` for a
+> criterion that genuinely requires model judgment; the
 > [control ablation](../benchmarks/control_ablation.md) shows why generic prose
 > review is not the default gate.
 
@@ -158,7 +160,7 @@ readable verdict is the norm.
 
 ## Gating without a model
 
-Most useful gates are objective and need no LLM at all — image
+Most useful gates are objective, and their verdict needs no LLM — image
 dimensions, JSON schema conformance, a required section:
 
 ```python
@@ -170,8 +172,27 @@ long_enough = CallableVerifier(
 swarm = Swarm(verifier=long_enough, ...)
 ```
 
-A `CallableVerifier` can return a bool or a `Verdict(passed=..., reason=...)`
-when you want the reason recorded in the trace.
+The function decides the gate only through an explicit bool. It may return:
+
+- `True` or `False`;
+- a `Verdict(passed=..., reason=...)` whose `passed` is a bool, when you want
+  the reason recorded in the trace; or
+- an object with a bool `passed` attribute, such as a
+  `smythe.assets.ValidationReport`. Its `reason` or `summary` string becomes
+  the verdict's reason; a failing report without either lists up to four of
+  its hard findings as `code: message`.
+
+Anything else **fails** the gate, with a reason that names the returned type
+(`verifier returned str`). The string `"FAIL"`, a non-empty list of
+findings, `None`, `1`, a NumPy boolean, and a `passed` that is not a bool are
+not verdicts, so return `bool(...)` when a check produces another type. The
+function is called synchronously: an `async def` function's coroutine is
+closed without running, and the gate fails.
+
+The executor holds every `Verifier` to the same rule: a verdict passes only
+when its `passed` is exactly `True`. A custom verifier's
+`Verdict(passed="false")` or `Verdict(passed=1)` is a failed verdict, and the
+regeneration span records `verdict 'passed' must be a bool`.
 
 ## Gating from YAML and from a generated plan
 
@@ -219,6 +240,13 @@ synthesis excludes verifier nodes, so a gated run returns the artefact
 rather than the "PASS" that approved it.
 
 ## Cost
+
+A gate node is executed like any other node: it makes a provider call. When
+the gate has `max_regenerations` above 0, the verifier then computes the
+verdict from that call's result. A durable workflow, which accepts only
+`TokenVerifier`, journals the call in the `verification` phase. A
+`CallableVerifier` replaces only the verdict computation, so an objective gate
+still pays for its node's call, and again after each regeneration.
 
 Regeneration buys another provider call, so it is bounded per verifier
 by `max_regenerations` (default `0`, which makes the verdict advisory

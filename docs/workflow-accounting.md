@@ -196,6 +196,43 @@ all recorded phases and failed attempts, using the adapter's dated published
 token prices. It does not represent a reconciled account invoice or hardware,
 human, and external service costs. No historical benchmark is repriced.
 
+## Price versions
+
+Each native call records the price version it was admitted under, and its
+journal binding covers that version. `smythe.pricing.PRICE_TABLES` and
+`smythe.pricing_anthropic.PRICE_TABLES` register every version by name, and
+`PRICE_VERSION` in each module names the current one. A release that changes
+prices or the supported models adds a version and keeps the earlier ones
+registered.
+
+A new call must use the current version and a model that version prices. A
+saved call is verified by recomputing its stored binding instead of applying
+the current request rules: its version must still be registered and must
+price its model. Lookup, inspection, audit and recovery therefore keep working
+after such a release, and the call's quote and settlement use the rates of
+the version it recorded. A stored receipt never changes, and settling the
+same evidence again produces the same bytes. A journal that names a version
+this release does not register, such as one written by a newer release, is
+reported as corrupt.
+
+A price table can give a model a retirement date (`PriceTable.retired_on`).
+From that day, by the journal clock in UTC, a durable run admits no new call to
+that model and does not send a saved call to it that was never sent. Preparing
+such a call again, reserving it or claiming its dispatch raises
+`WorkflowValidationError`, so a resumed run neither quotes nor sends it. The
+call keeps its state and recorded price version, and
+`release_before_dispatch` frees its reservation. Calls to the model that were
+already sent remain readable and still settle and replay.
+
+A run saved before such a release resumes. The provider descriptions in its
+saved recipe may name an earlier registered price version and a different
+supported model list; every other recipe field must still match exactly.
+Each saved call replays under the price version it recorded, including a call
+that was prepared or quoted but not yet sent, unless its model has since
+retired, and every new call uses the current version. A run's total can
+therefore combine charges at two price versions, and each call's receipt names
+its own. The configured model must still be one the current version prices.
+
 ## Recovery boundaries
 
 Each call has a stable phase, component or node scope, generation, invocation,
@@ -219,6 +256,10 @@ The SQLite journal uses WAL, full synchronization, fenced leases, and checkpoint
 revisions. Heartbeats renew ownership during calls. A former owner can append
 immutable late evidence for its exact dispatch, but cannot advance the run.
 Recovery settles available late evidence before admitting new work.
+Each plan, execute or resume entry audits the whole journal once when it
+starts. A checkpoint saved during the run reads only the calls it consumes
+and, once a node has been regenerated, the keys of settled calls, so its cost
+does not grow with the run's events, evidence or earlier checkpoints.
 
 A 0.8.0 journal holds every saved 4xx error response as unknown exposure. On
 resume, 0.8.1 settles a saved response that meets the zero-cost conditions
@@ -235,23 +276,28 @@ Competing openers reuse that identity. Failed initialization rolls back;
 existing evidence and read-only inspection retain their behavior.
 
 Resume requires the same component descriptions, model configuration, budget,
-retry backoff, and concurrency policy. It does not refill allowances. An
+retry backoff, and concurrency policy, apart from the
+[price versions](#price-versions) of saved provider descriptions. It does not
+refill allowances. An
 inspected pending plan can be edited before execution; a stale graph from an
 already progressing run must use `resume()`. A graph carrying durable
 provenance cannot enter the ordinary unjournaled execution path.
 
 ## Supported scope
 
-The initial managed path supports plain text with the exact built-in native
-Responses provider for Astra and Sol, or stateless `OfflineProvider` plan/echo
-fixtures. It binds the built-in simple, LLM, and constrained architects,
+The managed path supports plain text with three exact built-in providers:
+native `OpenAIResponsesProvider` for `gpt-6-astra` and `gpt-5.6-sol`, native
+`AnthropicMessagesProvider` for `claude-fable-5-1`, and stateless
+`OfflineProvider` plan/echo fixtures. Both native providers use their global
+endpoints. The path binds the built-in simple, LLM, and constrained architects,
 WhiteRabbit routing, static registries, LLM supervision, synthesis strategies,
 and token verification. Every reachable router tier and template is checked
 before routing can make a paid call. Provider instances are snapshotted per run.
 
-The [Fable 5.1 benchmark extension](../benchmarks/fable_51_benchmark_plan.md)
-requires a native Claude Messages adapter and journal integration. That support
-is planned; the ordinary `AnthropicProvider` cannot enter this managed path.
+[Native Claude Messages](anthropic-messages.md) shares this journal and runs
+the [Fable 5.1 benchmark extension](../benchmarks/fable_51_benchmark_plan.md).
+The ordinary `AnthropicProvider` cannot enter this managed path, and neither
+can subclasses of the supported providers.
 
 Custom local architects, template builders, supervisors, and synthesizers use
 `LocalOnly(factory, identity, version, role=...)`. The factory must return a fresh
@@ -262,13 +308,19 @@ explicit caller contract, not a sandbox. Arbitrary paid custom components,
 scripted offline response cursors, tools, image attachments, active capability
 hydration, live planner memory, and a separate checkpoint store are rejected.
 Those features remain available through the ordinary Swarm and artifact Jobs
-APIs within their documented accounting scopes.
+APIs within their documented accounting scopes. A rejected `run_store`,
+`verifier`, `memory`, `tool_runtime` or `checkpoint_store` raises
+`WorkflowBindingError` with a message that starts with that argument's name.
+The [support matrix](support-matrix.md) lists each accepted and rejected
+combination with the test behind it.
 
 ## Inspect a run
 
 `store.list_runs()` finds run IDs, including runs interrupted during planning.
 `store.inspect_run(execution_id)` returns safe call summaries, exact balances,
-hashes, and events. `store.audit(execution_id)` verifies accounting and evidence
+hashes, and events. `store.lease_sessions(execution_id)` returns the
+journal-clock bounds of each lease session, which a durable result reports as
+its [timing](execution.md#timing). `store.audit(execution_id)` verifies accounting and evidence
 bindings. Open `SQLiteWorkflowStore(path, read_only=True)` for inspection without
 schema changes or provider construction. Explicit `load_replay()` and
 `load_evidence()` calls expose sensitive saved text and raw provider responses;

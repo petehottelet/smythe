@@ -11,6 +11,7 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from contextlib import contextmanager
 from dataclasses import asdict, dataclass
+from datetime import datetime, timezone
 import hashlib
 import json
 import os
@@ -23,14 +24,18 @@ import time
 from typing import Any
 from uuid import uuid4
 
+from smythe import pricing, pricing_anthropic
 from smythe._sqlite import enable_wal
-from smythe.pricing import PRICE_VERSION, conservative_quote, price_native_response
 
 STORE_VERSION = 1
 STORE_KIND = "smythe.workflow"
 OFFLINE_PRICE_VERSION = "offline-zero-v1"
 _MONEY = re.compile(r"0|[1-9][0-9]*")
 _PHASES = {"routing", "planning", "execution", "verification", "supervision", "synthesis"}
+_PRICED_KINDS = {"openai_responses": pricing, "anthropic_messages": pricing_anthropic}
+_OUTPUT_CAPS = {"openai_responses": "max_output_tokens", "anthropic_messages": "max_tokens"}
+# States of a call whose request has never been sent.
+_UNSENT = frozenset({"prepared", "quoted", "reserved", "released"})
 
 
 class WorkflowError(RuntimeError):
@@ -143,6 +148,31 @@ def _loads(value: str | bytes, *, stored=False):
 
 def _sha(value: str | bytes) -> str:
     return hashlib.sha256(value.encode("utf-8") if isinstance(value, str) else value).hexdigest()
+
+
+def _price_table(kind, price_version=None):
+    """Return a native kind's registered price table; ``None`` is the current one.
+
+    Raises ValueError for an offline kind or an unregistered version.
+    """
+    if kind not in _PRICED_KINDS:
+        raise ValueError("Offline calls have no price table")
+    return _PRICED_KINDS[kind].price_table(price_version)
+
+
+def _registered_price_version(kind, price_version):
+    """Whether calls of a durable provider kind can still be priced at a version.
+
+    A release that changes prices or models registers a new version beside the
+    earlier ones, so saved calls keep the version they recorded.
+    """
+    if kind == "offline":
+        return price_version == OFFLINE_PRICE_VERSION
+    try:
+        _price_table(kind if type(kind) is str else "", price_version)
+    except ValueError:
+        return False
+    return True
 
 
 def _credential_free(value):
@@ -559,7 +589,8 @@ class SQLiteWorkflowStore:
             return ordinal
 
     @staticmethod
-    def _request_binding(request_json, tool_names_json, provider, price_version):
+    def _binding(request_json, tool_names_json, provider, price_version):
+        """Check a call's JSON shape; return its request, kind and binding hash."""
         request, names = _loads(request_json), _loads(tool_names_json)
         if type(request) is not dict or type(names) is not dict or type(provider) is not dict:
             raise WorkflowValidationError("Request, tool map and provider must be JSON objects")
@@ -571,10 +602,61 @@ class SQLiteWorkflowStore:
         for version in ("adapter_version", "decoder_version"):
             _text(provider.get(version), version)
         _text(price_version, "price_version")
+        provider_json = _canonical(provider)
+        _credential_free(provider)
+        binding = _sha(_canonical([request_json, tool_names_json, provider_json, price_version]))
+        return request, names, kind, binding
+
+    @staticmethod
+    def _stored_binding(row, provider):
+        """Re-verify a saved call by recomputing its binding, not by today's rules.
+
+        The call was admitted under the rules of the release that saved it. Its
+        price version must still be registered and price its model, which is
+        what quoting and settlement need; a later price version, model list or
+        request rule leaves it readable.
+        """
+        request, _, kind, binding = SQLiteWorkflowStore._binding(
+            row["request_json"], row["tool_names_json"], provider, row["price_version"])
+        if not _registered_price_version(kind, row["price_version"]):
+            raise WorkflowValidationError("Call price version is not registered")
+        if kind != "offline":
+            cap = request.get(_OUTPUT_CAPS[kind])
+            if (not _price_table(kind, row["price_version"]).prices(request.get("model"))
+                    or type(cap) is not int or cap < 1):
+                raise WorkflowValidationError("Call model or output cap is not priced")
+        return binding
+
+    def _admit_model(self, kind, model):
+        """Refuse a model the current price table does not admit today.
+
+        Today is the journal clock's date in UTC. A retirement date refuses a
+        new call and the first dispatch of a saved call never sent, which
+        otherwise keeps its recorded price version. Reading, settling and
+        replaying a call already sent are unaffected.
+        """
+        if kind in _PRICED_KINDS:
+            today = datetime.fromtimestamp(self._clock_ns() // 1_000_000_000, timezone.utc).date()
+            if not _price_table(kind).admits(model, today):
+                raise WorkflowValidationError("Model is retired and admits no new calls")
+
+    def _admit_unsent(self, call):
+        """Apply today's retirement dates to a saved call before it is sent."""
+        self._admit_model(_loads(call["provider_json"], stored=True)["kind"],
+                          _loads(call["request_json"], stored=True).get("model"))
+
+    def _admission_binding(self, request_json, tool_names_json, provider, price_version):
+        """Validate a new call against the current price version and wire rules.
+
+        A retirement date in the current price table refuses new calls to that
+        model from that day, by the journal clock in UTC.
+        """
+        request, names, kind, _ = self._binding(request_json, tool_names_json, provider, price_version)
+        table = None if kind == "offline" else _price_table(kind)
         if kind == "openai_responses":
-            if price_version != PRICE_VERSION:
+            if price_version != table.price_version:
                 raise WorkflowValidationError("Unsupported native price version")
-            if request.get("model") not in ("gpt-6-astra", "gpt-5.6-sol") or request.get("service_tier") != "default":
+            if not table.prices(request.get("model")) or request.get("service_tier") != "default":
                 raise WorkflowValidationError("Unsupported native billing identity")
             if provider.get("endpoint", "https://api.openai.com/v1") != "https://api.openai.com/v1":
                 raise WorkflowValidationError("Durable native endpoint must be global")
@@ -593,42 +675,65 @@ class SQLiteWorkflowStore:
             except (TypeError, ValueError, KeyError) as exc:
                 raise WorkflowValidationError("Native request is outside supported text workflow scope") from exc
         elif kind == "anthropic_messages":
-            from smythe.pricing_anthropic import PRICE_VERSION as MESSAGES_PRICE_VERSION
             from smythe.provider_messages import AnthropicMessagesProvider
             from smythe.provider_responses import PreparedRequest
-            if (price_version != MESSAGES_PRICE_VERSION
+            if (price_version != table.price_version
                     or provider.get("endpoint_scope") != "global"
                     or provider.get("endpoint", "https://api.anthropic.com") != "https://api.anthropic.com"):
                 raise WorkflowValidationError("Unsupported Messages price version or endpoint")
             try:
+                if not table.prices(request.get("model")):
+                    raise ValueError("Unpriced Messages model")
                 AnthropicMessagesProvider._validate_prepared(PreparedRequest(request_json, tool_names_json))
             except (TypeError, ValueError, KeyError) as exc:
                 raise WorkflowValidationError("Unsupported durable Messages request") from exc
         elif price_version != OFFLINE_PRICE_VERSION:
             raise WorkflowValidationError("Offline calls require the explicit zero-cost price version")
-        provider_json = _canonical(provider)
-        _credential_free(provider)
-        binding = _sha(_canonical([request_json, tool_names_json, provider_json, price_version]))
-        return provider_json, binding
+        self._admit_model(kind, request.get("model"))
+
+    @staticmethod
+    def _repriced(record, request_json, tool_names_json, provider, price_version):
+        """Whether a saved call is this request under another registered price version.
+
+        Only the price version and the provider description's price_version and
+        supported_models may differ, as after a release that adds a version or
+        a model. The saved call keeps its binding, so its quote, settlement and
+        receipt use the version it recorded, even if it was not yet sent.
+        """
+        def unpriced(description):
+            return _canonical({name: value for name, value in description.items()
+                               if name not in ("price_version", "supported_models")})
+
+        return (record["request_json"] == request_json and record["tool_names_json"] == tool_names_json
+                and unpriced(record["provider"]) == unpriced(provider)
+                and _registered_price_version(provider["kind"], price_version))
 
     def prepare_call(self, lease, key, *, request_json, tool_names_json="{}", provider, price_version):
         if not isinstance(key, CallKey):
             raise WorkflowValidationError("Expected CallKey")
-        provider_json, binding = self._request_binding(request_json, tool_names_json, provider, price_version)
+        _, _, _, binding = self._binding(request_json, tool_names_json, provider, price_version)
         key_json = _canonical(asdict(key))
         with self._transaction() as db:
             run = self._lease(db, lease)
             existing = db.execute("SELECT * FROM workflow_calls WHERE run_id=? AND key_json=?", (lease.run_id, key_json)).fetchone()
             if existing:
-                if existing["binding_sha"] != binding:
+                record = self._call_record(existing)
+                if (existing["binding_sha"] != binding
+                        and not self._repriced(record, request_json, tool_names_json, provider, price_version)):
                     raise WorkflowConflictError("Logical call has different immutable request bindings")
-                return self._call_record(existing)
+                if record["state"] in _UNSENT:
+                    # Refuse before its quote or dispatch request is made.
+                    self._admit_unsent(existing)
+                return record
+            # A saved call keeps the rules it was admitted under; a new one
+            # must satisfy the current price version and wire rules.
+            self._admission_binding(request_json, tool_names_json, provider, price_version)
             self._admit(run)
             call_id, now = uuid4().hex, self._clock_ns()
             db.execute("""INSERT INTO workflow_calls(call_id,run_id,key_json,request_json,tool_names_json,
               provider_json,price_version,binding_sha,request_sha,state,billing_state,result_state,reserved,unknown,created,updated)
               VALUES (?,?,?,?,?,?,?,?,?,'prepared','unquoted','pending','0','0',?,?)""",
-                       (call_id, lease.run_id, key_json, request_json, tool_names_json, provider_json,
+                       (call_id, lease.run_id, key_json, request_json, tool_names_json, _canonical(provider),
                         price_version, binding, _sha(request_json), now, now))
             self._event(db, lease.run_id, "call_prepared", call_id=call_id, payload={"key": asdict(key)})
             return self._call_record(self._call(db, call_id))
@@ -658,6 +763,38 @@ class SQLiteWorkflowStore:
                     return True
             return False
 
+    def superseded_node_calls(self, run_id, generations):
+        """IDs of settled calls that earlier generations of graph nodes made.
+
+        ``generations`` maps node ids to their current generation. An execution
+        or verification call scoped ``node/<id>`` qualifies when its generation
+        is lower than that node's, its billing is known and its result was
+        accepted, rejected or applied. Only settled calls' keys are read, and
+        nothing is read until a node has been regenerated, so a checkpoint
+        need not audit the whole journal.
+        """
+        if not isinstance(generations, Mapping):
+            raise WorkflowValidationError("Node generations must be a mapping")
+        for generation in generations.values():
+            _integer(generation, "generation")
+        if not any(generations.values()):
+            return []
+        with self._transaction(write=False) as db:
+            self._run(db, run_id)
+            result = []
+            for row in db.execute("""SELECT call_id,key_json FROM workflow_calls WHERE run_id=? AND
+              billing_state='known' AND result_state IN ('accepted','rejected','applied')
+              ORDER BY created,call_id""", (run_id,)):
+                try:
+                    key = CallKey(**_loads(row["key_json"], stored=True))
+                except (WorkflowValidationError, TypeError) as exc:
+                    raise WorkflowCorruptionError("Call key is invalid") from exc
+                node = key.scope_id.removeprefix("node/")
+                if (key.phase in ("execution", "verification") and key.scope_id.startswith("node/")
+                        and node in generations and key.generation < generations[node]):
+                    result.append(row["call_id"])
+            return result
+
     @staticmethod
     def _call_record(row):
         request = _loads(row["request_json"], stored=True)
@@ -666,7 +803,7 @@ class SQLiteWorkflowStore:
         key = _loads(row["key_json"], stored=True)
         try:
             CallKey(**key)
-            _, binding = SQLiteWorkflowStore._request_binding(row["request_json"], row["tool_names_json"], provider, row["price_version"])
+            binding = SQLiteWorkflowStore._stored_binding(row, provider)
         except (WorkflowValidationError, TypeError, KeyError) as exc:
             raise WorkflowCorruptionError("Call bindings are invalid") from exc
         if binding != row["binding_sha"] or _sha(row["request_json"]) != row["request_sha"]:
@@ -795,16 +932,18 @@ class SQLiteWorkflowStore:
         provider = _loads(call["provider_json"], stored=True)
         request = _loads(call["request_json"], stored=True)
         count = _integer(raw.get("input_tokens"), "input_tokens")
+        # A quote uses the rates of the price version the call recorded.
         if provider["kind"] == "offline":
             if (raw != {"provider_kind": "offline", "version": 1, "input_tokens": 0}
                     or type(raw.get("version")) is not int):
                 raise WorkflowValidationError("Invalid offline quote evidence")
             ceiling = 0
         elif provider["kind"] == "anthropic_messages":
-            from smythe.pricing_anthropic import messages_quote_nanousd
-            ceiling = messages_quote_nanousd(count, request["max_tokens"], request["model"])
+            ceiling = pricing_anthropic.messages_quote_nanousd(
+                count, request["max_tokens"], request["model"], price_version=call["price_version"])
         else:
-            quote = conservative_quote(count, request["max_output_tokens"], request["model"])
+            quote = pricing.conservative_quote(count, request["max_output_tokens"], request["model"],
+                                               price_version=call["price_version"])
             digits = quote.as_tuple()
             coefficient = int("".join(map(str, digits.digits)))
             exponent = digits.exponent + 9
@@ -835,6 +974,8 @@ class SQLiteWorkflowStore:
             self._admit(run)
             if call["quote_id"] != quote_id or quote_id is None:
                 raise WorkflowConflictError("Reservation quote does not match the call")
+            if call["state"] in _UNSENT:
+                self._admit_unsent(call)
             ceiling = _amount(call["ceiling"])
             if call["state"] == "reserved":
                 return CallPermit(call_id, lease.run_id, ceiling)
@@ -858,6 +999,7 @@ class SQLiteWorkflowStore:
                 raise WorkflowConflictError("Dispatch request does not match the reserved request")
             if call["state"] != "reserved" or call["dispatch_token_sha"] is not None:
                 raise WorkflowStateError("Dispatch has already been claimed or was never reserved")
+            self._admit_unsent(call)
             token = secrets.token_hex(32)
             db.execute("UPDATE workflow_calls SET state='dispatched',dispatch_token_sha=?,dispatch_epoch=?,updated=? WHERE call_id=?",
                        (_sha(token), lease.epoch, self._clock_ns(), call_id))
@@ -943,11 +1085,14 @@ class SQLiteWorkflowStore:
                            "pricing_scope": "zero_external_api_cost", "cost_nanousd": "0" if valid else None,
                            "cost_usd": "0" if valid else None, "cost_is_complete": valid}
             else:
+                # Saved evidence settles at the price version the call recorded,
+                # so its receipt is the same whichever release settles it.
                 if provider["kind"] == "anthropic_messages":
-                    from smythe.pricing_anthropic import price_messages_response
-                    native = price_messages_response(raw, requested_model=request["model"])
+                    native = pricing_anthropic.price_messages_response(
+                        raw, requested_model=request["model"], price_version=call["price_version"])
                 else:
-                    native = price_native_response(raw, requested_model=request["model"])
+                    native = pricing.price_native_response(
+                        raw, requested_model=request["model"], price_version=call["price_version"])
                 cost, receipt = native.cost_nanousd, native.safe_summary()
                 rejection = _http_rejection_receipt(evidence, raw, call["price_version"])
                 if rejection is not None:
@@ -1310,6 +1455,37 @@ class SQLiteWorkflowStore:
                     "events": [{"sequence": row["sequence"], "call_id": row["call_id"], "type": row["event_type"],
                                 "data": _loads(row["payload_json"], stored=True)}
                                for row in db.execute("SELECT * FROM workflow_events WHERE run_id=? ORDER BY sequence", (run_id,))]}
+
+    def lease_sessions(self, run_id):
+        """Wall-clock bounds of each lease session on a run, oldest first.
+
+        Bounds are journal clock nanoseconds, so they relate sessions held by
+        different processes. A session that still holds the lease ends now.
+        One that never released it, as when its process was killed, ends at
+        its last journal event and is marked interrupted.
+        """
+        with self._transaction(write=False) as db:
+            run, now, sessions = self._run(db, run_id), self._clock_ns(), []
+            for row in db.execute("SELECT event_type,payload_json,created FROM workflow_events "
+                                  "WHERE run_id=? ORDER BY sequence", (run_id,)):
+                kind, created = row["event_type"], row["created"]
+                if kind == "lease_acquired":
+                    epoch = _loads(row["payload_json"], stored=True).get("epoch")
+                    # The same owner renewing its active lease keeps its session.
+                    if not (sessions and sessions[-1]["open"] and sessions[-1]["epoch"] == epoch):
+                        sessions.append({"epoch": epoch, "started_ns": created, "ended_ns": created,
+                                         "open": True})
+                elif sessions and sessions[-1]["open"]:
+                    sessions[-1]["ended_ns"] = created
+                    sessions[-1]["open"] = kind != "lease_released"
+            held = run["owner"] is not None and run["expires"] > now
+            for session in sessions:
+                unreleased = session.pop("open")
+                current = unreleased and held and session["epoch"] == run["epoch"]
+                if current:
+                    session["ended_ns"] = now
+                session["interrupted"] = unreleased and not current
+            return {"created_ns": run["created"], "now_ns": now, "sessions": sessions}
 
     def recover(self, lease):
         with self._transaction() as db:

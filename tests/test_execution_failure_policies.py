@@ -56,7 +56,8 @@ class ScriptedProvider(Provider):
 
 def run(mode, provider, graph, budget, **kwargs):
     options = dict(provider=provider, registry=Registry(), tracer=Tracer(),
-                   budget=budget, artifact_dir=None, **kwargs)
+                   budget=budget, artifact_dir=None)
+    options.update(kwargs)
     if mode == "serial":
         return Executor(**options).run(graph)
     return asyncio.run(AsyncExecutor(**options, max_concurrency=1).run(graph))
@@ -106,6 +107,60 @@ def test_consumed_failure_policy_allows_later_work(mode, policy, failures):
     assert budget.breakdown() == dict.fromkeys(expected_ids, 0.125)
     assert budget.total_cost_usd == len(expected_ids) * 0.125
     assert budget._reservations == {}
+
+
+def problem_spans(tracer):
+    return [(span["status"], span["error"]) for span in tracer.summary()
+            if span["node_id"] == "problem"]
+
+
+@pytest.mark.parametrize("policy,failures,outcome", [
+    (FailurePolicy.RETRY, 2, NodeStatus.COMPLETED),
+    (FailurePolicy.RETRY, 3, NodeStatus.FAILED),
+    (FailurePolicy.HALT, 1, NodeStatus.FAILED),
+    (FailurePolicy.SKIP, 1, NodeStatus.SKIPPED),
+])
+def test_failed_attempt_spans_record_failed_status(mode, policy, failures, outcome):
+    """Regression: an attempt that raised was traced as still running."""
+    errors = [RuntimeError(f"attempt {i}") for i in range(failures)]
+    graph, tracer = make_graph(policy), Tracer()
+
+    if outcome is NodeStatus.FAILED:
+        with pytest.raises(RuntimeError):
+            run(mode, ScriptedProvider(errors), graph, Sentinel(10), tracer=tracer)
+    else:
+        run(mode, ScriptedProvider(errors), graph, Sentinel(10), tracer=tracer)
+
+    assert graph.nodes[1].status is outcome
+    expected = [("failed", str(error)) for error in errors]
+    if outcome is NodeStatus.COMPLETED:
+        expected.append(("completed", None))
+    assert problem_spans(tracer) == expected
+
+
+def test_node_stays_running_between_failed_attempts(mode):
+    """Only the failed attempt's span is marked failed; the node remains in
+    flight until its failure policy settles it."""
+    graph = make_graph(FailurePolicy.RETRY)
+    seen = []
+    base = Executor if mode == "serial" else AsyncExecutor
+
+    class ObservedRetries(base):
+        def retry_delay_s(self, attempt):
+            # Only "problem" retries, and its backoff starts here.
+            if attempt:
+                seen.append(graph.nodes[1].status)
+            return super().retry_delay_s(attempt)
+
+    options = dict(provider=ScriptedProvider([RuntimeError("transient")] * 2),
+                   registry=Registry(), tracer=Tracer(), artifact_dir=None)
+    if mode == "serial":
+        ObservedRetries(**options).run(graph)
+    else:
+        asyncio.run(ObservedRetries(**options, max_concurrency=1).run(graph))
+
+    assert seen == [NodeStatus.RUNNING, NodeStatus.RUNNING]
+    assert graph.nodes[1].status is NodeStatus.COMPLETED
 
 
 class HangingProvider(ScriptedProvider):
@@ -272,6 +327,27 @@ def test_retry_after_truncation_passes_budget_admission_again(mode, hard_ceiling
     assert budget.breakdown() == {"problem": 0.05}
     assert graph.nodes[0].status is NodeStatus.FAILED
     assert budget._reservations == {}
+
+
+def test_terminal_attempt_error_span_records_failed_status(mode):
+    """Regression: serial execution closed a terminal attempt's span before
+    marking the node failed, so the trace showed it still running."""
+    provider, tracer = TruncatingProvider(truncations=3), Tracer()
+    graph = ExecutionGraph([Topology.SERIAL], [
+        Node("problem", id="problem", failure_policy=FailurePolicy.RETRY, max_retries=2),
+    ])
+
+    # The truncated first call spends the budget; the retry's admission check
+    # raises a terminal budget alert inside the second attempt.
+    with pytest.raises(SentinelAlert) as caught:
+        run(mode, provider, graph, Sentinel(0.0625), tracer=tracer)
+
+    assert provider.calls == ["problem"]
+    assert graph.nodes[0].status is NodeStatus.FAILED
+    [(first, truncated), (second, alert)] = problem_spans(tracer)
+    assert (first, second) == ("failed", "failed")
+    assert "truncated" in truncated
+    assert alert == str(caught.value)
 
 
 def test_retry_after_truncation_counts_concurrent_reservations():
