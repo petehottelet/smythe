@@ -21,8 +21,8 @@ from smythe.executor_base import NodeFinalizationError
 from smythe.jobs.operator import WorkerStartupError, WorkerStartupInterrupted
 from smythe.jobs.providers import ProviderPreflightError, ProviderPreflightKind
 from smythe.provider import (
-    CompletionResult, OutputRefusedError, OutputTruncatedError, ProviderAccountingCancelledError,
-    ProviderAccountingError, ProviderResponseError,
+    CompletionResult, NativeOutputDefectError, OutputRefusedError, OutputTruncatedError,
+    ProviderAccountingCancelledError, ProviderAccountingError, ProviderResponseError,
 )
 from smythe.provider_responses import PreparedRequest, RawResponseEnvelope, ResponseQuoteError
 from smythe.workflow_provider import ProviderRequestRejectedError, WorkflowQuoteError
@@ -73,6 +73,7 @@ CUSTOM_CONSTRUCTED = {
     ),
     OutputTruncatedError: lambda: OutputTruncatedError("max_tokens", where="Node 'report'"),
     OutputRefusedError: lambda: OutputRefusedError("content_filter", where="Synthesis"),
+    NativeOutputDefectError: lambda: NativeOutputDefectError("refusal", where="Node 'draft'"),
     ProviderResponseError: lambda: ProviderResponseError(
         "unusable output", envelope=_ENVELOPE, receipt={"cost_nanousd": "5"},
         billing_result=CompletionResult("", prompt_tokens=3, completion_tokens=4, cost_usd=0.5),

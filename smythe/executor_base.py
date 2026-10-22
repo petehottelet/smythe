@@ -15,6 +15,8 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Awaitable, Callable
 
 from smythe._errors import PicklableError
+from smythe._failures import QUALITY_DEFECT, classify_failure
+from smythe._http_rejection import _http_rejection_receipt
 from smythe._publish import publish_unique
 from smythe.acceptance import AcceptanceMode, AcceptancePolicy, _unmet_obligations, task_sha256
 from smythe.agent import Agent
@@ -32,11 +34,14 @@ from smythe.graph import (
     REVISION_ADDED_KEY, ExecutionGraph, Node, NodeStatus, Revision, RevisionError, _deliverable_ids,
 )
 from smythe.provider import (
-    CompletionResult, Provider, ProviderResponseError, _declared_features, _missing_cost_ceiling,
-    _native_receipt, _raise_if_incomplete, _settle_response_error, _native_response_errors,
+    CompletionResult, NativeOutputDefectError, Provider, ProviderAccountingError,
+    ProviderResponseError, _declared_features, _missing_cost_ceiling, _native_receipt,
+    _raise_if_incomplete, _settle_response_error, _native_response_errors,
     _settle_response_group,
 )
+from smythe.provider_responses import RawResponseEnvelope
 from smythe.registry import Registry
+from smythe.scheduling import RetryDeadlineError, RetryPolicy, _attempt_records, _retry_after_s
 from smythe.task import _prompt_json, render_task, snapshot_task
 from smythe.tools import ChatMessage, ToolLoopLimitError, ToolResult, ToolRuntime
 from smythe.tracer import Tracer
@@ -44,6 +49,7 @@ from smythe.verifier import (
     ADVISORY_VERDICT_KEY, TokenVerifier, Verifier, VerificationRecoveryError, node_generation,
     read_verdict, rejection_reason, verification_integer, validate_verification_receipt,
 )
+from smythe.workflow_provider import ProviderRequestRejectedError
 from smythe.workflow_store import WorkflowError, WorkflowStateError
 from smythe.workflow_tools import READ_STEP_KEY
 
@@ -102,7 +108,7 @@ def validate_max_concurrency(value: int | None) -> int | None:
 def check_provider_support(
     provider: Provider, model: str, *, node_id: str | None, max_budget_usd: float | None = None,
     estimate: object = None, check_model: bool = True, tools: bool = False,
-    attachments: bool = False,
+    attachments: bool = False, retry_owner: bool = False,
 ) -> None:
     """Raise, before any call, what calling *model* would raise for this configuration.
 
@@ -112,12 +118,21 @@ def check_provider_support(
     ``BudgetEstimateRequired``, as the executor would when it reserves the
     node's budget. A model (when *check_model*), tool calling or image
     attachments the provider declares unsupported raise ``ValueError``; a
-    feature it does not declare never raises.
+    feature it does not declare never raises. With *retry_owner*, for a run
+    under a retry policy, so does a provider that does not declare
+    ``sdk_retries=0``.
     """
     name = type(provider).__name__
     if max_budget_usd is not None and estimate is None and _missing_cost_ceiling(provider, model):
         raise BudgetEstimateRequired(node_id, model, name)
     features = _declared_features(provider, model)
+    if retry_owner and features.sdk_retries != 0:
+        raise ValueError(
+            f"retry_policy must be the only retry owner, but {name} declares "
+            f"sdk_retries={features.sdk_retries!r} for model {model!r}, so its SDK may send a "
+            "failed call again. Construct it with max_retries=0, or declare sdk_retries=0 "
+            "in feature_support()"
+        )
     if check_model and features.model_supported is False:
         where = "a generated plan's nodes" if node_id is None else f"node {node_id!r}"
         raise ValueError(f"{name} does not support model {model!r}, which {where} would use")
@@ -134,6 +149,7 @@ def check_provider_support(
 
 def check_pending_nodes(
     provider: Provider, graph: ExecutionGraph, *, max_budget_usd: float | None, tools: bool,
+    retry_owner: bool = False,
 ) -> None:
     """Check every node that has not completed or been skipped, before any of them runs."""
     for node in graph.nodes:
@@ -142,7 +158,7 @@ def check_pending_nodes(
         check_provider_support(
             provider, str(node.metadata.get("model", "")), node_id=node.id,
             max_budget_usd=max_budget_usd, estimate=node.metadata.get("estimated_cost_usd"),
-            tools=tools, attachments=node.attach_dep_artifacts,
+            tools=tools, attachments=node.attach_dep_artifacts, retry_owner=retry_owner,
         )
 
 
@@ -289,6 +305,22 @@ class ExecutorBase:
     each node prompt from its snapshot (:meth:`build_context_prompt`), with
     tool results marked as untrusted data as well. Without one, prompts keep
     their earlier bytes.
+
+    ``retry_policy``, a :class:`~smythe.scheduling.RetryPolicy`, opts into
+    classified retries with ``Retry-After``, a backoff cap and a deadline
+    shared by each node's attempts and waits; a run under one refuses,
+    before any node call, a provider that does not declare
+    ``sdk_retries=0``, its own or, while revisions remain, an
+    ``LLMSupervisor``'s. ``sleep(seconds)`` replaces the wait before a retry
+    (``time.sleep`` in the serial executor, ``asyncio.sleep`` in the async
+    one) and is awaited when it returns an awaitable; ``rng`` replaces the
+    ``random`` module that draws backoff jitter. Under a policy with
+    ``persist_attempts``, each attempt is recorded in :attr:`attempts_used`
+    and saved through the control hook before its call, and
+    ``attempts_used``, as a checkpoint saved it, seeds the attempts each node
+    has already used in its current ``execution_generation``. The seed applies
+    to the executor's first run only: a later run is a new run, with a fresh
+    allowance for every node.
     """
 
     def __init__(
@@ -316,11 +348,34 @@ class ExecutorBase:
         context_assembler: Callable[
             [Node, ExecutionGraph, dict[str, Any]], Awaitable[ContextSnapshot]
         ] | None = None,
+        retry_policy: RetryPolicy | None = None,
+        sleep: Callable[[float], Any] | None = None,
+        rng: Any = None,
+        attempts_used: dict[str, dict[str, int]] | None = None,
         acceptance: AcceptancePolicy | None = None,
     ) -> None:
         if context_assembler is not None and not callable(context_assembler):
             raise TypeError("context_assembler must be callable or None")
         self._context_assembler = context_assembler
+        if retry_policy is not None and not isinstance(retry_policy, RetryPolicy):
+            raise TypeError(
+                f"retry_policy must be a RetryPolicy or None, not {type(retry_policy).__name__}"
+            )
+        if sleep is not None and not callable(sleep):
+            raise TypeError("sleep must be callable or None")
+        if rng is not None and not callable(getattr(rng, "uniform", None)):
+            raise TypeError("rng must have a uniform(low, high) method, or be None")
+        self._retry_policy, self._sleep, self._rng = retry_policy, sleep, rng
+        # When each node's retry deadline passes, on the tracer's clock.
+        self._deadlines: dict[str, float] = {}
+        self._persist_attempts = retry_policy is not None and retry_policy.persist_attempts
+        if attempts_used is not None and not self._persist_attempts:
+            raise ValueError("attempts_used needs a retry_policy with persist_attempts")
+        # Like revisions_used, a per-run allowance: each node's generation and
+        # the attempts it has spent there, restored on resume. The seed binds
+        # only the first run; a reused executor's next run starts empty.
+        self._attempts_used = _attempt_records(attempts_used or {})
+        self._attempts_seed = dict(self._attempts_used)
         if acceptance is not None and not isinstance(acceptance, AcceptancePolicy):
             raise TypeError(
                 f"acceptance must be an AcceptancePolicy or None, not {type(acceptance).__name__}"
@@ -339,9 +394,13 @@ class ExecutorBase:
         self._workflow_managed = (
             provider_call_factory is not None or getattr(provider, "workflow_managed", False) is True
         )
+        if retry_policy is not None and self._workflow_managed:
+            raise ValueError("retry_policy is not supported with journal-managed provider calls")
         self._call_attempts: dict[str, int] = {}
         self._reserved_node_ids: set[str] = set()
         self._settled_response_errors: list[tuple[str, Exception]] = []
+        # Settled errors whose node marker a retry policy cleared for another attempt.
+        self._cleared_response_errors: list[Exception] = []
         self._response_settlement_failures: dict[str, Exception] = {}
         self._registry = registry
         self._tracer = tracer
@@ -369,6 +428,12 @@ class ExecutorBase:
     def revisions_used(self) -> int:
         """How many supervisor revisions this executor has applied."""
         return self._revisions_used
+
+    @property
+    def attempts_used(self) -> dict[str, dict[str, int]]:
+        """Under a policy with ``persist_attempts``, each node's attempts in its generation."""
+        return {node_id: {"execution_generation": generation, "attempts": used}
+                for node_id, (generation, used) in self._attempts_used.items()}
 
     async def maybe_revise(self, node: Node, graph: ExecutionGraph) -> bool:
         """Let the supervisor revise the plan after *node* completed.
@@ -739,6 +804,8 @@ class ExecutorBase:
         )
         for candidate in reset:
             self.notify_update(candidate)
+        # Before the reset work runs again, so it cannot spend its checks' allowance.
+        self._hold_pending_verifiers(reset)
 
     def _rejected_records(
         self, judge: Node, reset: list[Node], intent: dict, graph: ExecutionGraph,
@@ -872,18 +939,124 @@ class ExecutorBase:
                 # A goal-only SimpleArchitect retains its original bare prompt.
                 node.metadata.pop("task_context", None)
 
-    def retry_delay_s(self, attempt: int) -> float:
+    def retry_delay_s(self, attempt: int, *, error: BaseException | None = None) -> float:
         """Full-jitter exponential backoff before retry `attempt` (1-based).
 
         Returns 0 when backoff is disabled (the default) so existing
         RETRY behavior and test timing are unchanged; opt in via
         ``retry_backoff_s`` for rate-limited workloads (429s at wide
-        parallel image fan-out).
+        parallel image fan-out). Under a retry policy, the ``Retry-After``
+        of *error*, the failure being retried, replaces the backoff when it
+        is a transient status error and the policy honors the header, and
+        no wait exceeds ``backoff_max_s``.
         """
-        if attempt <= 0 or not self._retry_backoff_s:
+        if attempt <= 0:
             return 0.0
-        ceiling = self._retry_backoff_s * (2 ** (attempt - 1))
-        return random.uniform(0, ceiling)
+        policy = self._retry_policy
+        if policy is not None and policy.honor_retry_after and error is not None:
+            asked = _retry_after_s(error)
+            if asked is not None:
+                return min(asked, policy.backoff_max_s)
+        if not self._retry_backoff_s:
+            return 0.0
+        if policy is None:
+            ceiling = self._retry_backoff_s * (2 ** (attempt - 1))
+        else:
+            try:
+                ceiling = min(math.ldexp(self._retry_backoff_s, attempt - 1), policy.backoff_max_s)
+            except OverflowError:
+                ceiling = policy.backoff_max_s
+        return (self._rng or random).uniform(0, ceiling)
+
+    def _retry_wait_s(self, node: Node, attempt: int, error: BaseException | None) -> float:
+        """The wait before *attempt*; a retry policy's deadline starts at the first.
+
+        The first attempt in this process has no *error* before it: attempt
+        0, or a resumed node's first unspent attempt. Raises
+        ``RetryDeadlineError``, from *error*, when the wait would end at or
+        after the node's deadline, so that retry is not made. The trace
+        still records the refused attempt, with no duration and no call, as
+        it records an attempt the deadline ends: its span says why the node
+        stopped.
+        """
+        policy = self._retry_policy
+        if policy is None:
+            return self.retry_delay_s(attempt)
+        if error is None:
+            self._deadlines.pop(node.id, None)
+            if policy.deadline_s is not None:
+                self._deadlines[node.id] = self._tracer.now() + policy.deadline_s
+            return 0.0
+        delay = self.retry_delay_s(attempt, error=error)
+        deadline = self._deadlines.get(node.id)
+        if deadline is not None and self._tracer.now() + delay >= deadline:
+            refused = self._deadline_error(node)
+            self._tracer.on_node_start(node, attempt=attempt)
+            self._tracer.on_node_error(node, refused)
+            self._end_failed_attempt(node)
+            raise refused from error
+        return delay
+
+    def _deadline_error(self, node: Node) -> RetryDeadlineError:
+        return RetryDeadlineError(
+            f"Node {node.id!r} reached its retry deadline of "
+            f"{self._retry_policy.deadline_s}s before an attempt succeeded"
+        )
+
+    def _attempts_spent(self, node: Node) -> int:
+        """The attempts *node* already used in its current generation, under ``persist_attempts``."""
+        generation, used = self._attempts_used.get(node.id, (None, 0))
+        return used if self._persist_attempts and generation == node_generation(node) else 0
+
+    def _spend_attempt(self, node: Node, attempt: int) -> None:
+        """Under ``persist_attempts``, save *attempt* as spent before it is sent.
+
+        The save is not batched. When it fails, the attempt is not counted and
+        its error stops the node without the call.
+        """
+        if not self._persist_attempts:
+            return
+        before = self._attempts_used.get(node.id)
+        self._attempts_used[node.id] = (node_generation(node), attempt + 1)
+        try:
+            if self._on_control_update is not None:
+                self._on_control_update()
+            else:
+                self.notify_update(node)
+        except BaseException:
+            if before is None:
+                del self._attempts_used[node.id]
+            else:
+                self._attempts_used[node.id] = before
+            raise
+
+    @staticmethod
+    def _allowance_spent(node: Node, attempts: int) -> RuntimeError:
+        return RuntimeError(
+            f"Node {node.id!r} already used all {attempts} attempts its retry policy allows "
+            "in this generation"
+        )
+
+    def _may_retry(self, error: Exception) -> bool:
+        """Whether a failed attempt may be retried: under a policy, only a listed class."""
+        policy = self._retry_policy
+        return policy is None or classify_failure(error) in policy.retry_classes
+
+    def _attempt_timeout(self, node: Node) -> tuple[float | None, bool]:
+        """The attempt's timeout, and whether the retry deadline set it.
+
+        Under a deadline the timeout is ``timeout_s`` or the time left,
+        whichever is shorter; with no time left the attempt is not started.
+        """
+        deadline = self._deadlines.get(node.id)
+        if deadline is None:
+            return node.timeout_s, False
+        remaining = deadline - self._tracer.now()
+        if remaining <= 0:
+            raise self._deadline_error(node)
+        if node.timeout_s is not None and node.timeout_s < remaining:
+            return node.timeout_s, False
+        return remaining, True
 
     def _end_failed_attempt(self, node: Node) -> None:
         """Close the span of an attempt that raised, recording it as failed.
@@ -902,6 +1075,23 @@ class ExecutorBase:
         """Reserve this executor's pre-call estimate for one node."""
         self.reserve_node_budget(node)
 
+    def _node_estimate(
+        self, node: Node, default_estimated_tokens: int | None,
+    ) -> tuple[float | None, bool]:
+        """The node's pre-call estimate, and whether its provider requires an explicit one."""
+        estimate = node.metadata.get("estimated_cost_usd")
+        model = str(node.metadata.get("model", ""))
+        requires_explicit = self._provider.requires_explicit_budget_estimate(model)
+        if estimate is None:
+            estimate = self._provider.budget_estimate_usd(model)
+        if estimate is None and not requires_explicit and default_estimated_tokens is not None:
+            tokens = validate_token_count(default_estimated_tokens, "default_estimated_tokens")
+            try:
+                estimate = tokens * self._budget.cost_per_token
+            except OverflowError as exc:
+                raise BudgetValidationError("Token-derived estimate must remain finite") from exc
+        return estimate, requires_explicit
+
     def reserve_node_budget(
         self,
         node: Node,
@@ -914,47 +1104,65 @@ class ExecutorBase:
         generic token fallback is allowed only for providers that declare it
         safe.  Serial execution passes no fallback to preserve its historical
         pre-call behavior for ordinary text providers while still reserving
-        image calls.
+        image calls. A node with a budget hold (see
+        :meth:`hold_verifier_budget`) converts it into its reservation, and
+        without an estimate of its own reserves the held amount.
         """
         if self._budget is None or self._workflow_managed:
             return
 
-        estimate = node.metadata.get("estimated_cost_usd")
-        model = str(node.metadata.get("model", ""))
-        requires_explicit = self._provider.requires_explicit_budget_estimate(model)
-        if estimate is None:
-            estimate = self._provider.budget_estimate_usd(model)
-
+        estimate, requires_explicit = self._node_estimate(node, default_estimated_tokens)
         if estimate is None and requires_explicit:
             if self._budget.max_budget_usd is not None:
                 raise BudgetEstimateRequired(
-                    node.id, model, type(self._provider).__name__,
+                    node.id, str(node.metadata.get("model", "")), type(self._provider).__name__,
                 )
             # Unlimited execution may proceed without a price, but must not
             # consume a fake text-token reservation and report it as complete.
             # The provider result will mark its USD cost unknown.
             return
 
-        if estimate is not None:
-            self._budget.reserve(
-                node.id,
-                estimate,
-                hard_ceiling=requires_explicit,
-            )
-            self._reserved_node_ids.add(node.id)
-        elif default_estimated_tokens is not None:
-            tokens = validate_token_count(default_estimated_tokens, "default_estimated_tokens")
-            try:
-                estimate = tokens * self._budget.cost_per_token
-            except OverflowError as exc:
-                raise BudgetValidationError("Token-derived estimate must remain finite") from exc
-            self._budget.reserve(
-                node.id,
-                estimate,
-            )
-            self._reserved_node_ids.add(node.id)
-        else:
+        holds = self._budget.holds
+        if estimate is None:
+            estimate = holds.get(node.id)
+        if estimate is None:
             self._budget.check(node.id)
+            return
+        self._budget.reserve(
+            node.id, estimate, hard_ceiling=requires_explicit, from_hold=node.id in holds,
+        )
+        self._reserved_node_ids.add(node.id)
+
+    # The token estimate a verifier's hold falls back on when neither the
+    # node nor its provider gives one; AsyncExecutor's estimated_tokens_per_node
+    # replaces it. hold_verifier_budget() turns on holding for regenerations.
+    _estimated_tokens_per_node = 2000
+    _hold_verifiers = False
+
+    def hold_verifier_budget(self, graph: ExecutionGraph) -> None:
+        """Hold each pending verifier's estimate so that other nodes cannot spend it.
+
+        A hold is what the async executor would reserve for the verifier, and
+        the verifier converts it into its reservation when it is admitted.
+        From then on, a regeneration holds the estimate of each verifier it
+        makes pending again, so a rerun converts a hold as well. Raises
+        ``SentinelAlert`` when the budget cannot cover a hold. Durable runs,
+        whose journal admits each call, hold nothing.
+        """
+        if self._budget is None or self._workflow_managed:
+            return
+        self._hold_verifiers = True
+        self._hold_pending_verifiers(graph.nodes)
+
+    def _hold_pending_verifiers(self, nodes: list[Node]) -> None:
+        if not self._hold_verifiers:
+            return
+        held = self._budget.holds
+        for node in nodes:
+            if node.verifies and node.status is NodeStatus.PENDING and node.id not in held:
+                estimate = self._node_estimate(node, self._estimated_tokens_per_node)[0]
+                if estimate is not None:
+                    self._budget.hold(node.id, estimate)
 
     def notify_update(self, node: Node) -> None:
         """Invoke the node-update hook (used for checkpointing) if one is set.
@@ -1017,9 +1225,28 @@ class ExecutorBase:
                 if ("workflow_accounting_invalid" in node.metadata
                         or node.metadata.get("accounting_invalid") and "response_error" not in node.metadata):
                     raise BudgetValidationError("Unjournaled accounting requires reconciliation")
+        if self._retry_policy is not None:
+            calls = [(self._provider, model) for model in sorted(
+                {str(node.metadata.get("model", "")) for node in graph.nodes
+                 if node.status not in (NodeStatus.COMPLETED, NodeStatus.SKIPPED)})]
+            from smythe.supervisor import LLMSupervisor
+
+            # A supervisor that may still revise reviews with its own model or
+            # else the reviewed node's, which can be any node of the graph.
+            supervisor = self._supervisor
+            if isinstance(supervisor, LLMSupervisor) and self._max_revisions > self._revisions_used:
+                models = {supervisor._model} if supervisor._model else {
+                    str(node.metadata.get("model", "")) for node in graph.nodes}
+                calls += [(supervisor._provider, model) for model in sorted(models)]
+            for provider, model in calls:
+                check_provider_support(provider, model, node_id=None, check_model=False,
+                                       retry_owner=True)
         self._reserved_node_ids.clear()
         self._call_attempts.clear()
+        self._deadlines.clear()
+        self._attempts_used, self._attempts_seed = self._attempts_seed, {}
         self._settled_response_errors.clear()
+        self._cleared_response_errors.clear()
         self._response_settlement_failures.clear()
         self._prepared_graph = None
         self.prepare_graph(graph)
@@ -1120,13 +1347,24 @@ class ExecutorBase:
         """Run the node's conversation (including any tool loop) under timeout_s.
 
         Owns cost recording: every provider call inside is billed via
-        Sentinel.add_cost, so executors must not record costs again.
+        Sentinel.add_cost, so executors must not record costs again. Under
+        a retry deadline the timeout is at most the time left, and reaching
+        it raises ``RetryDeadlineError``. A ``TimeoutError`` the conversation
+        raises itself, such as an HTTP client's own timeout, is an ordinary
+        timeout even then.
         """
+        timeout, by_deadline = self._attempt_timeout(node)
         coro = self._run_node_conversation(node, graph)
+        deadline_timer = None
         try:
-            if node.timeout_s is None:
+            if timeout is None:
                 return await coro
-            return await asyncio.wait_for(coro, timeout=node.timeout_s)
+            if not by_deadline:
+                return await asyncio.wait_for(coro, timeout=timeout)
+            # A scope of its own tells the deadline's expiry apart from a
+            # TimeoutError raised inside the conversation.
+            async with asyncio.timeout(timeout) as deadline_timer:
+                return await coro
         except BaseExceptionGroup as exc:
             if not _native_response_errors(exc):
                 _raise_workflow_error(exc)
@@ -1142,10 +1380,13 @@ class ExecutorBase:
         except WorkflowError:
             raise
         except TimeoutError as exc:
-            # wait_for can wrap a native CancelledError subclass on timeout.
-            # Its unknown bill remains terminal, regardless of retry policy.
+            # wait_for or the deadline's timer can wrap a native CancelledError
+            # subclass on timeout. Its unknown bill remains terminal,
+            # regardless of retry policy.
             if isinstance(exc.__cause__, ProviderResponseError):
                 raise exc.__cause__
+            if deadline_timer is not None and deadline_timer.expired():
+                raise self._deadline_error(node) from None
             raise TimeoutError(
                 f"Node {node.id!r} timed out after {node.timeout_s}s"
             ) from None
@@ -1318,8 +1559,72 @@ class ExecutorBase:
                 exc, lambda error: self._record_response_error(node, error, phase=phase),
             )
         except ProviderResponseError as exc:
+            # A classified error is raised without a cause: a run that fails
+            # with it must not save the settled error's unresolved marker.
+            rejection = self._settle_rejection(node, exc, phase)
+            if rejection is not None:
+                raise rejection from None
             self._record_response_error(node, exc, phase=phase)
+            defect = self._release_known_charge(node, exc)
+            if defect is not None:
+                raise defect from None
             raise
+
+    def _settle_rejection(self, node, error, phase):
+        """Under a retry policy, settle a native plain HTTP rejection at zero cost.
+
+        A durable journal's rules decide (``_http_rejection_receipt``): a 401,
+        403, 404, 413 or 429 response with the provider's plain error body.
+        Its zero-cost receipt is recorded as the call's charge, and the
+        ``ProviderRequestRejectedError`` to raise, whose class follows the
+        status, is returned. Any other error returns None and keeps its
+        unknown exposure.
+        """
+        envelope = getattr(error, "envelope", None)
+        if (self._retry_policy is None or not isinstance(error, ProviderAccountingError)
+                or isinstance(error, asyncio.CancelledError)
+                or not isinstance(envelope, RawResponseEnvelope)):
+            return None
+        try:
+            raw = envelope.json()
+        except ValueError:
+            return None
+        recorded = error.receipt if isinstance(error.receipt, dict) else {}
+        receipt = _http_rejection_receipt(
+            {"status_code": envelope.status_code, "transport_error": envelope.transport_error},
+            raw, recorded.get("price_version"),
+        )
+        if receipt is None:
+            return None
+        receipt.update(request_sha256=envelope.request_sha256,
+                       response_sha256=envelope.response_sha256, request_id=envelope.request_id)
+        self._record_cost(node, CompletionResult("", cost_usd=0.0, native_receipt=receipt),
+                          phase=phase)
+        detail = receipt["error_code"] or receipt["error_type"]
+        return ProviderRequestRejectedError(
+            f"Provider rejected the request with HTTP {receipt['http_status']}"
+            + (f" ({detail})" if detail else "") + "; it was settled at zero cost",
+            status_code=receipt["http_status"], envelope=envelope, receipt=receipt,
+        )
+
+    def _release_known_charge(self, node, error):
+        """Under a policy listing ``quality_defect``, release a settled refusal or truncation.
+
+        A native reply whose ``stop_reason`` is ``refusal`` or ``max_tokens``
+        and whose known charge was just recorded has its node marker cleared,
+        so the next attempt can dispatch, and the ``NativeOutputDefectError``
+        to raise is returned. Any other error, or a policy without that class,
+        returns None and stays terminal.
+        """
+        policy = self._retry_policy
+        if (policy is None or QUALITY_DEFECT not in policy.retry_classes
+                or error.billing_result is None or isinstance(error, BudgetValidationError)
+                or error.stop_reason not in ("refusal", "max_tokens")
+                or node.metadata.get("accounting_invalid")):
+            return None
+        node.metadata.pop("response_error", None)
+        self._cleared_response_errors.append(error)
+        return NativeOutputDefectError(error.stop_reason, where=f"Node {node.id!r}")
 
     def _raise_unresolved_response(self, node):
         if self._workflow_managed and "workflow_accounting_invalid" in node.metadata:
@@ -1328,8 +1633,10 @@ class ExecutorBase:
             return
         if node.id in self._response_settlement_failures:
             raise self._response_settlement_failures[node.id]
+        cleared = self._cleared_response_errors
         for node_id, error in reversed(self._settled_response_errors):
-            if node_id == node.id:
+            # A cleared error was settled and released for another attempt.
+            if node_id == node.id and not any(error is done for done in cleared):
                 raise error
         if self._workflow_managed and "response_error" in node.metadata:
             # A new managed run re-enters the same immutable journal call.

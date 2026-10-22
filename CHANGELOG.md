@@ -223,7 +223,8 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   `inconclusive` otherwise. `PromotionAssessment.verdict`,
   `OptimizationResult.verdict` and
   `smythe.optimize.statistics.improvement_verdict()` expose it; decisions
-  record it for each paired stage and the campaign; and
+  record it for each paired stage and the campaign, and a decision made in
+  development records `inconclusive`; and
   `smythe optimize concurrency --json` reports it beside `promoted`, with
   unchanged exit codes. Promotion is unchanged. HTML reports show each verdict,
   and decisions recorded earlier show one derived from their saved interval
@@ -258,10 +259,11 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   adds `input_digest` to each operation, computed from the stored plan, and
   prints it; the HTML report shows it in an Input digest column. It is null
   where it cannot be computed, including when the stored attachment
-  fingerprints are unreadable. `SQLiteRunStore.plan_attachments()` reads a
-  run's recorded attachment fingerprints. The digest is never stored: plan
-  hashes, operation IDs, approval tokens, exports and the Jobs schema are
-  unchanged. See
+  fingerprints are unreadable or an operation's stored attachments are not an
+  array, which the function refuses with `ValueError`.
+  `SQLiteRunStore.plan_attachments()` reads a run's recorded attachment
+  fingerprints. The digest is never stored: plan hashes, operation IDs,
+  approval tokens, exports and the Jobs schema are unchanged. See
   [operation identity](docs/jobs.md#operation-identity-and-input-digest).
 - Strict runs check their acceptance obligations before they spend.
   `smythe.acceptance.validate_acceptance_obligations(graph, policy)` lists
@@ -400,7 +402,9 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   commits decides again on resume, and a committed decision replays with no
   validator run or provider call. Such runs, and runs with a gate validator, write checkpoint
   version 2 with a `delivery_acceptance` block and key synthesis after a
-  regeneration as `synthesis/<n>`. Resuming a completed run rechecks the
+  regeneration as `synthesis/<digest>`, a short digest of every node id and
+  its generation, so two graph states whose generations add up to the same
+  number never share a synthesis. Resuming a completed run rechecks the
   output digest, task, source generations and journal decision, giving
   `indeterminate` on any mismatch, and results follow the strict output
   rule. A verification receipt left pending, including one from a release
@@ -502,6 +506,305 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   `smythe.context` reads the records back. Recipes without
   `context_assembly` keep their prompts and records byte for byte. See
   [context snapshots](docs/tasks.md#context-snapshots).
+- Source evidence. `smythe.evidence` adds versioned JSON records:
+  `SourceRecord` (a source's id, version or digest, and its retained text, a
+  reference, or a tombstone that keeps only its identity, digest, reason and
+  time), `ClaimRecord` (a claim, supporting and contradicting passages quoted
+  from named sources, scope, unresolved questions and a proposed conclusion)
+  and `SourceEvidence`. `from_dict()` rejects unknown versions and keys. An
+  artifact carries its records in one `source-evidence` fenced block.
+  `SourceEvidenceValidator`, a final validator whose identity pins each
+  source's id, version, digest and state, rejects output whose evidence
+  states no claim, cites a source the run was not given, states another
+  version or digest, quotes a passage that is not verbatim in its source,
+  cites a source it does not list, or lists a contradiction the artifact's
+  body leaves out. A
+  passage from a tombstoned source cannot be checked, which gives an `error`
+  outcome and never acceptance. Whether a passage supports its claim stays a
+  judgement for a gate. A durable run whose strict policy has such a
+  validator journals the evidence its output carries as a `source_evidence`
+  operation keyed `source-evidence/<sha256>`, and
+  `smythe.evidence.load_source_evidence` reads it back without source text
+  unless `include_text=True`. In a durable run with context assembly, a
+  validator that checks other sources than the run's current source set,
+  such as those before `Swarm.refresh_context`, does not run: its outcome is
+  `error`, the decision follows `on_invalid` (`indeterminate` by default)
+  and the reason names the differing sources; `evaluate_delivery` takes a
+  keyword-only `unusable` mapping of validator identities to the reason each
+  cannot check the output. See [source evidence](docs/source-evidence.md).
+- Failure classes. Every exception a node attempt raises has one class:
+  `input_error`, `authority_denied`, `quality_defect`, `provider_rejected`,
+  `transient`, `unknown_outcome`, `terminal_accounting`, `persistence` or
+  `workflow`; `validator_error` and `security_stop` are named, but no
+  exception has them. Each failed attempt's trace span records its class as
+  `metadata["failure_class"]`, which `Tracer.summary()` leaves out and
+  checkpoints do not store. The read-only
+  `ProviderRequestRejectedError.failure_class` is `authority_denied` for HTTP
+  401 or 403, `input_error` for 404 or 413 and `transient` for 429. Both
+  executors decide which failures stop a run, whatever the node's failure
+  policy, through one shared classifier, and they retry, skip and stop on
+  exactly the failures they did before. See
+  [failure classes](docs/execution.md#failure-classes).
+- `ProviderResponseError.stop_reason` names why a native
+  `OpenAIResponsesProvider` or `AnthropicMessagesProvider` response ended
+  unfinished, with the values the SDK providers use: `max_tokens` or
+  `model_context_window_exceeded` for a truncation, `refusal`,
+  `content_filter`, or `incomplete` for any other incomplete response,
+  including a Messages `pause_turn`. It is `None` for other unusable
+  responses and for errors raised elsewhere. The error's message is
+  unchanged, so durable runs still match the text their journals saved for
+  rejected calls. See [execution policies](docs/execution.md).
+- `Swarm.reevaluate(execution_id, acceptance=policy)` and
+  `Swarm.areevaluate()` record a new delivery acceptance decision for a
+  completed run's saved output, for example under a fixed validator. The
+  strict policy, by default the `Swarm`'s own, runs its final validators on
+  the saved bytes and reads every gate's recorded verdict; no node runs, no
+  provider is called, and costs, the budget, retry and regeneration counters
+  and node generations are left as saved. Only a completed run with a decided
+  record is re-evaluated, and only while its saved output still matches the
+  record's digest and its task, source generations and delivered files are
+  unchanged; otherwise nothing is written, so changed output never becomes
+  accepted. Each decision has a sequence, 0 for the run's own and one more
+  for each re-evaluation, so the same bytes under an unchanged policy get a
+  new decision. An ordinary checkpoint keeps the new record as its
+  `delivery_acceptance` and the last 16 it superseded under
+  `delivery_acceptance_history`, which `smythe.checkpoint` reads back. A
+  durable run accepts a recipe that differs only in its acceptance policy and
+  gate verifier, journals the decision as a new `acceptance` operation keyed
+  `acceptance/<sequence>/<digest>` and applies it with a new completed
+  checkpoint, leaving calls, charges and the recipe unchanged;
+  `smythe.workflow.current_decision()` and `decision_history()` read the
+  decisions back. Resume returns the current decision and never makes a new
+  one: a strict `Swarm` resuming a completed run without a record, or one
+  decided under another policy, behaves as before, and a durable run still
+  resumes only under the policy its recipe records. `smythe runs inspect`
+  adds a `decisions` block with the current decision's sequence and the
+  decisions before it, and its exit codes follow the current decision. See
+  [re-evaluation](docs/verifier.md#re-evaluation).
+- Durable text workflows can publish their delivered output as a local
+  document. `Swarm(run_store=..., renderer=MarkdownRenderer())`, or a
+  deterministic renderer declared with `LocalOnly(..., role="renderer")`,
+  renders the synthesized text after synthesis, and the document's bytes are
+  published once into `artifact_dir/<run id>/`, which an owner marker binds
+  to the run, without replacing any file. The recipe records the renderer's
+  identity and version only when there is one. The document is the run's
+  output, so a strict policy's final validators check those bytes and its
+  decision binds their SHA-256; a strict policy with a renderer needs a final
+  validator. Each publication is a journaled `publication` operation holding
+  a `PublishedArtifact` record, and a process lost after publishing reuses
+  its file. `smythe.workflow_artifact.current_artifact()` returns a run's
+  current publication, the decision that covers it and whether it is
+  eligible for delivery. A missing or changed file is not: resuming the run
+  gives an `indeterminate` decision, and `smythe runs inspect` reports the
+  `artifact` block, exits with code 11 and names the next action
+  `republish`. `Swarm.republish()` publishes the saved document again under
+  a free name, which becomes current, with no provider call and the same
+  decision; re-evaluation needs an intact document, so it is refused until
+  then. See [published documents](docs/workflow-accounting.md#published-documents).
+- An opt-in `RetryPolicy` makes the executor the only retry owner of an
+  ordinary run's node calls; `Swarm(retry_policy=...)` and both executors
+  take one. A `RETRY` node then calls again only after a failure whose class
+  the policy lists (`transient` by default, so never after a 401, 403, 404 or
+  413), waits as long as a transient status error's `Retry-After` asks or
+  else a jittered backoff, never longer than `backoff_max_s`, and stops at
+  `deadline_s`, which a node's attempts and waits share: each attempt's
+  timeout shrinks to the time left, and the node fails with
+  `RetryDeadlineError`, failure class `deadline`; the trace records that
+  refused attempt as a span with outcome `timed_out`, class `deadline` and no
+  call. A run under a policy refuses, before routing, planning or any node
+  call, every provider it can call that does not declare
+  `ProviderFeatures.sdk_retries` as `0`, so no SDK retries a call unseen:
+  its own, a `WhiteRabbit` classifier's, that of each `LLMArchitect` or
+  `ConstrainedArchitect` that could plan it, including one built from
+  `planning_provider`, and an `LLMSupervisor`'s when `max_revisions` lets it
+  review; `Executor` and `AsyncExecutor` check the supervisor's with their
+  own. Built-in providers declare it, and `AnthropicProvider` takes
+  `max_retries`, passed to the SDK only when set. Durable runs refuse the
+  policy, and checkpoints record it only with `persist_attempts`. Executors
+  also take `sleep` and `rng`, which replace the retry wait and its jitter.
+  Without a policy, retries are unchanged. See
+  [retry policy](docs/execution.md#retry-policy).
+- `RetryPolicy(persist_attempts=True)` keeps a node's allowance of attempts
+  across crashes and resumes. Each attempt is saved as spent before its call,
+  whatever `checkpoint_every_n_nodes` is, and checkpoints record the policy
+  and each node's attempts in its current `execution_generation` under
+  `control.retry_policy` and `control.attempts_used`. Such checkpoints are
+  version 5 and list `attempt_allowance` in `requires`, so builds that read
+  only version 4, or that do not know the feature, refuse them instead of
+  refilling the allowance. Resume starts each node from the attempts its
+  generation used, so a `RETRY` node makes at most `1 + max_retries` calls in
+  total, and a node with none left fails without a call; a regenerated node
+  gets a fresh allowance. An unfinished run resumes only under an equal
+  policy, which `smythe runs inspect` names in its resume action. Executors
+  take `attempts_used=` for their first run and report the `attempts_used`
+  property, and `smythe.checkpoint.attempt_allowance_from_state()` reads the
+  record. Other runs keep writing version 4. See
+  [persisted attempts](docs/execution.md#persisted-attempts).
+  policy, and checkpoints do not record it. Executors also take `sleep` and
+  `rng`, which replace the retry wait and its jitter. Without a policy,
+  retries are unchanged. See [retry policy](docs/execution.md#retry-policy).
+- Under a `RetryPolicy`, an ordinary run classifies the native providers'
+  failures as a durable journal does. A 401, 403, 404, 413 or 429 response
+  from `OpenAIResponsesProvider` or `AnthropicMessagesProvider` whose body is
+  only the provider's plain error object settles at zero cost and raises
+  `ProviderRequestRejectedError`, whose class follows its status, so the
+  default policy retries a native 429 with exact totals. A 400, another
+  status or a body with usage still leaves the bill unknown and stops the
+  run. A refused or `max_tokens` reply with a known charge raises the new
+  `NativeOutputDefectError`, class `quality_defect`, after recording that
+  charge once, when the policy lists `quality_defect`; otherwise it still
+  stops the run. Neither leaves an unresolved marker, so the run resumes like
+  any other failure. Without a policy, native failures still stop the run.
+  See [retry policy](docs/execution.md#retry-policy).
+- `jobs stop --drain-timeout-s SECONDS` bounds a pause's drain. That long
+  after the request, the worker cancels each call still awaiting its provider
+  and records it as `unknown_outcome`, keeping its full per-call ceiling as
+  exposure; a call whose response has arrived settles normally.
+  `SQLiteRunStore.request_pause()` and `stop_job()` take `drain_timeout_s`
+  (0-3600), the earliest deadline of an open request holds until resume
+  clears it, and `SQLiteRunStore.drain_time_remaining()` reads it. The
+  worker reads it at least once a second while calls run; a read that fails,
+  for example on a locked database, leaves the run and any deadline already
+  read unchanged. The `pause_requested` event records it as
+  `drain_deadline_ns`, so the Jobs schema stays at version 4. Without it, a
+  pause waits for every admitted call as before. See
+  [stop and resume](docs/jobs.md#stop-and-resume-safely);
+  the guide's [current boundaries](docs/jobs.md#current-boundaries) now state
+  that Jobs do not read a response's `stop_reason`.
+- A durable run with context assembly can remove a source.
+  `Swarm.remove_source(execution_id, source_id, reason)` and
+  `aremove_source()` journal its tombstone, a `SourceRecord` that keeps the
+  source's id, version and SHA-256, the reason and the time and none of its
+  text, as a `source_tombstone` operation keyed `source-tombstone/<sha256>`
+  that a new checkpoint applies, with no call. The run then never uses the
+  text again, and nothing rebuilds it from the journal's copy:
+  `load_context_sources` and `load_context_snapshot` raise the new
+  `smythe.context.SourceRemovedError` for a record that holds it,
+  `load_source_evidence` marks the source `removed` and returns no text for
+  it, an unfinished run resumes only after `refresh_context` gives it other
+  sources, and a completed run's earlier decision becomes `indeterminate`
+  until `reevaluate` decides again under a source evidence validator that
+  holds the tombstone. A decision binds the keys of the tombstones the run
+  held when it was made, so a re-evaluation stopped before a removal is
+  decided again rather than finished. `smythe.evidence.load_source_tombstones`
+  reads a run's tombstones. Earlier journal records and published documents
+  keep what they hold. See [remove a source](docs/tasks.md#remove-a-source).
+- `smythe runs inspect` reports what a durable research run was given, read
+  and claimed, without source text, read bodies, quotes or output: a
+  `context` block (the context-assembly and snapshot versions, the current
+  sources by id, version, digest and size, removed sources, each node's
+  snapshot id and the run's tombstones), `tool_calls` (each journaled
+  read's node, attempt, profile, URL, states, charge, HTTP status, response
+  digest and the size and digest of its decoded text), `evidence` (the
+  delivered source evidence: each cited source's availability, and each
+  claim's passage counts, cited sources, scope and unresolved questions)
+  and `issues` (unresolved questions, unavailable sources, failed reads and
+  final validators that did not pass). Ordinary runs report null for the
+  first three. See [research runs](docs/runs.md#research-runs).
+- [`examples/16_source_to_artifact.py`](examples/16_source_to_artifact.py)
+  runs a durable research workflow offline and without keys. It plans one
+  journaled read step per bundled source, reads the sources from a server it
+  starts on the loopback address, stops part way as a lost process would,
+  resumes without reading a saved source again, publishes a brief carrying
+  its source evidence, accepts it under a strict policy with
+  `SourceEvidenceValidator` and `TextValidator`, and prints the accepted
+  document's path, the decision, the evidence and the
+  `smythe runs inspect` report. `tests/test_examples_smoke.py` runs it.
+- Routing decision records. `WhiteRabbit.decide()` and `adecide()` return the
+  chosen architect with a `RoutingDecision`: the tier, the method
+  (`classifier`, `fallback_no_classifier` or `fallback_unmatched`), the tiers
+  offered, reasons, the routing policy version, the matched reply only as its
+  normalized token, and the classifier call's token usage and reported cost;
+  `route()` and `aroute()` still return the architect. A `Swarm` with a
+  `WhiteRabbit` router records the decision as `graph.planning["routing"]`,
+  where the new optional `ExecutionGraph.planning` holds informational
+  records keyed by namespace. Ordinary checkpoints keep it and stay version
+  4, a graph without records is saved as before, and the classifier's usage
+  is recorded without being charged to the run's budget. A durable run's
+  decision names the journal calls of its `routing` phase instead of copying
+  their amounts, and its `planning` operation result carries the decision
+  under `routing`; resume restores `graph.planning` from the saved plan
+  without classifying again. The classifier prompt and durable recipes are
+  unchanged. See [routing decisions](docs/architecture.md#routing-decisions).
+- `LineagePolicy` opts a durable run into artifact lineage:
+  `Swarm(run_store=..., acceptance=<strict policy>, lineage=LineagePolicy())`,
+  `Swarm.from_yaml(..., lineage=...)` and `WorkflowRuntime` take one. It
+  declares an `access_scope` label (declared, not authenticated, and compared
+  exactly), the `reuse` switch and what `undeclared_coverage` calls for
+  (`review` or `regenerate`). Without a `run_store` or a strict policy it is
+  refused before any routing, planning or node call. The recipe records it
+  under `lineage` only when configured, so other recipes keep their bytes,
+  and plan, execute, resume and re-evaluation compare it exactly: a run
+  resumed under another policy, or without its own, raises
+  `WorkflowConflictError`. A new durable graph cannot carry `lineage_reuse`
+  node metadata. `ArtifactLineage` is the versioned record of a run's
+  accepted artifact, delivery decision and each node's inputs as ids,
+  versions and digests, with no source text; its reader rejects unknown
+  versions and keys. Runs do not write lineage records yet. See
+  [artifact lineage](docs/lineage.md).
+- `Swarm(reserve_for_checks=True)` holds allowance for a run's verifiers and
+  its `LLM_MERGE` synthesis so other nodes cannot spend it. Under
+  `max_budget_usd`, before any node runs, the run holds what each pending
+  verifier and the merge will reserve; another node whose reservation would
+  reach into that allowance is refused with `SentinelAlert` before its call.
+  Each verifier and the merge converts its own hold into its reservation, a
+  regeneration holds again for the verifiers it resets before their work
+  reruns, and a run releases leftover holds after synthesis or when it fails.
+  Holds never count as spend and are not saved: resume holds again, and
+  checkpoints stay at version 4. `Sentinel.hold()`, `release_hold()`,
+  `holds` and `reserve(..., from_hold=True)` expose the same allowance, and
+  `Sentinel.check()` treats held allowance as spent. Durable runs refuse the
+  option. Without it, reservations are unchanged. See
+  [held allowance](docs/budgets.md#held-allowance-for-checks).
+- `Synthesizer(retain_contradictions=True)` keeps the contradictions that
+  source evidence lists. `DELIVERABLE` synthesis appends a deterministic
+  `Contradictions` section for each contradicting passage that the delivered
+  nodes' claim records list and their text does not quote, citing both
+  sides exactly, so strict acceptance's `contradictions` check passes on the
+  exact output; text that quotes every one is delivered unchanged.
+  `LLM_MERGE` appends `CONTRADICTION_NOTE` to the merge prompt; a strict
+  policy with `SourceEvidenceValidator` still rejects a merge that drops a
+  listed contradiction. `MERGE_SYSTEM_PROMPT` is unchanged. `CONCATENATE` and `STRUCTURED` refuse
+  the option. A durable recipe names it in its synthesizer description only
+  when set, so other recipes keep their identity.
+  `smythe.evidence.render_contradictions()` writes the section. See
+  [keep contradictions through synthesis](docs/source-evidence.md#keep-contradictions-through-synthesis).
+- An authorized operator can resolve output that a strict policy left
+  `needs_review` or `indeterminate`. `Swarm.reevaluate(execution_id,
+  operator=OperatorDecision(...))`, and `WorkflowRuntime.reevaluate(run_id,
+  operator=...)`, take the operator's `accepted` or `rejected`, the SHA-256 of
+  the evidence they decided on and an assertion that the host's
+  `ApprovalVerifier` must accept for exactly `operator_decision_sha256()` of
+  the run, the current decision's sequence and record, the decision and the
+  evidence. A forged, expired or misbound assertion raises the verifier's
+  `ApprovalRejected` and nothing is written, and an `accepted` or `rejected`
+  decision stands. No node runs, no provider is called, and costs, budget and
+  counters stay as saved. The decision is a new delivery acceptance record,
+  version 2, whose `operator` block names the verified principal, the
+  verifier and the evidence digest; the earlier record is kept. An ordinary
+  checkpoint lists `operator_decision` in `requires` while it holds such a
+  record, and a durable run journals it as its next `acceptance` operation.
+  Readers that know only version 1 records, or only the
+  `delivery_acceptance` feature, refuse it. A policy's records stay version
+  1, and checkpoint versions are unchanged. See
+  [operator decisions](docs/verifier.md#operator-decisions).
+- `jobs adopt RUN_ID OPERATION --reason TEXT` accepts the bytes an
+  unknown-outcome attempt already published, without a provider call. A
+  response's bytes are published before its call settles, so a process that
+  stopped in between can leave the whole response on disk. The latest
+  attempt's directory must hold exactly the files of the artifact count the
+  profile requests and nothing else, and they must pass the built-in artifact
+  check and the plan's registered validators again; other bytes or operation
+  states are refused with exit code 6 and leave the operation unchanged. The
+  operation becomes `succeeded` with that attempt accepted and no attempt
+  used, while the attempt and its call keep their unknown outcome and the
+  call its exposure, so no charge is settled. An `unknown_outcome_adopted`
+  event records the reason, each artifact's SHA-256 and the delivery
+  decision, and `jobs inspect` and its HTML report show the adoption beside
+  the kept exposure. In Python, `JobRunner.adopt()` records the verified
+  bytes with `SQLiteRunStore.adopt_published_attempt()`; the Jobs schema
+  stays at version 4. See
+  [adopt published bytes](docs/jobs.md#adopt-published-bytes).
 
 ### Changed
 
@@ -808,6 +1111,16 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   whose bytes no longer match the `sha256` in its record now raises
   `smythe.executor_base.ArtifactIntegrityError` before the call. Records
   without a digest, written before digests were recorded, attach as before.
+- Provider and service error text no longer keeps account identifiers where
+  Smythe stores it. A failed or skipped node's result, which checkpoints save
+  and dependents receive, its trace span error and log line, the native
+  response error marker in node metadata, Jobs call and attempt errors, and
+  Autotune trial errors now replace organization and project ids and keys
+  in known provider formats with placeholders such as `org-[redacted]`, as
+  journaled read and source-evidence reasons already did. Raised exceptions
+  are unchanged. Durable decode rejections keep their text, which journals
+  compare byte for byte and which names no account. See
+  [failure classes](docs/execution.md#failure-classes).
 
 ## [0.9.1] - 2026-09-29
 

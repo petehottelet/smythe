@@ -9,12 +9,14 @@ import json
 import math
 import os
 import re
+import sqlite3
+import stat
 import time
 from collections.abc import Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from decimal import Decimal
 from pathlib import Path
-from typing import Any
+from typing import Any, NoReturn
 from uuid import uuid4
 
 from smythe.acceptance import ValidationSubject
@@ -36,7 +38,7 @@ from smythe.jobs.delivery import (
     validator_registry,
     validator_result,
 )
-from smythe.jobs.inspection import check_artifact_integrity
+from smythe.jobs.inspection import _check_path, check_artifact_integrity
 from smythe.jobs.models import (
     ArtifactSpecV1,
     DEFAULT_CALL_TIMEOUT_S,
@@ -59,11 +61,14 @@ from smythe.jobs.providers import ProviderPool
 from smythe.jobs.store import (
     MAX_ARTIFACTS_PER_CALL,
     MAX_SQLITE_INTEGER,
+    InvalidTransitionError,
     JobBudgetError,
+    JobNotFoundError,
     OperationStatus,
     RunLease,
     RunLeaseError,
     RunPauseRequested,
+    RunStoreError,
     SQLiteRunStore,
 )
 from smythe.provider import Artifact, CompletionResult
@@ -75,6 +80,7 @@ _SAFE_COMPONENT = re.compile(r"[^A-Za-z0-9._-]+")
 _SAFE_RUN_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}\Z")
 MAX_TOTAL_ARTIFACT_BYTES_PER_CALL = 128 * 1024 * 1024
 _INVALID_ACCOUNTING_PREFIX = "invalid provider accounting: "
+_DRAIN_POLL_S = 1.0
 
 
 @dataclass(frozen=True, slots=True)
@@ -102,6 +108,34 @@ class _ArtifactCheck:
     @property
     def accepted(self) -> bool:
         return self.record["decision"] == "accepted"
+
+
+@dataclass(slots=True)
+class _Drain:
+    """A pause request's drain deadline, in event-loop time.
+
+    ``waits`` holds the timeouts of calls still awaiting their provider;
+    an earlier deadline reschedules each one.
+    """
+
+    when: float | None = None
+    waits: set[asyncio.Timeout] = field(default_factory=set)
+
+    def tighten(self, when: float) -> None:
+        if self.when is None or when < self.when:
+            self.when = when
+            for wait in self.waits:
+                if not wait.expired():
+                    wait.reschedule(when)
+
+
+def _drain_bound(drain: _Drain) -> asyncio.Timeout:
+    """A timeout for one provider wait that expires at the drain deadline.
+
+    ``drain.when`` is an event-loop time, so a wait that starts after the
+    deadline is set must take it as an absolute time, not a delay.
+    """
+    return asyncio.timeout_at(drain.when)
 
 
 class JobRunner:
@@ -253,6 +287,25 @@ class JobRunner:
         )
         return await asyncio.to_thread(self._delivery_view, result)
 
+    async def adopt(self, run_id: str, operation_key: str, *, reason: str) -> dict[str, Any]:
+        """Accept the bytes an unknown outcome already published, without a provider call.
+
+        The operation's latest attempt directory must hold exactly the files a
+        response with the artifact count its profile requests is published
+        as, and nothing else. Those bytes then pass the built-in artifact
+        check and the plan's registered validators again before
+        :meth:`SQLiteRunStore.adopt_published_attempt` records them under the
+        run's lease. The call keeps its unknown outcome and its exposure. Any
+        other state or bytes refuse adoption with ``InvalidTransitionError``.
+        """
+        _validate_run_id(run_id)
+        record = self.store.manifest_record(run_id)
+        root = Path(record["manifest_root"])
+        plan = self._preflight(JobManifestV1.from_json(record["manifest_json"]), root)
+        verify_approval(plan, JobApprovalV1.from_dict(record["approval"]))
+        result = await self._execute_with_lease(run_id, plan, root, adopt=(operation_key, reason))
+        return await asyncio.to_thread(self._delivery_view, result)
+
     def _delivery_view(self, snapshot: dict[str, Any]) -> dict[str, Any]:
         """Recheck every accepted artifact's bytes and derive delivery eligibility.
 
@@ -298,8 +351,9 @@ class JobRunner:
         recover: bool = False,
         reroll: tuple[list[str], str, bool] | None = None,
         pause_generation: int | None = None,
+        adopt: tuple[str, str] | None = None,
     ) -> dict[str, Any]:
-        """Own the run for recovery, state transitions, and provider execution."""
+        """Own the run for recovery, state transitions, and provider execution or adoption."""
 
         owner_id = f"runner-{uuid4().hex}"
         lease = self.store.acquire_run_lease(
@@ -329,7 +383,8 @@ class JobRunner:
             )
             execution_task = asyncio.create_task(
                 asyncio.wait_for(
-                    self._execute(run_id, plan, root, lease=lease),
+                    self._execute(run_id, plan, root, lease=lease) if adopt is None
+                    else self._adopt(run_id, plan, root, *adopt, lease=lease),
                     timeout=wall_timeout,
                 )
             )
@@ -415,6 +470,7 @@ class JobRunner:
         counter_lock = asyncio.Lock()
         stop_dispatch = asyncio.Event()
         pause_dispatch = asyncio.Event()
+        drain = _Drain()
         start = time.perf_counter()
 
         async def producer() -> None:
@@ -441,7 +497,7 @@ class JobRunner:
                         await self._execute_operation(
                             run_id, operation, root, plan, stop_dispatch=stop_dispatch,
                             pause_dispatch=pause_dispatch, lease=lease,
-                            artifact_directory=snapshot["artifact_directory"],
+                            artifact_directory=snapshot["artifact_directory"], drain=drain,
                         )
                     finally:
                         async with counter_lock:
@@ -449,15 +505,30 @@ class JobRunner:
                 finally:
                     queue.task_done()
 
+        async def watch_drain() -> None:
+            # Admission cannot see a pause while every worker awaits a provider,
+            # so poll for a drain deadline until the workers finish. A failed
+            # read, such as of a locked database, keeps any deadline already
+            # read and never stops the run; the next poll reads again.
+            loop = asyncio.get_running_loop()
+            poll_s = min(_DRAIN_POLL_S, self.lease_heartbeat_s)
+            while (await asyncio.wait(workers, timeout=poll_s))[1]:
+                try:
+                    remaining = self.store.drain_time_remaining(run_id)
+                except (sqlite3.Error, RunStoreError):
+                    continue
+                if remaining is not None:
+                    drain.tighten(loop.time() + remaining)
+
         producer_task = asyncio.create_task(producer())
         workers = [asyncio.create_task(worker()) for _ in range(concurrency)]
+        tasks = [producer_task, *workers, asyncio.create_task(watch_drain())]
         try:
-            await asyncio.gather(producer_task, *workers)
+            await asyncio.gather(*tasks)
         except BaseException:
-            producer_task.cancel()
-            for task in workers:
+            for task in tasks:
                 task.cancel()
-            await asyncio.gather(producer_task, *workers, return_exceptions=True)
+            await asyncio.gather(*tasks, return_exceptions=True)
             raise
         finally:
             wall_s = time.perf_counter() - start
@@ -466,6 +537,52 @@ class JobRunner:
         self.store.finalize_run(run_id, lease=lease)
         snapshot = self.store.snapshot(run_id)
         snapshot["execution_metrics"] = self.last_metrics.to_dict()
+        return snapshot
+
+    async def _adopt(
+        self,
+        run_id: str,
+        plan: JobPlanV1,
+        root: Path,
+        operation_key: str,
+        reason: str,
+        *,
+        lease: RunLease,
+    ) -> dict[str, Any]:
+        snapshot = self.store.snapshot(run_id)
+        await asyncio.to_thread(self._claim_artifact_directory, snapshot, root)
+        state = next((item for item in snapshot["operations"]
+                      if operation_key in (item["operation_key"], item["operation_id"])), None)
+        if state is None:
+            raise JobNotFoundError(f"{run_id}:{operation_key}")
+        if state["status"] != OperationStatus.UNKNOWN_OUTCOME.value:
+            raise InvalidTransitionError(
+                f"operation {state['operation_key']} in state {state['status']} "
+                "has no unknown outcome to adopt"
+            )
+        attempt = max((item for item in snapshot["attempts"]
+                       if item["operation_id"] == state["operation_id"]),
+                      key=lambda item: item["attempt_number"])
+        operation = next(item for item in plan.operations
+                         if item.operation_id == state["operation_id"])
+        check = await asyncio.to_thread(
+            self._check_published,
+            operation,
+            attempt_id=attempt["attempt_id"],
+            attempt_number=attempt["attempt_number"],
+            validators=[self._validators[identity.name] for identity in operation.validators],
+            run_root=_validated_run_root(root, output_directory=plan.output_directory, run_id=run_id,
+                                         artifact_directory=snapshot["artifact_directory"]),
+        )
+        # The store checks again, in its transaction, that this is still the
+        # operation's latest attempt and that its outcome is unknown.
+        self.store.adopt_published_attempt(
+            run_id, state["operation_id"], reason=reason, artifacts=check.records,
+            delivery_acceptance=check.record, lease=lease,
+        )
+        self.store.finalize_run(run_id, lease=lease)
+        snapshot = self.store.snapshot(run_id)
+        snapshot["execution_metrics"] = JobExecutionMetrics(0, 0, 0.0).to_dict()
         return snapshot
 
     async def _execute_operation(
@@ -479,6 +596,7 @@ class JobRunner:
         pause_dispatch: asyncio.Event,
         lease: RunLease,
         artifact_directory: str,
+        drain: _Drain,
     ) -> None:
         try:
             attempt = self.store.begin_attempt(run_id, operation.operation_id, lease=lease)
@@ -543,20 +661,27 @@ class JobRunner:
             fallback=DEFAULT_CALL_TIMEOUT_S,
         )
         try:
-            result = await asyncio.wait_for(
-                provider.chat(
-                    "Create exactly the requested artifact. Return no extra variants.",
-                    [
-                        ChatMessage(
-                            role="user",
-                            content=operation.prompt,
-                            attachments=attachments,
-                        )
-                    ],
-                    operation.model,
-                ),
-                timeout=call_timeout,
-            )
+            # A pause's drain deadline bounds only the wait for the provider;
+            # a response that has arrived settles normally.
+            async with _drain_bound(drain) as bound:
+                drain.waits.add(bound)
+                try:
+                    result = await asyncio.wait_for(
+                        provider.chat(
+                            "Create exactly the requested artifact. Return no extra variants.",
+                            [
+                                ChatMessage(
+                                    role="user",
+                                    content=operation.prompt,
+                                    attachments=attachments,
+                                )
+                            ],
+                            operation.model,
+                        ),
+                        timeout=call_timeout,
+                    )
+                finally:
+                    drain.waits.discard(bound)
         except asyncio.CancelledError:
             try:
                 self.store.mark_unknown_outcome(
@@ -568,7 +693,8 @@ class JobRunner:
         except TimeoutError:
             self.store.mark_unknown_outcome(
                 permit.call_id,
-                f"provider call exceeded its {call_timeout:g}s deadline after dispatch",
+                "provider call was still running at the pause drain deadline" if bound.expired()
+                else f"provider call exceeded its {call_timeout:g}s deadline after dispatch",
                 lease=lease,
             )
             return
@@ -739,6 +865,7 @@ class JobRunner:
         attempt_number: int,
         run_root: Path,
         validators: Sequence[tuple[ValidatorIdentity, Any]] = (),
+        publish: bool = True,
     ) -> _ArtifactCheck:
         """Check a response's artifacts, then publish every decodable one.
 
@@ -748,7 +875,8 @@ class JobRunner:
         ``accepted=0``. Registered ``validators`` then check each decodable
         artifact's exact bytes; one that fails to decide never makes the call
         an unknown outcome. Artifact data that is not bytes breaks the
-        provider contract and raises instead.
+        provider contract and raises instead. With ``publish`` false nothing
+        is written, as for bytes an attempt already published.
         """
         builtin = artifact_spec_identity(operation.artifact)
         checked: dict[str, list[ValidationReport]] = {
@@ -815,7 +943,8 @@ class JobRunner:
                     checked[identity.name].append(report)
                     errors.extend(reasons)
             destination = run_root / relative
-            _prepare_confined_parent(destination, run_root)
+            if publish:
+                _prepare_confined_parent(destination, run_root)
             records.append(
                 {
                     "artifact_id": uuid4().hex,
@@ -828,10 +957,63 @@ class JobRunner:
                 }
             )
             pending_writes.append((destination, artifact.data))
-        for destination, data in pending_writes:
+        for destination, data in pending_writes if publish else ():
             atomic_publish_bytes(destination, data)
         return _ArtifactCheck(records, errors,
                               delivery_record(attempt_id, subjects, results(reports), errors))
+
+    @staticmethod
+    def _check_published(
+        operation: PlannedOperationV1,
+        *,
+        attempt_id: str,
+        attempt_number: int,
+        run_root: Path,
+        validators: Sequence[tuple[ValidatorIdentity, Any]] = (),
+    ) -> _ArtifactCheck:
+        """Check the bytes an attempt published as the response they came from.
+
+        The attempt's directory must hold exactly the files a response with
+        the artifact count the operation's profile requests is published as,
+        and nothing else, and the response's checks must accept them.
+        Symbolic links and junctions are refused, never followed.
+        """
+        def refuse(problems: list[str]) -> NoReturn:
+            raise InvalidTransitionError(
+                f"attempt {attempt_number} of operation {operation.operation_key} cannot be "
+                "adopted: " + "; ".join(problems)
+            )
+
+        count = _requested_artifacts(operation)
+        if type(count) is not int or not 1 <= count <= MAX_ARTIFACTS_PER_CALL:
+            refuse([f"its profile requests {count!r} artifacts per call"])
+        directory = ("artifacts", _SAFE_COMPONENT.sub("_", operation.operation_key).strip("._"),
+                     f"attempt-{attempt_number:04d}")
+        sample = Artifact(b"", operation.artifact.mime_type)
+        expected = [_artifact_filename(operation, sample, index) for index in range(count)]
+        try:
+            found = os.listdir(_check_path(run_root, directory))
+        except FileNotFoundError:
+            found = []
+        problems = [f"{name} is missing" for name in expected if name not in found]
+        problems += [f"{name} is not part of the response" for name in sorted(found)
+                     if name not in expected]
+        if problems:
+            refuse(problems)
+        artifacts = []
+        for name in expected:
+            path = _check_path(run_root, (*directory, name))
+            if not stat.S_ISREG(path.lstat().st_mode):
+                refuse([f"{name} is not a regular file"])
+            with path.open("rb") as stream:
+                artifacts.append(Artifact(stream.read(MAX_ARTIFACT_BYTES + 1), sample.mime_type))
+        check = JobRunner._persist_and_validate(
+            CompletionResult(text="", artifacts=artifacts), operation, attempt_id=attempt_id,
+            attempt_number=attempt_number, run_root=run_root, validators=validators, publish=False,
+        )
+        if not check.accepted:
+            refuse(check.errors or [f"the decision is {check.record['decision']}"])
+        return check
 
 
 def _positive_finite_timeout(value: object, field: str) -> float:
@@ -877,6 +1059,13 @@ def _artifact_filename(
     stem = Path(requested).stem if requested else "artifact"
     suffix = artifact.suffix
     return f"{stem}-{index + 1:02d}{suffix}"
+
+
+def _requested_artifacts(operation: PlannedOperationV1) -> object:
+    """The artifact count an operation's profile requests from its provider."""
+    option = {ProviderKind.OFFLINE: "artifacts_per_call",
+              ProviderKind.OPENAI_IMAGE: "n"}.get(operation.provider)
+    return operation.options.get(option, 1) if option else 1
 
 
 def _artifact_findings(

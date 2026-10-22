@@ -206,9 +206,11 @@ def operation_delivery(
     """Project one operation's delivery decision and derive its eligibility.
 
     The decision is the accepted attempt's, else that of the latest attempt
-    that completed. An attempt completed by an earlier release has no record
-    and is projected as a legacy built-in decision whose validator is
-    unrecorded; it is never reported as accepted or as not evaluated.
+    that completed. An accepted attempt whose published bytes were adopted
+    keeps its unknown outcome, so it need not have completed. An attempt
+    completed by an earlier release has no record and is projected as a
+    legacy built-in decision whose validator is unrecorded; it is never
+    reported as accepted or as not evaluated.
 
     The operation is eligible for delivery only with a recorded ``accepted``
     decision, validators identical to the ones its plan requires now, and
@@ -219,7 +221,7 @@ def operation_delivery(
     accepted_id = operation.get("accepted_attempt_id")
     completed = [attempt for attempt in attempts
                  if attempt.get("status") in ("succeeded", "rejected")]
-    attempt = next((item for item in completed if item.get("attempt_id") == accepted_id), None)
+    attempt = next((item for item in attempts if item.get("attempt_id") == accepted_id), None)
     if attempt is None and completed:
         attempt = max(completed, key=lambda item: item.get("attempt_number") or 0)
     if attempt is None:

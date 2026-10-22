@@ -440,6 +440,8 @@ def _check_host_code(value: object, role: str, methods: dict[str, bool]) -> None
         if method is None and not required:
             continue
         if not callable(method):
+            # An async property returned a coroutine in place of the method.
+            _close(method)
             raise TypeError(f"{type(value).__name__} has no {name}() method")
         if _calls_async(method):
             raise TypeError(f"{type(value).__name__}.{name}() must be synchronous")

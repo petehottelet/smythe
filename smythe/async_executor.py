@@ -3,12 +3,15 @@
 from __future__ import annotations
 
 import asyncio
+import inspect
 from collections import deque
 from itertools import islice
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Awaitable, Callable
 
-from smythe.budget import BudgetValidationError, Sentinel, SentinelAlert, validate_token_count
+from smythe._failures import is_terminal
+from smythe._redact import error_text
+from smythe.budget import BudgetValidationError, Sentinel, validate_token_count
 from smythe.executor_base import (
     DEFAULT_MAX_TOOL_ITERATIONS,
     PROMPT_ASSEMBLY_VERSION,
@@ -17,16 +20,17 @@ from smythe.executor_base import (
     validate_max_concurrency,
 )
 from smythe.graph import ExecutionGraph, FailurePolicy, Node, NodeStatus
-from smythe.provider import Provider, ProviderResponseError
+from smythe.provider import Provider
 from smythe.registry import Registry
+from smythe.scheduling import RetryDeadlineError
 from smythe.tools import ToolRuntime
 from smythe.tracer import Tracer
 from smythe.verifier import VerificationRecoveryError
-from smythe.workflow_store import WorkflowError
 
 if TYPE_CHECKING:
     from smythe.acceptance import AcceptancePolicy
     from smythe.context import ContextSnapshot
+    from smythe.scheduling import RetryPolicy
     from smythe.supervisor import Supervisor
     from smythe.task import Task
     from smythe.verifier import Verifier
@@ -80,6 +84,10 @@ class AsyncExecutor(ExecutorBase):
         context_assembler: Callable[
             [Node, ExecutionGraph, dict[str, Any]], Awaitable[ContextSnapshot]
         ] | None = None,
+        retry_policy: RetryPolicy | None = None,
+        sleep: Callable[[float], Any] | None = None,
+        rng: Any = None,
+        attempts_used: dict[str, dict[str, int]] | None = None,
         acceptance: AcceptancePolicy | None = None,
     ) -> None:
         super().__init__(
@@ -96,6 +104,10 @@ class AsyncExecutor(ExecutorBase):
             read_call_factory=read_call_factory,
             acceptance=acceptance,
             context_assembler=context_assembler,
+            retry_policy=retry_policy,
+            sleep=sleep,
+            rng=rng,
+            attempts_used=attempts_used,
         )
         self._estimated_tokens_per_node = validate_token_count(
             estimated_tokens_per_node, "estimated_tokens_per_node",
@@ -336,10 +348,7 @@ class AsyncExecutor(ExecutorBase):
             active, set(intent["affected_generations"]),
         )
         for error in errors:
-            if isinstance(error, (
-                BudgetValidationError, NodeFinalizationError, SentinelAlert,
-                VerificationRecoveryError, ProviderResponseError, WorkflowError,
-            )):
+            if is_terminal(error):
                 # Retain the intent and all accounting: recovery must not hide
                 # an unusable bill or buy a replacement for a failed write.
                 raise error
@@ -353,15 +362,23 @@ class AsyncExecutor(ExecutorBase):
         last_exc: Exception | None = None
         attempts = 1 + max(node.max_retries, 0) if node.failure_policy == FailurePolicy.RETRY else 1
 
-        for attempt in range(attempts):
+        # A resumed run continues the allowance its checkpoint recorded.
+        for attempt in range(self._attempts_spent(node), attempts):
             self._call_attempts[node.id] = attempt
-            delay = self.retry_delay_s(attempt)
+            try:
+                delay = self._retry_wait_s(node, attempt, last_exc)
+            except RetryDeadlineError as exc:
+                last_exc = exc
+                break
             if delay:
                 started = self._tracer.now()
                 try:
-                    await asyncio.sleep(delay)
+                    waited = (self._sleep or asyncio.sleep)(delay)
+                    if inspect.isawaitable(waited):
+                        await waited
                 finally:
                     self._tracer.on_wait("retry_backoff", self._tracer.since(started), node)
+            self._spend_attempt(node, attempt)
             node.status = NodeStatus.RUNNING
             self.begin_verification(node, graph)
             self._tracer.on_node_start(node, attempt=attempt)
@@ -394,34 +411,40 @@ class AsyncExecutor(ExecutorBase):
                 return
             except VerificationRecoveryError:
                 raise
-            except (BudgetValidationError, NodeFinalizationError, SentinelAlert,
-                    ProviderResponseError, WorkflowError) as exc:
-                # A reconciliation alert or post-billing persistence failure
-                # is non-retryable here: another provider call would compound
-                # the spend rather than repair the local failure. Invalid
-                # accounting also retains its reservation until reconciled.
-                if isinstance(exc, BudgetValidationError):
-                    self.mark_accounting_invalid(node, exc)
-                node.status = NodeStatus.FAILED
-                node.result = str(exc)
-                self._tracer.on_node_error(node, exc)
-                self._tracer.on_node_end(node)
-                self.notify_update(node)
-                raise
-            except asyncio.CancelledError:
-                self.release_node_budget(node)
-                node.status = NodeStatus.PENDING
-                node.result = None
-                self._tracer.on_node_end(node)
-                raise
             except Exception as exc:
+                # A cancellation can also be an Exception. A terminal one, such
+                # as ProviderAccountingCancelledError, fails the node here; any
+                # other is a cancellation and is never retried or skipped.
+                if is_terminal(exc):
+                    # A reconciliation alert or post-billing persistence failure
+                    # is non-retryable here: another provider call would compound
+                    # the spend rather than repair the local failure. Invalid
+                    # accounting also retains its reservation until reconciled.
+                    if isinstance(exc, BudgetValidationError):
+                        self.mark_accounting_invalid(node, exc)
+                    node.status = NodeStatus.FAILED
+                    node.result = error_text(exc)
+                    self._tracer.on_node_error(node, exc)
+                    self._tracer.on_node_end(node)
+                    self.notify_update(node)
+                    raise
+                if isinstance(exc, asyncio.CancelledError):
+                    self._requeue_cancelled(node)
+                    raise
                 last_exc = exc
                 self._tracer.on_node_error(node, exc)
                 self._end_failed_attempt(node)
+                if not self._may_retry(exc):
+                    break
+            except asyncio.CancelledError:
+                self._requeue_cancelled(node)
+                raise
+        if last_exc is None:  # No attempt was left to make.
+            last_exc = self._allowance_spent(node, attempts)
 
         self.release_node_budget(node)
 
-        node.result = str(last_exc)
+        node.result = error_text(last_exc)
 
         if node.failure_policy == FailurePolicy.SKIP:
             node.status = NodeStatus.SKIPPED
@@ -431,3 +454,10 @@ class AsyncExecutor(ExecutorBase):
         node.status = NodeStatus.FAILED
         self.notify_update(node)
         raise last_exc  # type: ignore[misc]
+
+    def _requeue_cancelled(self, node: Node) -> None:
+        """Return a cancelled attempt's node to pending and release its reservation."""
+        self.release_node_budget(node)
+        node.status = NodeStatus.PENDING
+        node.result = None
+        self._tracer.on_node_end(node)

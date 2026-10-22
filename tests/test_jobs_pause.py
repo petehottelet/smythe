@@ -295,6 +295,262 @@ def test_runner_pause_between_local_transactions_restores_attempt_allowance(tmp_
     asyncio.run(scenario())
 
 
+def pause_payloads(store):
+    return [event["payload"] for event in store.snapshot("run", include_events=True)["events"]
+            if event["event_type"] == "pause_requested"]
+
+
+@pytest.mark.parametrize("value", [True, -1, 3600.5, float("nan"), float("inf"), "5"])
+def test_invalid_drain_timeout_is_refused_before_any_write(journal, value):
+    first, second, _, _ = journal
+    before = dump(first)
+    with pytest.raises(ValueError, match="drain_timeout_s"):
+        second.request_pause("run", drain_timeout_s=value)
+    assert dump(first) == before
+
+
+def test_earliest_drain_deadline_of_an_open_pause_holds_until_resume_clears_it(journal):
+    first, second, clock, _ = journal
+    assert first.drain_time_remaining("run") is None
+    requested = second.request_pause("run", drain_timeout_s=10)
+    deadline = clock.now + 10_000_000_000
+    assert requested["drain_deadline_ns"] == deadline
+    assert first.drain_time_remaining("run") == 10
+    clock.now += 4_000_000_000
+    assert second.request_pause("run", drain_timeout_s=60)["drain_deadline_ns"] == deadline
+    newest = second.request_pause("run", reason="no deadline named")
+    assert newest["drain_deadline_ns"] == deadline
+    assert first.drain_time_remaining("run") == 6
+    clock.now += 7_000_000_000
+    assert first.drain_time_remaining("run") == -1
+    assert [payload.get("drain_deadline_ns") for payload in pause_payloads(first)] == [deadline] * 3
+    first.acquire_run_lease("run", "worker", pause_generation=newest["pause_generation"])
+    assert first.drain_time_remaining("run") is None
+    assert "drain_deadline_ns" not in second.request_pause("run")
+    assert first.drain_time_remaining("run") is None
+    assert pause_payloads(first)[-1] == {"pause_generation": 4, "reason": "operator requested pause"}
+
+
+class PricedDrainingProvider(DrainingProvider):
+    """Both admitted calls wait for ``release``; each then reports a known charge."""
+
+    def __init__(self):
+        super().__init__()
+        self.cancelled = 0
+
+    async def complete(self, system, prompt, model):
+        try:
+            result = await super().complete(system, prompt, model)
+        except asyncio.CancelledError:
+            self.cancelled += 1
+            raise
+        result.cost_usd = 0.08
+        return result
+
+
+async def start_draining_run(tmp_path, store, provider):
+    plan = plan_for(tmp_path, priced=True)
+    runner = JobRunner(store, provider_pool=FixedPool(provider), lease_heartbeat_s=.05)
+    task = asyncio.create_task(runner.start(plan, make_approval(plan), manifest_root=tmp_path, run_id="run"))
+    await asyncio.wait_for(provider.both_entered.wait(), 30)
+    return task
+
+
+async def settle(task, provider):
+    provider.release.set()
+    if not task.done():
+        task.cancel()
+    await asyncio.gather(task, return_exceptions=True)
+
+
+class AdjustableLoop(asyncio.SelectorEventLoop):
+    """An event loop whose clock a test moves forward instead of sleeping.
+
+    The clock still runs, so the test's own bounded waits keep working, and a
+    test advances it past a drain deadline instead of waiting for one.
+    """
+
+    def __init__(self):
+        super().__init__()
+        self.offset = 0.0
+
+    def time(self):
+        return super().time() + self.offset
+
+    def advance(self, seconds):
+        self.offset += seconds
+
+
+def run_adjustable(scenario):
+    with asyncio.Runner(loop_factory=AdjustableLoop) as runner:
+        return runner.run(scenario)
+
+
+class DeadlineReads:
+    """Counts a store's drain deadline reads, so a test waits for polls, not time.
+
+    While ``error`` is set, each read raises a new copy of it instead.
+    """
+
+    def __init__(self, store, monkeypatch):
+        self.read = store.drain_time_remaining
+        self.error = None
+        self.count = 0
+        self.failed = 0
+        self.polled = asyncio.Event()
+        monkeypatch.setattr(store, "drain_time_remaining", self)
+
+    def __call__(self, run_id):
+        self.count += 1
+        self.polled.set()
+        if self.error is not None:
+            self.failed += 1
+            raise type(self.error)(*self.error.args)
+        return self.read(run_id)
+
+    async def wait(self, task, polls):
+        """Wait for ``polls`` more reads, failing if ``task`` ends first."""
+        target = self.count + polls
+        while self.count < target:
+            self.polled.clear()
+            waiter = asyncio.ensure_future(self.polled.wait())
+            done, _ = await asyncio.wait({waiter, task}, timeout=30, return_when=asyncio.FIRST_COMPLETED)
+            waiter.cancel()
+            if task in done:
+                await task  # raises the error that ended the run
+                pytest.fail("the run finished before the drain deadline reads")
+            assert done, "no drain deadline read within 30 seconds"
+
+
+@pytest.mark.parametrize("drain_timeout_s", [0, 60])
+def test_calls_still_awaiting_a_provider_at_the_drain_deadline_become_unknown_at_their_ceiling(
+        tmp_path, monkeypatch, drain_timeout_s):
+    async def scenario():
+        clock = Clock()
+        with SQLiteRunStore(tmp_path / "jobs.db", clock_ns=clock) as first, \
+                SQLiteRunStore(tmp_path / "jobs.db", clock_ns=clock) as second:
+            provider = PricedDrainingProvider()
+            reads = DeadlineReads(first, monkeypatch)
+            task = await start_draining_run(tmp_path, first, provider)
+            try:
+                second.request_pause("run", drain_timeout_s=drain_timeout_s)
+                if drain_timeout_s:
+                    await reads.wait(task, 1)  # the worker has read a deadline still ahead
+                    assert provider.cancelled == 0
+                    assert {row["status"] for row in second._call_rows("run")} == {"dispatched"}
+                    asyncio.get_running_loop().advance(drain_timeout_s)
+                result = await asyncio.wait_for(task, 30)
+            finally:
+                await settle(task, provider)
+            assert result["status"] == "needs_attention"
+            assert result["counts"] == {"unknown_outcome": 2, "pending": 1}
+            assert provider.calls == 2 and provider.cancelled == 2
+            assert result["cost"]["exposure_microusd"] == 200_000
+            assert result["cost"]["confirmed_microusd"] == result["cost"]["reserved_microusd"] == 0
+            calls = second._call_rows("run")
+            assert {(row["status"], row["exposure_microusd"]) for row in calls} == {("unknown_outcome", 100_000)}
+            assert {row["error"] for row in calls} == {"provider call was still running at the pause drain deadline"}
+            assert result["control"]["drained_at_ns"] is not None and not second.get_run_lease("run")
+
+    run_adjustable(scenario())
+
+
+@pytest.mark.parametrize("drain_timeout_s", [None, 3600])
+def test_calls_answered_within_the_drain_deadline_settle_normally(tmp_path, monkeypatch, drain_timeout_s):
+    async def scenario():
+        clock = Clock()
+        with SQLiteRunStore(tmp_path / "jobs.db", clock_ns=clock) as first, \
+                SQLiteRunStore(tmp_path / "jobs.db", clock_ns=clock) as second:
+            provider = PricedDrainingProvider()
+            reads = DeadlineReads(first, monkeypatch)
+            task = await start_draining_run(tmp_path, first, provider)
+            try:
+                deadline = {} if drain_timeout_s is None else {"drain_timeout_s": drain_timeout_s}
+                second.request_pause("run", **deadline)
+                await reads.wait(task, 3)  # several drain polls while both calls still wait
+                assert not task.done() and provider.cancelled == 0
+                assert {row["status"] for row in second._call_rows("run")} == {"dispatched"}
+                provider.release.set()
+                result = await asyncio.wait_for(task, 30)
+            finally:
+                await settle(task, provider)
+            assert result["status"] == "paused"
+            assert result["counts"] == {"succeeded": 2, "pending": 1}
+            assert result["cost"]["confirmed_microusd"] == 160_000
+            assert result["cost"]["exposure_microusd"] == result["cost"]["reserved_microusd"] == 0
+            assert provider.cancelled == 0
+            if drain_timeout_s is None:
+                assert second.drain_time_remaining("run") is None
+                assert pause_payloads(second) == [{"pause_generation": 1, "reason": "operator requested pause"}]
+
+    asyncio.run(scenario())
+
+
+LOCKED = sqlite3.OperationalError("database is locked")
+INVALID = RunStoreError("Invalid stored pause drain deadline")
+
+
+@pytest.mark.parametrize("errors", [[None] * 4, [LOCKED, None, LOCKED, None], [LOCKED] * 4, [INVALID] * 4],
+                         ids=["readable", "locked-on-some-reads", "locked-on-every-read", "invalid-on-every-read"])
+def test_failed_drain_deadline_reads_leave_a_default_run_unchanged(tmp_path, monkeypatch, errors):
+    async def scenario():
+        with SQLiteRunStore(tmp_path / "jobs.db", clock_ns=Clock()) as store:
+            provider = PricedDrainingProvider()
+            reads = DeadlineReads(store, monkeypatch)
+            reads.error = errors[0]
+            task = await start_draining_run(tmp_path, store, provider)
+            try:
+                for error in errors:  # polls while both calls still wait
+                    reads.error = error
+                    await reads.wait(task, 1)
+                provider.release.set()
+                result = await asyncio.wait_for(task, 30)
+            finally:
+                await settle(task, provider)
+            assert bool(reads.failed) == any(error is not None for error in errors)
+            assert result["status"] == "completed"
+            assert result["counts"] == {"succeeded": 3}
+            assert result["cost"]["confirmed_microusd"] == 240_000
+            assert result["cost"]["exposure_microusd"] == result["cost"]["reserved_microusd"] == 0
+            assert provider.calls == 3 and provider.cancelled == 0
+            assert {row["status"] for row in store._call_rows("run")} == {"succeeded"}
+            assert not store.get_run_lease("run")
+
+    asyncio.run(scenario())
+
+
+def test_a_drain_deadline_read_between_failed_reads_still_bounds_waiting_calls(tmp_path, monkeypatch):
+    async def scenario():
+        clock = Clock()
+        with SQLiteRunStore(tmp_path / "jobs.db", clock_ns=clock) as first, \
+                SQLiteRunStore(tmp_path / "jobs.db", clock_ns=clock) as second:
+            provider = PricedDrainingProvider()
+            reads = DeadlineReads(first, monkeypatch)
+            reads.error = LOCKED
+            task = await start_draining_run(tmp_path, first, provider)
+            try:
+                await reads.wait(task, 2)
+                second.request_pause("run", drain_timeout_s=60)
+                reads.error = None
+                await reads.wait(task, 1)  # polling goes on and reads the deadline
+                reads.error = LOCKED
+                await reads.wait(task, 2)  # later reads fail; the deadline read stays
+                assert provider.cancelled == 0
+                assert {row["status"] for row in second._call_rows("run")} == {"dispatched"}
+                asyncio.get_running_loop().advance(60)
+                result = await asyncio.wait_for(task, 30)
+            finally:
+                await settle(task, provider)
+            assert result["status"] == "needs_attention"
+            assert result["counts"] == {"unknown_outcome": 2, "pending": 1}
+            assert provider.calls == 2 and provider.cancelled == 2
+            calls = second._call_rows("run")
+            assert {(row["status"], row["exposure_microusd"]) for row in calls} == {("unknown_outcome", 100_000)}
+            assert {row["error"] for row in calls} == {"provider call was still running at the pause drain deadline"}
+
+    run_adjustable(scenario())
+
+
 def test_v3_reader_capability_follows_upgrade_and_live_v3_lease_blocks_it(tmp_path):
     path, clock = tmp_path / "legacy-v3.db", Clock()
     with SQLiteRunStore(path, clock_ns=clock) as store:
@@ -322,3 +578,39 @@ def test_v3_reader_capability_follows_upgrade_and_live_v3_lease_blocks_it(tmp_pa
             assert upgraded.get_control("run")["pause_generation"] == 0
             assert reader.snapshot("run")["version"] == 4
             assert reader.inspection_snapshot("run")["control"]["pause_supported"]
+
+
+def test_a_call_that_starts_after_a_drain_deadline_is_set_is_still_bounded():
+    from smythe.jobs.runner import _Drain, _drain_bound
+
+    async def scenario():
+        loop = asyncio.get_running_loop()
+        drain = _Drain(when=loop.time() + 60)
+        bounds = []
+
+        async def call():
+            async with _drain_bound(drain) as bound:
+                bounds.append(bound)
+                await asyncio.Event().wait()
+
+        task = asyncio.create_task(call())
+        await asyncio.sleep(0)
+        assert [bound.when() for bound in bounds] == [drain.when]
+        loop.advance(60)
+        done, _ = await asyncio.wait({task}, timeout=30)
+        assert done and isinstance(task.exception(), TimeoutError)
+        assert bounds[0].expired()
+
+    run_adjustable(scenario())
+
+
+def test_a_drain_bound_without_a_deadline_never_expires_on_its_own():
+    from smythe.jobs.runner import _Drain, _drain_bound
+
+    async def scenario():
+        async with _drain_bound(_Drain()) as bound:
+            asyncio.get_running_loop().advance(3600)
+            await asyncio.sleep(0)
+        assert bound.when() is None and not bound.expired()
+
+    run_adjustable(scenario())

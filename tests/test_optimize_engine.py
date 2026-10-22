@@ -350,6 +350,25 @@ async def test_holdout_rejection_never_promotes(tmp_path):
 
 
 @pytest.mark.asyncio
+async def test_an_unknown_trial_keeps_no_account_identifier_from_its_error(tmp_path):
+    organization = "org-" + "A1b2" * 6  # built here, so no tracked file holds an identifier
+    contract = _contract()
+    incumbent, challenger = _candidates(contract)
+
+    async def evaluate(_context: TrialContext) -> TrialOutcome:
+        raise RuntimeError(f"429 in organization {organization} on requests per min")
+
+    with ExperimentLedger(tmp_path / "redacted.sqlite3", durability="normal") as ledger:
+        runner = _runner(contract, ledger, evaluate)
+        with pytest.raises(OptimizationNeedsAttention):
+            await runner.run(incumbent, (challenger,))
+        (trial,) = ledger.list_trials(runner._build_plan(incumbent, (challenger,))["campaign_id"])
+        assert trial.status is TrialStatus.UNKNOWN
+        assert trial.error == ("evaluator raised RuntimeError after dispatch: 429 in organization "
+                               "org-[redacted] on requests per min")
+
+
+@pytest.mark.asyncio
 async def test_callback_failure_becomes_unknown_and_is_never_redispatched(tmp_path):
     contract = _contract()
     incumbent, challenger = _candidates(contract)
@@ -859,6 +878,9 @@ async def test_development_only_campaign_verdict_is_inconclusive(tmp_path):
         assessment = ledger.list_decisions(result.campaign_id)[0]["assessment"]
         assert assessment["stage"] == "development"
         assert assessment["runner_version"] == 4
+        # The decision records the campaign's verdict, as a paired decision does.
+        assert assessment["verdict"] == "inconclusive"
+        assert len(ledger.validate_decision_inventory(result.campaign_id)) == 1
         assert [score["candidate_id"] for score in assessment["development_scores"]] == [
             challenger.candidate_id
         ]

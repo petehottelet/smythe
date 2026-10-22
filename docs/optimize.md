@@ -152,7 +152,9 @@ still rejected when a gate, hard bound, or secondary allowance fails, and an
 `inconclusive` verdict claims neither an improvement nor a regression. A
 campaign's verdict is its holdout verdict when the holdout ran and its
 confirmation verdict otherwise; a campaign that stops in development forms no
-paired interval, so its verdict is `inconclusive`. Identical paired
+paired interval, so its verdict is `inconclusive`. Every terminal decision
+records the campaign's verdict as `verdict` in its assessment, including a
+decision made in development, which records `inconclusive`. Identical paired
 improvements form a zero-width interval, so even three pairs give a definite
 verdict; that reflects the data, not measured precision.
 `improvement_verdict(interval, min_improvement)` in
@@ -455,9 +457,12 @@ units.
 The decision summary and each confirmation and holdout section show the
 three-way verdict. A decision recorded before verdicts were saved shows one
 derived from the saved primary interval endpoints and minimum improvement,
-labeled as derived, or "Not recorded" when either is missing. A recorded verdict
+labeled as derived, or "Not recorded" when either is missing. A decision made
+in development shows the `inconclusive` verdict it records; one recorded by
+an earlier release shows none. A recorded verdict
 that is not one of the three values, or that disagrees with its saved interval
-or with the decision's final stage, stops export.
+or with the decision's final stage, stops export, as does any verdict other
+than `inconclusive` on a decision without a paired stage.
 
 A decision with [reference arms](#reference-arms) adds a References section:
 its rule, a table that compares the incumbent and each reference with the

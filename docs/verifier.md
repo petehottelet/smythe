@@ -319,7 +319,8 @@ from execution and cost. `smythe.acceptance` defines its types:
   `not_evaluated`, `accepted`, `rejected`, `needs_review` or `indeterminate`.
   It binds the SHA-256 of the delivered bytes, the synthesis strategy, the
   source nodes and their generations, the task and policy hashes, and each
-  validator's outcome. Checkpoints and JSON keep it under
+  validator's outcome; version 2 records an
+  [operator's decision](#operator-decisions). Checkpoints and JSON keep it under
   `delivery_acceptance`; the [checkpoint format](checkpoint-format.md#delivery-acceptance-version-5)
   lists its fields.
 - A validator is trusted local code: an object with an `identity`
@@ -418,7 +419,12 @@ a supervisor adds after the gated node, two deliverable nodes, the
 `STRUCTURED`, `LLM_MERGE` or a custom synthesizer all need a final validator.
 A `Swarm` whose strict policy has none raises `ValueError` when it is built
 with a synthesis other than `DELIVERABLE`, and refuses the other cases
-[before any call](#acceptance-obligations).
+[before any call](#acceptance-obligations). `DELIVERABLE` output to which
+`retain_contradictions` appends a
+[contradictions section](source-evidence.md#keep-contradictions-through-synthesis)
+is not covered by the gate either. Whether the section is appended depends on
+results, so such a run is not refused up front: without a final validator it
+makes its calls and its output is decided by `on_invalid`.
 
 <a id="which-gates-count"></a>
 **Which gates count.** Acceptance criteria are inputs you control, so a gate
@@ -528,7 +534,8 @@ without a strict policy returns its text in `output`, as before. A strict
 logger says how to obtain a decision. Re-run the task under the strict
 policy, or decide the saved output yourself with
 `evaluate_delivery(policy, result.graph, result.rejected_output, ...)`. The
-checkpoint is not changed.
+checkpoint is not changed, and [re-evaluation](#re-evaluation) refuses it:
+nothing bound its output.
 
 The trace gains one span with `node_id` `acceptance:delivery`, status
 `acceptance_<decision>` and the first reason as its label; `Tracer.summary()`
@@ -538,6 +545,111 @@ keys are unchanged, and the validators' time counts as verification in
 sources=...)` makes the same decision outside a run, and
 `smythe.synthesizer.deliverable_sources(graph)` returns the nodes
 `DELIVERABLE` synthesis delivers and whether it fell back.
+
+### Re-evaluation
+
+Resuming a completed run never decides it again. To decide its saved output
+under a fixed or changed validator, call
+`swarm.reevaluate(execution_id, acceptance=policy)`, or
+`await swarm.areevaluate(...)`. Without `acceptance` it uses the `Swarm`'s
+own policy, which must then be strict.
+
+```python
+fixed = AcceptancePolicy(mode="strict", final_validators=[RequiredSection("## Sources")])
+result = swarm.reevaluate(execution_id, acceptance=fixed)
+```
+
+- The policy's final validators run on the saved output, with no provider
+  call, and every gate's recorded final verdict is read, as when the run
+  completed; no judge runs again. No node runs: costs, the budget, retry and
+  regeneration counters and node generations stay as saved, and so do a
+  durable run's calls and charges.
+- Only a completed run whose record holds a decision can be re-evaluated,
+  and only while everything that record binds still holds: the saved output
+  must match its digest, and its task, source generations and delivered files
+  must be unchanged. Otherwise `reevaluate` raises `ValueError`
+  (`WorkflowStateError` on a durable run) and writes nothing, so changed
+  output is never accepted. A completed run without a record, such as an
+  advisory run or a version 4 checkpoint, has nothing that binds its output,
+  and its gates were not marked by origin
+  ([which gates count](#which-gates-count)): run the task again under a
+  strict policy. An unfinished run is resumed, not re-evaluated.
+- The new decision becomes the run's current decision, and the decisions
+  before it are kept. Sequence 0 is the decision the run made when it
+  completed, and each re-evaluation adds one, so the same bytes re-evaluated
+  under an unchanged policy still get a new decision. An ordinary checkpoint
+  keeps the last 16 superseded records under `delivery_acceptance_history`
+  ([checkpoint format](checkpoint-format.md#decision-history)); a durable run
+  keeps every decision in its journal
+  ([durable re-evaluation](#strict-acceptance-in-durable-workflows)).
+- Resuming the run returns its current decision, checked as any completed
+  resume checks its record. An ordinary checkpoint does not record its
+  policy, so, as before, a strict `Swarm` whose policy did not make the
+  current decision gets `indeterminate`. A durable run still resumes only
+  under the policy its recipe records, which re-evaluation does not change,
+  and returns the current decision, whichever policy made it.
+  [`smythe runs inspect`](runs.md#decision-history) lists the decisions and
+  exits by the current one.
+
+### Operator decisions
+
+A policy that selects `needs_review`, or a decision left `indeterminate`,
+withholds output until someone decides it. An authorized operator can
+resolve it, as accepted or rejected, through the same entry point:
+`swarm.reevaluate(execution_id, operator=decision)`, or
+`await swarm.areevaluate(...)`. `decision` is an
+`smythe.acceptance.OperatorDecision`; it takes no `acceptance` policy, and the
+`Swarm` needs none.
+
+Smythe does not authenticate operators. Your host's approval verifier does,
+through the [`ApprovalVerifier`](actions.md#connectors-and-approval-verifiers)
+contract that external actions use: it issues an assertion for one digest and
+returns the `Principal` behind it from `verify()`.
+`operator_decision_sha256(run_id, sequence, record, decision,
+evidence_sha256)` is the digest to approve. It binds the run, the current
+decision's sequence and record, the operator's `"accepted"` or `"rejected"`,
+and the SHA-256 of the evidence the operator decided on, which your host
+keeps; Smythe stores only the digest.
+
+```python
+from smythe.acceptance import OperatorDecision, operator_decision_sha256
+from smythe.checkpoint import delivery_acceptance_sequence
+
+record = result.acceptance                       # needs_review
+sequence = delivery_acceptance_sequence(checkpoint_store.load(execution_id))
+digest = operator_decision_sha256(execution_id, sequence, record, "accepted", evidence_sha256)
+assertion = identity_host.issue(digest, ...)     # your host's approval flow
+decided = swarm.reevaluate(execution_id, operator=OperatorDecision(
+    "accepted", evidence_sha256, assertion=assertion, verifier=identity_host))
+assert decided.accepted
+```
+
+On a durable run, `smythe.workflow.current_decision(store, run_id)` gives the
+`sequence` and `record`.
+
+- Only a current decision of `needs_review` or `indeterminate` can be
+  resolved. An `accepted` or `rejected` decision, including an operator's,
+  stands: `reevaluate` raises `ValueError` (`WorkflowStateError` on a durable
+  run) before the assertion is checked. As with re-evaluation, the run must
+  be completed and everything its record binds must still hold.
+- The verifier must accept the assertion for exactly that digest. A forged,
+  expired or revoked assertion, or one issued for another run, decision,
+  sequence, record or evidence, makes it raise `ApprovalRejected`, which
+  propagates; nothing is written.
+- No node runs, no validator or provider is called, and costs, the budget,
+  retry and regeneration counters and node generations stay as saved.
+- The new decision is a version 2 record with the bindings of the one it
+  resolves, no validator outcomes, and an `operator` block: the principal's
+  `issuer`, `subject` and `tenant`, the verifier's `identity`, and
+  `evidence_sha256`. A reader that knows only version 1 records refuses it.
+  It becomes the current decision and the earlier one is kept, as for a
+  re-evaluation: an ordinary checkpoint also lists `operator_decision` in
+  [`requires`](checkpoint-format.md#required-state-features-version-5) while
+  it holds such a record, and a durable run journals it as the next
+  `acceptance` operation, whose inputs also bind the decision and the
+  operator. Delivery, resume and `smythe runs inspect` follow it.
+- A later re-evaluation under a policy still records a new decision, and
+  keeps the operator's among the earlier ones.
 
 ## Built-in final validators
 
@@ -621,6 +733,19 @@ summary = JSONValidator({"checks": [
 ]})
 ```
 
+**Source evidence.** `SourceEvidenceValidator(sources)`, named
+`smythe.source-evidence`, checks the [source evidence](source-evidence.md)
+that an artifact carries in a `source-evidence` block against the sources the
+run was given: each cited source exists, its stated version and digest match,
+each quoted passage appears verbatim in its source's retained text, no passage
+cites a source the evidence does not list, and each contradiction the
+evidence lists appears in the artifact. A passage from a tombstoned source
+cannot be checked and gives an `error` outcome, never acceptance. The checks
+are mechanical: whether a passage supports its claim stays a judgement for a
+gate or a reviewer. `Synthesizer(retain_contradictions=True)`
+[keeps listed contradictions through synthesis](source-evidence.md#keep-contradictions-through-synthesis),
+and these checks then run on the output it delivers.
+
 ### Rejected generations
 
 Under a strict policy a regeneration keeps a record of what it discards. Each
@@ -686,16 +811,39 @@ policy, and records the decision in its journal:
   already refuse their recipes.
 - **Completed runs.** Resuming a completed run checks the saved output
   against the record's digest, the task and source generations against the
-  record, and the record against the decision the journal applied. Any
+  record, and the record against the journal's current decision. Any
   mismatch returns an `indeterminate` record with the saved text in
   `rejected_output`, never acceptance. A run without a strict policy returns
   `acceptance=None`. [`smythe runs inspect`](runs.md) makes the same checks
   without resuming the run.
+- **Re-evaluation.** `Swarm(run_store=...).reevaluate(run_id,
+  acceptance=policy)`, or `WorkflowRuntime.reevaluate(run_id)`,
+  [decides a completed run again](#re-evaluation). The saved recipe may
+  differ from the `Swarm`'s only in its acceptance policy and gate verifier,
+  since no gate judges again; anything else raises `WorkflowConflictError`.
+  The decision is a new `acceptance` operation keyed
+  `acceptance/<sequence>/<digest>`, the digest covering the output, the
+  policy and everything else the decision binds, and a new completed
+  checkpoint applies it in one transaction. The run's calls, charges,
+  budget, counters and recipe are unchanged. A re-evaluation stopped before
+  that checkpoint is finished by the next one under the same policy, without
+  validating again, unless a source was [removed](tasks.md#remove-a-source)
+  from the run after it decided; the next one then decides again.
+  `smythe.workflow.current_decision(store, run_id)` returns the run's
+  current decision, and `decision_history(store, run_id)` every
+  decision a checkpoint applied, by sequence; resume, re-evaluation and
+  `smythe runs inspect` read the decision there. Resuming under a changed
+  policy is still refused with `WorkflowConflictError`. A run with a renderer
+  is re-evaluated only while its published document is intact; when the
+  file is missing or changed, `republish()` publishes it again first. An
+  [operator's decision](#operator-decisions) is journaled and applied the
+  same way, by a `Swarm` with or without a policy.
 - **Synthesis keys.** Such a run journals its synthesis under `synthesis`
-  while no node has regenerated and under `synthesis/<n>` afterwards, where
-  `n` is the sum of the nodes' generations, so synthesis for a regenerated
-  graph never replays an earlier generation's output. Other runs keep the key
-  `synthesis`.
+  while every node is at generation 0, and otherwise under
+  `synthesis/<digest>`, the first 16 hex digits of the SHA-256 of every node
+  id and its generation, so synthesis for one graph state never replays the
+  output of another, even when their generations add up to the same number.
+  Other runs keep the key `synthesis`.
 
 **Verdicts left pending.** A judge's receipt stays `pending` until its verdict
 is read, and resume then reads the judge's saved reply with the rules of the

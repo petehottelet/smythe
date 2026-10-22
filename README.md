@@ -199,8 +199,8 @@ memo. Its saved graph, trace, and expected output make the workflow inspectable.
 | Adapt the workflow to the task | Generated graphs, approved templates, and deterministic planning |
 | Control spending and parallel work | Request reservations and bounded concurrency |
 | Recover interrupted work | Checkpoints, native response replay, [recorded read steps](docs/workflow-accounting.md#recorded-read-steps), and durable job journals |
-| Check the deliverable | Output verification, opt-in strict acceptance of the exact output returned, and artifact receipts |
-| Understand a run | Graph exports, traces, costs, inspection reports, and [read-only run inspection](docs/runs.md) that reports execution, acceptance and cost separately |
+| Check the deliverable | Output verification, opt-in strict acceptance of the exact output returned, [source-evidence checks](docs/source-evidence.md) that quotes and listed contradictions hold, and artifact receipts |
+| Understand a run | Graph exports, traces, costs, inspection reports, and [read-only run inspection](docs/runs.md) that reports execution, acceptance and cost separately, with a research run's sources, reads, evidence and open questions |
 
 [Architecture](docs/architecture.md) · [Execution](docs/execution.md) ·
 [Jobs](docs/jobs.md) · [Verification](docs/verifier.md) · [MCP tools](docs/mcp.md).
@@ -321,7 +321,11 @@ matrix of supported configurations, and broader external-task benchmarks,
 including separately controlled Astra scheduler and framework studies.
 See the [roadmap](ROADMAP.md) for status and acceptance criteria.
 The [support matrix](docs/support-matrix.md) shows what each execution path
-accepts today, with the test behind each cell.
+accepts today, with the test behind each cell. The
+[source-to-artifact example](examples/16_source_to_artifact.py) runs a
+durable research workflow offline and without keys, from bundled sources
+through an interruption and resume to an accepted document whose evidence
+`smythe runs inspect` reports.
 
 The [Noumenon screensaver](https://github.com/petehottelet/noumenon) renders
 Smythe's glyph catalog, with a web explorer and native Windows, macOS and Linux

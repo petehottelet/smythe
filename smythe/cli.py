@@ -234,6 +234,9 @@ def build_parser() -> argparse.ArgumentParser:
     stop = commands.add_parser("stop", help="request a durable pause and let admitted calls drain")
     stop.add_argument("run_id")
     stop.add_argument("--reason", default="operator requested pause", help="saved reason for this stop request")
+    stop.add_argument("--drain-timeout-s", type=float, default=None,
+                      help="record calls still awaiting a provider this long after the request "
+                           "as unknown outcomes (0-3600 seconds; default: wait for them)")
     stop.add_argument("--timeout-s", type=float, default=30.0,
                       help="drain observation duration (0-3600 seconds; default: 30)")
     stop.add_argument("--poll-interval-s", type=float, default=1.0,
@@ -258,6 +261,14 @@ def build_parser() -> argparse.ArgumentParser:
         help="acknowledge possible duplicate spend for unknown outcomes",
     )
     _add_output_options(reroll, inherited=True)
+
+    adopt = commands.add_parser(
+        "adopt", help="accept verified bytes an unknown outcome already published, without a call",
+    )
+    adopt.add_argument("run_id")
+    adopt.add_argument("operation_key")
+    adopt.add_argument("--reason", required=True)
+    _add_output_options(adopt, inherited=True)
 
     export = commands.add_parser("export", help="export portable run JSON with events")
     export.add_argument("run_id")
@@ -346,7 +357,8 @@ def build_parser() -> argparse.ArgumentParser:
     runs_commands = runs.add_subparsers(dest="runs_command", required=True)
     run_inspection = runs_commands.add_parser(
         "inspect",
-        help="show a run's execution, delivery acceptance, cost, timing and next action",
+        help="show a run's execution, delivery acceptance, context, reads, evidence, open issues, "
+             "cost, timing and next action",
     )
     run_inspection.add_argument("run_id")
     _add_runs_output_options(run_inspection, inherited=True)
@@ -733,6 +745,11 @@ def _emit_job_inspection(value: dict[str, Any]) -> None:
               f"({_terminal_text(operation['operation_id'])}): {_terminal_text(operation['status'])}; "
               f"attempts {operation['attempt_count']}/{operation['max_attempts']}")
         print(f"  Input digest: {_terminal_text(operation.get('input_digest') or 'unavailable')}")
+        adoption = operation.get("adoption")
+        if adoption:
+            print(f"  Adopted published bytes: {_terminal_text(adoption['reason'])}; attempt "
+                  f"{_terminal_text(adoption.get('attempt_id'))} keeps its unknown outcome and "
+                  f"exposure {_usd(adoption['exposure_microusd'])}")
         for attempt in value["attempts"]:
             if attempt["operation_id"] != operation["operation_id"]:
                 continue
@@ -777,6 +794,41 @@ def _emit_run_list(value: dict[str, Any]) -> None:
         print(f"More runs: use --offset {value['offset'] + value['returned']}")
 
 
+def _emit_research(value: dict[str, Any]) -> None:
+    """A durable run's context, reads, source evidence and open issues, without any text."""
+    context = value.get("context")
+    if context is not None:
+        print(f"Context: assembly version {context['assembly_version']}, snapshot version "
+              f"{context['snapshot_version']}; sources revision {context['sources_revision']}; "
+              f"{len(context['sources'])} sources, {len(context['snapshots'])} snapshots")
+        for source in context["sources"]:
+            version = f" version {_terminal_text(source['version'])}" if source["version"] else ""
+            removed = source["removed"]
+            state = (f"removed {_terminal_text(removed['removed_at'])}: {_terminal_text(removed['reason'])}"
+                     if removed else f"{source['text_bytes']} bytes")
+            print(f"  Source {_terminal_text(source['source_id'])}{version}: {state}; "
+                  f"sha256 {source['sha256'][:12]}")
+    for call in value.get("tool_calls") or ():
+        status = call["http_status"] if call["http_status"] is not None else "none"
+        text = f"; {call['text_bytes']} bytes of text" if call["text_bytes"] is not None else ""
+        error = f"; {_terminal_text(call['error'])}" if call["error"] else ""
+        print(f"Read {_terminal_text(call['node_id'])} (generation {call['generation']}, attempt "
+              f"{call['attempt']}): {_terminal_text(call['profile'])} "
+              f"{_terminal_text(call['profile_version'])}; {call['state']}, "
+              f"{call['result_state']}; HTTP {status}{text}; cost {call['cost_nanousd']} nanoUSD{error}")
+    evidence = value.get("evidence")
+    if evidence is not None:
+        print(f"Evidence: {len(evidence['claims'])} claims citing {len(evidence['sources'])} sources "
+              f"({evidence['state']})")
+        for claim in evidence["claims"]:
+            print(f"  Claim {_terminal_text(claim['claim_id'])}: {claim['supporting']} supporting, "
+                  f"{claim['contradicting']} contradicting; sources "
+                  f"{_terminal_text(', '.join(claim['sources']) or 'none')}")
+    for issue in value.get("issues") or ():
+        subject = f" ({_terminal_text(issue['subject'])})" if issue["subject"] is not None else ""
+        print(f"Issue {issue['kind']}{subject}: {_terminal_text(issue['detail'])}")
+
+
 def _emit_run_inspection(value: dict[str, Any]) -> None:
     print(f"Run: {_terminal_text(value['run_id'])}")
     saved = value["format"]
@@ -805,10 +857,30 @@ def _emit_run_inspection(value: dict[str, Any]) -> None:
             print(f"  Validator {_terminal_text(identity['name'])} {_terminal_text(identity['version'])} "
                   f"(config {identity['config_sha256'][:12]}): {result['outcome']}")
         print(f"  Policy: {record['policy_sha256']}")
+    decisions = value["decisions"]
+    if decisions["history"]:
+        print(f"Decision history: decision {decisions['current']} is current; earlier decisions:")
+        for entry in decisions["history"]:
+            earlier = entry["record"]
+            reason = f": {_terminal_text(earlier['reasons'][0])}" if earlier["reasons"] else ""
+            print(f"  Decision {entry['sequence']}: {earlier['decision']} under policy "
+                  f"{earlier['policy_sha256'][:12]}{reason}")
     withheld = delivery["rejected_output"]
     if withheld is not None:
         print(f"Withheld output: {withheld['bytes']} bytes in the saved {withheld['field']} field; "
               f"sha256 {withheld['sha256']}")
+    artifact = value["artifact"]
+    if artifact is not None:
+        published, eligibility = artifact["publication"], artifact["delivery_eligibility"]
+        print(f"Artifact: {_terminal_text(artifact['path'], limit=1000)} (publication "
+              f"{published['sequence']}); {published['size_bytes']} bytes; "
+              f"sha256 {published['sha256']}")
+        print(f"  Integrity: {artifact['integrity']['status']}: "
+              f"{_terminal_text(artifact['integrity']['detail'])}")
+        eligible = "eligible" if eligibility["eligible"] else (
+            "not eligible (" + ", ".join(eligibility["reasons"]) + ")")
+        print(f"  Delivery eligibility: {eligible}")
+    _emit_research(value)
     accounting = value["accounting"]
     print(f"Cost: ${accounting['total_cost_usd']:.6f} ({accounting['cost_scope']}); "
           f"complete: {_yes(accounting['cost_is_complete'])}; "
@@ -856,7 +928,7 @@ def _emit(args: argparse.Namespace, command: str, value: Any) -> None:
         print(f"Operations: {len(value['plan']['operations'])}")
         print(f"Worst-case cost: ${value['plan']['worst_case_cost_usd']}")
         print(f"Approval token: {value['approval']['token']}")
-    elif command in {"run", "status", "resume", "reroll"}:
+    elif command in {"run", "status", "resume", "reroll", "adopt"}:
         job = value
         print(f"Run: {_terminal_text(job['run_id'])}")
         print(f"Status: {_terminal_text(job['status'])}")
@@ -1144,7 +1216,8 @@ def _dispatch_jobs(args: argparse.Namespace) -> int:
             observe = stop_job if command == "stop" else attach_job
             snapshot = observe(args.store, args.run_id, timeout_s=args.timeout_s,
                                poll_interval_s=args.poll_interval_s, on_update=update,
-                               **({"reason": args.reason} if command == "stop" else {}))
+                               **({"reason": args.reason, "drain_timeout_s": args.drain_timeout_s}
+                                  if command == "stop" else {}))
         except KeyboardInterrupt:
             _emit(args, command, {"run_id": args.run_id, "attachment": {"state": "disconnected"}})
             return EXIT_INTERRUPTED
@@ -1188,6 +1261,10 @@ def _dispatch_jobs(args: argparse.Namespace) -> int:
                     reason=args.reason,
                     acknowledge_unknown=args.acknowledge_unknown,
                 )
+            )
+        elif command == "adopt":
+            snapshot = asyncio.run(
+                JobRunner(store).adopt(args.run_id, args.operation_key, reason=args.reason)
             )
         elif command == "export":
             snapshot = _portable_export(

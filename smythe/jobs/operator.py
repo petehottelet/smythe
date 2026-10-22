@@ -686,15 +686,20 @@ def attach_job(store_path, run_id, *, timeout_s=DEFAULT_ATTACH_TIMEOUT_S,
             time.sleep(min(interval, max(0, deadline - time.monotonic())))
 
 
-def stop_job(store_path, run_id, *, reason="operator requested pause",
+def stop_job(store_path, run_id, *, reason="operator requested pause", drain_timeout_s=None,
              timeout_s=DEFAULT_ATTACH_TIMEOUT_S, poll_interval_s=1.0, on_update=None) -> dict:
     """Persist a graceful pause request, then observe its bounded drain.
 
-    Already admitted calls may finish. An observation timeout or interruption
+    Already admitted calls may finish. With ``drain_timeout_s``, the worker
+    itself abandons calls still awaiting their provider that long after the
+    request, as unknown outcomes. An observation timeout or interruption
     leaves the request in SQLite; neither event cancels or signals a worker.
     """
     timeout = _seconds(timeout_s, "timeout_s", minimum=0, maximum=MAX_ATTACH_TIMEOUT_S)
     interval = _seconds(poll_interval_s, "poll_interval_s", minimum=.05, maximum=60)
+    if drain_timeout_s is not None:
+        drain_timeout_s = _seconds(drain_timeout_s, "drain_timeout_s", minimum=0,
+                                   maximum=MAX_ATTACH_TIMEOUT_S)
     if type(reason) is not str or not reason.strip() or len(reason) > 2048:
         raise ValueError("stop reason must be nonempty text of at most 2048 characters")
     database, run_id = Path(store_path).resolve(), _run_id(run_id)
@@ -703,7 +708,7 @@ def stop_job(store_path, run_id, *, reason="operator requested pause",
     with SQLiteRunStore(database, read_only=True) as store:
         store.get_run(run_id)
     with SQLiteRunStore(database) as store:
-        requested = store.request_pause(run_id, reason=reason)
+        requested = store.request_pause(run_id, reason=reason, drain_timeout_s=drain_timeout_s)
     try:
         snapshot = attach_job(database, run_id, timeout_s=timeout, poll_interval_s=interval,
                               on_update=on_update)

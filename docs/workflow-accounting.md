@@ -148,8 +148,12 @@ generation response qualifies only when all of these hold:
 
 The node raises `ProviderRequestRejectedError`, with the status code and raw
 evidence attached, and its failure policy decides what happens next: `RETRY`
-makes a new journaled call, `SKIP` skips the node, and `HALT` fails it. A
-rejected supervisor review counts as no change, like other supervisor errors.
+makes a new journaled call, `SKIP` skips the node, and `HALT` fails it. Its
+read-only `failure_class` is `authority_denied` for 401 or 403, `input_error`
+for 404 or 413 and `transient` for 429 (see [failure
+classes](execution.md#failure-classes)); it does not change what the failure
+policy does. A rejected supervisor review counts as no change, like other
+supervisor errors.
 Every other unsuccessful response holds unknown exposure, because the provider
 may have processed and billed the request:
 
@@ -310,8 +314,9 @@ Competing openers reuse that identity. Failed initialization rolls back;
 existing evidence and read-only inspection retain their behavior.
 
 Resume requires the same component descriptions, model configuration, budget,
-retry backoff, concurrency policy, gate validator and
-[acceptance policy](#strict-delivery-acceptance), apart from the
+retry backoff, concurrency policy, gate validator,
+[acceptance policy](#strict-delivery-acceptance) and
+[renderer](#published-documents), apart from the
 [price versions](#price-versions) of saved provider descriptions. It does not
 refill allowances. An
 inspected pending plan can be edited before execution; a stale graph from an
@@ -337,7 +342,12 @@ version from the saved recipe, so a `Swarm` without `context_sources` resumes
 such a run with the sources it recorded, and one with `context_sources`
 cannot resume a run whose recipe has no `context_assembly`. Such a run keys
 synthesis by node generation, like a strict run, so a refresh of its sources
-never replays an earlier synthesis.
+never replays an earlier synthesis. `Swarm.remove_source` journals a
+`source_tombstone` operation for a source that must no longer be used; the
+run then never sends or returns its text, an unfinished run resumes only
+with other sources, and a completed run's earlier decision becomes
+`indeterminate` until it is re-evaluated
+([remove a source](tasks.md#remove-a-source)).
 
 ## Strict delivery acceptance
 
@@ -364,24 +374,138 @@ journals the decision:
   validators on the exact output and reads every gate's final verdict, with
   no provider call. It is keyed by the output digest and everything else its
   record binds, and the completed checkpoint consumes it together with the
-  synthesis, in one transaction.
+  synthesis, in one transaction. When the policy has a
+  `SourceEvidenceValidator`, a `source_evidence` operation keyed
+  `source-evidence/<sha256>` first records the
+  [source evidence](source-evidence.md#durable-runs) the output carries,
+  bound to its digest and the run's source set, and the same checkpoint
+  consumes it. A `SourceEvidenceValidator` built from other sources than
+  the run's current source set does not run, and the decision is
+  `indeterminate` by default.
 - A process lost after synthesis and before the decision commits decides
   again on resume, on the same saved output. A process lost after the
   decision commits replays it, and one lost after the completed checkpoint
   returns it; neither runs a validator or calls a provider again.
 - Checkpoints of runs with a strict policy or a gate validator are version 2,
   with a `delivery_acceptance` block; other runs keep version 1. Synthesis in
-  such a run is keyed `synthesis` until a node regenerates, then
-  `synthesis/<n>` with `n` the sum of the node generations.
+  such a run is keyed `synthesis` while every node is at generation 0, then
+  `synthesis/<digest>`, a short digest of every node id and its generation,
+  so each graph state has its own synthesis.
 - Resuming a completed run checks the saved output, task, source generations
-  and journal decision against the record; a mismatch gives an
+  and the journal's current decision against the record; a mismatch gives an
   `indeterminate` record and moves the text to `rejected_output`.
+- Resuming never decides a completed run again, and resuming under another
+  policy is refused. `Swarm(run_store=store).reevaluate(run_id,
+  acceptance=policy)` is the explicit way to a new decision, for example
+  under a fixed validator: it accepts a recipe that differs only in its
+  acceptance policy and gate verifier, runs no node and calls no provider,
+  journals the decision as a new `acceptance` operation keyed
+  `acceptance/<sequence>/<digest>`, and applies it with a new completed
+  checkpoint. Calls, charges, the budget, revision and regeneration counters,
+  node generations and the recipe are unchanged, and earlier decisions stay
+  in the journal. Output that no longer matches its record is refused. See
+  [re-evaluation](verifier.md#re-evaluation);
+  `smythe.workflow.current_decision(store, run_id)` returns the decision that
+  resume and [`smythe runs inspect`](runs.md#decision-history) report.
 
 The journal format is unchanged: operation kinds are free text, so this needs
 no journal upgrade. `tests/test_workflow_process_loss.py` kills a real
 process at each of these points and resumes the run, including a run with
 priced native calls and a regenerated draft, whose confirmed charges, node
 generations and regeneration count resume unchanged without a new call.
+
+## Published documents
+
+A durable run can publish its delivered output as a local document. Pass a
+`renderer` with the `run_store`; the document goes to
+`artifact_dir/<run id>/`:
+
+```python
+from smythe import (
+    AcceptancePolicy, MarkdownRenderer, OfflineProvider, SimpleArchitect, SQLiteWorkflowStore,
+    Swarm, Task, TextValidator,
+)
+from smythe.workflow_artifact import current_artifact
+
+with SQLiteWorkflowStore("smythe-runs.db") as store:
+    swarm = Swarm(
+        model="offline", provider=OfflineProvider(), architect=SimpleArchitect(),
+        run_store=store, renderer=MarkdownRenderer(), artifact_dir="briefs",
+        acceptance=AcceptancePolicy(mode="strict", final_validators=[TextValidator()]),
+    )
+    result = swarm.execute(Task("Write the brief"))
+    artifact = current_artifact(store, result.execution_id)
+    print(artifact.publication.path, artifact.eligible)
+```
+
+- **The renderer is registered, deterministic local code.** The built-in
+  `MarkdownRenderer` writes `document.md`: a level-one heading with the
+  task's goal, a blank line, the synthesized text without trailing
+  whitespace, and one final newline. Your own renderer is declared with
+  `LocalOnly(factory, identity, version, role="renderer")`: the factory builds
+  an object with a synchronous `render(output, task)` that returns text, and
+  optional `filename` (default `document.txt`, a simple name with an
+  extension) and `media_type` (default `text/plain; charset=utf-8`, a `text/*`
+  type). It must make the same text from the same input, with no provider
+  calls or side effects; this is a caller contract, not a sandbox. The recipe
+  records the renderer's description, `{"type": "markdown_renderer",
+  "version": 1}` or its `LocalOnly` identity and version, only when there is
+  one, so existing recipes keep their bytes and a run resumes only with the
+  renderer it started with. Without a renderer, `artifact_dir` is ignored, as
+  before.
+- **The document is the delivered output.** After the `synthesis` operation
+  the renderer renders the synthesized text, and the document's UTF-8 bytes
+  are published once. A strict policy's final validators check exactly those
+  bytes, so the decision's `output_sha256` is the published file's SHA-256,
+  and the run's result and completed checkpoint hold the document. A
+  [source evidence](source-evidence.md#durable-runs) record is read from the
+  document. Because a rendered document is not any node's result, a strict
+  policy with a renderer needs a final validator.
+- **Publication never replaces a file.** The run's directory is bound to the
+  run by an owner marker before any node call; a directory owned by another
+  run, or holding files the run does not own, is refused with
+  `WorkflowStateError`, as is a filesystem without hard links. The document
+  is published under the renderer's file name or, when that name is taken,
+  the next free numbered name (`document-2.md`). A `publication` operation
+  keyed `publication/<sequence>` records a `PublishedArtifact`: the sequence,
+  the directory and file name, the SHA-256, size and media type of the bytes,
+  the renderer's description, and the synthesis it rendered. The completed
+  checkpoint consumes it with the decision.
+- **Interrupted publication.** A process lost after publishing and before the
+  operation commits reuses the file it published, which already holds the
+  same bytes. A process lost after the operation commits renders the
+  document again and checks that it has the recorded SHA-256; if the
+  renderer no longer makes those bytes, the published file is read instead,
+  and if that file is also missing or changed the run fails with
+  `WorkflowStateError` rather than decide on other bytes.
+
+`smythe.workflow_artifact.current_artifact(store, run_id)` is the one accessor
+for a run's current publication: the one with the highest sequence that a
+checkpoint applied, the delivery decision that covers it, and whether it is
+eligible for delivery now. The decision is the run's current one, checked as
+resume checks it, so after a [re-evaluation](verifier.md#re-evaluation) it is
+the re-evaluation's, under the policy that made it. Its `reasons` name every
+condition that is not met:
+`no_decision` (the run has no strict policy or has not completed),
+`not_accepted`, `record_mismatch` (the decision binds other bytes), and
+`artifact_missing`, `artifact_changed`, `artifact_unsafe` (a symbolic link,
+junction or non-regular file) or `artifact_unreadable` from rechecking the
+file's size and SHA-256. Eligibility is derived on every read and never stored;
+the accessor only reads, so a store opened read-only will do.
+
+A strict run's result, whether the run completes now, including after an
+interrupted publication, or completed earlier, and `smythe runs inspect` all
+check the current publication: a missing or changed file gives an
+`indeterminate` decision with the reason, the output moves to
+`rejected_output`, and [inspection](runs.md#published-documents) exits with
+code 11 and the next action `republish`. `swarm.republish(run_id)` publishes
+the saved document again: its bytes, which must still have the published
+SHA-256, go to the renderer's file name or, when that is taken, the next free
+numbered name, so a changed file keeps its bytes, and the next `publication`
+operation, applied by a new completed checkpoint, becomes current. It calls no
+provider, runs no validator and leaves the decision as it is, since that binds
+the same bytes. A run whose current file is intact is left as it is. Operation
+kinds are free text, so publication needs no journal upgrade.
 
 ## Recorded read steps
 
@@ -533,8 +657,10 @@ endpoints. The path binds the built-in simple, LLM, and constrained architects,
 WhiteRabbit routing, static registries, LLM supervision, synthesis strategies,
 token verification, gates judged by a
 [registered validator](verifier.md#gate-validators-in-durable-workflows)
-declared with `LocalOnly(..., role="validator")`, and
-[recorded read steps](#recorded-read-steps) of declared profiles. Every reachable router tier
+declared with `LocalOnly(..., role="validator")`,
+[recorded read steps](#recorded-read-steps) of declared profiles, and
+[published documents](#published-documents) from `MarkdownRenderer` or a
+renderer declared with `LocalOnly(..., role="renderer")`. Every reachable router tier
 and template is checked before routing can make a paid call. Provider
 instances are snapshotted per run.
 
@@ -543,8 +669,8 @@ the [Fable 5.1 benchmark extension](../benchmarks/fable_51_benchmark_plan.md).
 The ordinary `AnthropicProvider` cannot enter this managed path, and neither
 can subclasses of the supported providers.
 
-Custom local architects, template builders, supervisors, synthesizers and gate
-validators use `LocalOnly(factory, identity, version, role=...)`. The factory must return a fresh
+Custom local architects, template builders, supervisors, synthesizers, gate
+validators and renderers use `LocalOnly(factory, identity, version, role=...)`. The factory must return a fresh
 component that performs no provider calls or external side effects. A template
 builder must also return the same nodes, with the same ids, for the same task
 and params ([why](architecture.md#planning-tiers)). This is an
@@ -569,7 +695,8 @@ bindings. Open `SQLiteWorkflowStore(path, read_only=True)` for inspection withou
 schema changes or provider construction, including a journal from an earlier
 release ([journal upgrades](#journal-upgrades)). From the command line,
 `smythe runs --journal <path> inspect <run id>` reports the same balances,
-the run's state, its delivery decision and its next action through a
+the run's state, its delivery decision, its
+[published document](#published-documents) and its next action through a
 read-only open; see
 [Inspect saved runs](runs.md). Explicit `load_replay()` and
 `load_evidence()` calls expose sensitive saved text and raw provider and read responses;

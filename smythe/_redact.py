@@ -1,9 +1,11 @@
 """Account-identifier redaction for text that a record keeps.
 
 Provider and service error messages can embed account identifiers and masked
-keys. Records redact them before they are written; a repository test rejects
-them in every tracked file. ``benchmarks.artifact_records`` re-exports these
-names. This module imports nothing from smythe.
+keys. Records redact them before they are written: a failed node's result
+and trace span, a native response error marker, Jobs call errors, Autotune
+trial errors and journaled read and evidence reasons. A repository test
+rejects them in every tracked file. ``benchmarks.artifact_records``
+re-exports these names. This module imports nothing from smythe.
 """
 
 from __future__ import annotations
@@ -36,3 +38,8 @@ def redact_account_identifiers(value: Any) -> Any:
     if isinstance(value, (list, tuple)):
         return [redact_account_identifiers(item) for item in value]
     return value
+
+
+def error_text(error: object) -> str:
+    """*error*'s message, as a record keeps it: with account identifiers redacted."""
+    return redact_account_identifiers(str(error))

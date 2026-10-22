@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 from contextlib import closing
+import hashlib
 import json
 import sqlite3
 
@@ -22,6 +23,7 @@ from smythe.provider import CompletionResult
 from smythe.registry import Registry
 from smythe.validation import ValidationReport, ValidatorIdentity, hard_finding
 from smythe.verifier import TOKEN_VERIFIER_IDENTITY
+from smythe.workflow import _synthesis_key, current_decision, decision_history
 from smythe.workflow_binding import WorkflowBindingError
 from smythe.workflow_store import WorkflowConflictError, WorkflowStateError, _canonical, _sha
 
@@ -387,7 +389,8 @@ def test_strict_durable_run_with_a_gate_validator(store, replies):
     assert recipe["acceptance"] == strict().to_dict()
     # Synthesis after a regeneration has its own key, scoped by the node generations.
     keys = operations(store, result.execution_id)
-    assert keys["synthesis/2"] == ("synthesis", "applied") and "synthesis" not in keys
+    assert keys[generation_key(draft=1, judge=1)] == ("synthesis", "applied")
+    assert "synthesis" not in keys
 
 
 def test_legacy_runs_keep_the_unscoped_synthesis_key(store, replies):
@@ -396,6 +399,84 @@ def test_legacy_runs_keep_the_unscoped_synthesis_key(store, replies):
     result = durable(store).execute(gated())
     assert result.graph.nodes[0].metadata["execution_generation"] == 1
     assert operations(store, result.execution_id)["synthesis"] == ("synthesis", "applied")
+
+
+def generation_key(**generations) -> str:
+    """The scoped synthesis key of a graph whose nodes hold *generations*."""
+    digest = hashlib.sha256(json.dumps(generations, sort_keys=True, separators=(",", ":"))
+                            .encode()).hexdigest()
+    return "synthesis/" + digest[:16]
+
+
+def at_generations(**generations) -> ExecutionGraph:
+    return ExecutionGraph([Topology.FORK_JOIN], [
+        Node(id=node_id, label=node_id.upper(), metadata={"execution_generation": generation})
+        for node_id, generation in generations.items()])
+
+
+def test_scoped_synthesis_keys_name_every_node_generation():
+    states = [
+        {"a": 1, "b": 0}, {"a": 0, "b": 1},
+        # A dropped node, then another regeneration, gives the same sum.
+        {"a": 1, "b": 1, "c": 0}, {"a": 2, "c": 0}, {"a": 1, "b": 0, "c": 1},
+    ]
+    keys = [_synthesis_key(at_generations(**state), scoped=True) for state in states]
+    assert keys == [generation_key(**state) for state in states]
+    assert len(set(keys)) == len(states)
+    # The literal key stays while every node is at generation 0, and for other recipes.
+    assert _synthesis_key(at_generations(a=0, b=0), scoped=True) == "synthesis"
+    assert _synthesis_key(at_generations(a=1, b=0), scoped=False) == "synthesis"
+
+
+def test_synthesis_for_another_graph_state_with_the_same_generation_sum_is_not_replayed(
+    tmp_path, replies, monkeypatch,
+):
+    """Scoped synthesis keys were the sum of node generations, so synthesis for
+    a graph at {a: 0, b: 1} replayed output saved for {a: 1, b: 0}."""
+    script, calls = replies
+    script.update({"A": ["first a"], "B": ["first b"]})
+    path = tmp_path / "states.db"
+    policy = strict(Contains("first"))
+    graph = ExecutionGraph([Topology.FORK_JOIN], [Node(id="a", label="A"), Node(id="b", label="B")])
+    with SQLiteWorkflowStore(path) as store:
+        restore = stop_after_saving(monkeypatch, store, lambda state: state["status"] == "planned")
+        with pytest.raises(Crash):
+            durable(store, acceptance=policy).execute(graph)
+        restore()
+        (run,) = store.list_runs()
+    run_id = run["run_id"]
+    # The run's first state: node a at generation 1, b at 0.
+    rewrite_checkpoint(path, run_id, lambda state: state["graph"]["nodes"][0]["metadata"].update(
+        execution_generation=1))
+    with SQLiteWorkflowStore(path) as store:
+        restore = stop_at(monkeypatch, store, "begin_operation",
+                          lambda lease, key, *args, **kwargs: key.startswith("acceptance/"))
+        with pytest.raises(Crash):
+            durable(store, acceptance=policy).resume(run_id)
+        restore()
+        (first,) = [key for key, (kind, _) in operations(store, run_id).items() if kind == "synthesis"]
+        assert store.load_operation(run_id, first)["result"] == {"output": "first a\n\nfirst b"}
+
+    def second_state(state):
+        a, b = state["graph"]["nodes"]
+        assert (a["status"], b["status"]) == ("completed", "completed")
+        a["metadata"]["execution_generation"], b["metadata"]["execution_generation"] = 0, 1
+        b["result"] = "first b, regenerated"
+
+    # Another state with the same generation sum, and another result for b.
+    rewrite_checkpoint(path, run_id, second_state)
+    sent = list(calls)
+    with SQLiteWorkflowStore(path) as store:
+        result = durable(store, acceptance=policy).resume(run_id)
+        keys = operations(store, run_id)
+
+    assert calls == sent
+    assert result.accepted and result.output == "first a\n\nfirst b, regenerated"
+    second = generation_key(a=0, b=1)
+    assert (first, keys[first]) == (generation_key(a=1, b=0), ("synthesis", "completed"))
+    # The stopped process never applied its synthesis; the second state's was applied.
+    assert keys[second] == ("synthesis", "applied")
+    assert {key for key, (kind, _) in keys.items() if kind == "synthesis"} == {first, second}
 
 
 def test_crash_after_synthesis_before_the_decision_decides_again(store, replies, monkeypatch):
@@ -470,6 +551,49 @@ def test_corrupted_stored_output_is_not_accepted(tmp_path, replies, change):
     expected = ("does not match the digest" if change == "output"
                 else "the journal holds no applied decision")
     assert any(expected in reason for reason in result.acceptance.reasons)
+    assert calls == sent and Contains.checked == []
+
+
+@pytest.mark.parametrize("change", ["source", "task"])
+def test_completed_resume_rechecks_the_bound_source_generation_and_task(tmp_path, replies, change):
+    path = tmp_path / "bound.db"
+    with SQLiteWorkflowStore(path) as store:
+        first = durable(store, acceptance=strict(Contains())).execute(Task("Write the needle"))
+    assert first.accepted
+    node_id = first.graph.nodes[0].id
+
+    def rewrite(checkpoint):
+        if change == "source":
+            checkpoint["graph"]["nodes"][0]["metadata"]["execution_generation"] = 3
+        else:
+            checkpoint["delivery_acceptance"]["task_sha256"] = "0" * 64
+
+    rewrite_checkpoint(path, first.execution_id, rewrite)
+    _, calls = replies
+    sent, Contains.checked = list(calls), []
+    with SQLiteWorkflowStore(path) as store:
+        result = durable(store, acceptance=strict(Contains())).resume(first.execution_id)
+
+    assert result.acceptance.decision is AcceptanceDecision.INDETERMINATE
+    assert (result.output, result.rejected_output) == ("", first.output)
+    expected = {"source": f"node {node_id!r} no longer holds the generation its record bound",
+                "task": "the saved task does not match the task its record bound"}[change]
+    assert expected in result.acceptance.reasons
+    # The journal holds the decision for the graph and record that were decided, not these.
+    assert "the journal holds no applied decision matching the saved record" in result.acceptance.reasons
+    assert calls == sent and Contains.checked == []
+
+
+def test_completed_resume_refuses_a_checkpoint_without_its_acceptance_block(tmp_path, replies):
+    path = tmp_path / "block.db"
+    with SQLiteWorkflowStore(path) as store:
+        first = durable(store, acceptance=strict(Contains())).execute(Task("Write the needle"))
+    rewrite_checkpoint(path, first.execution_id, lambda state: state.pop("delivery_acceptance"))
+    _, calls = replies
+    sent, Contains.checked = list(calls), []
+    with SQLiteWorkflowStore(path) as store:
+        with pytest.raises(WorkflowStateError, match="no delivery acceptance block"):
+            durable(store, acceptance=strict(Contains())).resume(first.execution_id)
     assert calls == sent and Contains.checked == []
 
 
@@ -871,3 +995,213 @@ def test_final_validators_decide_a_durable_step_added_after_a_gate(store, replie
     assert final_text in (result.output, result.rejected_output)
     assert [source.node_id for source in result.acceptance.sources] == ["final"]
     assert Contains.checked == [final_text] and not refused_revisions(result)
+
+
+# ---------------------------------------------------------------------------
+# Re-evaluation: a new decision for a completed run's saved output
+# ---------------------------------------------------------------------------
+
+
+def run_state(store, run_id) -> dict:
+    """What a re-evaluation leaves as it was: calls, charges, budget, recipe and status."""
+    inspected, run = store.inspect_run(run_id), store.load_run(run_id)
+    return {"calls": inspected["calls"], "config": run["config"], "binding": run["binding_sha256"],
+            "status": run["status"], "budget": run["budget_nanousd"],
+            **{key: inspected[key] for key in ("confirmed_nanousd", "reserved_nanousd",
+                                               "unknown_nanousd", "unknown_calls", "call_count")}}
+
+
+def checkpoint_without_decision(store, run_id) -> dict:
+    checkpoint = dict(store.get_checkpoint(run_id)["checkpoint"])
+    checkpoint.pop("delivery_acceptance")
+    return checkpoint
+
+
+@pytest.mark.parametrize("first,decision", [(Contains(), "rejected"), (Raises(), "indeterminate")],
+                         ids=["rejected", "indeterminate"])
+def test_durable_reevaluation_decides_again_and_leaves_the_run_as_it_was(store, replies, first,
+                                                                         decision):
+    script, calls = replies
+    script["Write"] = ["the report"]
+    original = durable(store, acceptance=strict(first)).execute(single())
+    assert original.acceptance.decision.value == decision
+    run_id = original.execution_id
+    before, saved = run_state(store, run_id), checkpoint_without_decision(store, run_id)
+    revision = store.get_checkpoint(run_id)["revision"]
+    sent, Contains.checked = list(calls), []
+    fixed = strict(Contains("report"))
+
+    result = durable(store).reevaluate(run_id, acceptance=fixed)
+
+    assert result.accepted and result.output == "the report"
+    assert result.acceptance.policy_sha256 == fixed.sha256
+    assert result.workflow_accounting == original.workflow_accounting
+    # The validator ran once; no node ran and no provider was called.
+    assert Contains.checked == ["the report"] and calls == sent
+    # Calls, charges, budget and recipe are unchanged; the checkpoint differs
+    # only in its decision, which a new revision holds.
+    assert run_state(store, run_id) == before
+    assert checkpoint_without_decision(store, run_id) == saved
+    current = store.get_checkpoint(run_id)
+    assert current["revision"] == revision + 1
+    assert current["checkpoint"]["delivery_acceptance"] == result.acceptance.to_dict()
+    # The first decision stays in the journal; the new one is current.
+    history = decision_history(store, run_id)
+    assert [(item["sequence"], item["record"]) for item in history] == [
+        (0, original.acceptance), (1, result.acceptance)]
+    assert history[1]["operation_key"].startswith("acceptance/1/")
+    assert history[1]["revision"] == current["revision"]
+    assert history[1]["inputs"]["policy_sha256"] == fixed.sha256
+    assert current_decision(store, run_id) == history[-1]
+    assert any(span["node_id"] == "acceptance:delivery" for span in result.trace)
+    assert store.audit(run_id)["ok"]
+
+
+def test_normal_resume_under_a_changed_policy_still_refuses(store, replies):
+    _, calls = replies
+    original = durable(store, acceptance=strict(Contains())).execute(single())
+    assert original.acceptance.decision is AcceptanceDecision.REJECTED
+    run_id, fixed = original.execution_id, strict(Contains("done"))
+    sent = list(calls)
+    # Resuming a completed run never makes a new decision under another policy.
+    with pytest.raises(WorkflowConflictError, match="acceptance policy"):
+        durable(store, acceptance=fixed).resume(run_id)
+
+    reevaluated = durable(store).reevaluate(run_id, acceptance=fixed)
+
+    assert reevaluated.accepted and reevaluated.output == "Write done"
+    # The recipe still names the policy the run executed under.
+    for policy in (fixed, None):
+        with pytest.raises(WorkflowConflictError, match="acceptance policy"):
+            durable(store, acceptance=policy).resume(run_id)
+    # Under that policy, resume returns the run's current decision.
+    again = durable(store, acceptance=strict(Contains())).resume(run_id)
+    assert again.acceptance == reevaluated.acceptance
+    assert again.accepted and again.output == "Write done"
+    assert calls == sent
+
+
+def test_reevaluating_identical_bytes_twice_records_two_distinct_decisions(store, replies):
+    script, _ = replies
+    script["Write"] = ["the needle report"]
+    policy = strict(Contains())
+    original = durable(store, acceptance=policy).execute(single())
+    run_id, swarm = original.execution_id, durable(store, acceptance=policy)
+    Contains.checked = []
+
+    first, second = (swarm.reevaluate(run_id) for _ in range(2))
+
+    assert first.acceptance == second.acceptance == original.acceptance
+    history = decision_history(store, run_id)
+    assert [item["sequence"] for item in history] == [0, 1, 2]
+    assert len({item["operation_key"] for item in history}) == 3
+    assert all(item["record"] == original.acceptance for item in history)
+    assert current_decision(store, run_id)["sequence"] == 2
+    # Each re-evaluation ran the validators and was applied by its own checkpoint.
+    assert Contains.checked == ["the needle report"] * 2
+    assert [state for kind, state in operations(store, run_id).values()
+            if kind == "acceptance"] == ["applied"] * 3
+    assert len({item["revision"] for item in history}) == 3
+
+
+@pytest.mark.parametrize("change", ["output", "output-and-record"])
+def test_corrupted_durable_output_is_never_reevaluated(tmp_path, replies, change):
+    path = tmp_path / "corrupt.db"
+    with SQLiteWorkflowStore(path) as store:
+        first = durable(store, acceptance=strict(Contains("other"))).execute(single("Write the needle"))
+    assert first.acceptance.decision is AcceptanceDecision.REJECTED
+    tampered = "the needle, but not the text that was decided"
+
+    def rewrite(checkpoint):
+        checkpoint["output"] = tampered
+        if change == "output-and-record":
+            checkpoint["delivery_acceptance"]["output_sha256"] = text_sha256(tampered)
+
+    rewrite_checkpoint(path, first.execution_id, rewrite)
+    _, calls = replies
+    sent, Contains.checked = list(calls), []
+    with SQLiteWorkflowStore(path) as store:
+        before, revision = operations(store, first.execution_id), store.load_run(
+            first.execution_id)["revision"]
+        with pytest.raises(WorkflowStateError, match="cannot be re-evaluated"):
+            durable(store).reevaluate(first.execution_id, acceptance=strict(Contains()))
+        assert operations(store, first.execution_id) == before
+        assert store.load_run(first.execution_id)["revision"] == revision
+        resumed = durable(store, acceptance=strict(Contains("other"))).resume(first.execution_id)
+    assert resumed.acceptance.decision is AcceptanceDecision.INDETERMINATE
+    assert calls == sent and Contains.checked == []
+
+
+def test_a_reevaluation_stopped_before_its_checkpoint_is_finished_by_the_next(store, replies,
+                                                                             monkeypatch):
+    original = durable(store, acceptance=strict(Contains())).execute(single())
+    run_id, fixed = original.execution_id, strict(Contains("done"))
+    restore = stop_at(monkeypatch, store, "save_checkpoint", lambda *args, **kwargs: True)
+    with pytest.raises(Crash):
+        durable(store).reevaluate(run_id, acceptance=fixed)
+    restore()
+    (stopped,) = [key for key, (kind, state) in operations(store, run_id).items()
+                  if kind == "acceptance" and state == "completed"]
+    assert stopped.startswith("acceptance/1/")
+    # The committed but unapplied decision is not current.
+    assert current_decision(store, run_id)["record"] == original.acceptance
+    Contains.checked = []
+
+    result = durable(store).reevaluate(run_id, acceptance=fixed)
+
+    # The next re-evaluation applies the committed decision without validating again.
+    assert result.accepted and Contains.checked == []
+    assert current_decision(store, run_id)["operation_key"] == stopped
+    assert [item["sequence"] for item in decision_history(store, run_id)] == [0, 1]
+    # Under another policy the stopped decision stays unapplied and the next sequence is used.
+    other = durable(store).reevaluate(run_id, acceptance=strict(Contains("Write")))
+    assert other.accepted and current_decision(store, run_id)["sequence"] == 2
+
+
+def test_reevaluation_reads_recorded_gate_verdicts_without_its_gate_validator(store, replies):
+    script, calls = replies
+    script["Draft"] = ["first", "second"]
+    original = durable(store, verifier=contains(), acceptance=strict()).execute(gated())
+    assert original.acceptance.decision is AcceptanceDecision.REJECTED
+    run_id = original.execution_id
+    before, saved = run_state(store, run_id), checkpoint_without_decision(store, run_id)
+    sent, Contains.checked = list(calls), []
+
+    # The gate validator is not needed: its recorded verdicts are read.
+    result = durable(store).reevaluate(run_id, acceptance=strict(on_exhausted="needs_review"))
+
+    assert result.acceptance.decision is AcceptanceDecision.NEEDS_REVIEW
+    assert (result.output, result.rejected_output) == ("", "second")
+    assert calls == sent and Contains.checked == []
+    # The regenerated draft keeps its generation and the judge its spent regeneration.
+    assert run_state(store, run_id) == before
+    assert checkpoint_without_decision(store, run_id) == saved
+    draft, judge = result.graph.nodes
+    assert draft.metadata["execution_generation"] == 1 and judge.metadata["regenerations_used"] == 1
+    assert store.load_run(run_id)["config"]["verifier"] == "validator-v1"
+
+
+def test_durable_reevaluation_refuses_what_it_cannot_decide(store, replies):
+    _, calls = replies
+    legacy = durable(store).execute(single()).execution_id
+    planned = durable(store, acceptance=strict(Contains())).plan(Task("Write")).run_ref["run_id"]
+    checked = durable(store, acceptance=strict(Contains())).execute(single()).execution_id
+    sent = list(calls)
+    before = {run_id: operations(store, run_id) for run_id in (legacy, planned, checked)}
+
+    with pytest.raises(ValueError, match="strict AcceptancePolicy"):
+        durable(store).reevaluate(checked)
+    with pytest.raises(WorkflowStateError, match="without a strict acceptance policy"):
+        durable(store).reevaluate(legacy, acceptance=strict(Contains()))
+    with pytest.raises(WorkflowStateError, match="Only a completed workflow"):
+        durable(store).reevaluate(planned, acceptance=strict(Contains()))
+    # Only the acceptance policy and gate verifier may differ from the recipe.
+    with pytest.raises(WorkflowConflictError, match="components or budget"):
+        Swarm(model="offline", provider=OfflineProvider(), architect=SimpleArchitect(),
+              run_store=store, max_budget_usd=1, max_revisions=2).reevaluate(
+                  checked, acceptance=strict(Contains()))
+    with pytest.raises(WorkflowConflictError, match="components or budget"):
+        Swarm(model="offline", provider=OfflineProvider(), architect=SimpleArchitect(),
+              run_store=store, max_budget_usd=2).reevaluate(checked, acceptance=strict(Contains()))
+    assert calls == sent
+    assert {run_id: operations(store, run_id) for run_id in before} == before

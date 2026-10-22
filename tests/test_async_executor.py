@@ -10,7 +10,7 @@ from smythe.async_executor import AsyncExecutor
 from smythe.budget import Sentinel, SentinelAlert
 from smythe.executor_base import NodeFinalizationError
 from smythe.graph import ExecutionGraph, FailurePolicy, Node, NodeStatus, Revision, Topology
-from smythe.provider import CompletionResult, Provider
+from smythe.provider import CompletionResult, Provider, ProviderResponseError
 from smythe.registry import Registry
 from smythe.supervisor import Supervisor
 from smythe.tracer import Tracer
@@ -42,6 +42,40 @@ def _make_executor(
     p = provider or SlowMockProvider(delay=0.0)
     executor = AsyncExecutor(provider=p, registry=registry, tracer=tracer, budget=budget)
     return executor, tracer
+
+
+ORGANIZATION = "org-" + "A1b2" * 6  # built here, so no tracked file holds an identifier
+
+
+class AccountRefusal(Provider):
+    """Fails every call with an error that names the provider account, as SDK errors do."""
+
+    def __init__(self, error=RuntimeError) -> None:
+        self.error = error
+
+    async def complete(self, system, prompt, model):
+        raise self.error(f"429 in organization {ORGANIZATION} on requests per min")
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("error,policy", [
+    (RuntimeError, FailurePolicy.SKIP), (RuntimeError, FailurePolicy.HALT),
+    (ProviderResponseError, FailurePolicy.SKIP),
+], ids=["skipped", "halted", "terminal"])
+async def test_a_failed_node_keeps_no_account_identifier_from_its_error(error, policy, caplog):
+    executor, tracer = _make_executor(AccountRefusal(error))
+    node = Node(label="Call", id="call", failure_policy=policy)
+    graph = ExecutionGraph(topology=[Topology.SERIAL], nodes=[node])
+    if policy is FailurePolicy.SKIP and error is RuntimeError:
+        await executor.run(graph)
+    else:
+        # The raised error is the caller's; the saved result and trace keep no identifier.
+        with pytest.raises(error, match=ORGANIZATION):
+            await executor.run(graph)
+    assert node.result == "429 in organization org-[redacted] on requests per min"
+    assert ORGANIZATION not in repr(tracer.summary())
+    assert "org-[redacted]" in repr(tracer.summary())
+    assert ORGANIZATION not in caplog.text and "org-[redacted]" in caplog.text
 
 
 @pytest.mark.asyncio

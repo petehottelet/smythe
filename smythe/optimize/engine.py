@@ -15,6 +15,7 @@ from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any, TypeAlias
 
+from smythe._redact import error_text
 from smythe.optimize.contracts import (
     _SPLITS,
     Candidate,
@@ -473,6 +474,8 @@ class OptimizationRunner:
                     "holdout_seed_commitment": holdout_seed_commitment,
                     "stage": "development",
                     "development_scores": list(scores),
+                    # No paired interval was formed: the campaign's verdict.
+                    "verdict": _final_verdict(None, None),
                     **_reference_fields(plan, references),
                 },
             )
@@ -1430,8 +1433,9 @@ class OptimizationRunner:
                 )
 
     def _mark_unknown(self, trial_key: str, error: str, *, lease: CampaignLease) -> None:
+        # Evaluator errors can name a service account; the ledger keeps them redacted.
         normalized = "".join(
-            character if ord(character) >= 32 else " " for character in str(error)
+            character if ord(character) >= 32 else " " for character in error_text(error)
         ).strip()
         if not normalized:
             normalized = "unknown evaluator failure after dispatch"

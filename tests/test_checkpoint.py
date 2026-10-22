@@ -166,6 +166,58 @@ def test_graph_roundtrip_preserves_every_field():
     assert r.timeout_s == 45.0
 
 
+def test_graph_planning_is_omitted_until_set_and_round_trips_detached():
+    graph = _serial_graph()
+    assert graph.planning is None
+    assert list(graph_to_dict(graph)) == ["topology", "estimated_cost_usd", "task", "run_ref", "nodes"]
+    assert graph_from_dict(graph_to_dict(graph)).planning is None
+
+    graph.planning = {"routing": {"tier": "autonomous"}, "templates": [{"name": "report"}]}
+    saved = graph_to_dict(graph)
+    graph.planning["routing"]["tier"] = "changed"
+    restored = graph_from_dict(saved)
+
+    assert saved["planning"] == {"routing": {"tier": "autonomous"}, "templates": [{"name": "report"}]}
+    assert restored.planning == saved["planning"]
+    saved["planning"]["templates"].append("later")
+    assert restored.planning["templates"] == [{"name": "report"}]
+    assert graph.to_json().keys() == {"topology", "estimated_cost_usd", "task", "run_ref", "nodes"}
+
+
+@pytest.mark.parametrize("planning", ["routing", ["routing"], 1])
+def test_graph_from_dict_refuses_planning_that_is_not_an_object(planning):
+    data = graph_to_dict(_serial_graph())
+    data["planning"] = planning
+    with pytest.raises(ValueError, match="planning"):
+        graph_from_dict(data)
+
+
+def test_an_older_style_reader_ignores_graph_planning(tmp_path):
+    """Earlier builds read a saved graph key by key, so an added key is ignored."""
+    def older_graph_from_dict(data):
+        return ExecutionGraph(
+            topology=[Topology(t) for t in data.get("topology", ["serial"])],
+            nodes=[node_from_dict(n) for n in data.get("nodes", [])],
+            estimated_cost_usd=data.get("estimated_cost_usd"),
+            task=task_from_dict(data.get("task")),
+        )
+
+    graph = _serial_graph()
+    graph.planning = {"routing": {"tier": "autonomous"}}
+    state = build_state(execution_id="saved", status="running", model="test-model", graph=graph,
+                        registry=Registry(), task=None, max_budget_usd=None, node_costs={})
+    store = FileCheckpointStore(tmp_path)
+    store.save("saved", state)
+    saved = store.load("saved")
+
+    older = older_graph_from_dict(saved["graph"])
+
+    assert saved["version"] == 4
+    assert [node_to_dict(n) for n in older.nodes] == [node_to_dict(n) for n in graph.nodes]
+    assert older.topology == graph.topology
+    assert graph_from_dict(saved["graph"]).planning == {"routing": {"tier": "autonomous"}}
+
+
 def test_non_json_result_falls_back_to_str():
     class Weird:
         def __str__(self) -> str:
@@ -775,11 +827,11 @@ def test_resume_refuses_a_checkpoint_that_requires_an_unknown_feature(tmp_path, 
               else DeliveryAcceptance("not_evaluated", "b" * 64))
     _save(store, 5, status=status, acceptance=record)
     state = store.load("saved")
-    state["requires"].append("attempt_allowance")
+    state["requires"].append("later_feature")
     store.save("saved", state)
     provider = NoCallProvider()
 
-    with pytest.raises(ValueError, match="attempt_allowance"):
+    with pytest.raises(ValueError, match="later_feature"):
         Swarm(provider=provider, model="test-model", checkpoint_store=store).resume("saved")
     assert provider.calls == 0
 

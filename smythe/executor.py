@@ -3,14 +3,16 @@
 from __future__ import annotations
 
 import asyncio
+import inspect
 import time
 
-from smythe.budget import BudgetValidationError, SentinelAlert
+from smythe._failures import is_terminal
+from smythe._redact import error_text
+from smythe.budget import BudgetValidationError
 from smythe.executor_base import ExecutorBase, NodeFinalizationError
 from smythe.graph import ExecutionGraph, FailurePolicy, Node, NodeStatus, _dependency_order
-from smythe.provider import ProviderResponseError
+from smythe.scheduling import RetryDeadlineError
 from smythe.verifier import VerificationRecoveryError
-from smythe.workflow_store import WorkflowError
 
 
 class Executor(ExecutorBase):
@@ -80,13 +82,21 @@ class Executor(ExecutorBase):
         last_exc: Exception | None = None
         attempts = 1 + max(node.max_retries, 0) if node.failure_policy == FailurePolicy.RETRY else 1
 
-        for attempt in range(attempts):
+        # A resumed run continues the allowance its checkpoint recorded.
+        for attempt in range(self._attempts_spent(node), attempts):
             self._call_attempts[node.id] = attempt
-            delay = self.retry_delay_s(attempt)
+            try:
+                delay = self._retry_wait_s(node, attempt, last_exc)
+            except RetryDeadlineError as exc:
+                last_exc = exc
+                break
             if delay:
                 started = self._tracer.now()
-                time.sleep(delay)
+                waited = (self._sleep or time.sleep)(delay)
+                if inspect.isawaitable(waited):
+                    asyncio.run(asyncio.wait_for(waited, None))
                 self._tracer.on_wait("retry_backoff", self._tracer.since(started), node)
+            self._spend_attempt(node, attempt)
             node.status = NodeStatus.RUNNING
             self.begin_verification(node, graph)
             self._tracer.on_node_start(node, attempt=attempt)
@@ -107,27 +117,30 @@ class Executor(ExecutorBase):
                 # Keep the paid verdict and pending receipt intact. A local
                 # control-write failure must never cause another provider call.
                 raise
-            except (BudgetValidationError, NodeFinalizationError, SentinelAlert,
-                    ProviderResponseError, WorkflowError) as exc:
-                # Invalid post-call accounting is terminal. Retain any held
-                # reservation: an unusable bill is not evidence of a free call.
-                if isinstance(exc, BudgetValidationError):
-                    self.mark_accounting_invalid(node, exc)
-                node.status = NodeStatus.FAILED
-                node.result = str(exc)
-                self._tracer.on_node_error(node, exc)
-                self._tracer.on_node_end(node)
-                self.notify_update(node)
-                raise
             except Exception as exc:
+                if is_terminal(exc):
+                    # Invalid post-call accounting is terminal. Retain any held
+                    # reservation: an unusable bill is not evidence of a free call.
+                    if isinstance(exc, BudgetValidationError):
+                        self.mark_accounting_invalid(node, exc)
+                    node.status = NodeStatus.FAILED
+                    node.result = error_text(exc)
+                    self._tracer.on_node_error(node, exc)
+                    self._tracer.on_node_end(node)
+                    self.notify_update(node)
+                    raise
                 last_exc = exc
                 self._tracer.on_node_error(node, exc)
                 self._end_failed_attempt(node)
+                if not self._may_retry(exc):
+                    break
+        if last_exc is None:  # No attempt was left to make.
+            last_exc = self._allowance_spent(node, attempts)
 
         self.release_node_budget(node)
 
         node.status = NodeStatus.FAILED
-        node.result = str(last_exc)
+        node.result = error_text(last_exc)
 
         if node.failure_policy == FailurePolicy.SKIP:
             node.status = NodeStatus.SKIPPED

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import io
 import os
 import threading
@@ -11,6 +12,7 @@ from contextlib import ExitStack
 import pytest
 import smythe.jobs.runner as runner_module
 
+from fakes import Crash, crash_when
 from smythe.jobs import ApprovalError, JobManifestV1, PreflightError, make_approval, preflight_job
 from smythe.jobs.models import (
     DEFAULT_CALL_TIMEOUT_S,
@@ -20,7 +22,8 @@ from smythe.jobs.models import (
 from smythe.jobs.providers import ProviderPool
 from smythe.jobs.runner import JobRunner
 from smythe.jobs.store import (
-    InvalidTransitionError, OperationStatus, RunLeaseError, RunStatus, SQLiteRunStore,
+    InvalidTransitionError, JobNotFoundError, OperationStatus, RunLeaseError, RunStatus,
+    SQLiteRunStore,
 )
 from smythe.provider import Artifact, CompletionResult, Provider
 
@@ -671,6 +674,43 @@ def test_invalid_accounting_preserves_already_dispatched_sibling_cost(tmp_path, 
     assert len(result["artifacts"]) == 1
 
 
+def test_stored_call_errors_keep_no_account_identifier(tmp_path, store_factory):
+    organization = "org-" + "A1b2" * 6  # built here, so no tracked file holds an identifier
+
+    class AccountRefusal(Provider):
+        async def complete(self, system, prompt, model):
+            raise ConnectionError(f"429 in organization {organization} on images per min")
+
+    class UnconfiguredPool(_FixedPool):
+        """Passes the run's start checks, then refuses each dispatch's own lookup."""
+
+        def __init__(self, provider):
+            super().__init__(provider)
+            self.lookups = 0
+
+        def get(self, operation):
+            self.lookups += 1
+            if self.lookups > 2:
+                raise RuntimeError(f"project for organization {organization} is not enabled")
+            return self.provider
+
+    data = _priced_manifest(count=2).to_dict()
+    data["execution"]["max_concurrency"] = 1
+    plan = preflight_job(JobManifestV1.from_dict(data), manifest_root=tmp_path)
+    for name, pool, status, error in (
+        ("after", _FixedPool(AccountRefusal()), "unknown_outcome",
+         "provider failure after dispatch: 429 in organization org-[redacted] on images per min"),
+        ("before", UnconfiguredPool(AccountRefusal()), "failed",
+         "project for organization org-[redacted] is not enabled"),
+    ):
+        store = store_factory(tmp_path / f"{name}.db")
+        result = asyncio.run(JobRunner(store, provider_pool=pool).start(
+            plan, make_approval(plan), manifest_root=tmp_path))
+        assert result["counts"] == {status: 2}
+        assert [item["error"] for item in result["operations"]] == [error, error]
+        assert organization not in repr(store.snapshot(result["run_id"], include_events=True))
+
+
 def test_arbitrary_provider_message_cannot_impersonate_accounting_classification(tmp_path, store_factory):
     class MisleadingFailure(Provider):
         def __init__(self):
@@ -1051,6 +1091,197 @@ def test_resume_rechecks_accepted_bytes_and_reports_a_corrupted_file(tmp_path, s
     assert after["operations"] == before["operations"] and after["artifacts"] == before["artifacts"]
     assert not {"call_completed", "artifact_rejected"} & {
         event["event_type"] for event in after["events"][len(before["events"]):]}
+
+
+def _jpeg_1x1():
+    buffer = io.BytesIO()
+    Image.new("RGB", (1, 1), (0, 0, 255)).save(buffer, format="JPEG")
+    return buffer.getvalue()
+
+
+def _unknown_after_publication(tmp_path, store, monkeypatch, provider, *, manifest=None,
+                               validators=()):
+    """Stop the process after a response's bytes are published, before its call settles.
+
+    Resuming then records the dispatched call as an unknown outcome.
+    """
+    validators = list(validators)
+    plan = preflight_job(manifest or _priced_manifest(), manifest_root=tmp_path,
+                         validators=validators)
+    runner = JobRunner(store, provider_pool=_FixedPool(provider), validators=validators)
+    stop = crash_when(monkeypatch, store, "complete_call")
+    with pytest.raises(Crash):
+        asyncio.run(runner.start(plan, make_approval(plan), manifest_root=tmp_path, run_id="adopt"))
+    stop.restore()
+    resumed = asyncio.run(runner.resume("adopt"))
+    assert resumed["status"] == RunStatus.NEEDS_ATTENTION.value
+    assert resumed["counts"] == {OperationStatus.UNKNOWN_OUTCOME.value: 1}
+    return runner, resumed
+
+
+def test_adoption_accepts_published_bytes_without_a_call_and_keeps_the_exposure(
+    tmp_path, store_factory, monkeypatch,
+):
+    store = store_factory(tmp_path / "jobs.db")
+    provider = _PricedArtifactProvider([Artifact(PNG_1X1, "image/png")])
+    runner, unknown = _unknown_after_publication(tmp_path, store, monkeypatch, provider)
+    assert unknown["cost"]["exposure_microusd"] == 100_000 and unknown["artifacts"] == []
+    [published] = (tmp_path / "outputs").rglob("*.png")
+    key = unknown["operations"][0]["operation_key"]
+
+    adopted = asyncio.run(runner.adopt("adopt", key, reason="the provider billed one image"))
+
+    assert provider.calls == 1
+    assert adopted["status"] == RunStatus.COMPLETED.value
+    assert adopted["counts"] == {OperationStatus.SUCCEEDED.value: 1}
+    [operation], [attempt], [artifact] = (adopted[name] for name in ("operations", "attempts", "artifacts"))
+    assert operation["accepted_attempt_id"] == attempt["attempt_id"]
+    assert operation["attempt_count"] == 1 and operation["error"] is None
+    assert artifact["attempt_id"] == attempt["attempt_id"] and artifact["accepted"] == 1
+    assert artifact["sha256"] == hashlib.sha256(published.read_bytes()).hexdigest()
+    assert operation["delivery_acceptance"]["decision"] == "accepted"
+    assert operation["delivery_eligibility"] == {"eligible": True, "reasons": []}
+    # The attempt and its call keep their unknown outcome: no charge is settled.
+    assert attempt["status"] == OperationStatus.UNKNOWN_OUTCOME.value
+    [call] = store._call_rows("adopt")
+    assert (call["status"], call["confirmed_microusd"], call["exposure_microusd"]) == (
+        "unknown_outcome", 0, 100_000)
+    assert adopted["cost"]["confirmed_microusd"] == 0
+    assert adopted["cost"]["exposure_microusd"] == 100_000
+    assert adopted["cost"]["cost_is_complete"] is False
+    assert _events(store, "adopt", "call_completed") == []
+    [event] = _events(store, "adopt", "unknown_outcome_adopted")
+    assert event["payload"]["reason"] == "the provider billed one image"
+    assert (event["payload"]["call_id"], event["payload"]["attempt_id"]) == (
+        call["call_id"], attempt["attempt_id"])
+    assert event["payload"]["exposure_microusd"] == 100_000
+    assert event["payload"]["artifacts"] == [
+        {"relative_path": artifact["relative_path"], "sha256": artifact["sha256"]}]
+    assert event["payload"]["delivery_acceptance"]["decision"] == "accepted"
+
+    # Adopted work is not adopted twice, rerolled or dispatched again.
+    with pytest.raises(InvalidTransitionError, match="no unknown outcome"):
+        asyncio.run(runner.adopt("adopt", key, reason="again"))
+    with pytest.raises(InvalidTransitionError, match="cannot be rerolled"):
+        asyncio.run(runner.reroll("adopt", [key], reason="again", acknowledge_unknown=True))
+    assert asyncio.run(runner.resume("adopt"))["execution_metrics"]["operations_started"] == 0
+    assert provider.calls == 1
+
+
+def test_adoption_refuses_bytes_that_are_not_the_complete_accepted_response(
+    tmp_path, store_factory, monkeypatch,
+):
+    store = store_factory(tmp_path / "jobs.db")
+    provider = _PricedArtifactProvider([Artifact(PNG_1X1, "image/png")])
+    runner, unknown = _unknown_after_publication(tmp_path, store, monkeypatch, provider)
+    key = unknown["operations"][0]["operation_key"]
+    [published] = (tmp_path / "outputs").rglob("*.png")
+    extra = published.parent / "artifact-02.png"
+    before = store.snapshot("adopt", include_events=True)
+
+    for change, problem in (
+        (lambda: published.write_bytes(_UNDECODABLE_PNG), "could not be fully decoded"),
+        (published.unlink, "artifact-01.png is missing"),
+        (lambda: published.write_bytes(_jpeg_1x1()), "expected image/png, observed image/jpeg"),
+        (lambda: (published.write_bytes(PNG_1X1), extra.write_bytes(PNG_1X1)),
+         "artifact-02.png is not part of the response"),
+    ):
+        change()
+        with pytest.raises(InvalidTransitionError, match="cannot be adopted") as refused:
+            asyncio.run(runner.adopt("adopt", key, reason="bytes look complete"))
+        assert problem in str(refused.value)
+        after = store.snapshot("adopt", include_events=True)
+        assert after["counts"] == {OperationStatus.UNKNOWN_OUTCOME.value: 1}
+        assert after["operations"] == before["operations"] and after["artifacts"] == []
+        assert after["cost"] == before["cost"]
+        assert not {"unknown_outcome_adopted", "call_completed"} & {
+            event["event_type"] for event in after["events"]}
+
+    # The complete response is still adoptable after the refusals.
+    extra.unlink()
+    adopted = asyncio.run(runner.adopt("adopt", key, reason="bytes restored"))
+    assert adopted["counts"] == {OperationStatus.SUCCEEDED.value: 1}
+    assert provider.calls == 1
+
+
+def test_adoption_runs_the_registered_validators_on_the_published_bytes(
+    tmp_path, store_factory, monkeypatch,
+):
+    from smythe.validation import ValidationReport, hard_finding
+
+    def off_palette(validator, subject):
+        return ValidationReport("tile", (hard_finding("off_palette", "uses #00ff00"),),
+                                validator=validator.identity)
+
+    validator = _PaletteValidator(off_palette)
+    store = store_factory(tmp_path / "jobs.db")
+    runner, unknown = _unknown_after_publication(
+        tmp_path, store, monkeypatch, _ImmediateArtifactProvider(),
+        manifest=_validated_manifest(), validators=[validator])
+    key = unknown["operations"][0]["operation_key"]
+    published = validator.subjects[0].data
+
+    with pytest.raises(InvalidTransitionError, match="brand-palette: uses #00ff00"):
+        asyncio.run(runner.adopt("adopt", key, reason="looks right"))
+    assert store.snapshot("adopt")["counts"] == {OperationStatus.UNKNOWN_OUTCOME.value: 1}
+
+    validator.verdict = None
+    adopted = asyncio.run(runner.adopt("adopt", key, reason="palette confirmed"))
+
+    assert validator.subjects[-1].data == published
+    assert adopted["counts"] == {OperationStatus.SUCCEEDED.value: 1}
+    [event] = _events(store, "adopt", "unknown_outcome_adopted")
+    assert [result["outcome"] for result in event["payload"]["delivery_acceptance"]["validators"]] == [
+        "passed", "passed"]
+    assert adopted["operations"][0]["delivery_eligibility"] == {"eligible": True, "reasons": []}
+
+
+def test_adoption_is_refused_in_any_other_state_and_while_another_owner_holds_the_lease(
+    tmp_path, store_factory, monkeypatch,
+):
+    store = store_factory(tmp_path / "jobs.db")
+    runner, unknown = _unknown_after_publication(
+        tmp_path, store, monkeypatch, _PricedArtifactProvider([Artifact(PNG_1X1, "image/png")]))
+    key = unknown["operations"][0]["operation_key"]
+
+    lease = store.acquire_run_lease("adopt", "other-worker", ttl_s=30)
+    with pytest.raises(RunLeaseError, match="other-worker"):
+        asyncio.run(runner.adopt("adopt", key, reason="bytes verified"))
+    store.release_run_lease("adopt", "other-worker", lease=lease)
+    with pytest.raises(ValueError, match="reason"):
+        asyncio.run(runner.adopt("adopt", key, reason=" "))
+    with pytest.raises(JobNotFoundError):
+        asyncio.run(runner.adopt("adopt", "missing[0]", reason="bytes verified"))
+    assert store.snapshot("adopt")["counts"] == {OperationStatus.UNKNOWN_OUTCOME.value: 1}
+
+    # Completed, rejected and pending operations have no unknown outcome to adopt.
+    plan = preflight_job(_manifest(count=3, attempts=1), manifest_root=tmp_path)
+    provider = _PricedArtifactProvider([Artifact(PNG_1X1, "image/png")], [],
+                                       [Artifact(PNG_1X1, "image/png")], cost_usd=None)
+    other = JobRunner(store, provider_pool=_FixedPool(provider))
+    run_id = store.create_run(plan, make_approval(plan), manifest_root=tmp_path, run_id="settled")
+    asyncio.run(other.resume(run_id))
+    snapshot = store.snapshot(run_id)
+    assert snapshot["counts"] == {"succeeded": 2, "rejected": 1}
+    for operation in snapshot["operations"]:
+        with pytest.raises(InvalidTransitionError, match="no unknown outcome"):
+            asyncio.run(other.adopt(run_id, operation["operation_key"], reason="bytes verified"))
+    pending = store.create_run(plan, make_approval(plan), manifest_root=tmp_path, run_id="pending",
+                               allow_approval_reuse=True)
+    with pytest.raises(InvalidTransitionError, match="state pending"):
+        asyncio.run(other.adopt(pending, "glyph[0]", reason="bytes verified"))
+
+
+def test_an_unknown_outcome_that_published_nothing_cannot_be_adopted(tmp_path, store_factory):
+    plan = preflight_job(_manifest(count=1), manifest_root=tmp_path)
+    store = store_factory(tmp_path / "jobs.db")
+    runner = JobRunner(store, provider_pool=_FixedPool(_AmbiguousProvider()))
+    result = asyncio.run(runner.start(plan, make_approval(plan), manifest_root=tmp_path))
+    key = result["operations"][0]["operation_key"]
+
+    with pytest.raises(InvalidTransitionError, match="artifact-01.png is missing"):
+        asyncio.run(runner.adopt(result["run_id"], key, reason="provider shows a response"))
+    assert store.snapshot(result["run_id"])["counts"] == {OperationStatus.UNKNOWN_OUTCOME.value: 1}
 
 
 def test_slow_artifact_finalizer_does_not_starve_lease_heartbeat(

@@ -219,6 +219,14 @@ def test_missing_hard_link_support_fails_before_provider_entry(tmp_path, monkeyp
         assert store.get_run_lease("run") is None
 
 
+def test_jobs_publication_is_the_shared_exclusive_publication():
+    import smythe._publish as shared
+    import smythe.jobs.artifact_io as jobs
+
+    for name in ("MAX_ARTIFACT_BYTES", "atomic_publish_bytes", "claim_artifact_root"):
+        assert getattr(jobs, name) is getattr(shared, name)
+
+
 def test_incomplete_owner_marker_is_retained_and_rejected(tmp_path):
     root = tmp_path / "owned"
     root.mkdir()

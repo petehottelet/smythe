@@ -17,16 +17,23 @@ sandbox: it cannot detect a synchronous validator that performs network I/O or
 paid calls, which such a validator must not do.
 Policies and records store only validator names, versions and configuration
 digests, never code.
+
+An :class:`OperatorDecision` resolves output that a strict policy left
+``needs_review`` or ``indeterminate``: the host's approval verifier
+(:class:`smythe.actions.ApprovalVerifier`) establishes who decided, and the
+decision is a version 2 record that names them, so a reader that knows only
+version 1 refuses it.
 """
 
 from __future__ import annotations
 
 import hashlib
 import inspect
+import time
 # Imported at runtime, not only for type checking, so that
 # typing.get_type_hints() can resolve the dataclass field annotations.
-from collections.abc import Sequence
-from dataclasses import dataclass, field
+from collections.abc import Mapping, Sequence
+from dataclasses import KW_ONLY, dataclass, field, replace
 from enum import StrEnum
 from pathlib import Path
 from typing import Any, Protocol
@@ -44,7 +51,9 @@ from smythe.validation import (
 from smythe.verifier import gate_disposition, node_generation
 
 DELIVERY_ACCEPTANCE_VERSION = 1
-SUPPORTED_DELIVERY_ACCEPTANCE_VERSIONS = (1,)
+# The record version of an operator's decision, which adds its ``operator`` block.
+OPERATOR_DECISION_VERSION = 2
+SUPPORTED_DELIVERY_ACCEPTANCE_VERSIONS = (1, 2)
 ACCEPTANCE_POLICY_VERSION = 1
 
 # What a record's decision covers: the delivered output, meaning the
@@ -80,6 +89,11 @@ class AcceptanceDecision(StrEnum):
     REJECTED = "rejected"
     NEEDS_REVIEW = "needs_review"
     INDETERMINATE = "indeterminate"
+
+
+# What an operator decides, and the decisions an operator may resolve.
+_OPERATOR_DECISIONS = (AcceptanceDecision.ACCEPTED, AcceptanceDecision.REJECTED)
+_RESOLVABLE = (AcceptanceDecision.NEEDS_REVIEW, AcceptanceDecision.INDETERMINATE)
 
 
 def text_sha256(text: str) -> str:
@@ -437,6 +451,39 @@ class ValidatorResult:
         return cls(ValidatorIdentity.from_dict(data["validator"]), data["outcome"])
 
 
+_OPERATOR_KEYS = ("issuer", "subject", "tenant", "verifier", "evidence_sha256")
+
+
+@dataclass(frozen=True, slots=True)
+class OperatorReference:
+    """Who made an operator decision, as the host's approval verifier established it.
+
+    ``issuer``, ``subject`` and ``tenant`` name the verified principal and
+    ``verifier`` the approval verifier's identity. ``evidence_sha256`` is the
+    SHA-256 of the evidence the operator decided on, which the host keeps.
+    """
+
+    issuer: str
+    subject: str
+    tenant: str
+    verifier: str
+    evidence_sha256: str
+
+    def __post_init__(self) -> None:
+        for name in _OPERATOR_KEYS[:4]:
+            if not isinstance(getattr(self, name), str) or not getattr(self, name):
+                raise ValueError(f"operator {name} must be a non-empty string")
+        _require_sha256(self.evidence_sha256, "operator evidence_sha256")
+
+    def to_dict(self) -> dict[str, Any]:
+        return {name: getattr(self, name) for name in _OPERATOR_KEYS}
+
+    @classmethod
+    def from_dict(cls, data: Any) -> OperatorReference:
+        _require_keys(data, "operator reference", frozenset(_OPERATOR_KEYS))
+        return cls(**data)
+
+
 _RECORD_KEYS = frozenset({
     "version", "decision", "reasons", "output_sha256", "strategy", "sources",
     "used_fallback", "task_sha256", "policy_sha256", "validators", "scope",
@@ -458,7 +505,10 @@ class DeliveryAcceptance:
     :attr:`AcceptancePolicy.sha256`, and ``scope`` names what was evaluated
     (``output``: the delivered output). ``artifacts`` binds each file a
     source node delivered by its SHA-256 and size; it is empty for text, and
-    :meth:`to_dict` then leaves the key out.
+    :meth:`to_dict` then leaves the key out. ``operator`` names who made an
+    operator decision (``accepted`` or ``rejected``); exactly such a record
+    has version :data:`OPERATOR_DECISION_VERSION`, and a policy's records
+    keep version 1 without the key.
 
     :meth:`from_dict` rejects unknown record versions, unknown decisions and
     unknown keys rather than guessing what a newer record means.
@@ -476,6 +526,7 @@ class DeliveryAcceptance:
     scope: str = "output"
     version: int = DELIVERY_ACCEPTANCE_VERSION
     artifacts: tuple[AcceptanceArtifact, ...] = ()
+    operator: OperatorReference | None = None
 
     def __post_init__(self) -> None:
         if type(self.version) is not int or self.version not in SUPPORTED_DELIVERY_ACCEPTANCE_VERSIONS:
@@ -485,6 +536,12 @@ class DeliveryAcceptance:
             )
         decision = _choice(AcceptanceDecision, self.decision, "delivery acceptance decision")
         object.__setattr__(self, "decision", decision)
+        if self.operator is not None and not isinstance(self.operator, OperatorReference):
+            raise ValueError("operator must be an OperatorReference or None")
+        if (self.operator is not None) != (self.version == OPERATOR_DECISION_VERSION):
+            raise ValueError("an operator decision is exactly a version 2 record")
+        if self.operator is not None and decision not in _OPERATOR_DECISIONS:
+            raise ValueError("an operator decision is accepted or rejected")
         _require_sha256(self.policy_sha256, "policy_sha256")
         for name in ("output_sha256", "task_sha256"):
             if getattr(self, name) is not None:
@@ -545,6 +602,7 @@ class DeliveryAcceptance:
             "validators": [result.to_dict() for result in self.validators],
             "scope": self.scope,
             **({"artifacts": [item.to_dict() for item in self.artifacts]} if self.artifacts else {}),
+            **({"operator": self.operator.to_dict()} if self.operator else {}),
         }
 
     @classmethod
@@ -558,7 +616,10 @@ class DeliveryAcceptance:
                 f"Unsupported delivery acceptance record version {version!r}; this build "
                 f"reads {list(SUPPORTED_DELIVERY_ACCEPTANCE_VERSIONS)}"
             )
-        _require_keys(data, "delivery acceptance record", _RECORD_KEYS, frozenset({"artifacts"}))
+        operator = version == OPERATOR_DECISION_VERSION
+        _require_keys(data, f"delivery acceptance record version {version}",
+                      _RECORD_KEYS | ({"operator"} if operator else set()),
+                      frozenset({"artifacts"}))
         if not isinstance(data["decision"], str):
             raise ValueError(f"Unknown delivery acceptance decision: {data['decision']!r}")
         for name in ("reasons", "sources", "validators", "artifacts"):
@@ -577,6 +638,7 @@ class DeliveryAcceptance:
             scope=data["scope"],
             version=version,
             artifacts=tuple(AcceptanceArtifact.from_dict(item) for item in data.get("artifacts", [])),
+            operator=OperatorReference.from_dict(data["operator"]) if operator else None,
         )
 
 
@@ -584,6 +646,93 @@ def _unique(values: list[str], what: str) -> None:
     duplicates = sorted({value for value in values if values.count(value) > 1})
     if duplicates:
         raise ValueError(f"delivery acceptance has duplicate {what}: {duplicates}")
+
+
+def operator_decision_sha256(
+    run_id: str, sequence: int, record: DeliveryAcceptance,
+    decision: AcceptanceDecision | str, evidence_sha256: str,
+) -> str:
+    """The digest an approval assertion for an operator decision must approve.
+
+    It binds the run, the sequence and content of the run's current decision
+    *record*, the operator's *decision* and the evidence digest, so an
+    assertion approves one decision on one run's output and nothing else.
+    """
+    if not isinstance(run_id, str) or not run_id:
+        raise ValueError("run_id must be a non-empty string")
+    if type(sequence) is not int or sequence < 0:
+        raise ValueError("sequence must be a non-negative integer")
+    if not isinstance(record, DeliveryAcceptance):
+        raise TypeError("record must be a DeliveryAcceptance")
+    decision = _choice(AcceptanceDecision, decision, "operator decision")
+    if decision not in _OPERATOR_DECISIONS:
+        raise ValueError("an operator decision is accepted or rejected")
+    _require_sha256(evidence_sha256, "evidence_sha256")
+    return _json_sha256({
+        "type": "smythe.operator-decision", "run_id": run_id, "sequence": sequence,
+        "record": record.to_dict(), "decision": decision.value, "evidence_sha256": evidence_sha256,
+    }, "operator decision")
+
+
+@dataclass(frozen=True, slots=True)
+class OperatorDecision:
+    """An operator's ``accepted`` or ``rejected`` for output a strict policy left undecided.
+
+    It resolves a ``needs_review`` or ``indeterminate`` decision.
+    ``evidence_sha256`` is the SHA-256 of the evidence the operator decided
+    on, which the host keeps. ``assertion`` is what the host issued for
+    exactly :func:`operator_decision_sha256` of this decision, and
+    ``verifier``, a :class:`smythe.actions.ApprovalVerifier`, checks it.
+    Pass it to ``Swarm.reevaluate(execution_id, operator=...)``.
+    """
+
+    decision: AcceptanceDecision
+    evidence_sha256: str
+    _: KW_ONLY
+    assertion: str = field(repr=False)
+    verifier: Any = field(repr=False)
+
+    def __post_init__(self) -> None:
+        from smythe.actions import check_verifier
+
+        decision = _choice(AcceptanceDecision, self.decision, "operator decision")
+        if decision not in _OPERATOR_DECISIONS:
+            raise ValueError("an operator decision is accepted or rejected")
+        _require_sha256(self.evidence_sha256, "evidence_sha256")
+        if not isinstance(self.assertion, str) or not self.assertion:
+            raise ValueError("assertion must be a non-empty string")
+        check_verifier(self.verifier)
+        object.__setattr__(self, "decision", decision)
+
+
+def _operator_record(
+    operator: OperatorDecision, run_id: str, sequence: int, record: DeliveryAcceptance,
+    error: type[Exception] = ValueError,
+) -> DeliveryAcceptance:
+    """The record *operator* makes for *record*, a run's current decision at *sequence*.
+
+    Raises *error* unless *record* is ``needs_review`` or ``indeterminate``,
+    before the assertion is verified; then whatever the verifier raises, such
+    as ``ApprovalRejected``. The new record keeps everything *record* binds.
+    """
+    from smythe.actions import ApprovalRejected, Principal, check_verifier
+
+    if record.decision not in _RESOLVABLE:
+        raise error(
+            "An operator decides only output left needs_review or indeterminate; the current "
+            f"decision is {record.decision.value}, which stands"
+        )
+    digest = operator_decision_sha256(run_id, sequence, record, operator.decision,
+                                      operator.evidence_sha256)
+    principal = operator.verifier.verify(operator.assertion, digest, time.time_ns())
+    if not isinstance(principal, Principal):
+        raise ApprovalRejected("The approval verifier did not return a Principal")
+    return replace(
+        record, decision=operator.decision, validators=(), version=OPERATOR_DECISION_VERSION,
+        reasons=(f"an operator {operator.decision.value} the output after review",),
+        operator=OperatorReference(principal.issuer, principal.subject, principal.tenant,
+                                   check_verifier(operator.verifier), operator.evidence_sha256),
+    )
 
 
 _OUTPUT_CHANGED = "the saved output does not match the digest its record bound"
@@ -759,6 +908,7 @@ def evaluate_delivery(
     sources: Sequence[Node],
     used_fallback: bool = False,
     task: Task | None = None,
+    unusable: Mapping[ValidatorIdentity, str] | None = None,
 ) -> DeliveryAcceptance:
     """Decide delivery acceptance for exactly *output* under a strict *policy*.
 
@@ -767,6 +917,9 @@ def evaluate_delivery(
     ``Synthesizer``), and *sources* are the nodes it came from. Every final
     validator runs, with no provider call, on the UTF-8 bytes of *output*,
     and every gate in *graph* is read from its recorded final verdict.
+    *unusable* maps the identity of a final validator that cannot check this
+    output, such as one configured for other sources than the run's, to why:
+    it does not run, and its outcome is ``error``.
 
     The decision is ``rejected`` when a final validator rejects the output,
     then ``policy.on_exhausted`` when a gate's final verdict fails, then
@@ -793,7 +946,10 @@ def evaluate_delivery(
     invalid: list[str] = []
     results: list[ValidatorResult] = []
     for validator, identity in zip(policy.final_validators, policy.validator_identities):
-        outcome, reason = _final_check(validator, identity, subject)
+        if unusable and identity in unusable:
+            outcome, reason = ValidationOutcome.ERROR, unusable[identity]
+        else:
+            outcome, reason = _final_check(validator, identity, subject)
         results.append(ValidatorResult(identity, outcome))
         if outcome is ValidationOutcome.REJECTED:
             rejected.append(reason)
@@ -874,6 +1030,7 @@ __all__ = [
     "ACCEPTANCE_POLICY_VERSION",
     "DELIVERY_ACCEPTANCE_VERSION",
     "GENERATED_GATE_KEY",
+    "OPERATOR_DECISION_VERSION",
     "SUPPORTED_DELIVERY_ACCEPTANCE_VERSIONS",
     "AcceptanceArtifact",
     "AcceptanceDecision",
@@ -881,12 +1038,15 @@ __all__ = [
     "AcceptancePolicy",
     "AcceptanceSource",
     "DeliveryAcceptance",
+    "OperatorDecision",
+    "OperatorReference",
     "ValidationSubject",
     "Validator",
     "ValidatorResult",
     "check_validator",
     "delivered_artifacts",
     "evaluate_delivery",
+    "operator_decision_sha256",
     "task_sha256",
     "text_sha256",
     "validate_acceptance_obligations",

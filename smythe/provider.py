@@ -24,6 +24,7 @@ from dataclasses import dataclass, field, replace
 from uuid import uuid4
 
 from smythe._errors import PicklableError
+from smythe._redact import error_text
 from smythe.budget import BudgetValidationError
 from smythe.tools import ChatMessage, ToolCall, ToolSpec, display_name, wire_name
 
@@ -186,6 +187,25 @@ class OutputRefusedError(IncompleteOutputError):
         super().__init__(f"{prefix}{cause} (stop_reason={stop_reason!r}); the output is not usable")
 
 
+class NativeOutputDefectError(IncompleteOutputError):
+    """A native reply was refused or truncated after its known charge was recorded.
+
+    An executor under a ``RetryPolicy`` that lists ``quality_defect`` raises
+    it in place of the terminal ``ProviderResponseError`` of an
+    ``OpenAIResponsesProvider`` or ``AnthropicMessagesProvider`` reply whose
+    ``stop_reason`` is ``refusal`` or ``max_tokens``. Its failure class is
+    ``quality_defect``, and the node's failure policy applies.
+    """
+
+    def __init__(self, stop_reason: str, *, where: str | None = None) -> None:
+        self.stop_reason = stop_reason
+        prefix = f"{where}: " if where else ""
+        super().__init__(
+            f"{prefix}the native reply was refused or truncated (stop_reason={stop_reason!r}); "
+            "its charge is recorded and the output is not used"
+        )
+
+
 def _raise_if_incomplete(result: CompletionResult, *, where: str | None = None) -> None:
     """Reject incomplete output. Call only after the result's cost is recorded."""
     if result.stop_reason in TRUNCATED_STOP_REASONS:
@@ -199,7 +219,14 @@ class ProviderResponseError(RuntimeError):
 
     ``billing_result`` carries a validated known charge, even when output cannot
     be consumed. Raw envelopes never enter ordinary node/checkpoint metadata.
+    ``stop_reason`` is the normalized reason a native response ended
+    unfinished, as ``IncompleteOutputError`` names it: ``max_tokens`` or
+    ``model_context_window_exceeded``, ``refusal``, ``content_filter`` or
+    ``incomplete``. It is None when the response reports none of these, and
+    never part of the message.
     """
+
+    stop_reason: str | None = None
 
     def __init__(self, message: str, *, envelope=None, receipt=None, billing_result=None):
         super().__init__(message)
@@ -230,12 +257,15 @@ def _native_receipt(metadata: dict, receipt: dict | None, *, phase: str) -> None
 
 
 def _response_error_marker(error: BaseException | None) -> dict | None:
-    """Find a native error through explicit settlement causes, without raw data."""
+    """Find a native error through explicit settlement causes, without raw data.
+
+    The marker keeps the message with account identifiers redacted.
+    """
     seen = set()
     while error is not None and id(error) not in seen:
         seen.add(id(error))
         if isinstance(error, ProviderResponseError):
-            return {"type": type(error).__name__, "message": str(error)[:500]}
+            return {"type": type(error).__name__, "message": error_text(error)[:500]}
         error = error.__cause__
     return None
 
@@ -324,11 +354,12 @@ def _settle_response_error(error, *, budget, node_id, metadata, phase):
 class ProviderFeatures:
     """What a provider declares one model can do, for checks before any call.
 
-    Each field is ``True`` (supported), ``False`` (not supported: a call
+    Each feature is ``True`` (supported), ``False`` (not supported: a call
     that needs it is refused, or the output never appears) or ``None`` (not
     declared). An ordinary ``Swarm`` rejects a run before planning, or
     before its first node call, only for a feature declared ``False`` that
-    the run needs, so a provider that declares nothing runs as before.
+    the run needs, so a provider that declares nothing runs as before. A run
+    under a ``RetryPolicy`` also needs ``sdk_retries`` declared ``0``.
     """
 
     model_supported: bool | None = None
@@ -344,6 +375,25 @@ class ProviderFeatures:
     cost_ceiling_required: bool | None = None
     """Whether a call under ``max_budget_usd`` needs an inclusive per-call
     ceiling, as ``requires_explicit_budget_estimate`` reports."""
+    sdk_retries: int | None = None
+    """How many more times the provider's SDK client sends a failed request
+    on its own, unseen by Smythe; ``0`` when each call is sent once."""
+
+
+def _sdk_retries(provider: Provider) -> int | None:
+    """The retries an SDK provider's client makes: a caller-owned ``_client``'s
+    own ``max_retries``, else the provider's setting (None for the SDK default)."""
+    client = getattr(provider, "_client", None)
+    if client is None:
+        return getattr(provider, "_client_max_retries", None)
+    retries = getattr(client, "max_retries", None)
+    return retries if type(retries) is int else None
+
+
+def _max_retries_setting(value: object) -> int | None:
+    if value is not None and (isinstance(value, bool) or not isinstance(value, int) or value < 0):
+        raise ValueError("max_retries must be a non-negative integer")
+    return value
 
 
 def _builtin_features(provider: Provider, owner: type, model: str, **features) -> ProviderFeatures:
@@ -509,7 +559,8 @@ class OfflineProvider(Provider):
     def feature_support(self, model: str) -> ProviderFeatures:
         # Attachments are acknowledged in the text; tool calls are not served.
         return _builtin_features(self, OfflineProvider, model, text=True, tools=False,
-                                 attachments=True, image_output=self._artifacts_per_call > 0)
+                                 attachments=True, image_output=self._artifacts_per_call > 0,
+                                 sdk_retries=0)
 
     async def complete(self, system: str, prompt: str, model: str) -> CompletionResult:
         from smythe.prompts import PLANNING_SYSTEM_PROMPT
@@ -664,16 +715,21 @@ class AnthropicProvider(Provider):
     known charge. ``"unknown"`` also marks the result's cost unknown
     (``cost_usd_unknown``): the Sentinel then keeps the call's reservation as
     an estimate or, without one, reports ``cost_is_complete=False``.
+
+    ``max_retries`` is passed to the SDK client only when set; ``None``
+    keeps the SDK's own default retries.
     """
 
     _missing_usage = "zero"
 
     def __init__(
         self, *, api_key: str | None = None, max_tokens: int = 4096, missing_usage: str = "zero",
+        max_retries: int | None = None,
     ) -> None:
         self._api_key = api_key or os.environ.get("ANTHROPIC_API_KEY", "")
         self._max_tokens = max_tokens
         self._missing_usage = _missing_usage_mode(missing_usage)
+        self._client_max_retries = _max_retries_setting(max_retries)
         self._client = None
         self._loop_clients = _LoopClients()
 
@@ -684,7 +740,10 @@ class AnthropicProvider(Provider):
             raise ImportError(
                 "Install the anthropic extra: pip install smythe[anthropic]"
             ) from exc
-        return anthropic.AsyncAnthropic(api_key=self._api_key)
+        kwargs = {"api_key": self._api_key}
+        if self._client_max_retries is not None:
+            kwargs["max_retries"] = self._client_max_retries
+        return anthropic.AsyncAnthropic(**kwargs)
 
     def _get_client(self):
         if self._client is not None:
@@ -693,7 +752,8 @@ class AnthropicProvider(Provider):
 
     def feature_support(self, model: str) -> ProviderFeatures:
         return _builtin_features(self, AnthropicProvider, model, text=True, tools=True,
-                                 attachments=True, image_output=False)
+                                 attachments=True, image_output=False,
+                                 sdk_retries=_sdk_retries(self))
 
     async def complete(self, system: str, prompt: str, model: str) -> CompletionResult:
         return await self.chat(system, [ChatMessage(role="user", content=prompt)], model)
@@ -837,12 +897,7 @@ class OpenAIProvider(Provider):
             or request_timeout_s <= 0
         ):
             raise ValueError("request_timeout_s must be finite and positive")
-        if max_retries is not None and (
-            isinstance(max_retries, bool)
-            or not isinstance(max_retries, int)
-            or max_retries < 0
-        ):
-            raise ValueError("max_retries must be a non-negative integer")
+        _max_retries_setting(max_retries)
         self._missing_usage = _missing_usage_mode(missing_usage)
         self._api_key = api_key or os.environ.get("OPENAI_API_KEY", "")
         self._max_tokens = max_tokens
@@ -879,7 +934,8 @@ class OpenAIProvider(Provider):
 
     def feature_support(self, model: str) -> ProviderFeatures:
         return _builtin_features(self, OpenAIProvider, model, text=True, tools=True,
-                                 attachments=True, image_output=False)
+                                 attachments=True, image_output=False,
+                                 sdk_retries=_sdk_retries(self))
 
     async def complete(self, system: str, prompt: str, model: str) -> CompletionResult:
         return await self.chat(system, [ChatMessage(role="user", content=prompt)], model)
@@ -1141,6 +1197,7 @@ class OpenAIImageProvider(OpenAIProvider):
         return _builtin_features(
             self, OpenAIImageProvider, model, model_supported=model.lower().startswith("gpt-image-"),
             text=False, tools=False, attachments=False, image_output=True,
+            sdk_retries=_sdk_retries(self),
         )
 
     async def chat(
@@ -1310,8 +1367,11 @@ class GeminiProvider(Provider):
         return any(hint in model.lower() for hint in ("image", "banana"))
 
     def feature_support(self, model: str) -> ProviderFeatures:
+        # google-genai retries only when a client is configured to, as an
+        # owned client never is; a caller-owned client declares nothing.
         return _builtin_features(self, GeminiProvider, model, text=True, tools=True,
-                                 attachments=True, image_output=self._requests_images(model))
+                                 attachments=True, image_output=self._requests_images(model),
+                                 sdk_retries=0 if getattr(self, "_client", None) is None else None)
 
     def _new_client(self):
         try:

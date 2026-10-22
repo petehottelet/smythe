@@ -11,6 +11,7 @@ from typing import Any
 from smythe.budget import (
     BudgetEstimateRequired, BudgetValidationError, Sentinel, validate_completion_usage,
 )
+from smythe.evidence import ClaimRecord, read_source_evidence, render_contradictions
 from smythe.executor_base import check_provider_support
 from smythe.graph import SYNTHESIS_NODE_ID, ExecutionGraph, Node, NodeStatus, _deliverable_ids
 from smythe.provider import (
@@ -36,6 +37,16 @@ You are a synthesis agent.  You receive outputs from multiple parallel \
 execution steps.  Your job is to merge them into a single coherent output.  \
 Preserve key information from every input.  Be concise and well-organized.
 """
+
+# Appended to the merge's user prompt only by Synthesizer(retain_contradictions=True);
+# MERGE_SYSTEM_PROMPT is unchanged.
+CONTRADICTION_NOTE = (
+    "Some inputs may carry a source-evidence block of claim records. Keep every "
+    "contradiction those records list: quote each contradicting passage exactly, beside "
+    "the passages it contradicts, and say which cited passage resolves the conflict if "
+    "one does. Never settle a contradiction by silently choosing one side. Carry one "
+    "source-evidence block that lists every claim the inputs record."
+)
 
 DEFAULT_SYNTHESIS_ESTIMATED_TOKENS = 2000
 
@@ -64,6 +75,30 @@ def deliverable_sources(graph: ExecutionGraph) -> tuple[list[Node], bool]:
     return _select_deliverable(graph, _completed(graph))
 
 
+def _with_contradictions(nodes: list[Node], output: str) -> str:
+    """*output* and a section for each contradiction its nodes' evidence lists and it leaves out.
+
+    Each node's claim records come from the ``source-evidence`` block of its
+    own result; a node without a readable block adds none. A contradiction is
+    left out when its passage is not in the results without their blocks.
+    """
+    claims: list[ClaimRecord] = []
+    bodies: list[str] = []
+    for node in nodes:
+        text = str(node.result)
+        try:
+            evidence, body = read_source_evidence(text)
+        except ValueError:
+            evidence, body = None, text
+        bodies.append(body)
+        if evidence is not None:
+            claims.extend(evidence.claims)
+    section = render_contradictions(claims, "\n\n".join(bodies))
+    if not section:
+        return output
+    return output + ("\n" if output.endswith("\n") else "\n\n") + section
+
+
 class Synthesizer:
     """Combines completed node results into a coherent final output.
 
@@ -72,6 +107,12 @@ class Synthesizer:
     - CONCATENATE: join every completed result with newlines (zero cost).
     - LLM_MERGE: send all results to an LLM for intelligent merging.
     - STRUCTURED: parse each result as JSON and shallow-merge.
+
+    ``retain_contradictions=True`` keeps the contradictions that source
+    evidence lists. ``DELIVERABLE`` appends a ``Contradictions`` section
+    for each one the delivered text leaves out
+    (:func:`~smythe.evidence.render_contradictions`); ``LLM_MERGE`` appends
+    ``CONTRADICTION_NOTE`` to the merge prompt.
     """
 
     def __init__(
@@ -83,18 +124,30 @@ class Synthesizer:
         tracer: Tracer | None = None,
         *,
         run_binding: ComponentBinding | None = None,
+        retain_contradictions: bool = False,
     ) -> None:
+        if type(retain_contradictions) is not bool:
+            raise TypeError("retain_contradictions must be a bool")
+        if retain_contradictions and strategy not in (SynthesisStrategy.DELIVERABLE,
+                                                      SynthesisStrategy.LLM_MERGE):
+            raise ValueError("retain_contradictions applies to DELIVERABLE and LLM_MERGE synthesis")
         self._strategy = strategy
         self._provider = provider
         self._model = model or ""
         self._budget = budget
         self._tracer = tracer
         self._run_binding = run_binding
+        self._retain_contradictions = retain_contradictions
 
     @property
     def strategy(self) -> SynthesisStrategy:
         """The strategy this synthesizer applies."""
         return self._strategy
+
+    @property
+    def retain_contradictions(self) -> bool:
+        """Whether synthesis keeps the contradictions its inputs' source evidence lists."""
+        return self._retain_contradictions
 
     def workflow_description(self, **defaults) -> dict:
         require_exact(self, Synthesizer)
@@ -107,8 +160,12 @@ class Synthesizer:
         paid = self._strategy is SynthesisStrategy.LLM_MERGE
         if paid and provider is None:
             raise WorkflowBindingError("Journaled LLM synthesis requires an explicit provider")
-        return {"type": "synthesizer", "version": 1, "strategy": self._strategy.value,
-                "completion": provider_description(provider, model) if paid else None}
+        description = {"type": "synthesizer", "version": 1, "strategy": self._strategy.value,
+                       "completion": provider_description(provider, model) if paid else None}
+        # Named only when set, so that other recipes keep their identity.
+        if self._retain_contradictions:
+            description["retain_contradictions"] = True
+        return description
 
     def workflow_providers(self) -> tuple[Provider, ...]:
         return (self._provider,) if self._strategy is SynthesisStrategy.LLM_MERGE and self._provider else ()
@@ -122,6 +179,7 @@ class Synthesizer:
             provider=binding.snapshot_provider(source)
             if source is not None and self._strategy is SynthesisStrategy.LLM_MERGE else None,
             model=binding.default_model or self._model, run_binding=binding,
+            retain_contradictions=self._retain_contradictions,
         )
 
     def _check_bound_overrides(self, provider, model, budget, tracer):
@@ -153,6 +211,33 @@ class Synthesizer:
         resolved_model = model if model is not None else self._model
         check_provider_support(resolved_provider, resolved_model or "", node_id=SYNTHESIS_NODE_ID,
                                max_budget_usd=max_budget_usd)
+
+    def merge_estimate_usd(
+        self, budget: Sentinel, *, provider: Provider | None = None, model: str | None = None,
+    ) -> float | None:
+        """What an ``LLM_MERGE`` synthesis would reserve under *budget*, or None.
+
+        The provider's estimate for the model, else
+        ``DEFAULT_SYNTHESIS_ESTIMATED_TOKENS`` at the budget's
+        ``cost_per_token``. None for another strategy, without a provider, or
+        when the provider requires an explicit ceiling and has none.
+        """
+        resolved_provider = provider or self._provider
+        if self._strategy is not SynthesisStrategy.LLM_MERGE or resolved_provider is None:
+            return None
+        return self._merge_estimate(resolved_provider, model if model is not None else self._model,
+                                    budget)[0]
+
+    @staticmethod
+    def _merge_estimate(
+        provider: Provider, model: str | None, budget: Sentinel,
+    ) -> tuple[float | None, bool]:
+        """The merge's estimate and whether its provider requires an explicit one."""
+        requires_explicit = provider.requires_explicit_budget_estimate(model or "")
+        estimate = provider.budget_estimate_usd(model or "")
+        if estimate is None and not requires_explicit:
+            estimate = DEFAULT_SYNTHESIS_ESTIMATED_TOKENS * budget.cost_per_token
+        return estimate, requires_explicit
 
     def synthesize(
         self,
@@ -220,8 +305,7 @@ class Synthesizer:
             )
         return self._concatenate(completed)
 
-    @staticmethod
-    def _deliverable(graph: ExecutionGraph, nodes: list[Node]) -> str:
+    def _deliverable(self, graph: ExecutionGraph, nodes: list[Node]) -> str:
         """Return what the graph produced, not a transcript of producing it.
 
         The executor already tells terminal nodes their output *is* the
@@ -238,9 +322,13 @@ class Synthesizer:
 
         Falls back to every completed node when a graph has no terminal
         result to hand back, so nothing is ever silently lost.
-        :func:`deliverable_sources` names the same nodes.
+        :func:`deliverable_sources` names the same nodes. With
+        ``retain_contradictions``, the contradictions those nodes' source
+        evidence lists and their text leaves out follow in a section.
         """
-        return Synthesizer._concatenate(_select_deliverable(graph, nodes)[0])
+        selected = _select_deliverable(graph, nodes)[0]
+        output = Synthesizer._concatenate(selected)
+        return _with_contradictions(selected, output) if self._retain_contradictions else output
 
     @staticmethod
     def _concatenate(nodes: list[Node]) -> str:
@@ -293,29 +381,27 @@ class Synthesizer:
             )
         for node in nodes:
             parts.append(f"## {node.label} (id: {node.id})\n\n{node.result}")
+        if self._retain_contradictions:
+            parts.append(CONTRADICTION_NOTE)
         prompt = "\n\n---\n\n".join(parts)
 
         if resolved_budget:
-            requires_explicit = resolved_provider.requires_explicit_budget_estimate(
-                resolved_model or ""
+            estimate, requires_explicit = self._merge_estimate(
+                resolved_provider, resolved_model, resolved_budget,
             )
-            estimate = resolved_provider.budget_estimate_usd(resolved_model or "")
-            if estimate is None and requires_explicit:
+            if estimate is None:
                 if resolved_budget.max_budget_usd is not None:
                     raise BudgetEstimateRequired(
                         SYNTHESIS_NODE_ID,
                         resolved_model or "",
                         type(resolved_provider).__name__,
                     )
-            elif estimate is not None:
+            else:
+                # Allowance held for the merge (Swarm reserve_for_checks)
+                # becomes its reservation.
                 resolved_budget.reserve(
                     SYNTHESIS_NODE_ID, estimate, hard_ceiling=requires_explicit,
-                )
-            else:
-                resolved_budget.reserve(
-                    SYNTHESIS_NODE_ID,
-                    DEFAULT_SYNTHESIS_ESTIMATED_TOKENS
-                    * resolved_budget.cost_per_token,
+                    from_hold=SYNTHESIS_NODE_ID in resolved_budget.holds,
                 )
 
         synth_node = Node(label="Synthesis merge", id=SYNTHESIS_NODE_ID)

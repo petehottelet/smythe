@@ -107,6 +107,25 @@ def test_native_failure_is_terminal_and_preserves_exposure(parallel, policy, unk
 
 
 @pytest.mark.parametrize("parallel", [False, True])
+def test_a_native_failure_marker_keeps_no_account_identifier(parallel):
+    organization = "org-" + "A1b2" * 6  # built here, so no tracked file holds an identifier
+    error = ProviderResponseError(
+        f"Response failed: organization {organization} has no access to this model",
+        envelope=SimpleNamespace(body=SECRET.encode()), receipt=SAFE,
+        billing_result=CompletionResult("", cost_usd=0.1),
+    )
+    graph, tracer = graph_for(), Tracer()
+    with pytest.raises(ProviderResponseError):
+        execute(graph, Script(error), Sentinel(1), parallel=parallel, tracer=tracer)
+    node = graph.nodes[0]
+    assert node.metadata["response_error"] == {
+        "type": "ProviderResponseError",
+        "message": "Response failed: organization org-[redacted] has no access to this model"}
+    assert organization not in json.dumps(graph_to_dict(graph))
+    assert organization not in json.dumps(tracer.summary())
+
+
+@pytest.mark.parametrize("parallel", [False, True])
 def test_reconciliation_overrun_preserves_original_evidence_and_known_bill(parallel):
     error = failed_response(cost=0.3)
     graph, provider, budget = graph_for(), Script(error), Sentinel(1)

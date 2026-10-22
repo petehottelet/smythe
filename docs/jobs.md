@@ -217,6 +217,8 @@ and attachment paths are left out. Every sample of a template therefore shares
 one digest, and renaming a profile or moving an attachment to another path
 with the same bytes and extension keeps it. A different prompt, model, option,
 artifact spec, attachment content or attachment order changes it.
+`operation_input_digest` raises `ValueError` when the operation's attachments
+are not an array or an attachment has no fingerprint in the list it is given.
 
 The digest is computed on demand and never stored. It is not part of the plan
 hash or approval token, so plans, exports, approvals and the Jobs schema are
@@ -224,7 +226,8 @@ unchanged. `jobs inspect` adds `input_digest` to each operation, computed from
 the run's stored plan, prints it on an `Input digest:` line under each
 operation, and the HTML report shows it in an Input digest column. It is
 `null` (`unavailable` in the printed output) for an operation whose stored
-specification cannot produce one, or that sends attachments when the plan's
+specification cannot produce one, such as one whose stored attachments are
+not an array of planned paths, or that sends attachments when the plan's
 stored attachment fingerprints cannot be read; inspection itself still
 succeeds.
 Jobs does not reuse artifacts across runs by digest.
@@ -538,10 +541,33 @@ smythe jobs resume RUN_ID --detach
 
 The request blocks new attempt, reservation, and dispatch admission. Calls
 already marked dispatched finish through the normal accounting and artifact
-path. A pause does not cancel a provider request. Safe prepared calls return
-to pending; accepted outputs and attempt history remain intact. The run becomes
+path. Without a drain deadline, a pause does not cancel a provider request.
+Safe prepared calls return to pending; accepted outputs and attempt history
+remain intact. The run becomes
 `paused` after admitted work drains and pending work remains. Completed work,
 unknown outcomes, and budget overruns retain their corresponding statuses.
+
+`--drain-timeout-s` (0 to 3,600 seconds) bounds the drain:
+
+```bash
+smythe jobs stop RUN_ID --drain-timeout-s 60
+```
+
+That long after the request, the worker cancels each call still awaiting its
+provider and records it as `unknown_outcome`, keeping its full per-call
+ceiling as exposure; the run then becomes `needs_attention`. A call whose
+response has arrived settles normally. The deadline counts from the request,
+and the worker checks for it at least once a second; a worker from an earlier
+release ignores it and waits for every call. A check that cannot read the
+database, for example while it is locked, changes nothing: the run continues,
+any deadline the worker has already read still applies, and the next check
+reads again. The request's `pause_requested`
+event and the JSON `stop_request` record it as `drain_deadline_ns`; the Jobs
+schema is unchanged. A later stop can bring the deadline forward but not
+extend it, and resume clears it with the pause. Investigate abandoned calls as
+described under [unknown outcomes](#resume-and-unknown-outcomes). In Python,
+pass `drain_timeout_s` to `SQLiteRunStore.request_pause` or
+`smythe.jobs.operator.stop_job`.
 
 `stop` uses the same timeout and polling ranges as `attach`. Set `--timeout-s 0`
 to return immediately after saving the request. A timeout or Ctrl+C ends only
@@ -596,8 +622,10 @@ The earlier unknown exposure remains in the ledger after that reroll.
 
 Do not resolve an unknown outcome by ordinary `resume`; that is intentionally a
 no-op for the ambiguous operation. First investigate the provider account and
-artifact destination. If a duplicate call is acceptable, acknowledge that
-risk explicitly during a selective reroll.
+artifact destination. If the attempt already published the whole response,
+[adopt those bytes](#adopt-published-bytes) without another call. If a
+duplicate call is acceptable, acknowledge that risk explicitly during a
+selective reroll.
 
 ## Jobs database upgrades
 
@@ -656,6 +684,50 @@ and attempts recorded by earlier versions keep an empty reason.
 Successful operations cannot be casually rerolled, which preserves accepted
 outputs byte-for-byte.
 
+## Adopt published bytes
+
+A response's bytes are published before its call settles in the journal. A
+process that stops between the two leaves an unknown outcome whose attempt
+may already hold the whole response on disk. When investigation shows the
+provider completed that request, adopt those bytes instead of paying for a
+duplicate call:
+
+```bash
+smythe jobs adopt RUN_ID "tile[3]" --reason "provider console shows one completed image"
+```
+
+Adoption applies only to an `unknown_outcome` operation. Its latest attempt
+directory, `artifacts/<operation-directory>/attempt-NNNN/` beneath the run's
+artifact root, must hold exactly the files of a response with the artifact
+count the profile requests (`artifacts_per_call` for `offline`, `n` for
+`openai_image`, one for `gemini_image`) and nothing else. The bytes then pass
+the [built-in artifact check](#delivery-acceptance) and the plan's
+[registered validators](#registered-validators) again; pass the runner the
+same validators as for the run. Missing, extra, undecodable or wrong-MIME
+bytes, a validator rejection, and any other operation state refuse adoption
+with exit code 6, and symbolic links or junctions with exit code 2. A refusal
+leaves the operation, its attempts, calls and artifact records unchanged.
+
+The adopted operation becomes `succeeded` with that attempt accepted and its
+artifact receipts recorded. No provider call is made and no attempt is used.
+The attempt and its call keep their unknown outcome, and the call keeps its
+full per-call ceiling as exposure: no settlement is invented. A run whose
+operations have all succeeded is therefore `completed` with
+`cost_is_complete: false` while that exposure remains. The
+`unknown_outcome_adopted` event records the reason, call, attempt, kept
+exposure, each artifact's path and SHA-256, and the delivery decision under
+`delivery_acceptance`, from which [delivery eligibility](#delivery-eligibility)
+is derived as for a completed call. `jobs inspect` adds that record, without
+the decision, to the operation as `adoption`, prints an
+`Adopted published bytes:` line, and the HTML report shows it with the
+operation.
+
+Adoption holds the run's lease, like a reroll, and dispatches no pending
+work; resume the run for that. It prints the run and returns its exit code
+like `reroll`. In Python, call `JobRunner.adopt(run_id, operation_key,
+reason=...)`; it records the verified bytes with
+`SQLiteRunStore.adopt_published_attempt`. The Jobs schema stays at version 4.
+
 ## Export
 
 Export includes the manifest and plan hashes, operation and attempt lineage,
@@ -700,7 +772,7 @@ and output charge that one request can incur.
 | 3 | provider configuration or optional dependency failure |
 | 4 | approval mismatch, or an already used approval without `--new-run` |
 | 5 | budget admission failure |
-| 6 | unknown run or invalid state transition |
+| 6 | unknown run, invalid state transition, or refused adoption |
 | 7 | local SQLite/filesystem failure, detached startup failure, or attachment detects a failed worker or expired lease |
 | 130 | detached startup interrupted, or attachment disconnected with Ctrl+C |
 
@@ -767,8 +839,12 @@ runner = JobRunner(store, validators=validators)
   manifest.
 - Rerolls are operator-selected; there is no automatic vision-judge promotion
   policy in the runtime.
-- Unknown provider outcomes require human investigation or explicit duplicate
-  acknowledgment.
+- Unknown provider outcomes require human investigation, then explicit
+  duplicate acknowledgment or adoption of the bytes the attempt published.
+- Jobs do not read a response's `stop_reason`. A response that the provider
+  truncated, refused or filtered is judged by its artifacts and accounting
+  alone: without an artifact it is `rejected` (`no_artifacts`) at its
+  reported cost, and artifacts that pass every check are accepted.
 
 ## High-fan-out example workload
 

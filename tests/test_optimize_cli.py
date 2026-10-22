@@ -460,6 +460,25 @@ def test_run_json_reports_a_worse_verdict_without_a_patch(tmp_path, capsys):
     assert "Verdict: <strong>worse</strong></p>" in out.read_text(encoding="utf-8")
 
 
+def test_a_campaign_stopped_in_development_records_an_inconclusive_verdict(
+    tmp_path, capsys
+):
+    ledger_path = tmp_path / "stopped.sqlite3"
+    stopped = _run(ledger_path, capsys, *_SMALL_CAMPAIGN, "--max-p95-latency-ms", "1")
+
+    assert (stopped["promoted"], stopped["verdict"]) == (False, "inconclusive")
+    assert stopped["evidence"]["confirmation_assessment"] is None
+    [decision] = stopped["ledger_snapshot"]["decisions"]
+    assert decision["assessment"]["stage"] == "development"
+    assert decision["assessment"]["verdict"] == "inconclusive"
+
+    out = tmp_path / "stopped.html"
+    assert main(["optimize", "inspect", stopped["campaign_id"], "--ledger", str(ledger_path),
+                 "--out", str(out), "--json"]) == EXIT_OK
+    capsys.readouterr()
+    assert "Verdict: <strong>inconclusive</strong></p>" in out.read_text(encoding="utf-8")
+
+
 def test_reference_concurrency_is_compared_on_paired_splits_and_never_promoted(
     tmp_path, capsys
 ):

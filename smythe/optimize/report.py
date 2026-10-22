@@ -427,6 +427,8 @@ def _decision_verdict(assessment: dict) -> str:
         recorded = _recorded_verdict(assessment['verdict'])
         if final is not None and final[0] != recorded:
             raise ValueError('Recorded verdict disagrees with its final assessment')
+        if not stages and recorded != 'inconclusive':
+            raise ValueError('Recorded verdict without a paired stage must be inconclusive')
         final = recorded, False
     elif not stages:
         return ''

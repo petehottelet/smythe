@@ -490,6 +490,26 @@ def test_development_decisions_have_no_verdict():
     assert 'selected for confirmation' not in visible(output)
 
 
+def development_decision(verdict):
+    data = payload()
+    data['ledger_snapshot']['decisions'][0].update(promoted=False)
+    data['ledger_snapshot']['decisions'][0]['assessment'] = {
+        'stage': 'development', 'development_scores': [development(), runner_up()],
+        'verdict': verdict}
+    return data
+
+
+def test_development_decisions_show_their_recorded_inconclusive_verdict():
+    output = render_optimization_report(bind(development_decision('inconclusive')))
+    assert 'Verdict: inconclusive' in overview_text(output)
+    assert visible(output).count('Verdict') == 1
+    assert 'derived' not in visible(output).lower()
+    # No paired interval was formed, so no other verdict can be recorded.
+    for recorded in ('improved', 'worse'):
+        with pytest.raises(ValueError, match='verdict'):
+            render_optimization_report(bind(development_decision(recorded)))
+
+
 def reference_payload(rule='must_not_be_worse'):
     data = verdict_payload()
     snapshot = data['ledger_snapshot']

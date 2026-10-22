@@ -156,6 +156,13 @@ class Sentinel:
     provider-reported cost or configured estimate once the node completes.
     ``release()`` frees a reservation if the node fails before ``record()``.
 
+    ``hold()`` sets allowance aside for a later call, such as a verifier or
+    an ``LLM_MERGE`` synthesis. Holds count toward every other admission,
+    ``reserve()`` and ``check()``, but never toward ``total_cost_usd``; the
+    call they were set aside for converts its hold with
+    ``reserve(key, ..., from_hold=True)``, and ``release_hold()`` frees one
+    that will not be used. Holds are not recorded in checkpoints.
+
     Attributes:
         max_budget_usd: Hard cap in USD.  None means unlimited.
         cost_per_token: Blended $/token rate (default ~$3/1M tokens).
@@ -171,6 +178,7 @@ class Sentinel:
         self._node_costs: dict[str, float] = {}
         self._reservations: dict[str, float] = {}
         self._hard_reservations: set[str] = set()
+        self._holds: dict[str, float] = {}
         self._spent: float = 0.0
         self._unknown_cost_nodes: set[str] = set()
         self._estimated_cost_nodes: set[str] = set()
@@ -225,6 +233,11 @@ class Sentinel:
         """
         return frozenset(self._token_estimate_nodes)
 
+    @property
+    def holds(self) -> dict[str, float]:
+        """A copy of the allowance held for later calls, in USD by key."""
+        return dict(self._holds)
+
     def mark_unknown(self, node_id: str) -> None:
         """Mark unresolved billing without inventing usage or releasing exposure."""
         self._unknown_cost_nodes.add(node_id)
@@ -233,9 +246,41 @@ class Sentinel:
         """Raise SentinelAlert if the budget is already exhausted.
 
         Used by the serial executor where reservation is unnecessary.
+        Allowance that ``hold()`` set aside counts as exhausted here.
         """
-        if self.max_budget_usd is not None and self._spent >= self.max_budget_usd:
+        if self.max_budget_usd is None:
+            return
+        if _sum_costs(chain((self._spent,), self._holds.values())) >= self.max_budget_usd:
             raise SentinelAlert(self._spent, self.max_budget_usd, node_id)
+
+    def _admits(self, committed: Iterable[float], key: str) -> None:
+        """Raise SentinelAlert unless *committed*, holds included, fits the budget."""
+        # A nano-dollar tolerance so an exact-fit budget (for example 192
+        # reservations of $0.06 against an $11.52 limit) is not rejected by
+        # accumulated floating-point error. Observed live: the 192nd
+        # reservation of a full-budget image run failed with $0.06 nominally
+        # remaining.
+        if self.max_budget_usd is not None and _sum_costs(committed) > self.max_budget_usd + 1e-9:
+            raise SentinelAlert(self._spent, self.max_budget_usd, key)
+
+    def hold(self, key: str, amount: float) -> None:
+        """Set *amount* aside for the later call that *key* names.
+
+        Raises SentinelAlert, and holds nothing, when the budget cannot cover
+        the hold on top of what is spent, reserved and already held.
+        """
+        amount = _validate_usd(amount, "hold amount")
+        if key in self._holds:
+            raise ValueError(f"{key!r} already has a budget hold")
+        if key in self._reservations:
+            raise ValueError(f"Node {key!r} already has a budget reservation")
+        self._admits(chain(self._node_costs.values(), self._reservations.values(),
+                           self._holds.values(), (amount,)), key)
+        self._holds[key] = amount
+
+    def release_hold(self, key: str) -> None:
+        """Free the allowance held for *key*, if any."""
+        self._holds.pop(key, None)
 
     def reserve(
         self,
@@ -243,30 +288,34 @@ class Sentinel:
         estimated_cost: float,
         *,
         hard_ceiling: bool = False,
+        from_hold: bool = False,
     ) -> None:
         """Pre-commit estimated cost before a node starts executing.
 
         Raises SentinelAlert if the reservation would exceed the
         budget.  The reservation is held until ``record()`` replaces it
         with actual cost, or ``release()`` cancels it on failure.
+        Allowance held for other keys is not available. ``from_hold``
+        converts the node's own hold: the hold is freed as the reservation
+        takes its place, and a refused reservation leaves it in place. A
+        node with a hold must convert it.
         """
         estimated_cost = _validate_usd(estimated_cost, "estimated_cost")
         if node_id in self._reservations:
             raise ValueError(f"Node {node_id!r} already has a budget reservation")
+        if from_hold and node_id not in self._holds:
+            raise ValueError(f"Node {node_id!r} has no budget hold")
+        if not from_hold and node_id in self._holds:
+            raise ValueError(f"Node {node_id!r} has a budget hold; reserve it with from_hold=True")
+        holds = {key: amount for key, amount in self._holds.items() if key != node_id}
         total = _sum_costs(chain(
             self._node_costs.values(), self._reservations.values(), (estimated_cost,)
         ))
-        if self.max_budget_usd is not None:
-            # A nano-dollar tolerance so an exact-fit budget (for example
-            # 192 reservations of $0.06 against an $11.52 limit) is not
-            # rejected by accumulated floating-point error. Observed live:
-            # the 192nd reservation of a full-budget image run failed with
-            # $0.06 nominally remaining.
-            if total > self.max_budget_usd + 1e-9:
-                raise SentinelAlert(self._spent, self.max_budget_usd, node_id)
+        self._admits(chain((total,), holds.values()), node_id)
         self._reservations[node_id] = estimated_cost
         if hard_ceiling:
             self._hard_reservations.add(node_id)
+        self._holds = holds
         self._spent = total
 
     def release(self, node_id: str) -> None:

@@ -36,7 +36,10 @@ one-hour writes, and output are separate categories. Claude's ordinary input
 count excludes cache tokens; thinking is included in billed output once.
 Missing usage, inconsistent cache totals, unknown models or service tiers,
 and interrupted dispatches keep their reserved exposure and close admission.
-Refusals and truncated output retain their known charge. A 401, 403, 404, 413
+Refusals and truncated output retain their known charge, and their
+`ProviderResponseError.stop_reason` is `refusal`, `max_tokens`,
+`model_context_window_exceeded`, or `incomplete` for `pause_turn`
+([stop reasons](execution.md)). A 401, 403, 404, 413
 or 429 response, such as a 429 `rate_limit_error`, settles at zero cost and
 follows the node's failure policy when two conditions hold. Its body must be
 Anthropic's plain error object, `{"type": "error", "error": {"type": "...",
@@ -49,6 +52,16 @@ policy", which can follow billed generation. 5xx responses, including 529
 cannot show they were not billed. See
 [workflow accounting](workflow-accounting.md#admission-and-cost) for the exact
 conditions.
+
+An ordinary run stops at any of these failures, unless it has a
+[retry policy](execution.md#retry-policy). Under one, a rejection that meets
+the same two conditions settles at zero cost and raises
+`ProviderRequestRejectedError`, whose
+[failure class](execution.md#failure-classes) follows its status; every other
+4xx or 5xx response still keeps its reserved exposure and stops the run. A
+policy that lists `quality_defect` also makes a `refusal` or `max_tokens` reply
+an ordinary node failure: its known charge is recorded once and
+`NativeOutputDefectError` is raised, so a `RETRY` node can call again.
 
 Input counts are estimates. The quote reserves the entire output cap and
 input headroom at the highest supported input rate. A measured overrun remains

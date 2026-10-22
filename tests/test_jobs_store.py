@@ -14,6 +14,7 @@ from smythe.jobs import ApprovalError, JobManifestV1, make_approval, preflight_j
 from smythe.jobs.store import (
     InvalidTransitionError,
     JobBudgetError,
+    JobNotFoundError,
     OperationStatus,
     RunLeaseError,
     RunStatus,
@@ -685,6 +686,103 @@ def test_recorded_attempt_reasons_are_never_backfilled(tmp_path):
         store.queue_reroll(run_id, [operation_id], reason="later reroll")
         store.begin_attempt(run_id, operation_id)
         assert _attempt_reasons(store, run_id) == [None, None, "later reroll"]
+
+
+_ADOPTED = {"relative_path": "artifacts/glyph_0_/attempt-0001/artifact-01.png",
+            "mime_type": "image/png", "sha256": "a" * 64, "size_bytes": 123, "width": 1, "height": 1}
+
+
+def _adoption_record(attempt_id, decision="accepted", artifact=_ADOPTED):
+    return _delivery_record(attempt_id, decision, [
+        {"path": artifact["relative_path"], "sha256": artifact["sha256"],
+         "size_bytes": artifact["size_bytes"], "published": True}])
+
+
+def test_adoption_records_published_bytes_and_keeps_the_unknown_call_exposed(tmp_path, store_factory):
+    plan, approval = _plan(tmp_path)
+    store = store_factory(tmp_path / "jobs.db")
+    run_id = store.create_run(plan, approval, manifest_root=tmp_path)
+    operation = store.pending_operations(run_id)[0]
+    attempt = store.begin_attempt(run_id, operation["operation_id"])
+    permit = store.prepare_call(attempt["attempt_id"], 100_000)
+    store.mark_call_dispatched(permit.call_id)
+    store.mark_unknown_outcome(permit.call_id, "connection lost after dispatch")
+    lease = store.acquire_run_lease(run_id, "worker-a")
+    key, attempt_id = operation["operation_key"], attempt["attempt_id"]
+
+    def adopt(record=None, artifacts=(_ADOPTED,), **options):
+        options = {"reason": "provider shows one charged image", "lease": lease} | options
+        return store.adopt_published_attempt(
+            run_id, key, artifacts=list(artifacts),
+            delivery_acceptance=_adoption_record(attempt_id) if record is None else record, **options)
+
+    before = store.snapshot(run_id, include_events=True)
+    with pytest.raises(RunLeaseError, match="requires a current lease token"):
+        adopt(lease=None)
+    for reason in ("", "  ", None, "x" * 2049):
+        with pytest.raises(ValueError, match="reason"):
+            adopt(reason=reason)
+    with pytest.raises(ValueError, match="artifact"):
+        adopt(artifacts=())
+    with pytest.raises(ValueError, match="decision"):
+        adopt(_adoption_record(attempt_id, "rejected"))
+    with pytest.raises(ValueError, match="subject"):
+        adopt(_adoption_record(attempt_id, artifact=dict(_ADOPTED, sha256="b" * 64)))
+    with pytest.raises(ValueError, match="latest attempt"):
+        adopt(_adoption_record("other"))
+    with pytest.raises(JobNotFoundError):
+        store.adopt_published_attempt(run_id, "missing[0]", reason="r", artifacts=[_ADOPTED],
+                                      delivery_acceptance=_adoption_record(attempt_id), lease=lease)
+    assert store.snapshot(run_id, include_events=True) == before
+
+    adopted = adopt()
+
+    snapshot = store.snapshot(run_id, include_events=True)
+    assert snapshot["counts"] == {OperationStatus.SUCCEEDED.value: 1}
+    [row] = snapshot["operations"]
+    assert (row["accepted_attempt_id"], row["attempt_count"], row["error"]) == (attempt_id, 1, None)
+    assert [item["status"] for item in snapshot["attempts"]] == ["unknown_outcome"]
+    [call] = store._call_rows(run_id)
+    assert (call["status"], call["confirmed_microusd"], call["exposure_microusd"]) == (
+        "unknown_outcome", 0, 100_000)
+    assert (snapshot["cost"]["exposure_microusd"], snapshot["cost"]["reserved_microusd"]) == (100_000, 0)
+    [artifact] = snapshot["artifacts"]
+    assert (artifact["attempt_id"], artifact["accepted"], artifact["sha256"]) == (attempt_id, 1, "a" * 64)
+    event = snapshot["events"][-1]
+    assert event["event_type"] == "unknown_outcome_adopted" and event["payload"] == adopted
+    assert adopted == {"call_id": permit.call_id, "attempt_id": attempt_id,
+                       "reason": "provider shows one charged image", "exposure_microusd": 100_000,
+                       "artifacts": [{"relative_path": _ADOPTED["relative_path"], "sha256": "a" * 64}],
+                       "delivery_acceptance": _adoption_record(attempt_id)}
+    assert store.delivery_records(run_id) == {attempt_id: _adoption_record(attempt_id)}
+    # The run completes while the call's exposure remains unresolved.
+    assert store.finalize_run(run_id, lease=lease) == RunStatus.COMPLETED.value
+    assert store.snapshot(run_id)["cost"]["cost_is_complete"] is False
+
+    with pytest.raises(InvalidTransitionError, match="no unknown outcome"):
+        adopt()
+    assert store.schema_version == 4
+
+
+@pytest.mark.parametrize("state", ["pending", "running", "rejected"])
+def test_adoption_needs_an_operation_with_an_unknown_outcome(tmp_path, store_factory, state):
+    plan, approval = _plan(tmp_path, provider="offline")
+    store = store_factory(tmp_path / "jobs.db")
+    run_id = store.create_run(plan, approval, manifest_root=tmp_path)
+    operation = store.pending_operations(run_id)[0]
+    attempt_id = "none"
+    if state == "rejected":
+        _settle_attempt(store, run_id, operation["operation_id"])
+    elif state == "running":
+        attempt_id = store.begin_attempt(run_id, operation["operation_id"])["attempt_id"]
+        store.mark_call_dispatched(store.prepare_call(attempt_id, 0).call_id)
+    before = store.snapshot(run_id, include_events=True)
+
+    with pytest.raises(InvalidTransitionError, match=f"state {state} has no unknown outcome"):
+        store.adopt_published_attempt(run_id, operation["operation_key"], reason="review",
+                                      artifacts=[_ADOPTED],
+                                      delivery_acceptance=_adoption_record(attempt_id))
+    assert store.snapshot(run_id, include_events=True) == before
 
 
 def test_budget_overrun_is_derived_latched_and_blocks_every_admission(tmp_path, store_factory):

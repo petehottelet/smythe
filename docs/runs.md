@@ -44,7 +44,13 @@ its runs and its recorded version do not change.
 |---|---|
 | `format` | Checkpoint version and the state features it `requires`; or journal version, durable checkpoint version and revision |
 | `execution` | `state`, `blocked_reason`, and node counts by status. Ordinary states are `running`, `failed` and `completed`; durable runs add `planned` and `blocked`, with the journal's `run_status` and `checkpoint_status` |
-| `delivery` | The delivery acceptance decision; see below |
+| `delivery` | The current delivery acceptance decision; see below |
+| `decisions` | The [decision history](#decision-history): the current decision's sequence and the decisions before it |
+| `artifact` | A durable run's [published document](#published-documents); null for a run that publishes none and for ordinary runs |
+| `context` | A durable run's [context assembly](#research-runs): versions, current sources, snapshots and tombstones; null without context assembly and for ordinary runs |
+| `tool_calls` | A durable run's [journaled reads](#research-runs), without response bodies or text; null for ordinary runs |
+| `evidence` | The [source evidence](#research-runs) a completed durable run delivered, summarized; null without any and for ordinary runs |
+| `issues` | What the run leaves open: unresolved questions, unavailable sources, failed reads and final validators that did not pass |
 | `accounting` | `cost_scope`, `total_cost_usd`, `max_budget_usd`, `cost_is_complete`, `cost_contains_estimates`, `unknown_cost_nodes`, the durable `workflow_accounting` balances, `unknown_exposure` and `unresolved` accounting that stops resume |
 | `timing` | `elapsed_ms`, `phases_ms` and `waiting_ms` added over the saved [timing segments](checkpoint-format.md#timing-segments), with the segment count, first start and last end; null when none were saved. Durable runs report lease sessions on the journal's wall clock and no phase totals |
 | `next_action` | The first thing the run needs, as an `action` code and a `detail` sentence |
@@ -62,7 +68,7 @@ number of calls that hold it.
 | `recorded` | Whether the run has a [delivery acceptance record](verifier.md#delivery-acceptance-records) |
 | `decision` | The decision that holds for the saved output now: `not_evaluated`, `accepted`, `rejected`, `needs_review`, `indeterminate`, or null without a record |
 | `reasons` | The reasons for that decision |
-| `integrity` | `verified` when the saved output, task and source node generations still match what the record bound, and for a durable run the journal applied the same decision; `mismatch` otherwise; null when nothing was decided |
+| `integrity` | `verified` when the saved output, task and source node generations still match what the record bound, and for a durable run the journal applied the same decision and any [published document](#published-documents) still holds the decided bytes; `mismatch` otherwise; null when nothing was decided |
 | `output_delivered` | Whether resuming the run returns its output as `output` |
 | `rejected_output` | For withheld output: the `field` that holds it, its `sha256` and its size in `bytes` |
 | `record` | The record as saved, including its validators' names, versions, configuration digests and outcomes |
@@ -79,19 +85,125 @@ A durable run under a strict policy keeps its record in
 [checkpoint version 2](verifier.md#strict-acceptance-in-durable-workflows),
 and inspection reads it as resume does. The checkpoint version must be the
 one the run's recipe writes, and the record must be undecided until the run
-completes and belong to the policy the recipe records, or the run is reported
-as unreadable. A decided record is checked as resuming the completed run
-checks it: against the saved output, the task and the source generations,
-and against the decision the journal applied, so a record changed to match
-other output also gives `indeterminate`. Durable runs without a strict
-policy, including runs with only a gate validator, have no record.
+completes and belong to the policy the recipe records, or to a policy a
+re-evaluation decided under, or the run is reported as unreadable. A decided
+record is checked as resuming the completed run checks it: against the saved
+output, the task and the source generations, and against the journal's
+current decision, so a record changed to match other output also gives
+`indeterminate`. Durable runs without a strict policy, including runs with
+only a gate validator, have no record.
+
+### Decision history
+
+A completed run can be decided again with
+[`Swarm.reevaluate`](verifier.md#re-evaluation), under a policy or with an
+[operator's decision](verifier.md#operator-decisions), which never runs a
+node; an operator's record carries an `operator` block. The
+`delivery` block and the exit code always follow the current decision, and
+the `decisions` block lists what came before it:
+
+| Field | Meaning |
+|---|---|
+| `current` | The current decision's sequence: 0 for the decision the run made when it completed, one more for each re-evaluation or operator decision; null without a decision |
+| `history` | The decisions the current one superseded, oldest first, each with its `sequence` and `record` |
+
+An ordinary checkpoint keeps the last 16 superseded records
+([checkpoint format](checkpoint-format.md#decision-history)), so `history`
+may start after sequence 0. A durable run's history comes from its journal:
+every `acceptance` operation a checkpoint applied, ordered by sequence, the
+last of which is the current decision. A run never decided again has
+`current` 0 and an empty `history`, and the text report lists earlier
+decisions only when there are any:
+
+```text
+Delivery acceptance: accepted
+Decision history: decision 1 is current; earlier decisions:
+  Decision 0: rejected under policy 8a51c0e2d9f4: final validator 'required-section' rejected the output: section_missing: no '## Sources' section
+```
+
+### Published documents
+
+A durable run with a [renderer](workflow-accounting.md#published-documents)
+reports its current publication under `artifact`, read through the same
+accessor resume uses:
+
+| Field | Meaning |
+|---|---|
+| `publication` | The `PublishedArtifact` record: `sequence`, `directory`, `name`, `sha256`, `size_bytes`, `media_type`, the `renderer` description, and the `synthesis` it rendered with that text's `output_sha256` |
+| `path` | Where the published file is |
+| `decision` | The delivery decision that covers it: the run's current decision, a re-evaluation's after one; or null |
+| `integrity` | `status` and `detail` from rechecking the file's size and SHA-256: `verified`, `missing`, `changed`, `unsafe` or `unreadable` |
+| `delivery_eligibility` | `eligible`, and `reasons` for every unmet condition: `no_decision`, `not_accepted`, `record_mismatch`, `artifact_missing`, `artifact_changed`, `artifact_unsafe`, `artifact_unreadable` |
+
+The file is only read. As on resume, a decided record whose published file is
+missing or changed gives `indeterminate` with that reason, and the next action
+is `republish`.
+
+### Research runs
+
+A durable run that reads sources and delivers evidence reports what it was
+given, what it read and what its output claims, without printing source
+text, read bodies, quotes or output. The
+[source-to-artifact example](../examples/16_source_to_artifact.py) prints
+one such report.
+
+`context`, for a run with [context assembly](tasks.md#context-snapshots):
+
+| Field | Meaning |
+|---|---|
+| `assembly_version`, `snapshot_version` | The context-assembly version the recipe records and the version of its snapshot records |
+| `sources_revision`, `sources_sha256` | The source revision the latest checkpoint names, and its digest |
+| `sources` | Each current source's `source_id`, `version`, `sha256`, `text_bytes` and `trust` (`untrusted`); a [removed](tasks.md#remove-a-source) source has `removed` with its tombstone's `reason` and `removed_at`, and no size |
+| `snapshots` | Each node's current snapshot by `node_id`, `generation` and `snapshot_id` |
+| `tombstones` | Every source removed from the run, as tombstone records |
+
+`tool_calls` lists each [journaled read](workflow-accounting.md#recorded-read-steps):
+its `node_id`, `generation`, `attempt` and `invocation`; the `profile`,
+`profile_version` and `decoder_version`, whether it is `metered` and
+`repeat_safe`; its `url`, with account identifiers redacted, and
+`request_sha256`; its `state`, `billing_state`, `result_state` and
+`cost_nanousd`; the `http_status`, `transport_error` and `response_sha256`
+of its response; the `text_bytes` and `text_sha256` of the text decoded from
+it; and its rejection `error`. Bodies and text stay in the journal.
+
+`evidence` summarizes [`load_source_evidence`](source-evidence.md#inspect-evidence):
+the operation's key and state, the output digest, the run's source set, any
+`problem`, each cited source's summary with `available` and `removed`, and
+each claim's id, the number of `supporting` and `contradicting` passages,
+the `sources` they cite, its `scope` and its `unresolved` questions.
+
+`issues` lists what is open, each with a `kind`, a `subject` and a `detail`:
+
+| `kind` | When |
+|---|---|
+| `evidence_problem` | The output carried no readable evidence |
+| `source_unavailable` | A source the evidence cites has no text the run holds: removed, tombstoned or not retained |
+| `unresolved_question` | A claim leaves a question open; the subject is the claim |
+| `read_failed` | A read step has no accepted read at its generation, or a read's charge is unknown |
+| `validator_rejected`, `validator_error` | A final validator in the decision record did not pass; the detail is its reason |
+
+The text report prints each block on its own lines:
+
+```text
+Context: assembly version 1, snapshot version 1; sources revision 0; 2 sources, 1 snapshots
+  Source survey-2019 version 2019: 79 bytes; sha256 26e6faa9bc6d
+Read fetch-survey-2019 (generation 0, attempt 0): source 1; settled, applied; HTTP 200; 79 bytes of text; cost 0 nanoUSD
+Evidence: 1 claims citing 2 sources (applied)
+  Claim billing-preference: 1 supporting, 1 contradicting; sources renewals-2026, survey-2019
+Issue unresolved_question (billing-preference): Whom did the 2019 poll ask?
+```
+
+A source removed after the run's decision makes that decision
+`indeterminate`, with the removal as its reason and exit code 11, until a
+re-evaluation decides again.
 
 ### Next actions
 
 | `action` | When |
 |---|---|
 | `none` | The run completed, its output is delivered and its cost is known |
-| `resume` | The run is unfinished; `detail` says how to resume it, including the strict policy's `sha256` that must resume a strict run, ordinary or durable |
+| `resume` | The run is unfinished; `detail` says how to resume it, including the strict policy's `sha256` that must resume a strict run, ordinary or durable, and the retry policy an ordinary run with [persisted attempts](execution.md#persisted-attempts) records |
+| `republish` | A completed durable run's published document is missing or changed; `Swarm(run_store=...).republish(run_id)` publishes it again without replacing a file |
 | `reconcile_accounting` | Accounting is unresolved (invalid usage, an accounting error, an unresolved native response, or a durable run blocked by `unknown_exposure` or `evidence_conflict`), or a completed run's cost is incomplete |
 | `rerun` | A durable run passed its budget and admits no more calls |
 | `review_output` | The output was `rejected` or `needs_review` and is withheld |
@@ -108,7 +220,9 @@ policy, including runs with only a gate validator, have no record.
 | 10 | The run completed and its output was `rejected` or `needs_review` |
 | 11 | The decision is `indeterminate` |
 
-`list` returns 0 whatever the runs' decisions. Codes 10 and 11 are used only
+Codes 10 and 11 follow the run's current decision, after any
+[re-evaluation](#decision-history). `list` returns 0 whatever the runs'
+decisions. Codes 10 and 11 are used only
 by `runs inspect`; the [Jobs codes](jobs.md#cli-exit-codes) are unchanged.
 
 ## From Python

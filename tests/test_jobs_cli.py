@@ -10,15 +10,18 @@ from pathlib import Path
 import pytest
 
 import smythe.provider as provider_module
+from fakes import Crash, crash_when
 from smythe.cli import (
     EXIT_APPROVAL,
     EXIT_INVALID_INPUT,
     EXIT_JOB_FAILED,
+    EXIT_JOB_STATE,
     EXIT_OK,
     EXIT_PREFLIGHT,
     _portable_export,
     main,
 )
+from smythe.jobs.store import SQLiteRunStore
 
 
 def _jpeg_bytes() -> bytes:
@@ -305,6 +308,82 @@ def test_rejected_job_and_reroll_return_terminal_error_exit(tmp_path, capsys, mo
     rerolled = _json_output(capsys)["reroll"]
     assert rerolled["counts"] == {"rejected": 1}
     assert rerolled["operations"][0]["attempt_count"] == 2
+
+
+def _unknown_after_publication(tmp_path, capsys, monkeypatch):
+    """Stop `jobs run` after its artifact is published, then resume to classify the call."""
+    manifest = _manifest(tmp_path)
+    store = tmp_path / "jobs.sqlite3"
+    assert main(["jobs", "plan", str(manifest), "--json"]) == EXIT_OK
+    token = _json_output(capsys)["plan"]["approval"]["token"]
+    stop = crash_when(monkeypatch, SQLiteRunStore, "complete_call")
+    with pytest.raises(Crash):
+        main(["jobs", "run", str(manifest), "--approve", token, "--store", str(store), "--json"])
+    stop.restore()
+    capsys.readouterr()
+    with SQLiteRunStore(store, read_only=True) as opened:
+        [run] = opened.list_runs()
+    assert main(["jobs", "resume", run["run_id"], "--store", str(store), "--json"]) == EXIT_JOB_FAILED
+    assert _json_output(capsys)["resume"]["counts"] == {"unknown_outcome": 1}
+    return store, run["run_id"]
+
+
+def test_adopt_accepts_published_bytes_and_reports_json(tmp_path, capsys, monkeypatch):
+    store, run_id = _unknown_after_publication(tmp_path, capsys, monkeypatch)
+    command = ["jobs", "adopt", run_id, "glyph[0]", "--reason", "one image was generated",
+               "--store", str(store), "--json"]
+
+    assert main(command) == EXIT_OK
+    adopted = _json_output(capsys)
+    assert adopted["ok"] is True and adopted["command"] == "adopt"
+    assert adopted["adopt"]["status"] == "completed"
+    assert adopted["adopt"]["counts"] == {"succeeded": 1}
+    assert adopted["adopt"]["execution_metrics"]["operations_started"] == 0
+    [operation] = adopted["adopt"]["operations"]
+    assert operation["delivery_eligibility"] == {"eligible": True, "reasons": []}
+
+    assert main(command) == EXIT_JOB_STATE
+    refused = _json_output(capsys)
+    assert refused["ok"] is False and refused["command"] == "adopt"
+    assert refused["error"]["type"] == "InvalidTransitionError"
+    assert "no unknown outcome" in refused["error"]["message"]
+
+    assert main(["jobs", "inspect", run_id, "--store", str(store), "--json"]) == EXIT_OK
+    inspected = _json_output(capsys)["inspect"]
+    [operation], [attempt], [call] = (inspected[name] for name in ("operations", "attempts", "calls"))
+    assert operation["adoption"]["reason"] == "one image was generated"
+    assert operation["adoption"]["attempt_id"] == attempt["attempt_id"] == operation["accepted_attempt_id"]
+    assert operation["adoption"]["call_id"] == call["call_id"]
+    assert operation["adoption"]["exposure_microusd"] == call["exposure_microusd"]
+    assert (attempt["status"], call["status"]) == ("unknown_outcome", "unknown_outcome")
+    assert main(["jobs", "inspect", run_id, "--store", str(store)]) == EXIT_OK
+    assert "Adopted published bytes: one image was generated" in capsys.readouterr().out
+    report = tmp_path / "report.html"
+    assert main(["jobs", "inspect", run_id, "--out", str(report), "--store", str(store), "--json"]) == EXIT_OK
+    _json_output(capsys)
+    assert "one image was generated" in report.read_text(encoding="utf-8")
+
+
+def test_adopt_refusals_have_stable_exit_codes(tmp_path, capsys, monkeypatch):
+    store, run_id = _unknown_after_publication(tmp_path, capsys, monkeypatch)
+    [published] = (tmp_path / "outputs").rglob("*.png")
+    published.write_bytes(_jpeg_bytes())
+
+    for arguments, error, message in (
+        ([run_id, "glyph[0]"], "InvalidTransitionError", "expected image/png, observed image/jpeg"),
+        (["missing-run", "glyph[0]"], "JobNotFoundError", "missing-run"),
+        ([run_id, "missing[0]"], "JobNotFoundError", "missing[0]"),
+    ):
+        assert main(["jobs", "adopt", *arguments, "--reason", "checked", "--store", str(store),
+                     "--json"]) == EXIT_JOB_STATE
+        refused = _json_output(capsys)
+        assert refused["ok"] is False and refused["command"] == "adopt"
+        assert refused["error"]["type"] == error and message in refused["error"]["message"]
+    assert main(["jobs", "status", run_id, "--store", str(store), "--json"]) == EXIT_JOB_FAILED
+    assert _json_output(capsys)["status"]["counts"] == {"unknown_outcome": 1}
+    with pytest.raises(SystemExit) as missing_reason:
+        main(["jobs", "adopt", run_id, "glyph[0]", "--store", str(store)])
+    assert missing_reason.value.code == EXIT_INVALID_INPUT
 
 
 def test_export_uses_recorded_directory_and_retains_legacy_missing_field_compatibility():

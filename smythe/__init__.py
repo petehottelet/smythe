@@ -19,7 +19,9 @@ from smythe.constrained_planner import ConstrainedArchitect, SubGraphTemplate
 from smythe.context import ContextSnapshot, ContextSource
 from smythe.design import DesignSystem, Finding, design_verifier, inspect_asset
 from smythe.distill import DistillationError, distill_template
+from smythe.evidence import ClaimPassage, ClaimRecord, SourceEvidence, SourceRecord
 from smythe.graph import FailurePolicy, Revision, RevisionError
+from smythe.lineage import ArtifactLineage, LineagePolicy
 from smythe.loader import load_graph
 from smythe.mcp import MCPConfigError, MCPServerSpec, MCPSkillProvider, MCPToolRuntime
 from smythe.memory import PlannerMemory
@@ -30,6 +32,7 @@ from smythe.provider import (
     CompletionResult,
     GeminiProvider,
     IncompleteOutputError,
+    NativeOutputDefectError,
     OfflineProvider,
     OpenAIImageProvider,
     OpenAIProvider,
@@ -44,12 +47,14 @@ from smythe.provider import (
 from smythe.provider_responses import OpenAIResponsesProvider
 from smythe.provider_messages import AnthropicMessagesProvider
 from smythe.pricing import NativeReceipt
+from smythe.workflow_artifact import MarkdownRenderer, PublishedArtifact
 from smythe.workflow_binding import LocalOnly, WorkflowBindingError
 from smythe.workflow_provider import ProviderRequestRejectedError
 from smythe.workflow_policy import WorkflowGraphPolicy
 from smythe.workflow_store import SQLiteWorkflowStore, WorkflowError
 from smythe.workflow_tools import ReadProfile, ReadToolError
-from smythe.router import WhiteRabbit
+from smythe.router import RoutingDecision, WhiteRabbit
+from smythe.scheduling import RetryDeadlineError, RetryPolicy
 from smythe.skills import (
     CapabilityHydrationMode,
     CapabilityMapper,
@@ -84,7 +89,7 @@ from smythe.validation import (
     ValidationReport,
     ValidatorIdentity,
 )
-from smythe.validators import JSONValidator, TextValidator
+from smythe.validators import JSONValidator, SourceEvidenceValidator, TextValidator
 
 __all__ = [
     "AcceptanceDecision",
@@ -93,6 +98,7 @@ __all__ = [
     "AnthropicMessagesProvider",
     "ArchitectError",
     "Artifact",
+    "ArtifactLineage",
     "BudgetEstimateRequired",
     "BudgetReconciliationError",
     "BudgetValidationError",
@@ -101,6 +107,8 @@ __all__ = [
     "CapabilityMapper",
     "ChatMessage",
     "CheckpointStore",
+    "ClaimPassage",
+    "ClaimRecord",
     "CompletionResult",
     "ConstrainedArchitect",
     "ContextSnapshot",
@@ -115,12 +123,14 @@ __all__ = [
     "Finding",
     "FindingSeverity",
     "GeminiProvider",
+    "LineagePolicy",
     "LLMArchitect",
     "LLMSupervisor",
     "MCPConfigError",
     "MCPServerSpec",
     "MCPSkillProvider",
     "MCPToolRuntime",
+    "MarkdownRenderer",
     "OfflineProvider",
     "OpenAIImageProvider",
     "OpenAIProvider",
@@ -129,6 +139,7 @@ __all__ = [
     "JSONValidator",
     "OutputRefusedError",
     "OutputTruncatedError",
+    "NativeOutputDefectError",
     "NativeReceipt",
     "LocalOnly",
     "SQLiteWorkflowStore",
@@ -142,15 +153,22 @@ __all__ = [
     "ProviderAccountingError",
     "ProviderAccountingCancelledError",
     "ProviderRequestRejectedError",
+    "PublishedArtifact",
     "ReadProfile",
     "ReadToolError",
+    "RetryDeadlineError",
+    "RetryPolicy",
     "Revision",
     "RevisionError",
+    "RoutingDecision",
     "Sentinel",
     "SentinelAlert",
     "SimpleArchitect",
     "SkillProvider",
     "SkillRef",
+    "SourceEvidence",
+    "SourceEvidenceValidator",
+    "SourceRecord",
     "SubGraphTemplate",
     "Supervisor",
     "Swarm",

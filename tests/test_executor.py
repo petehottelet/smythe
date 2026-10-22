@@ -10,7 +10,7 @@ from helpers import FailingProvider
 from smythe.executor import Executor
 from smythe.executor_base import NodeFinalizationError
 from smythe.graph import ExecutionGraph, FailurePolicy, Node, NodeStatus, Topology
-from smythe.provider import CompletionResult, OfflineProvider, Provider
+from smythe.provider import CompletionResult, OfflineProvider, Provider, ProviderResponseError
 from smythe.registry import Registry
 from smythe.supervisor import Supervisor
 from smythe.tracer import Tracer
@@ -92,6 +92,38 @@ def test_finalization_failure_after_billing_is_not_retried():
     assert provider.calls == 1
     assert node.status == NodeStatus.FAILED
     assert later.status == NodeStatus.PENDING
+
+
+ORGANIZATION = "org-" + "A1b2" * 6  # built here, so no tracked file holds an identifier
+
+
+class AccountRefusal(Provider):
+    """Fails every call with an error that names the provider account, as SDK errors do."""
+
+    def __init__(self, error=RuntimeError) -> None:
+        self.error = error
+
+    async def complete(self, system, prompt, model):
+        raise self.error(f"429 in organization {ORGANIZATION} on requests per min")
+
+
+@pytest.mark.parametrize("error,policy", [
+    (RuntimeError, FailurePolicy.SKIP), (RuntimeError, FailurePolicy.HALT),
+    (ProviderResponseError, FailurePolicy.SKIP),
+], ids=["skipped", "halted", "terminal"])
+def test_a_failed_node_keeps_no_account_identifier_from_its_error(error, policy, caplog):
+    executor, tracer = _make_executor(AccountRefusal(error))
+    node = Node(label="Call", id="call", failure_policy=policy)
+    if policy is FailurePolicy.SKIP and error is RuntimeError:
+        executor.run(ExecutionGraph(topology=[Topology.SERIAL], nodes=[node]))
+    else:
+        # The raised error is the caller's; the saved result and trace keep no identifier.
+        with pytest.raises(error, match=ORGANIZATION):
+            executor.run(ExecutionGraph(topology=[Topology.SERIAL], nodes=[node]))
+    assert node.result == "429 in organization org-[redacted] on requests per min"
+    assert ORGANIZATION not in repr(tracer.summary())
+    assert "org-[redacted]" in repr(tracer.summary())
+    assert ORGANIZATION not in caplog.text and "org-[redacted]" in caplog.text
 
 
 def test_retry_exhausted_raises():

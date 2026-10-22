@@ -103,17 +103,26 @@ one outstanding native call, and continuation belongs to its originating
 provider and model.
 
 `ProviderResponseError` retains a known charge when generation was billed but
-its output is incomplete, malformed, or unusable. `ProviderAccountingError`
+its output is incomplete, malformed, or unusable. Its `stop_reason` is
+`max_tokens` or `content_filter` for those `incomplete_details` reasons,
+`refusal` for a refusal part, `incomplete` for any other incomplete response,
+and `None` otherwise ([stop reasons](execution.md)). `ProviderAccountingError`
 retains unknown exposure when billing evidence cannot be reconciled. Execution
 records known charges once, stops further dispatch, and preserves unresolved
 in-memory reservations. These failures cannot trigger an automatic node retry or be
 converted into tool feedback that causes another paid turn. Saved error
 markers block ordinary resume until the response or accounting is reconciled.
-In a [durable workflow](workflow-accounting.md#admission-and-cost), a 401,
-403, 404, 413 or 429 response with OpenAI's plain error object, such as a 429
-rate limit, instead settles at zero cost and follows the node's failure policy.
-Other 4xx responses, such as a 400 `context_length_exceeded`, keep unknown
-exposure.
+In a [durable workflow](workflow-accounting.md#admission-and-cost), and on an
+ordinary run under a [retry policy](execution.md#retry-policy), a 401, 403,
+404, 413 or 429 response with OpenAI's plain error object, such as a 429 rate
+limit, instead settles at zero cost and follows the node's failure policy. An
+ordinary run raises it as `ProviderRequestRejectedError`, whose
+[failure class](execution.md#failure-classes) follows the status. Other 4xx
+responses, such as a 400 `context_length_exceeded`, keep unknown exposure.
+Under a policy that lists `quality_defect`, a reply with a refusal part
+(`refusal`) or cut off at `max_output_tokens` (`max_tokens`) also records its
+known charge once and raises `NativeOutputDefectError`, an ordinary node
+failure, so a `RETRY` node can call again.
 
 ## Swarm budget scope
 
