@@ -283,15 +283,52 @@ is unchanged.
   identifiers or local paths, and a repository test fails on any tracked file
   that does.
 
-## Built for the next release: reviewable learning
+## Shipped (v0.10.0): accepted deliverables
 
-These are built and tested offline but not yet released. Each is opt-in:
-nothing is promoted or activated automatically, and no default changes. What
-these items still need is listed under [Then](#then-recorded-context-governed-actions-and-reuse).
+The [0.10.0 release](docs/release-0.10.0.md) carries the execution envelope
+from a finished run to an accepted deliverable. Each capability is opt-in:
+nothing is promoted or activated automatically, and every new scheduling
+and learning policy is off by default. Some earlier behavior now fails closed;
+read the upgrade notes first. What each area still needs is listed under
+[Then](#then-recorded-context-governed-actions-and-reuse).
 No template, skill or campaign can change acceptance, budgets, evaluator
 data or the tools agents are offered
 ([what learning cannot change](docs/learning.md#what-learning-cannot-change)).
 
+- **Supported-configuration matrix** — the
+  [support matrix](docs/support-matrix.md) states which providers,
+  verifiers, tools, stores and Jobs profiles ordinary runs, durable text
+  workflows and Jobs accept, and
+  [who owns each execution responsibility](docs/support-matrix.md#who-owns-each-execution-responsibility),
+  with the test behind each cell. Combinations that a provider declares
+  unsupported fail before any call; an image input that only a generated
+  plan asks for is refused after planning, before any node call.
+- **Strict final acceptance** — an opt-in
+  [strict policy](docs/verifier.md#strict-delivery-acceptance) decides on the
+  exact output returned, after synthesis and after any step a supervisor
+  added, and never accepts exhausted regeneration, an unreadable verdict or a
+  failed validator; the rejected output stays inspectable. Versioned
+  [final validators](docs/verifier.md#built-in-final-validators) check
+  required sections, paths and JSON shape. Durable workflows
+  [decide on the same policy](docs/verifier.md#strict-acceptance-in-durable-workflows),
+  and Jobs decide delivery eligibility with
+  [registered validators](docs/jobs.md#registered-validators).
+- **Elapsed-time and outcome records** —
+  [`SwarmResult.timing`](docs/execution.md#timing) reports elapsed time apart
+  from summed node time, with time per phase and waiting time by reason, and
+  `smythe runs inspect` shows it beside the acceptance result. Durable runs
+  report lease sessions on the journal's clock and no phase totals.
+- **Deterministic validators in durable workflows** — registered
+  [gate validators](docs/verifier.md#gate-validators-in-durable-workflows)
+  and final validators, each decision stored with the output it judged.
+  Resume revalidates when a decision is missing, and a changed validator
+  needs an explicit [re-evaluation](docs/verifier.md#re-evaluation) or
+  [operator decision](docs/verifier.md#operator-decisions).
+- **Recorded context, governed actions, failure-aware scheduling and
+  lineage** — the first releases of
+  [Then](#then-recorded-context-governed-actions-and-reuse) items 1 to 5,
+  each described there with what it still needs. External actions are in
+  preview.
 - **Reviewable template lifecycle** — distilled graphs become
   [versioned template records](docs/learning.md#template-records) in an
   append-only catalog, validated as untrusted candidates that cannot grant
@@ -381,22 +418,19 @@ close the primary publication without changing its sealed evidence.
 
 ## Coming soon
 
-The next releases carry the execution envelope from a finished run to an
-accepted deliverable: choose an appropriate plan, execute within agreed
-limits, preserve useful work, verify the exact output returned, and learn
-which approaches work. New behavior is opt-in. A default changes only after a
+Version 0.10.0 carried the execution envelope from a finished run to an
+accepted deliverable. The next releases measure which of its controls earn
+their place: choose an appropriate plan, execute within agreed limits,
+preserve useful work, verify the exact output returned, and learn which
+approaches work. New behavior is opt-in. A default changes only after a
 measured comparison on held-out tasks, and the local single-machine path keeps
 working without extra services.
 
-### Next: accepted deliverables
+### Next: measured selection and cost
 
 | Priority | Change | Acceptance criteria |
 |---|---|---|
-| P1 | Supported-configuration matrix | State which providers, verifiers, tools, memory, artifact types, accounting scopes and resume behaviors each execution path supports: ordinary runs, durable text workflows and Jobs. Back every supported cell with a named test. Unsupported combinations fail before any paid call, including planning. In progress: the [support matrix](docs/support-matrix.md) covers all three paths. Durable runs refuse unsupported providers and components, Jobs unsupported profiles and artifacts, and ordinary runs tool, image-input, model and price-ceiling mismatches that their providers declare, all before any call; an ordinary run refuses an image input that only a generated plan asks for after planning, before any node call. It also states [who owns each execution responsibility](docs/support-matrix.md#who-owns-each-execution-responsibility) on each path. |
-| P1 | Strict final acceptance and complete deliverables | An opt-in policy checks the exact output returned, after synthesis and after any step a supervisor added. Every requested output part is required, so a terminal node that returns only its own increment fails. Exhausted regeneration, an unreadable verdict or a failed validator never produces an accepted result; the rejected output stays inspectable. Runs report execution, acceptance and cost separately. Advisory gates keep their current behavior. In progress: ordinary runs take a [strict policy](docs/verifier.md#strict-delivery-acceptance) that decides on the exact output returned, counts only gates the developer supplied, refuses before any call a graph whose output it could not decide, and refuses a supervisor revision that would leave the output unchecked. Versioned [final validators](docs/verifier.md#built-in-final-validators) check required sections, paths and JSON shape; durable workflows decide on the same policy and record each decision with the output it judged ([strict acceptance in durable workflows](docs/verifier.md#strict-acceptance-in-durable-workflows)); Jobs decide delivery eligibility with [registered validators](docs/jobs.md#registered-validators). |
-| P1 | Elapsed-time and outcome records | Record wall time separately from summed node time, split into routing, planning, queueing, execution, verification, synthesis and recovery, together with the acceptance result. Existing fields keep their meaning. In progress: [`SwarmResult.timing`](docs/execution.md#timing) reports elapsed time apart from summed node time, with time per phase and waiting time by reason, saved as [timing segments](docs/checkpoint-format.md#timing-segments) across resumes; `smythe runs inspect` shows it beside the acceptance result. Durable runs report lease sessions on the journal's clock and no phase totals. |
-| P2 | Deterministic validators in durable workflows | Versioned, developer-registered local validators join `TokenVerifier` in durable text workflows. Each acceptance decision is stored with the output it judged. Resume revalidates when that record is missing, and a changed validator needs a new decision. In progress: durable workflows take registered [gate validators](docs/verifier.md#gate-validators-in-durable-workflows) and final validators, store each decision with the output it judged, revalidate on resume when the decision is missing, refuse to resume under a changed validator, and decide again only through an explicit [re-evaluation](docs/verifier.md#re-evaluation) or an [operator decision](docs/verifier.md#operator-decisions). |
-| P2 | Graph selection | Compare a strong single worker, fixed templates and generated plans on newly frozen held-out tasks, charging selection, planning, failed attempts and checks. Record why each run chose its tier. Current evidence is mixed: generated plans recorded lower wall time on the [task-shape suite](benchmarks/shape_suite.md) and higher mean wall time on [Astra's supplied-source tasks](benchmarks/astra_findings.md). In progress: a `WhiteRabbit` router records each [routing decision](docs/architecture.md#routing-decisions) on the planned graph, with the classifier's usage or, in durable runs, its journal calls. Declarative [routing rules](docs/architecture.md#routing-rules), evaluated on the submitted task before any classifier call, can send a task to a first-class single-worker tier, a template or a generated plan, and durable recipes record the rules and their policy version. An offline [selector comparison](benchmarks/README.md#selector-comparison-offline-mechanics) runs the arms with fixture models and records mechanics only. The held-out comparison is not run yet. |
+| P2 | Graph selection | Compare a strong single worker, fixed templates and generated plans on newly frozen held-out tasks, charging selection, planning, failed attempts and checks. Record why each run chose its tier. Current evidence is mixed: generated plans recorded lower wall time on the [task-shape suite](benchmarks/shape_suite.md) and higher mean wall time on [Astra's supplied-source tasks](benchmarks/astra_findings.md). Shipped in 0.10.0: a `WhiteRabbit` router records each [routing decision](docs/architecture.md#routing-decisions) on the planned graph, with the classifier's usage or, in durable runs, its journal calls. Declarative [routing rules](docs/architecture.md#routing-rules), evaluated on the submitted task before any classifier call, can send a task to a first-class single-worker tier, a template or a generated plan, and durable recipes record the rules and their policy version. An offline [selector comparison](benchmarks/README.md#selector-comparison-offline-mechanics) runs the arms with fixture models and records mechanics only. The held-out comparison is not run yet. |
 | P2 | Broader complete-workflow cost evidence | Extend the completed Astra evidence to harder external tasks using the native ledger, declared prices, failed attempts and all optimization trials. |
 
 ### Then: recorded context, governed actions and reuse
@@ -410,7 +444,7 @@ connector or paid run.
    again; immutable snapshots of the context each worker saw, with source
    content marked untrusted; and evidence records that carry claims, sources
    and contradictions through synthesis. A source-to-artifact example runs
-   offline, survives interruption and resumes. In progress: durable workflows
+   offline, survives interruption and resumes. Shipped in 0.10.0: durable workflows
    journal [read steps](docs/workflow-accounting.md#recorded-read-steps) of
    declared, versioned HTTP read profiles with byte, time, redirect and
    destination limits; a saved response is reused on resume, verified by
@@ -430,7 +464,7 @@ connector or paid run.
    checked again before dispatch. One connector gets a stable action identity
    across retries, a receipt per action and independent readback: a write
    whose acknowledgment is lost is reconciled or reported as unresolved, never
-   blindly repeated. In progress: a completed durable run whose strict
+   blindly repeated. Shipped in 0.10.0: a completed durable run whose strict
    delivery acceptance is `accepted` can [deliver that output](docs/actions.md)
    through a host connector. An approval binds a principal your host verifies
    to one action and its exact intent, with a ceiling and an expiry; it is checked again
@@ -446,7 +480,7 @@ connector or paid run.
    with deterministic stage and anomaly triggers; reserve LLM review for a
    result that supplies evidence the pending plan should change. A replan
    records what it keeps, invalidates and adds, and cannot bypass final
-   acceptance. In progress: an opt-in
+   acceptance. Shipped in 0.10.0: an opt-in
    [evidence-triggered supervisor](docs/supervisor.md#evidence-triggered-review)
    reviews only when a declared stage or an anomaly in the run's recorded state
    fires, such as a skipped input, an exhausted gate, listed contradictions or
@@ -459,7 +493,7 @@ connector or paid run.
    that stops new paid work while in-flight results settle; and admission that
    respects provider rate limits and reserves allowance for verification and
    synthesis. Security events and revoked authority stop work immediately.
-   In progress, each experimental and off by default: an opt-in
+   Shipped in 0.10.0, each experimental and off by default: an opt-in
    [retry policy](docs/execution.md#retry-policy) classifies failures, with
    one retry owner, a shared deadline and attempt caps that resume cannot
    refill; [capacity limits](docs/execution.md#provider-capacity) admit work
@@ -479,7 +513,7 @@ connector or paid run.
 5. **Artifact lineage and selective repair** — accepted artifacts record the
    sources, validators and tools they depend on. A changed source or validator
    invalidates its dependents, and a repair plan shows what will be reused,
-   rechecked or regenerated before dispatch. In progress: strict durable runs
+   rechecked or regenerated before dispatch. Shipped in 0.10.0: strict durable runs
    opt into [lineage records](docs/lineage.md) of ids, versions and digests.
    A read-only [repair plan](docs/lineage.md#plan-a-repair) shows each run's
    decision, derived status and predicted work before anything runs, and
@@ -501,8 +535,8 @@ connector or paid run.
 7. **Reviewable continual learning** — a candidate becomes active only after
    it beats its predecessor and a simpler alternative on held-out tasks,
    without mutating the base planner. The
-   [template lifecycle](#built-for-the-next-release-reviewable-learning) is
-   built and its mechanics are shown offline. Still open: promoting failure
+   [template lifecycle](#shipped-v0100-accepted-deliverables) shipped in
+   0.10.0 and its mechanics are shown offline. Still open: promoting failure
    lessons, capability descriptions and reusable procedures into versioned
    supplemental state, since template records hold graph structure only and
    failure rows are opt-in planner history; and a template version measured
@@ -514,8 +548,8 @@ connector or paid run.
    live-evaluator adapters with per-trial price ceilings after the offline
    campaign. Optimizers cannot change acceptance criteria, spend ceilings,
    permissions or held-out data. Reserved paths, sample-size guidance,
-   cross-campaign reports, registry commands and bounded exploration are
-   [built](#built-for-the-next-release-reviewable-learning). Statistical
+   cross-campaign reports, registry commands and bounded exploration
+   [shipped in 0.10.0](#shipped-v0100-accepted-deliverables). Statistical
    comparison across campaigns and a correction for repeated comparisons are
    not built
 
