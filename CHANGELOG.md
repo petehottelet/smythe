@@ -24,6 +24,22 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
 
 ## [Unreleased]
 
+No unreleased changes.
+
+## [0.10.0] - 2026-10-24
+
+This minor release carries the execution envelope from a finished run to an
+accepted deliverable. It adds strict delivery acceptance of the exact output
+a run returns, on ordinary runs, durable text workflows and Jobs; recorded
+reads, context snapshots and source evidence in durable text workflows;
+external actions in preview; artifact lineage and selective repair; opt-in
+retry, drain, capacity and security-stop policies; a reviewable template
+lifecycle with an Autotune policy registry; and `smythe runs` commands that
+inspect and review saved runs. New capabilities are opt-in. Some earlier
+behavior now fails closed or changes, and durable workflow journals upgrade
+to a format that 0.9.x cannot open; read the
+[release guide](docs/release-0.10.0.md) before upgrading.
+
 ### Added
 
 - Shared offline test fakes. `tests/fakes.py` has Responses and Messages SDK
@@ -2608,7 +2624,8 @@ accepted; each is listed under **Changed**. The
   `smythe.graph.SYNTHESIS_NODE_ID` and `REVISION_ADDED_KEY`;
   `smythe.workflow.MAX_NODE_ID_CHARS`.
 
-[Unreleased]: https://github.com/petehottelet/smythe/compare/v0.9.1...HEAD
+[Unreleased]: https://github.com/petehottelet/smythe/compare/v0.10.0...HEAD
+[0.10.0]: https://github.com/petehottelet/smythe/compare/v0.9.1...v0.10.0
 [0.9.1]: https://github.com/petehottelet/smythe/compare/v0.9.0...v0.9.1
 [0.9.0]: https://github.com/petehottelet/smythe/compare/v0.8.2...v0.9.0
 [0.8.2]: https://github.com/petehottelet/smythe/compare/v0.8.1...v0.8.2

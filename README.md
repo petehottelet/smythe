@@ -316,12 +316,14 @@ identical fixtures, so this shows recovery correctness, not speed.
 
 ## Project status
 
-**Smythe 0.9.1** is the current library release. See the
-[release notes and upgrade guide](docs/release-0.9.1.md).
+**Smythe 0.10.0** is the current library release. It adds strict acceptance
+of the exact delivered output and a tested matrix of supported
+configurations. See the
+[release notes and upgrade guide](docs/release-0.10.0.md).
 
-Next priorities are strict acceptance of the exact delivered output, a tested
-matrix of supported configurations, and broader external-task benchmarks,
-including separately controlled Astra scheduler and framework studies.
+Next priorities are a held-out comparison of graph selection and broader
+external-task benchmarks, including separately controlled Astra scheduler
+and framework studies.
 See the [roadmap](ROADMAP.md) for status and acceptance criteria.
 The [support matrix](docs/support-matrix.md) shows what each execution path
 accepts today and what owns each execution responsibility on it, with the test
