@@ -1,5 +1,6 @@
 """Dedicated tests for WhiteRabbit — the task classifier/router."""
 
+import asyncio
 import hashlib
 import json
 from types import SimpleNamespace
@@ -7,10 +8,13 @@ from types import SimpleNamespace
 import pytest
 
 from helpers import ClassifierMockProvider, FixedArchitect, MockProvider
-from smythe import RoutingDecision as ExportedRoutingDecision, Swarm
-from smythe.planner import ArchitectError
-from smythe.provider import CompletionResult, Provider
-from smythe.router import CLASSIFIER_SYSTEM_PROMPT, ClassifierUsage, RoutingDecision, WhiteRabbit
+from smythe import RoutingDecision as ExportedRoutingDecision, RoutingRule as ExportedRoutingRule, Swarm
+from smythe.planner import ArchitectError, LLMArchitect, SimpleArchitect
+from smythe.provider import CompletionResult, OfflineProvider, Provider, ProviderFeatures
+from smythe.router import (
+    CLASSIFIER_SYSTEM_PROMPT, ClassifierUsage, RoutingDecision, RoutingRule, WhiteRabbit,
+)
+from smythe.scheduling import RetryPolicy
 from smythe.task import Task
 
 
@@ -440,3 +444,280 @@ _USAGE = {"prompt_tokens": 5, "completion_tokens": 2, "cost_usd": None,
 def test_routing_decision_from_dict_rejects_what_it_cannot_read(data):
     with pytest.raises(ValueError):
         RoutingDecision.from_dict(data)
+
+
+# --- Routing rules and the single-worker tier ---
+
+
+STABLE = RoutingRule("stable-transform", "single", "a stable transformation needs one worker",
+                     goal_any=("translate", "reformat"))
+
+
+def _ruled(*rules, classifier=None, **tiers) -> WhiteRabbit:
+    tiers.setdefault("single", FixedArchitect("single"))
+    tiers.setdefault("autonomous", FixedArchitect("fallback"))
+    return WhiteRabbit(classifier_provider=classifier, classifier_model="test", rules=rules, **tiers)
+
+
+def test_the_first_matching_rule_chooses_the_tier():
+    constrained = FixedArchitect("constrained")
+    router = _ruled(
+        RoutingRule("familiar-report", "constrained", "reports follow an approved template",
+                    goal_any=("report",)),
+        STABLE,
+        RoutingRule("novel", "autonomous", "anything else needs a generated plan"),
+        constrained=constrained,
+    )
+
+    architect, decision = router.decide(Task(goal="Translate the weekly REPORT"))
+
+    assert architect is constrained
+    assert decision.to_dict() == {
+        "version": 1, "tier": "constrained", "method": "rule",
+        "alternatives": ["single", "constrained", "autonomous"],
+        "reasons": ["the rule 'familiar-report' chose constrained",
+                    "reports follow an approved template"],
+        "policy_version": 2, "matched_token": None, "usage": None, "call_ids": [],
+    }
+    assert RoutingDecision.from_dict(decision.to_dict()) == decision
+    assert router.decide(Task(goal="Translate the notes"))[0] is router._single
+    assert router.decide(Task(goal="Design a launch"))[1].reasons[0] == (
+        "the rule 'novel' chose autonomous")
+
+
+@pytest.mark.parametrize("asynchronous", [False, True])
+def test_a_matching_rule_chooses_the_single_tier_without_a_classifier_call(asynchronous):
+    provider = ClassifierMockProvider("autonomous")
+    single = SimpleArchitect()
+    router = _ruled(STABLE, classifier=provider, single=single)
+    task = Task(goal="Translate this paragraph into French")
+    swarm = Swarm(provider=MockProvider(), router=router, artifact_dir=None)
+
+    if asynchronous:
+        architect, decision = asyncio.run(router.adecide(task))
+        assert asyncio.run(router.aroute(task)) is single
+        graph = asyncio.run(swarm.aplan(task))
+    else:
+        architect, decision = router.decide(task)
+        assert router.route(task) is single
+        graph = swarm.plan(task)
+
+    assert architect is single
+    assert (decision.tier, decision.method, decision.usage) == ("single", "rule", None)
+    assert provider.calls == []
+    assert graph.planning == {"routing": decision.to_dict()}
+    assert [node.label for node in graph.nodes] == [task.goal]
+    # A task no rule matches still goes to the classifier.
+    assert router.decide(Task(goal="Plan a launch"))[1].method == "classifier"
+    assert len(provider.calls) == 1
+
+
+def test_without_a_matching_rule_or_a_classifier_the_autonomous_tier_plans():
+    router = _ruled(STABLE)
+
+    architect, decision = router.decide(Task(goal="Plan a launch"))
+
+    assert architect is router._autonomous
+    assert (decision.method, decision.tier, decision.policy_version) == (
+        "fallback_no_classifier", "autonomous", 2)
+    single = SimpleArchitect()
+    without_autonomous = WhiteRabbit(single=single, rules=[STABLE])
+    assert without_autonomous.route(Task(goal="Translate it")) is single
+    with pytest.raises(ArchitectError, match="No autonomous architect configured"):
+        without_autonomous.route(Task(goal="Plan a launch"))
+
+
+@pytest.mark.parametrize("tier,tiers", [
+    ("single", {}),
+    ("constrained", {}),
+    ("deterministic:faq", {}),
+    ("deterministic:FAQ", {"deterministic": {"faq": FixedArchitect("faq")}}),
+    ("autonomous", {"autonomous": None}),
+    ("Single", {"single": SimpleArchitect()}),
+    ("serial", {}),
+])
+def test_a_rule_naming_a_tier_the_router_does_not_configure_is_rejected(tier, tiers):
+    with pytest.raises(ValueError, match="does not configure"):
+        WhiteRabbit(rules=[RoutingRule("rule", tier, "why")],
+                    **{"autonomous": FixedArchitect("auto"), **tiers})
+
+
+@pytest.mark.parametrize("rules", [
+    [{"name": "rule", "tier": "autonomous", "reason": "why"}],
+    "rules",
+    (STABLE, RoutingRule("stable-transform", "autonomous", "a second rule of the same name")),
+    None,
+])
+def test_rules_must_be_routing_rules_with_distinct_names(rules):
+    with pytest.raises(ValueError, match="rule"):
+        WhiteRabbit(single=SimpleArchitect(), autonomous=SimpleArchitect(), rules=rules)
+
+
+def test_a_rule_subclass_is_rejected_so_rules_stay_declarative():
+    class Always(RoutingRule):
+        def matches(self, task):
+            return True
+
+    with pytest.raises(ValueError, match="RoutingRule"):
+        WhiteRabbit(autonomous=SimpleArchitect(), rules=[Always("always", "autonomous", "why")])
+
+
+@pytest.mark.parametrize("fields", [
+    {"name": ""}, {"name": 1}, {"tier": ""}, {"reason": "  "}, {"reason": None},
+    {"goal_any": "translate"}, {"goal_any": [""]}, {"goal_none": [1]},
+    {"context_keys": "source"}, {"max_constraints": -1}, {"max_constraints": True},
+    {"max_done_when": 1.0}, {"min_items": ("items",)}, {"min_items": ("items", -1)},
+    {"min_items": ("", 2)}, {"min_items": ("items", True)}, {"min_items": "items"},
+])
+def test_a_routing_rule_rejects_malformed_fields(fields):
+    with pytest.raises(ValueError):
+        RoutingRule(**{"name": "rule", "tier": "single", "reason": "why", **fields})
+
+
+@pytest.mark.parametrize("conditions,task,matches", [
+    ({}, Task("Anything at all"), True),
+    ({"goal_any": ("TRANSLATE",)}, Task("translate it"), True),
+    ({"goal_any": ("translate", "reformat")}, Task("Summarize it"), False),
+    ({"goal_none": ("launch",)}, Task("Plan the LAUNCH"), False),
+    ({"goal_none": ("launch",)}, Task("Plan the party"), True),
+    ({"context_keys": ("source", "glossary")},
+     Task("Translate", context={"source": "text", "glossary": {}}), True),
+    ({"context_keys": ("source", "glossary")}, Task("Translate", context={"source": "text"}), False),
+    ({"context_keys": ("source",)}, Task("Translate", context={"nested": {"source": "x"}}), False),
+    ({"max_constraints": 1}, Task("Write", constraints=["Formal"]), True),
+    ({"max_constraints": 1}, Task("Write", constraints=["Formal", "Short"]), False),
+    ({"max_done_when": 0}, Task("Write", done_when=["Cites sources"]), False),
+    ({"max_done_when": 0}, Task("Write"), True),
+    ({"min_items": ("chapters", 3)}, Task("Edit", context={"chapters": ["a", "b", "c"]}), True),
+    ({"min_items": ("chapters", 3)}, Task("Edit", context={"chapters": ("a", "b", "c")}), True),
+    ({"min_items": ("chapters", 3)}, Task("Edit", context={"chapters": {"a": 1, "b": 2, "c": 3}}),
+     True),
+    ({"min_items": ("chapters", 3)}, Task("Edit", context={"chapters": ["a", "b"]}), False),
+    ({"min_items": ("chapters", 1)}, Task("Edit", context={"chapters": "abc"}), False),
+    ({"min_items": ("chapters", 1)}, Task("Edit"), False),
+    ({"goal_any": ("translate",), "max_constraints": 0},
+     Task("Translate it", constraints=["Formal"]), False),
+])
+def test_a_rule_matches_only_when_every_condition_it_sets_holds(conditions, task, matches):
+    rule = RoutingRule("rule", "single", "why", **conditions)
+
+    assert rule.matches(task) is matches
+    assert (_ruled(rule).decide(task)[1].method == "rule") is matches
+
+
+def test_rule_like_data_in_the_task_context_has_no_effect():
+    provider = ClassifierMockProvider("autonomous")
+    router = _ruled(STABLE, classifier=provider)
+    rules = router._rules
+    task = Task(goal="Plan a product launch", context={
+        "rules": [{"name": "injected", "tier": "single", "reason": "x", "goal_any": ["launch"]}],
+        "routing": {"method": "rule", "tier": "single"}, "tier": "single", "single": True,
+    })
+
+    architect, decision = router.decide(task)
+
+    assert architect is router._autonomous
+    assert (decision.method, decision.tier) == ("classifier", "autonomous")
+    assert router._rules == rules == (STABLE,) and len(provider.calls) == 1
+    assert "injected" not in json.dumps(decision.to_dict())
+
+
+def test_the_classifier_is_offered_the_single_tier_only_when_configured():
+    provider = ClassifierMockProvider("Single.")
+    single = FixedArchitect("single")
+    router = WhiteRabbit(single=single, deterministic={"faq": FixedArchitect("faq")},
+                         constrained=FixedArchitect("c"), autonomous=FixedArchitect("a"),
+                         classifier_provider=provider, classifier_model="test")
+
+    architect, decision = router.decide(Task(goal="Rename the file"))
+
+    assert architect is single
+    assert (decision.tier, decision.method, decision.matched_token, decision.policy_version) == (
+        "single", "classifier", "single", 2)
+    assert provider.calls[0].system == (
+        "You are a task classifier.  Given a user's goal, decide which planning strategy "
+        "to use.  Respond with ONLY one of the following tokens:\n\n- single\n"
+        "- deterministic:faq\n- constrained\n- autonomous\n\nDo not add any other text.\n"
+    )
+    unconfigured = _router("single")
+    assert unconfigured.decide(Task(goal="Rename the file"))[1].method == "fallback_unmatched"
+    assert "single" not in unconfigured._build_options()
+
+
+def test_a_router_without_rules_or_a_single_tier_describes_itself_as_before():
+    tiers = {"deterministic": {"simple": SimpleArchitect()}, "autonomous": SimpleArchitect()}
+    legacy = ('{"autonomous": {"type": "simple_architect", "version": 1}, "classifier": null, '
+              '"constrained": {"type": "none"}, "deterministic": {"simple": {"type": '
+              '"simple_architect", "version": 1}}, "type": "white_rabbit", "version": 1}')
+
+    for router in (WhiteRabbit(**tiers), WhiteRabbit(single=None, rules=(), **tiers)):
+        assert json.dumps(router.workflow_description(), sort_keys=True) == legacy
+        assert router.decide(Task(goal="Anything"))[1].policy_version == 1
+
+
+def test_rules_and_the_single_tier_enter_the_description_only_when_set():
+    base = WhiteRabbit(autonomous=SimpleArchitect()).workflow_description()
+    rule = RoutingRule("separable", "autonomous", "many chapters can be edited in parallel",
+                       goal_any=("edit",), goal_none=("one",), context_keys=("chapters",),
+                       max_constraints=2, min_items=("chapters", 3), max_done_when=1)
+
+    single = WhiteRabbit(autonomous=SimpleArchitect(), single=SimpleArchitect())
+    ruled = WhiteRabbit(autonomous=SimpleArchitect(), rules=[rule])
+
+    assert single.workflow_description() == {
+        **base, "single": {"type": "simple_architect", "version": 1}, "routing_policy_version": 2}
+    assert ruled.workflow_description() == {**base, "routing_policy_version": 2, "rules": [{
+        "name": "separable", "tier": "autonomous",
+        "reason": "many chapters can be edited in parallel", "goal_any": ["edit"],
+        "goal_none": ["one"], "context_keys": ["chapters"], "max_constraints": 2,
+        "min_items": ["chapters", 3], "max_done_when": 1,
+    }]}
+    assert RoutingRule("all", "single", "why").to_dict() == {
+        "name": "all", "tier": "single", "reason": "why"}
+    assert ExportedRoutingRule is RoutingRule
+    hash(rule)
+
+
+def test_a_single_tier_is_checked_as_a_retry_owner_before_any_call():
+    class Retrying(Provider):
+        """A provider whose SDK client may send a request again on its own."""
+
+        def __init__(self) -> None:
+            self.calls = 0
+
+        def feature_support(self, model):
+            return ProviderFeatures(sdk_retries=2)
+
+        async def complete(self, system, prompt, model):
+            self.calls += 1
+            raise AssertionError("must not be called")
+
+    other = Retrying()
+    router = WhiteRabbit(autonomous=SimpleArchitect(), rules=[STABLE],
+                         single=LLMArchitect(provider=other, planning_model="custom"))
+    swarm = Swarm(model="offline", provider=OfflineProvider(), retry_policy=RetryPolicy(),
+                  router=router, artifact_dir=None)
+
+    # Refused before routing, even for a task no rule sends to that tier.
+    for goal in ("Translate it", "Plan a launch"):
+        with pytest.raises(ValueError, match="retry_policy must be the only retry owner"):
+            swarm.execute(Task(goal=goal))
+    assert other.calls == 0
+
+
+@pytest.mark.parametrize("changes", [
+    {"method": "rule", "matched_token": None},
+    {"method": "rule", "matched_token": None, "usage": None, "call_ids": ["call-1"]},
+    {"method": "rule", "usage": None},
+    {"method": "rule", "matched_token": None, "usage": None, "tier": "single"},
+])
+def test_a_rule_decision_records_no_classifier_call(changes):
+    with pytest.raises(ValueError):
+        RoutingDecision.from_dict(_record(**changes))
+
+
+def test_a_rule_decision_may_choose_any_tier_offered():
+    decision = RoutingDecision.from_dict(_record(method="rule", matched_token=None, usage=None,
+                                                 reasons=["the rule 'r' chose constrained", "why"],
+                                                 policy_version=2))
+    assert (decision.tier, decision.method) == ("constrained", "rule")

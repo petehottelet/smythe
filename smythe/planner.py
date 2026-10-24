@@ -25,6 +25,10 @@ from smythe.task import Task
 from smythe.workflow_binding import (
     ComponentBinding, WorkflowBindingError, describe_component, provider_description, require_exact,
 )
+from smythe.workflow_tools import READ_STEP_KEY
+
+# The graph.planning["coordination"] record format this build writes.
+COORDINATION_RECORD_VERSION = 1
 
 
 class ArchitectError(Exception):
@@ -304,3 +308,49 @@ class LLMArchitect(Architect):
         if not isinstance(data, dict):
             raise ValueError("Expected a JSON object at the top level")
         return data
+
+
+def _comparable(value: object) -> object:
+    """JSON stand-in for a value the lint compares, such as an ``MCPServerSpec``."""
+    to_dict = getattr(value, "to_dict", None)
+    return to_dict() if callable(to_dict) else repr(value)
+
+
+def lint_contributions(graph: ExecutionGraph, registry: Registry | None = None) -> list[list[str]]:
+    """Group the parallel siblings in *graph* that could only repeat each other's work.
+
+    Nodes share a group when they have the same label, required
+    capabilities, verification target, read step and image inputs, the same
+    dependency inputs (``depends_on`` as a set), and the same agent and
+    ``metadata["model"]``. An agent that *registry* holds compares by what it
+    gives a worker: its persona, capabilities and MCP servers. Other agents
+    compare by ``agent_id``. Each group lists node ids in graph order, and
+    groups follow their first node. The lint is advisory: it never changes
+    the graph.
+    """
+    groups: dict[str, list[str]] = {}
+    for node in graph.nodes:
+        agent = registry.get(node.agent_id) if registry is not None and node.agent_id else None
+        worker = node.agent_id if agent is None else [
+            agent.profile.persona, sorted({str(item) for item in agent.profile.capabilities}),
+            list(agent.profile.mcp_servers)]
+        key = json.dumps([
+            node.label, worker, node.metadata.get("model"),
+            sorted({str(item) for item in node.required_capabilities}), node.verifies,
+            node.metadata.get(READ_STEP_KEY), node.attach_dep_artifacts,
+            sorted({str(item) for item in node.depends_on}),
+        ], sort_keys=True, default=_comparable)
+        groups.setdefault(key, []).append(node.id)
+    return [ids for ids in groups.values() if len(ids) > 1]
+
+
+def _record_coordination(graph: ExecutionGraph, registry: Registry | None) -> None:
+    """Record the groups :func:`lint_contributions` finds as ``graph.planning["coordination"]``.
+
+    Only that key is written, and only when the lint finds a group, so a
+    graph it does not flag keeps its planning records unchanged.
+    """
+    groups = lint_contributions(graph, registry)
+    if groups:
+        graph.planning = {**(graph.planning or {}), "coordination": {
+            "version": COORDINATION_RECORD_VERSION, "duplicate_siblings": groups}}

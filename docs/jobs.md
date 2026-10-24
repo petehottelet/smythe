@@ -387,7 +387,9 @@ Preflight refuses a name that is not registered, or registered at another
 version, before any run exists. The plan records each resolved identity,
 including its `config_sha256`, so a changed validator changes the plan hash:
 its approval no longer matches, and `resume` and `reroll` of a run approved
-under the old validator are refused before any provider call. A runner that
+under the old validator are refused before any provider call;
+[recheck](#recheck-accepted-outputs) decides that run's accepted outputs again
+under the changed validator without a call. A runner that
 lacks a validator the plan names, or has it with another identity, refuses
 to start the run. Manifests without validators keep their manifest hash, plan
 hash, operation IDs and approval tokens.
@@ -417,23 +419,35 @@ legacy built-in decision whose validator is unrecorded. It is never reported
 as `accepted` or as `not_evaluated`, and it keeps the recorded flag as
 provenance.
 
-`delivery_eligibility` is `{"eligible": true, "reasons": []}` only when the
-recorded decision is `accepted`, the recorded validators are exactly the ones
-the operation's plan requires now, and every accepted artifact is `verified`
-on disk with the recorded SHA-256. Otherwise `reasons` lists codes:
-`no_decision`, `not_accepted`, `validator_unrecorded`, `validator_changed`,
+An accepted attempt's decisions are its call's recorded one and any later
+[rechecks](#recheck-accepted-outputs) of the same bytes, which inspection
+lists, oldest first, as the attempt's `delivery_reevaluations`. Eligibility
+uses the latest of them whose validators are exactly the ones the operation
+requires now: this release's built-in check and the registered validators
+its plan names. `jobs inspect` takes those from the plan;
+`inspect_job(store, run_id, validators=[...])` and a `JobRunner` take, for
+each name, the validator registered now. The projection describes that
+decision, with `source: "reevaluated"` for a recheck; without one, it
+describes the latest decision.
+
+`delivery_eligibility` is `{"eligible": true, "reasons": []}` only when that
+decision is `accepted` and every accepted artifact is `verified` on disk with
+the SHA-256 the decision names. Otherwise `reasons` lists codes:
+`no_decision`, `not_accepted`, `validator_unrecorded`, `validator_changed`
+(no decision used the current validators: a recheck is required),
 `record_invalid`, `record_mismatch`, or `artifact_` followed by the integrity
 status (`artifact_changed`, `artifact_missing`, `artifact_unsafe`,
 `artifact_unreadable`, `artifact_not_checked`). Eligibility is derived on
 every read and never written back; recorded statuses and `accepted` flags are
-unchanged. The HTML report shows it in a Delivery column, with the decision
-and validator results beside each attempt.
+unchanged. The HTML report shows it in a Delivery column, with the decision,
+validator results and rechecks beside each attempt.
 
-`resume` and `reroll` recheck the SHA-256 of every accepted artifact in the run
-after execution, without the 64 MiB inspection limit, and return the same
-fields with an `artifact_integrity` summary. A changed or missing accepted file
-is reported there and makes its operation ineligible; the run's status and
-the operation's recorded acceptance stay as they were.
+`resume` and `reroll` recheck the SHA-256 of every file of each operation's
+accepted attempt after execution, without the 64 MiB inspection limit, and
+return the same fields with an `artifact_integrity` summary. A changed or
+missing accepted file is reported there and makes its operation ineligible;
+the run's status and the operation's recorded acceptance stay as they were.
+[Repair](#repair-corrupted-accepted-outputs) regenerates such an operation.
 
 ## List and inspect runs
 
@@ -675,6 +689,11 @@ smythe jobs reroll RUN_ID "tile[3]" \
   --acknowledge-unknown
 ```
 
+Operation keys may come before, between or after the options; every plain
+argument after the run ID is an operation key. `--dry-run`
+[previews](#preview-repairs) what each operation calls for without changing
+anything.
+
 Rerolls consume the same original approval and attempt allowance. The selected
 operation receives a new immutable attempt linked to its predecessor that
 records the reroll reason, which `smythe jobs inspect` shows with that attempt;
@@ -683,6 +702,47 @@ journal. A safe retry after recovery starts another attempt without a reason,
 and attempts recorded by earlier versions keep an empty reason.
 Successful operations cannot be casually rerolled, which preserves accepted
 outputs byte-for-byte.
+
+### Repair corrupted accepted outputs
+
+A succeeded operation whose accepted file was later deleted, truncated or
+overwritten is not delivered: its [delivery eligibility](#delivery-eligibility)
+reports `artifact_missing` or `artifact_changed`. Regenerate it with an
+integrity repair:
+
+```bash
+smythe jobs reroll RUN_ID "tile[3]" --repair-integrity --reason "tile.png was overwritten"
+```
+
+Under the run's lease, immediately before queueing, the runner hashes every
+file of the operation's accepted attempt again, without the 64 MiB inspection
+limit. The repair is queued only when at least one of those files is `missing`
+or `changed` and the others are `verified`. Bytes that all verify are refused,
+so a verified success still cannot be rerolled. A file that is unreadable or
+unsafe, such as a symbolic link or a directory, an exhausted attempt allowance
+and another worker's lease also refuse it with exit code 6, and a budget
+overrun with exit code 5. Before hashing, the runner claims the run's artifact
+directory as execution does, so a directory that holds files without its owner
+marker, or whose marker names another run, refuses the repair. A
+[migrated run](#jobs-database-upgrades) whose directory has not been claimed
+yet verifies its accepted bytes in that first claim: like a resume, its repair
+is refused until the original bytes are restored. A refused repair queues
+nothing and changes no operation, attempt or artifact record.
+`--repair-integrity` cannot be combined with `--acknowledge-unknown`.
+
+A repair uses the run's original approval and attempt allowance; it needs no
+new approval. The `integrity_repair_queued` event records the reason and each
+accepted file's finding: its `artifact_id`, `relative_path` and recorded
+`sha256`, and the observed `status` and `detail`. The new attempt is linked to
+the accepted attempt it replaces and records the reason. The operation keeps
+naming that accepted attempt until a new attempt is accepted: a rejected or
+failed repair attempt leaves it ineligible, and a reroll tries again. Earlier
+artifact rows and their `accepted` flags never change. `resume` and `reroll`
+recheck only each operation's current accepted attempt, so the files a repair
+replaced are not reported again; `jobs inspect` still shows their integrity.
+In Python, pass `repair_integrity=True` to `JobRunner.reroll`; it records the
+findings with `SQLiteRunStore.queue_integrity_repair`. The Jobs schema stays at
+version 4.
 
 ## Adopt published bytes
 
@@ -728,6 +788,149 @@ like `reroll`. In Python, call `JobRunner.adopt(run_id, operation_key,
 reason=...)`; it records the verified bytes with
 `SQLiteRunStore.adopt_published_attempt`. The Jobs schema stays at version 4.
 
+## Recheck accepted outputs
+
+A changed check never inherits a decision made under the old one. After a
+registered validator gets a new version or configuration, or a release ships
+a new version of the built-in artifact check, each operation decided under
+the old one reports `validator_changed` in its
+[delivery eligibility](#delivery-eligibility): a recheck is required. A
+recheck decides the accepted bytes again, without a provider call:
+
+```bash
+smythe jobs recheck RUN_ID "tile[3]" "tile[4]" --reason "artifact check version 2"
+```
+
+In Python, register the validators as they are now on the runner, such as
+the [`MaxBytes`](#python-api) validator with a lower limit, which is a new
+configuration:
+
+```python
+runner = JobRunner(store, validators=[MaxBytes(1_500_000)])
+result = asyncio.run(runner.recheck(run_id, ["tile[3]"], reason="limit lowered"))
+```
+
+- **What decides.** This release's built-in check and, for each validator
+  the plan names, the one registered under that name now, at any version or
+  configuration. Nothing is dispatched, so the plan's approval is not used,
+  and a recheck works where `resume` and `reroll` are refused under the
+  changed validator. A validator the plan names that the runner has not
+  registered refuses it with exit code 2. The CLI registers none, so
+  `jobs recheck` covers runs whose plans name no registered validators.
+- **What is read.** Only the accepted files of `succeeded` operations. Under
+  the run's lease each is hashed again and must be `verified`; then each
+  operation's files are read once into memory, at most 10 files of 32 MiB,
+  and must still hold the recorded bytes. Every check decides that copy, as
+  it decided the response.
+- **What is recorded.** One `delivery_acceptance_reevaluated` event per
+  operation, all in one transaction under the lease:
+
+  ```json
+  {
+    "version": 1,
+    "attempt_id": "...",
+    "reason": "artifact check version 2",
+    "outcome": "accepted",
+    "validators": [{"validator": {"name": "smythe.jobs.artifact-spec", "version": "2",
+                                  "config_sha256": "..."},
+                    "outcome": "passed", "reports": [{"...": "..."}]}],
+    "findings": [],
+    "artifacts": [{"relative_path": "artifacts/tile_3/attempt-0001/tile.png", "sha256": "..."}]
+  }
+  ```
+
+  `outcome` is decided as for a call: `accepted`, `rejected` or
+  `indeterminate`. `validators` holds each check's identity, outcome and
+  reports, `findings` the finding messages, and `artifacts` each accepted
+  file's path and SHA-256. Earlier decisions are kept. Statuses, the accepted
+  attempt, artifact rows and their `accepted` flags never change, and no
+  budget, attempt or approval is used.
+- **What follows.** Eligibility uses the latest decision made under the
+  current validators. An accepting recheck makes the operation eligible
+  again; a rejecting one leaves it `succeeded` but not eligible
+  (`not_accepted`). Its bytes still verify, so an integrity repair refuses
+  them, and regenerating them takes a new plan and approval.
+- **Refusals.** Another operation state, an unknown operation, an accepted
+  file that is missing, changed, unreadable or unsafe (an
+  [integrity repair](#repair-corrupted-accepted-outputs) regenerates a
+  missing or changed one) and another worker's lease refuse the whole
+  recheck with exit code 6; nothing is recorded.
+
+A recheck holds the run's lease, like a reroll, prints the run and returns
+its exit code like `reroll`. `jobs inspect` lists each attempt's rechecks as
+its `delivery_reevaluations`, with `reevaluated_at_ns`, and the HTML report
+shows them beside the attempt. `JobRunner.recheck` records the decisions
+with `SQLiteRunStore.record_reevaluation`. The Jobs schema stays at
+version 4.
+
+## Preview repairs
+
+Before rerolling, repairing or rechecking anything, see what each operation
+calls for:
+
+```bash
+smythe jobs reroll RUN_ID --dry-run
+smythe jobs reroll RUN_ID "tile[3]" "tile[4]" --dry-run --json
+```
+
+`--dry-run` previews the named operations, or every operation of the run
+when none is named; `--reason` and the other reroll options are ignored. It
+opens the Jobs database read-only, takes no lease, writes nothing and calls
+no provider, so it works while a worker holds the run, and it exits 0. It
+hashes every accepted file of the previewed succeeded operations again,
+without the 64 MiB inspection limit, and fingerprints every planned
+attachment again. In Python, `JobRunner(store, validators=[...]).repair_preview(run_id,
+operation_keys=None)` returns the same document, judged under that runner's
+validators; the CLI registers none, so it uses those the plan names.
+
+```text
+{
+  "version": 1,
+  "run_id": "...",
+  "status": "completed",
+  "budget": {"approved_microusd", "confirmed_microusd", "exposure_microusd",
+             "reserved_microusd", "remaining_microusd", "overrun", "unit"},
+  "attachments": [{"relative_path", "sha256", "status"}],
+  "counts": {"reuse": 3, "recheck": 0, "regenerate": 1, "review": 0},
+  "operations": [{"operation_key", "operation_id", "status", "action", "reasons",
+                  "attempts_remaining", "new_plan_required"}]
+}
+```
+
+Each operation's `action` is the most conservative its reasons call for, and
+its `reasons` are sorted codes from the
+[reuse decisions' vocabulary](lineage.md#reason-codes):
+
+| Operation | Action | Reasons | What carries it out |
+|---|---|---|---|
+| Succeeded, its latest decision under the current validators accepted, every accepted file verified | `reuse` | none | Nothing |
+| Succeeded, no decision under the current validators | `recheck` | `validator_set_changed` | [Recheck](#recheck-accepted-outputs) |
+| Succeeded, an accepted file missing or changed and the rest verified | `regenerate` | `artifact_missing`, `artifact_changed` | [Integrity repair](#repair-corrupted-accepted-outputs) |
+| Succeeded, an accepted file unsafe, unreadable or not checked | `review` | `artifact_unsafe`, `artifact_unreadable`, `artifact_unchecked` | A person |
+| Succeeded, its decision under the current validators not `accepted`, malformed, or not about its files | `review` | `decision_not_accepted` | A person; the bytes verify, so no repair in the run replaces them |
+| Pending, failed or rejected | `regenerate` | `node_incomplete` | `resume` for pending work, a [reroll](#selective-rerolls) otherwise |
+| Running | `review` | `run_in_progress` | The worker that holds it, or `resume` |
+| Unknown outcome | `review` | `outcome_unknown` | Investigation, then [adoption](#adopt-published-bytes) or an acknowledged reroll |
+| Sends an attachment whose bytes changed since the plan | `regenerate` | `source_changed` | A new plan and approval |
+| Sends an attachment that is missing, unsafe or unreadable | `review` | `source_unavailable` | Restore it |
+
+Jobs keep no rendering input, so a missing or changed accepted file calls for
+`regenerate`, a new attempt, where a durable run would rerender.
+`attempts_remaining` is the operation's attempt allowance left under the plan.
+`new_plan_required` is true for a `regenerate` that the run's approval cannot
+admit: the operation sends an attachment whose bytes changed, has no attempt
+left, or its run's budget overran. The run's `attachments` give each planned
+attachment's recorded SHA-256 and `status` (`verified`, `changed`, `missing`,
+`unsafe` or `unreadable`); while any is not `verified`, `resume` and
+`reroll` refuse the whole run until it is restored. `budget` is the run's
+cost state with `remaining_microusd` of the approved ceiling and whether it
+`overrun`. While every attachment verifies and the runner registers the
+validators the plan names, a `regenerate` with `new_plan_required` false is
+what an integrity repair, reroll or resume of that operation admits.
+
+The preview repairs nothing and never offers another run's artifacts, even
+when their input digest matches: Jobs reuse nothing across runs.
+
 ## Export
 
 Export includes the manifest and plan hashes, operation and attempt lineage,
@@ -772,7 +975,7 @@ and output charge that one request can incur.
 | 3 | provider configuration or optional dependency failure |
 | 4 | approval mismatch, or an already used approval without `--new-run` |
 | 5 | budget admission failure |
-| 6 | unknown run, invalid state transition, or refused adoption |
+| 6 | unknown run, invalid state transition, or refused adoption, repair or recheck |
 | 7 | local SQLite/filesystem failure, detached startup failure, or attachment detects a failed worker or expired lease |
 | 130 | detached startup interrupted, or attachment disconnected with Ctrl+C |
 
@@ -838,7 +1041,9 @@ runner = JobRunner(store, validators=validators)
   pipelines; those policies are not automatically inferred from a generic job
   manifest.
 - Rerolls are operator-selected; there is no automatic vision-judge promotion
-  policy in the runtime.
+  policy in the runtime. Repairs are too: the
+  [repair preview](#preview-repairs) shows what each operation calls for,
+  and nothing repairs an operation automatically.
 - Unknown provider outcomes require human investigation, then explicit
   duplicate acknowledgment or adoption of the bytes the attempt published.
 - Jobs do not read a response's `stop_reason`. A response that the provider

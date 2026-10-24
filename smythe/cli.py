@@ -75,6 +75,8 @@ EXIT_OPTIMIZE_LIMIT = 9
 # runs inspect: the run completed, but its output was not accepted.
 EXIT_RUN_NOT_ACCEPTED = 10
 EXIT_RUN_INDETERMINATE = 11
+# runs inspect: the output was accepted, but an external action's effect is unresolved.
+EXIT_RUN_ACTION_UNRESOLVED = 12
 EXIT_INTERRUPTED = 130
 
 _FAILED_STATUSES = {"needs_attention", "partial", "failed", "budget_overrun"}
@@ -253,12 +255,24 @@ def build_parser() -> argparse.ArgumentParser:
 
     reroll = commands.add_parser("reroll", help="rerun selected rejected operations")
     reroll.add_argument("run_id")
-    reroll.add_argument("operation_keys", nargs="+")
-    reroll.add_argument("--reason", required=True)
+    # Required unless --dry-run; _parse_arguments() checks them and collects
+    # the operation keys that follow an option.
+    reroll.add_argument("operation_keys", nargs="*")
+    reroll.add_argument("--reason", default=None)
     reroll.add_argument(
         "--acknowledge-unknown",
         action="store_true",
         help="acknowledge possible duplicate spend for unknown outcomes",
+    )
+    reroll.add_argument(
+        "--repair-integrity",
+        action="store_true",
+        help="rerun succeeded operations whose accepted files are missing or changed",
+    )
+    reroll.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="show what the selected operations, or all of them, call for; changes nothing",
     )
     _add_output_options(reroll, inherited=True)
 
@@ -269,6 +283,14 @@ def build_parser() -> argparse.ArgumentParser:
     adopt.add_argument("operation_key")
     adopt.add_argument("--reason", required=True)
     _add_output_options(adopt, inherited=True)
+
+    recheck = commands.add_parser(
+        "recheck", help="decide succeeded operations' accepted files again under the current checks",
+    )
+    recheck.add_argument("run_id")
+    recheck.add_argument("operation_keys", nargs="+")
+    recheck.add_argument("--reason", required=True)
+    _add_output_options(recheck, inherited=True)
 
     export = commands.add_parser("export", help="export portable run JSON with events")
     export.add_argument("run_id")
@@ -351,14 +373,15 @@ def build_parser() -> argparse.ArgumentParser:
 
     runs = root_commands.add_parser(
         "runs",
-        help="inspect saved Swarm checkpoints and durable workflow runs without changing them",
+        help="inspect saved Swarm checkpoints and durable workflow runs without changing them, "
+             "and revoke external action approvals",
     )
     _add_runs_output_options(runs, inherited=False)
     runs_commands = runs.add_subparsers(dest="runs_command", required=True)
     run_inspection = runs_commands.add_parser(
         "inspect",
         help="show a run's execution, delivery acceptance, context, reads, evidence, open issues, "
-             "cost, timing and next action",
+             "lineage, external actions, cost, timing and next action",
     )
     run_inspection.add_argument("run_id")
     _add_runs_output_options(run_inspection, inherited=True)
@@ -366,6 +389,14 @@ def build_parser() -> argparse.ArgumentParser:
     run_listing.add_argument("--limit", type=int, default=50, help="page size (1-500; default: 50)")
     run_listing.add_argument("--offset", type=int, default=0, help="number of runs to skip (default: 0)")
     _add_runs_output_options(run_listing, inherited=True)
+    revocation = runs_commands.add_parser(
+        "revoke-action",
+        help="revoke every approval of an external action, or one approval, without a principal or lease",
+    )
+    revocation.add_argument("target", metavar="ACTION_OR_APPROVAL_ID")
+    revocation.add_argument("--reason", required=True,
+                            help="reason to record, with account identifiers redacted")
+    _add_runs_output_options(revocation, inherited=True)
     return parser
 
 
@@ -775,6 +806,23 @@ def _emit_job_inspection(value: dict[str, Any]) -> None:
         print(f"HTML report: {_terminal_text(value['report_path'], limit=1000)}")
 
 
+def _emit_repair_preview(value: dict[str, Any]) -> None:
+    print(f"Run: {_terminal_text(value['run_id'])}")
+    print(f"Status: {_terminal_text(value['status'])}; nothing was changed")
+    budget = value["budget"]
+    print(f"Budget: {_usd(budget['remaining_microusd'])} of {_usd(budget['approved_microusd'])} "
+          f"left{'; overrun' if budget['overrun'] else ''}")
+    for attachment in value["attachments"]:
+        if attachment["status"] != "verified":
+            print(f"Attachment {_terminal_text(attachment['relative_path'])}: {attachment['status']}")
+    for item in value["operations"]:
+        reasons = f" ({', '.join(item['reasons'])})" if item["reasons"] else ""
+        left = item["attempts_remaining"]
+        plan = "; new plan and approval required" if item["new_plan_required"] else ""
+        print(f"{_terminal_text(item['operation_key'])}: {item['action']}{reasons}; "
+              f"{left} attempt{'' if left == 1 else 's'} left{plan}")
+
+
 def _yes(value: Any) -> str:
     return "yes" if value else "no"
 
@@ -792,6 +840,44 @@ def _emit_run_list(value: dict[str, Any]) -> None:
         print("No runs matched.")
     if value["has_more"]:
         print(f"More runs: use --offset {value['offset'] + value['returned']}")
+
+
+def _emit_lineage(lineage: dict[str, Any]) -> None:
+    """A lineage run's record, links, integrity and derived status, by ids and digests only."""
+    scope = _terminal_text(lineage["access_scope"])
+    if not lineage["recorded"]:
+        print(f"Lineage: not recorded yet; scope {scope}")
+    else:
+        nodes = ", ".join(f"{kind} {count}" for kind, count in lineage["nodes"].items())
+        print(f"Lineage: {lineage['coverage']} coverage; scope {scope}; nodes {_terminal_text(nodes)}; "
+              f"record sha256 {lineage['lineage_sha256']}")
+        if lineage["undeclared"]:
+            print(f"  Undeclared nodes: {_terminal_text(', '.join(lineage['undeclared']))}")
+        for source in lineage["sources"]:
+            version = f" version {_terminal_text(source['version'])}" if source["version"] else ""
+            print(f"  Source {_terminal_text(source['source_id'])}{version}: "
+                  f"sha256 {source['sha256'][:12]}")
+        artifact = lineage["artifact"]
+        if artifact is not None:
+            print(f"  Artifact {_terminal_text(artifact['relative_path'])}: sha256 "
+                  f"{artifact['sha256'][:12]}; integrity {artifact['integrity']}")
+        for item in lineage["tombstones"]:
+            version = f" version {_terminal_text(item['version'])}" if item["version"] else ""
+            when = f" ({_terminal_text(item['removed_at'])})" if item["removed_at"] else ""
+            print(f"  Tombstone {_terminal_text(item['source_id'])}{version}: sha256 "
+                  f"{item['sha256'][:12]}; {_terminal_text(item['reason'])}{when}")
+        for item in lineage["purged"]:
+            print(f"  Purged {_terminal_text(item['relative_path'])}: sha256 {item['sha256'][:12]}; "
+                  f"{_terminal_text(item['reason'])} ({_terminal_text(item['purged_at'])})")
+    predecessor = lineage["predecessor"]
+    successors = ", ".join(
+        _terminal_text(item["run_id"]) + ("" if item["supersedes"] else " (does not supersede)")
+        for item in lineage["successors"])
+    print(f"  Predecessor: {_terminal_text(predecessor['run_id']) if predecessor else 'none'}; "
+          f"successors: {successors or 'none'}")
+    reasons = f" ({', '.join(lineage['reasons'])})" if lineage["reasons"] else ""
+    status = lineage["status"] or "none; freshness needs a source catalog (Swarm.plan_repair)"
+    print(f"  Derived status: {status}{reasons}")
 
 
 def _emit_research(value: dict[str, Any]) -> None:
@@ -827,6 +913,49 @@ def _emit_research(value: dict[str, Any]) -> None:
     for issue in value.get("issues") or ():
         subject = f" ({_terminal_text(issue['subject'])})" if issue["subject"] is not None else ""
         print(f"Issue {issue['kind']}{subject}: {_terminal_text(issue['detail'])}")
+
+
+def _emit_actions(actions: dict[str, Any]) -> None:
+    """A durable run's external actions by identity, state, balances, approvals and record kinds."""
+    unit = actions["unit"]
+    print(f"External actions: {len(actions['items'])}; {actions['confirmed_nanousd']} confirmed, "
+          f"{actions['reserved_nanousd']} reserved, {actions['unknown_nanousd']} unknown {unit}; "
+          f"{len(actions['unresolved'])} unresolved")
+    for item in actions["items"]:
+        risk = "; duplicate risk" if item["duplicate_risk"] else ""
+        print(f"  Action {_terminal_text(item['slot'])}/{item['sequence']} ({_terminal_text(item['action_id'])}): "
+              f"{item['state']}; {len(item['attempts'])} attempts; {item['confirmed_nanousd']} confirmed, "
+              f"{item['unknown_nanousd']} unknown {unit}{risk}; next {item['next_action'] or 'none'}")
+        for approval in item["approvals"]:
+            principal, expiry = approval["principal"], approval["expires_at_ns"]
+            standing = (f"revoked {approval['revocation']}" if approval["revoked_at_ns"] is not None
+                        else "consumed" if approval["consumed_by_attempt"] else approval["verdict"])
+            print(f"    Approval {_terminal_text(approval['approval_id'])}: {_terminal_text(principal['subject'])} of "
+                  f"{_terminal_text(principal['tenant'])} ({_terminal_text(principal['issuer'])}); {standing}"
+                  + ("" if expiry is None else f"; expires at {expiry} ns"))
+        kinds: dict[str, int] = {}
+        for record in item["records"]:
+            kinds[record["kind"]] = kinds.get(record["kind"], 0) + 1
+        if kinds:
+            print("    Records: " + ", ".join(f"{kind} {count}" for kind, count in sorted(kinds.items())))
+
+
+def _emit_revisions(log: list[dict[str, Any]]) -> None:
+    """A run's revision log: one line per decision, then its reason and refusal detail."""
+    if log:
+        print(f"Revisions: {len(log)} logged")
+    for entry in log:
+        state = {True: "applied", False: "refused"}.get(entry["applied"], "undetermined")
+        parts = [f"{verb} {_terminal_text(', '.join(entry[key]))}" for verb, key in (
+            ("added", "added"), ("dropped", "dropped"), ("rewired", "rewired"),
+            ("invalidated", "invalidated")) if entry[key]]
+        parts.append(f"{entry['revisions_remaining_after']} revisions left, "
+                     f"{entry['added_total']} added nodes in the graph")
+        print(f"Revision after {_terminal_text(entry['after_node'])}: {state} "
+              f"({_terminal_text(entry['change'])}); " + "; ".join(parts))
+        for label, key in (("Reason", "reason"), ("Detail", "detail")):
+            if entry[key]:
+                print(f"  {label}: {_terminal_text(entry[key])}")
 
 
 def _emit_run_inspection(value: dict[str, Any]) -> None:
@@ -865,6 +994,7 @@ def _emit_run_inspection(value: dict[str, Any]) -> None:
             reason = f": {_terminal_text(earlier['reasons'][0])}" if earlier["reasons"] else ""
             print(f"  Decision {entry['sequence']}: {earlier['decision']} under policy "
                   f"{earlier['policy_sha256'][:12]}{reason}")
+    _emit_revisions(value.get("revision_log") or [])
     withheld = delivery["rejected_output"]
     if withheld is not None:
         print(f"Withheld output: {withheld['bytes']} bytes in the saved {withheld['field']} field; "
@@ -877,10 +1007,18 @@ def _emit_run_inspection(value: dict[str, Any]) -> None:
               f"sha256 {published['sha256']}")
         print(f"  Integrity: {artifact['integrity']['status']}: "
               f"{_terminal_text(artifact['integrity']['detail'])}")
+        if artifact["superseded"]:
+            print("  Supersedes: " + ", ".join(
+                f"publication {item['sequence']} ({_terminal_text(item['name'])})"
+                for item in artifact["superseded"]))
         eligible = "eligible" if eligibility["eligible"] else (
             "not eligible (" + ", ".join(eligibility["reasons"]) + ")")
         print(f"  Delivery eligibility: {eligible}")
+    if value.get("lineage") is not None:
+        _emit_lineage(value["lineage"])
     _emit_research(value)
+    if value.get("actions") is not None:
+        _emit_actions(value["actions"])
     accounting = value["accounting"]
     print(f"Cost: ${accounting['total_cost_usd']:.6f} ({accounting['cost_scope']}); "
           f"complete: {_yes(accounting['cost_is_complete'])}; "
@@ -915,6 +1053,10 @@ def _emit(args: argparse.Namespace, command: str, value: Any) -> None:
     if args.root_command == "runs":
         if command == "list":
             _emit_run_list(value)
+        elif command == "revoke-action":
+            revoked = value["revoked"]
+            print(f"Revoked {len(revoked)} approvals of {_terminal_text(value['target'])}"
+                  + (": " + ", ".join(map(_terminal_text, revoked)) if revoked else "; none was in force"))
         else:
             _emit_run_inspection(value)
     elif command == "validate":
@@ -928,7 +1070,9 @@ def _emit(args: argparse.Namespace, command: str, value: Any) -> None:
         print(f"Operations: {len(value['plan']['operations'])}")
         print(f"Worst-case cost: ${value['plan']['worst_case_cost_usd']}")
         print(f"Approval token: {value['approval']['token']}")
-    elif command in {"run", "status", "resume", "reroll", "adopt"}:
+    elif command == "reroll" and getattr(args, "dry_run", False):
+        _emit_repair_preview(value)
+    elif command in {"run", "status", "resume", "reroll", "adopt", "recheck"}:
         job = value
         print(f"Run: {_terminal_text(job['run_id'])}")
         print(f"Status: {_terminal_text(job['status'])}")
@@ -1246,6 +1390,12 @@ def _dispatch_jobs(args: argparse.Namespace) -> int:
         _emit(args, command, payload)
         return EXIT_OK
 
+    if command == "reroll" and args.dry_run:
+        with SQLiteRunStore(args.store, read_only=True) as store:
+            preview = JobRunner(store).repair_preview(args.run_id, args.operation_keys or None)
+        _emit(args, command, preview)
+        return EXIT_OK
+
     if command == "export" and args.out:
         _report_destination(args.out, args.store)
     with SQLiteRunStore(args.store, read_only=command in {"status", "export"}) as store:
@@ -1260,11 +1410,16 @@ def _dispatch_jobs(args: argparse.Namespace) -> int:
                     args.operation_keys,
                     reason=args.reason,
                     acknowledge_unknown=args.acknowledge_unknown,
+                    repair_integrity=args.repair_integrity,
                 )
             )
         elif command == "adopt":
             snapshot = asyncio.run(
                 JobRunner(store).adopt(args.run_id, args.operation_key, reason=args.reason)
+            )
+        elif command == "recheck":
+            snapshot = asyncio.run(
+                JobRunner(store).recheck(args.run_id, args.operation_keys, reason=args.reason)
             )
         elif command == "export":
             snapshot = _portable_export(
@@ -1286,9 +1441,35 @@ def _dispatch_jobs(args: argparse.Namespace) -> int:
     return _job_exit(snapshot)
 
 
+def _revoke_action(args: argparse.Namespace) -> int:
+    """Revoke as ``smythe.actions.revoke`` does, opening for writing only a journal that has actions."""
+    from smythe.actions import revoke
+    from smythe.workflow_store import SQLiteWorkflowStore, WorkflowError, WorkflowNotFoundError
+
+    if args.journal is None:
+        raise ValueError("revoke-action needs --journal: only durable runs have external actions")
+    with open_journal(args.journal) as journal:
+        # A version 1 journal has no actions, and opening it for writing would upgrade it.
+        if journal.store_version < 2:
+            raise RunNotFoundError("This workflow journal has no external actions")
+    try:
+        with SQLiteWorkflowStore(args.journal) as store:
+            revoked = revoke(store, args.target, args.reason)
+    except WorkflowNotFoundError as exc:
+        raise RunNotFoundError(f"No external action or approval {args.target!r} in this journal") from exc
+    except WorkflowError as exc:
+        if isinstance(exc, ValueError):
+            raise  # an invalid reason or id is invalid input
+        raise RunInspectionError(f"Cannot revoke in the workflow journal: {exc}") from exc
+    _emit(args, "revoke-action", {"target": args.target, "revoked": list(revoked)})
+    return EXIT_OK
+
+
 def _dispatch_runs(args: argparse.Namespace) -> int:
     if args.journal is not None and args.checkpoints is not None:
         raise ValueError("Choose --checkpoints or --journal, not both")
+    if args.runs_command == "revoke-action":
+        return _revoke_action(args)
     if args.journal is not None:
         store = open_journal(args.journal)
     else:
@@ -1307,6 +1488,8 @@ def _dispatch_runs(args: argparse.Namespace) -> int:
         return EXIT_RUN_NOT_ACCEPTED
     if decision == "indeterminate":
         return EXIT_RUN_INDETERMINATE
+    if decision == "accepted" and value["actions"] is not None and value["actions"]["unresolved"]:
+        return EXIT_RUN_ACTION_UNRESOLVED
     return EXIT_OK
 
 
@@ -1320,10 +1503,38 @@ def _dispatch(args: argparse.Namespace) -> int:
     raise AssertionError(args.root_command)  # pragma: no cover
 
 
+def _parse_arguments(parser: argparse.ArgumentParser, argv: list[str] | None) -> argparse.Namespace:
+    """Parse ``argv`` like ``parse_args``, with every operation key of ``jobs reroll``.
+
+    A reroll's operation keys are optional, so that ``--dry-run`` can preview a
+    whole run. Python 3.11 matches them as empty once an option follows the run
+    ID and leaves the keys after that option unrecognized, so a reroll's
+    leftover plain arguments are its operation keys on every Python version.
+    """
+    args, extras = parser.parse_known_args(argv)
+    if args.root_command == "jobs" and args.jobs_command == "reroll":
+        keys, unrecognized, separated = list(args.operation_keys or ()), [], False
+        for token in extras:
+            if token == "--" and not separated:
+                separated = True
+            elif separated or not token.startswith("-"):
+                keys.append(token)
+            else:
+                unrecognized.append(token)
+        args.operation_keys, extras = keys, unrecognized
+        missing = [name for name, absent in (("operation_keys", not keys),
+                                             ("--reason", args.reason is None)) if absent]
+        if missing and not args.dry_run:
+            parser.error("the following arguments are required: " + ", ".join(missing))
+    if extras:
+        parser.error(f"unrecognized arguments: {' '.join(extras)}")
+    return args
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """Run the Smythe CLI and return a stable process exit code."""
     parser = build_parser()
-    args = parser.parse_args(list(argv) if argv is not None else None)
+    args = _parse_arguments(parser, list(argv) if argv is not None else None)
     command = getattr(args, f"{args.root_command}_command", args.root_command)
     try:
         return _dispatch(args)

@@ -1,8 +1,10 @@
 """Runs inspection reads saved checkpoints and journals without changing them.
 
 Execution, delivery acceptance and cost are separate blocks. Exit status 10
-means a completed run's output was rejected or needs review, and 11 that no
-valid decision covers it.
+means a completed run's output was rejected or needs review, 11 that no
+valid decision covers it, and 12 that accepted output has an external action
+whose effect is unresolved. ``runs revoke-action`` is the one command that
+writes, and only revocations.
 """
 
 from __future__ import annotations
@@ -12,10 +14,12 @@ import json
 from pathlib import Path
 import shutil
 import sqlite3
+import time
 
 import pytest
 
 from fakes import ManualClock
+from fixture_connector import FixtureConnector
 from fixture_service import FixtureService, serve_http
 from smythe import (
     AcceptanceDecision,
@@ -34,17 +38,27 @@ from smythe import (
 )
 import smythe.cli as cli
 from smythe.acceptance import text_sha256
+from smythe.actions import inspect_actions
 from smythe.cli import (
-    EXIT_INVALID_INPUT, EXIT_JOB_STATE, EXIT_LOCAL_ERROR, EXIT_OK, EXIT_RUN_INDETERMINATE,
-    EXIT_RUN_NOT_ACCEPTED, build_parser, main,
+    EXIT_INVALID_INPUT, EXIT_JOB_STATE, EXIT_LOCAL_ERROR, EXIT_OK, EXIT_RUN_ACTION_UNRESOLVED,
+    EXIT_RUN_INDETERMINATE, EXIT_RUN_NOT_ACCEPTED, build_parser, main,
 )
-from smythe.graph import ExecutionGraph, FailurePolicy, Node, Topology
+from smythe.graph import ExecutionGraph, FailurePolicy, Node, NodeStatus, Revision, Topology
+from smythe.lineage import load_lineage
 from smythe.provider import CompletionResult, Provider
+from smythe.supervisor import SUPERVISOR_SYSTEM_PROMPT, LLMSupervisor, Supervisor
 from smythe.validation import hard_finding
+from smythe.workflow_artifact import current_artifact
+import test_action_approvals as action_approvals
+from test_action_journal import rows as action_rows
+import test_action_operator as operator_actions
+import test_repair_plan as repair_plans
 from test_source_evidence import CLAIM, DROPPED, KEPT, STRONG
 from test_source_evidence import SOURCES as EVIDENCE_SOURCES
 from test_source_evidence import artifact as evidence_artifact
-from test_workflow_acceptance import rewrite_checkpoint
+from test_workflow_acceptance import Contains, Raises, rewrite_checkpoint, strict
+from test_workflow_acceptance import replies as scripted_replies  # noqa: F401  (a fixture)
+import test_workflow_lineage as lineage_runs
 from test_workflow_store_migration import build_journal, dump, mark_version_1
 
 CONNECT = sqlite3.connect
@@ -990,5 +1004,546 @@ def test_ordinary_runs_have_no_durable_research_blocks(tmp_path, capsys):
     code, value = inspect(capsys, tmp_path, result.execution_id)
     assert code == EXIT_RUN_NOT_ACCEPTED
     assert (value["context"], value["tool_calls"], value["evidence"]) == (None, None, None)
+    assert value["lineage"] is None
     assert value["issues"] == [{"kind": "validator_rejected", "subject": "fixed-reject",
                                 "detail": value["delivery"]["reasons"][0]}]
+
+
+# ---------------------------------------------------------------------------
+# Supervisor revisions
+# ---------------------------------------------------------------------------
+
+
+class Revises(Supervisor):
+    """Adds a check after the final step, then proposes to drop the finished draft."""
+
+    async def review(self, graph, node, *, task, revisions_remaining):
+        if node.id == "draft":
+            check = Node(id="check", label="Check the answer", depends_on=["final"])
+            return Revision(add_nodes=(check,), reason="the answer needs a check")
+        if node.id == "final":
+            return Revision(drop_node_ids=("draft",), reason="the draft is done")
+        return None
+
+
+# What both kinds of run log for those two reviews, apart from the refusal's detail.
+REVISIONS = [
+    {"after_node": "draft", "applied": True, "change": "+1", "added": ["check"], "dropped": [],
+     "rewired": [], "retained": ["draft"], "invalidated": [], "preserved_gates": [],
+     "revisions_remaining_after": 1, "added_total": 1, "trigger": "node_completed",
+     "reason": "the answer needs a check", "detail": None},
+    {"after_node": "final", "applied": False, "change": "-1", "added": [], "dropped": ["draft"],
+     "rewired": [], "retained": ["draft", "final"], "invalidated": [], "preserved_gates": [],
+     "revisions_remaining_after": 1, "added_total": 1, "trigger": "node_completed",
+     "reason": "the draft is done", "detail": None},
+]
+
+
+def test_inspection_shows_an_ordinary_run_s_revision_log(tmp_path, capsys, monkeypatch):
+    swarm = Swarm(model="offline", provider=OfflineProvider(), artifact_dir=None,
+                  checkpoint_store=FileCheckpointStore(tmp_path), supervisor=Revises(),
+                  max_revisions=2)
+    result = swarm.execute(graph())
+    saved = json.loads((tmp_path / f"{result.execution_id}.json").read_text())
+    no_side_effects(monkeypatch)
+
+    code, value = inspect(capsys, tmp_path, result.execution_id)
+
+    assert code == EXIT_OK
+    assert value["revision_log"] == saved["control"]["revision_log"]
+    applied, refused = value["revision_log"]
+    assert applied == REVISIONS[0]
+    assert refused == REVISIONS[1] | {"detail": refused["detail"]}
+    assert refused["detail"].startswith("cannot drop node 'draft' with status completed")
+    assert main(["runs", "--checkpoints", str(tmp_path), "inspect", result.execution_id]) == EXIT_OK
+    text = capsys.readouterr().out
+    assert "Revisions: 2 logged" in text
+    assert ("Revision after draft: applied (+1); added check; 1 revisions left, "
+            "1 added nodes in the graph") in text
+    assert "  Reason: the answer needs a check" in text
+    assert "Revision after final: refused (-1); dropped draft; 1 revisions left" in text
+    assert "  Detail: cannot drop node 'draft' with status completed" in text
+
+
+def test_a_run_without_revisions_shows_an_empty_revision_log(tmp_path, capsys):
+    result = run(tmp_path)
+    code, value = inspect(capsys, tmp_path, result.execution_id)
+    assert code == EXIT_OK and value["revision_log"] == []
+    main(["runs", "--checkpoints", str(tmp_path), "inspect", result.execution_id])
+    assert "Revision" not in capsys.readouterr().out
+
+
+def test_inspection_derives_a_durable_run_s_revision_log_from_its_supervision_operations(
+    tmp_path, capsys, monkeypatch,
+):
+    proposals = [
+        {"change": True, "reason": "the answer needs a check",
+         "add": [{"id": "check", "label": "Check the answer", "depends_on": ["final"]}]},
+        {"change": True, "reason": "the draft is done", "drop": ["draft"]},
+        {"change": False, "reason": "nothing left to change"},
+    ]
+
+    async def complete(self, system, prompt, model):
+        if system == SUPERVISOR_SYSTEM_PROMPT:
+            return CompletionResult(json.dumps(proposals.pop(0)), cost_usd=0)
+        return CompletionResult("Done", cost_usd=0)
+
+    monkeypatch.setattr(OfflineProvider, "complete", complete)
+    path = tmp_path / "runs.db"
+    with SQLiteWorkflowStore(path) as store:
+        provider = OfflineProvider()
+        swarm = Swarm(model="offline", provider=provider, architect=SimpleArchitect(),
+                      run_store=store, max_budget_usd=1, max_revisions=2,
+                      supervisor=LLMSupervisor(provider, model="offline", only_terminal=False))
+        result = swarm.execute(graph())
+        run_id = result.execution_id
+        operations = store.list_operations(run_id, "supervision")
+        checkpoint = store.get_checkpoint(run_id)["checkpoint"]
+    with closing(CONNECT(path)) as db:
+        assert db.execute("PRAGMA journal_mode=DELETE").fetchone() == ("delete",)
+    before = journal_state(path)
+    no_side_effects(monkeypatch)
+
+    code, value = inspect_durable(capsys, path, run_id)
+
+    assert code == EXIT_OK and journal_state(path) == before
+    # The journal keeps no log: three reviews, the last of which changed nothing.
+    assert [operation["operation_key"] for operation in operations] == [
+        "supervision/draft/0", "supervision/final/0", "supervision/check/0"]
+    assert "revision_log" not in checkpoint
+    assert value["revision_log"] == REVISIONS
+    # The trace of the run that made the decisions records the same effects.
+    traced = [(span["status"], span["revision"]) for span in result.trace if "revision" in span]
+    assert [status for status, _ in traced] == ["revision_applied", "revision_rejected"]
+    for (_, record), entry in zip(traced, value["revision_log"]):
+        assert record == {key: entry[key] for key in record}
+    main(["runs", "--journal", str(path), "inspect", run_id])
+    text = capsys.readouterr().out
+    assert "Revision after draft: applied (+1); added check" in text
+    assert "Revision after final: refused (-1); dropped draft" in text
+
+
+class SupervisionJournal:
+    """The reads the durable revision log makes, over hand-written supervision operations."""
+
+    def __init__(self, operations, *, max_revisions, revisions_used):
+        self.operations, self.max_revisions, self.revisions_used = operations, max_revisions, revisions_used
+
+    def list_operations(self, run_id, kind):
+        assert kind == "supervision"
+        return self.operations
+
+    def get_checkpoint(self, run_id):
+        return {"checkpoint": {"revisions_used": self.revisions_used}}
+
+    def load_run(self, run_id):
+        return {"config": {"max_revisions": self.max_revisions}}
+
+
+def supervision(node_id, remaining, graph, result, *, applied=True):
+    from smythe.checkpoint import graph_to_dict
+
+    return {"operation_key": f"supervision/{node_id}/0", "applied_revision": 1 if applied else None,
+            "inputs": {"graph": graph_to_dict(graph), "node_id": node_id, "task": None,
+                       "revisions_remaining": remaining},
+            "result": result}
+
+
+def reviewed(*completed: str, extra: bool = False) -> ExecutionGraph:
+    """Two independent steps, ``a`` and ``b``, and the added ``x`` when *extra*."""
+    nodes = [Node(id=node_id, label=node_id) for node_id in ("a", "b")]
+    if extra:
+        nodes.append(Node(id="x", label="x", depends_on=["a"], metadata={"added_by_revision": True}))
+    for node in nodes:
+        if node.id in completed:
+            node.status = NodeStatus.COMPLETED
+    return ExecutionGraph([Topology.FORK_JOIN], nodes)
+
+
+def test_the_durable_revision_log_is_derived_from_supervision_operations():
+    from smythe.workflow import revision_log
+
+    add_x = {"add_nodes": [{"id": "x", "label": "x", "depends_on": ["a"]}], "drop_node_ids": [],
+             "rewire": {}, "reason": "a needs a follow-up"}
+    operations = [
+        supervision("a", 2, reviewed("a"), {"revision": add_x}),
+        supervision("b", 1, reviewed("a", "b", extra=True),
+                    {"revision": None, "local_error_type": "RuntimeError"}),
+        supervision("x", 1, reviewed("a", "b", "x", extra=True), {"revision": None}),
+        # Saved but not yet applied by a checkpoint: resume decides it again.
+        supervision("y", 1, reviewed("a", "b", "x", extra=True), {"revision": add_x}, applied=False),
+    ]
+    journal = SupervisionJournal(operations, max_revisions=2, revisions_used=1)
+
+    applied, raised = revision_log(journal, "run")
+
+    assert applied == {
+        "after_node": "a", "applied": True, "change": "+1", "added": ["x"], "dropped": [],
+        "rewired": [], "retained": ["a"], "invalidated": ["a"], "preserved_gates": [],
+        "revisions_remaining_after": 1, "added_total": 1, "trigger": "node_completed",
+        "reason": "a needs a follow-up", "detail": None}
+    assert raised == {
+        "after_node": "b", "applied": False, "change": "unknown", "added": [], "dropped": [],
+        "rewired": [], "retained": ["a", "b"], "invalidated": [], "preserved_gates": [],
+        "revisions_remaining_after": 1, "added_total": 1, "trigger": "node_completed",
+        "reason": None, "detail": "supervisor raised RuntimeError"}
+
+    # An allowance that does not step down by none or one cannot say what happened.
+    operations[2]["inputs"]["revisions_remaining"] = 3
+    assert [entry["applied"] for entry in revision_log(journal, "run")] == [True, None]
+
+    # Only the latest decisions are kept.
+    refused = {"add_nodes": [], "drop_node_ids": ["a"], "rewire": {}, "reason": "again"}
+    journal.operations = [supervision(f"n{index}", 1, reviewed("a"), {"revision": refused})
+                          for index in range(40)]
+    journal.revisions_used = 1
+    log = revision_log(journal, "run")
+    assert len(log) == 32 and log[0]["after_node"] == "n8"
+    assert {entry["applied"] for entry in log} == {False}
+
+
+def test_a_durable_review_that_proposed_an_empty_revision_is_not_logged():
+    from smythe.workflow import revision_log
+
+    nothing = {"add_nodes": [], "drop_node_ids": [], "rewire": {}, "reason": "nothing to change"}
+    add_x = {"add_nodes": [{"id": "x", "label": "x", "depends_on": ["a"]}], "drop_node_ids": [],
+             "rewire": {}, "reason": "a needs a follow-up"}
+    journal = SupervisionJournal([supervision("a", 2, reviewed("a"), {"revision": nothing})],
+                                 max_revisions=2, revisions_used=0)
+
+    assert revision_log(journal, "run") == []
+
+    # The allowance still steps across the review that changed nothing.
+    journal.operations.append(supervision("b", 2, reviewed("a", "b"), {"revision": add_x}))
+    journal.revisions_used = 1
+    assert [(entry["after_node"], entry["applied"], entry["change"])
+            for entry in revision_log(journal, "run")] == [("b", True, "+1")]
+
+
+class Approves(Supervisor):
+    """Reviews every step and proposes an empty revision, which changes nothing."""
+
+    async def review(self, graph, node, *, task, revisions_remaining):
+        return Revision(reason="looks fine, nothing to change")
+
+
+def test_a_review_that_proposed_an_empty_revision_is_logged_by_neither_kind_of_run(
+    tmp_path, capsys,
+):
+    checkpoints = tmp_path / "checkpoints"
+    swarm = Swarm(model="offline", provider=OfflineProvider(), artifact_dir=None,
+                  checkpoint_store=FileCheckpointStore(checkpoints), supervisor=Approves(),
+                  max_revisions=2)
+    ordinary = swarm.execute(graph())
+    path = tmp_path / "runs.db"
+    with SQLiteWorkflowStore(path) as store:
+        swarm = Swarm(model="offline", provider=OfflineProvider(), architect=SimpleArchitect(),
+                      run_store=store, max_budget_usd=1, max_revisions=2,
+                      supervisor=LocalOnly(Approves, "approves", "1", role="supervisor"))
+        durable = swarm.execute(graph())
+        operations = store.list_operations(durable.execution_id, "supervision")
+    with closing(CONNECT(path)) as db:
+        assert db.execute("PRAGMA journal_mode=DELETE").fetchone() == ("delete",)
+
+    # The journal keeps each empty proposal; neither run traced a revision.
+    assert [operation["result"]["revision"] for operation in operations] == [
+        {"add_nodes": [], "drop_node_ids": [], "rewire": {}, "reason": "looks fine, nothing to change"},
+    ] * 2
+    for result in (ordinary, durable):
+        assert [span for span in result.trace if "revision" in span] == []
+    code, value = inspect(capsys, checkpoints, ordinary.execution_id)
+    assert code == EXIT_OK and value["revision_log"] == []
+    code, value = inspect_durable(capsys, path, durable.execution_id)
+    assert code == EXIT_OK and value["revision_log"] == []
+    main(["runs", "--journal", str(path), "inspect", durable.execution_id])
+    assert "Revision" not in capsys.readouterr().out
+
+
+# ---------------------------------------------------------------------------
+# Durable runs with artifact lineage
+# ---------------------------------------------------------------------------
+
+
+def test_a_lineage_run_shows_a_damaged_artifact_and_its_lineage_without_text(
+        tmp_path, capsys, monkeypatch):
+    service = FixtureService()
+    records = {key: service.add_source(key, text) for key, text in lineage_runs.TEXTS.items()}
+    path = tmp_path / "runs.db"
+    with serve_http(service) as endpoint, SQLiteWorkflowStore(path) as store:
+        library = (service, records, endpoint)
+        result = lineage_runs.research(store, library, tmp_path).execute(
+            lineage_runs.research_graph(library))
+        run_id, record = result.execution_id, load_lineage(store, result.execution_id)
+        published = current_artifact(store, run_id).publication.path
+    published.write_bytes(published.read_bytes()[:-1] + b"?")
+    before = journal_state(path)
+    no_side_effects(monkeypatch)
+
+    code, value = inspect_durable(capsys, path, run_id)
+
+    # The damaged document makes the decision indeterminate, with its existing exit code.
+    assert code == EXIT_RUN_INDETERMINATE and journal_state(path) == before
+    served = [{"source_id": key, "version": "1", "sha256": records[key].sha256}
+              for key in sorted(records)]
+    assert value["lineage"] == {
+        "access_scope": "research-team", "recorded": True, "lineage_sha256": record.sha256,
+        "coverage": "complete", "nodes": {"model": 2, "read": 2, "synthesis": 1},
+        "undeclared": [], "sources": served,
+        "artifact": {"relative_path": f"{run_id}/document.md", "sha256": record.artifact["sha256"],
+                     "size_bytes": record.artifact["size_bytes"], "integrity": "changed"},
+        "predecessor": None, "successors": [], "tombstones": [], "purged": [],
+        "status": "invalid", "reasons": ["artifact_changed", "decision_not_accepted"]}
+    assert main(["runs", "--journal", str(path), "inspect", run_id]) == code
+    text = capsys.readouterr().out
+    assert (f"Lineage: complete coverage; scope research-team; nodes model 2, read 2, "
+            f"synthesis 1; record sha256 {record.sha256}") in text
+    assert f"  Source renewals version 1: sha256 {records['renewals'].sha256[:12]}" in text
+    assert "; integrity changed" in text and "  Predecessor: none; successors: none" in text
+    assert "  Derived status: invalid (artifact_changed, decision_not_accepted)" in text
+    # Ids, versions and digests only: no source text, and no agent or model result digest.
+    hidden = [digest for node in record.nodes if node["kind"] == "model"
+              for digest in (node["inputs"]["agent_sha256"], node["result_sha256"])]
+    for shown in (text, json.dumps(value)):
+        assert all(source not in shown for source in lineage_runs.TEXTS.values())
+        assert len(hidden) == 4 and not any(digest in shown for digest in hidden)
+    # Listing does not read the lineage.
+    assert main(["runs", "--journal", str(path), "--json", "list"]) == EXIT_OK
+    assert output(capsys)["list"]["runs"][0]["decision"] == "indeterminate"
+    assert journal_state(path) == before
+
+
+def test_lineage_names_predecessors_and_the_successors_that_supersede_them(tmp_path, capsys):
+    path = tmp_path / "runs.db"
+    with SQLiteWorkflowStore(path) as store:
+        def lineage_run(**options):
+            return repair_plans.lineage_swarm(store, **options).execute(graph()).execution_id
+
+        replaced, successor = lineage_run(), lineage_run()
+        undecided = lineage_run(acceptance=policy("raise"))
+        plain = lineage_run(lineage=None)
+        repair_plans.link(store, successor, replaced)
+        repair_plans.link(store, undecided, replaced)
+        recorded, store_id = load_lineage(store, replaced).sha256, store.store_id
+
+    code, value = inspect_durable(capsys, path, replaced)
+    assert code == EXIT_OK
+    lineage = value["lineage"]
+    assert lineage["successors"] == [{"run_id": successor, "supersedes": True},
+                                     {"run_id": undecided, "supersedes": False}]
+    assert (lineage["status"], lineage["reasons"]) == ("superseded", [])
+    code, value = inspect_durable(capsys, path, successor)
+    assert code == EXIT_OK
+    assert value["lineage"]["predecessor"] == {"store_id": store_id, "run_id": replaced,
+                                               "lineage_sha256": recorded}
+    # Without a source catalog, a run's freshness is not derived.
+    assert (value["lineage"]["status"], value["lineage"]["coverage"]) == (None, "partial")
+    assert value["lineage"]["undeclared"] == ["draft", "final"]
+    assert main(["runs", "--journal", str(path), "inspect", replaced]) == EXIT_OK
+    text = capsys.readouterr().out
+    assert (f"  Predecessor: none; successors: {successor}, {undecided} (does not supersede)"
+            in text)
+    assert "  Derived status: superseded" in text
+    assert main(["runs", "--journal", str(path), "inspect", successor]) == EXIT_OK
+    text = capsys.readouterr().out
+    assert f"  Predecessor: {replaced}; successors: none" in text
+    assert "  Undeclared nodes: draft, final" in text
+    assert "  Derived status: none; freshness needs a source catalog" in text
+    # A run without lineage has no lineage block.
+    assert inspect_durable(capsys, path, plain)[1]["lineage"] is None
+
+
+# ---------------------------------------------------------------------------
+# Durable runs with external actions
+# ---------------------------------------------------------------------------
+
+
+def action_journal(tmp_path, scripted, *, committed=False, setup=None):
+    """A journal, without WAL sidecars, whose accepted run has one action; returns the path, the
+    action, its host and clock. *setup* makes the action; by default its outcome is unknown and
+    reconciliation could not settle it."""
+    path, clock, host = tmp_path / "runs.db", ManualClock(time.time_ns()), action_approvals.Host()
+    with SQLiteWorkflowStore(path, clock_ns=clock) as store:
+        if setup is None:
+            action = operator_actions.under_review(store, tmp_path, scripted, host, clock, committed=committed)[0]
+        else:
+            action = setup(store, tmp_path, scripted, host, clock)[0]
+    with closing(CONNECT(path)) as db:
+        assert db.execute("PRAGMA journal_mode=DELETE").fetchone() == ("delete",)
+    return path, action, host, clock
+
+
+def secrets_of(path: Path) -> list[str]:
+    """What inspection must never show: assertions, error text, notes and parameters."""
+    return [row["assertion"] for row in action_rows(path, "workflow_action_approvals")] + [
+        "timed out", "nothing can show whether the write took effect", operator_actions.NOTE, "Launch notes"]
+
+
+def test_exit_code_12_is_new():
+    taken = {getattr(cli, name) for name in dir(cli)
+             if name.startswith("EXIT_") and not name.startswith("EXIT_RUN_")}
+    assert EXIT_RUN_ACTION_UNRESOLVED == 12 and EXIT_RUN_ACTION_UNRESOLVED not in taken
+    args = build_parser().parse_args(["runs", "revoke-action", "abc", "--reason", "why", "--journal", "j.db"])
+    assert (args.runs_command, args.target, args.reason, args.journal) == ("revoke-action", "abc", "why", "j.db")
+
+
+def test_inspection_shows_external_actions_read_only_and_exits_12_while_one_is_unresolved(
+        tmp_path, capsys, monkeypatch, scripted_replies):  # noqa: F811
+    path, action, host, _ = action_journal(tmp_path, scripted_replies)
+    before = journal_state(path)
+    statements = []
+
+    def connect(*args, **kwargs):
+        db = CONNECT(*args, **kwargs)
+        db.set_trace_callback(statements.append)
+        return db
+
+    def forbidden(*args, **kwargs):
+        pytest.fail("Runs inspection constructed a connector or an action runner")
+
+    no_side_effects(monkeypatch)
+    monkeypatch.setattr(FixtureConnector, "__init__", forbidden)
+    monkeypatch.setattr("smythe.actions.ActionRunner.__init__", forbidden)
+    monkeypatch.setattr(sqlite3, "connect", connect)
+    code = main(["runs", "--journal", str(path), "--json", "inspect", action.run_id])
+    monkeypatch.setattr(sqlite3, "connect", CONNECT)
+    value = output(capsys)["inspect"]
+
+    assert code == EXIT_RUN_ACTION_UNRESOLVED
+    compact = ["".join(sql.upper().split()) for sql in statements]
+    assert statements and "BEGINIMMEDIATE" not in compact
+    assert not any(sql.startswith(("PRAGMAJOURNAL_MODE=", "CREATE", "INSERT", "UPDATE", "DELETE", "ALTER"))
+                   for sql in compact)
+    assert journal_state(path) == before
+    # The output is accepted, and the run itself needs nothing more: only the action does.
+    assert (value["delivery"]["decision"], value["next_action"]["action"]) == ("accepted", "none")
+    actions = value["actions"]
+    assert list(actions) == ["accounting_scope", "unit", "confirmed_nanousd", "reserved_nanousd",
+                             "unknown_nanousd", "unresolved", "items"]
+    write = action.profile.write_ceiling_nanousd
+    assert (actions["accounting_scope"], actions["unit"], actions["unknown_nanousd"], actions["unresolved"]) == (
+        "external_actions", "nanoUSD", write, [action.action_id])
+    (entry,) = actions["items"]
+    assert (entry["action_id"], entry["slot"], entry["state"], entry["duplicate_risk"], entry["next_action"]) == (
+        action.action_id, "publish", "outcome_unknown", False, "operator_review")
+    (approval,) = entry["approvals"]
+    assert approval["principal"] == {"issuer": host.issuer, "subject": "editor-1", "tenant": "acme"}
+    assert set(approval) == {"approval_id", "verdict", "intent_sha256", "principal", "verifier", "ceiling_nanousd",
+                             "expires_at_ns", "consumed_by_attempt", "revoked_at_ns", "duplicate_risk"}
+    assert [(record["kind"], len(record["payload_sha256"])) for record in entry["records"]] == [("finding", 64)]
+    assert all(set(record) == {"record_id", "kind", "payload_sha256", "trusted", "cost_nanousd"}
+               for record in entry["records"])
+    with SQLiteWorkflowStore(path, read_only=True) as reader:
+        assert actions == inspect_actions(reader, action.run_id)
+
+    assert main(["runs", "--journal", str(path), "inspect", action.run_id]) == EXIT_RUN_ACTION_UNRESOLVED
+    text = capsys.readouterr().out
+    assert f"External actions: 1; 0 confirmed, 0 reserved, {write} unknown nanoUSD; 1 unresolved" in text
+    assert (f"  Action publish/1 ({action.action_id}): outcome_unknown; 1 attempts; 0 confirmed, "
+            f"{write} unknown nanoUSD; next operator_review") in text
+    assert (f"    Approval {approval['approval_id']}: editor-1 of acme ({host.issuer}); approved; "
+            f"expires at {approval['expires_at_ns']} ns") in text
+    assert "    Records: finding 1" in text
+    for shown in (text, json.dumps(value)):
+        assert not any(secret in shown for secret in secrets_of(path))
+    # Listing reports the run as before, with no new exit code.
+    assert main(["runs", "--journal", str(path), "--json", "list"]) == EXIT_OK
+    assert output(capsys)["list"]["runs"][0]["decision"] == "accepted"
+    assert journal_state(path) == before
+
+
+def test_exit_codes_10_and_11_take_precedence_and_a_resolved_action_exits_0(
+        tmp_path, capsys, scripted_replies):  # noqa: F811
+    path, action, host, clock = action_journal(tmp_path, scripted_replies, committed=True)
+
+    def decided(acceptance):
+        with SQLiteWorkflowStore(path, clock_ns=clock) as store:
+            action_approvals.swarm(store, tmp_path).reevaluate(action.run_id, acceptance=acceptance)
+        return inspect_durable(capsys, path, action.run_id)
+
+    for acceptance, decision, code in ((strict(Contains("absent")), "rejected", EXIT_RUN_NOT_ACCEPTED),
+                                       (strict(Raises()), "indeterminate", EXIT_RUN_INDETERMINATE),
+                                       (strict(Contains("report")), "accepted", EXIT_RUN_ACTION_UNRESOLVED)):
+        exit_code, value = decided(acceptance)
+        assert (exit_code, value["delivery"]["decision"]) == (code, decision)
+        assert value["actions"]["unresolved"] == [action.action_id]
+
+    with SQLiteWorkflowStore(path, clock_ns=clock) as store:
+        operator_actions.decide(store, host, action, "adopt_observed", operator_actions.evidence())
+    code, value = inspect_durable(capsys, path, action.run_id)
+    assert (code, value["actions"]["unresolved"]) == (EXIT_OK, [])
+    assert value["actions"]["items"][0]["state"] == "reconciled"
+    assert not any(secret in json.dumps(value) for secret in secrets_of(path))
+
+
+@pytest.mark.parametrize("setup,state,step,code", [
+    (operator_actions._wrong, "compensation_required", "compensate", EXIT_RUN_ACTION_UNRESOLVED),
+    (operator_actions._unverified, "dispatched", "operator_review", EXIT_RUN_ACTION_UNRESOLVED),
+    (operator_actions.awaiting_readback, "dispatched", "readback", EXIT_OK),
+], ids=["compensation-required", "unverified", "awaiting-readback"])
+def test_a_wrong_or_unverified_effect_exits_12_and_a_pending_readback_does_not(
+        tmp_path, capsys, scripted_replies, setup, state, step, code):  # noqa: F811
+    path, action, _, _ = action_journal(tmp_path, scripted_replies, setup=setup)
+    before = journal_state(path)
+
+    exit_code, value = inspect_durable(capsys, path, action.run_id)
+
+    assert (exit_code, value["delivery"]["decision"]) == (code, "accepted")
+    (entry,) = value["actions"]["items"]
+    assert (entry["state"], entry["next_action"]) == (state, step)
+    assert value["actions"]["unresolved"] == ([] if code == EXIT_OK else [action.action_id])
+    assert journal_state(path) == before
+
+
+def test_revoke_action_is_a_fail_safe_control_and_an_abandoned_action_stays_unresolved(
+        tmp_path, capsys, scripted_replies):  # noqa: F811
+    path, action, host, clock = action_journal(tmp_path, scripted_replies)
+    (approval_id,) = [row["approval_id"] for row in action_rows(path, "workflow_action_approvals")]
+    reason = f"Approver left {action_approvals.ORGANIZATION}"
+    revoke = ["runs", "--journal", str(path), "--json", "revoke-action", action.action_id, "--reason", reason]
+    # Another worker's live lease does not stop the revocation.
+    with SQLiteWorkflowStore(path, clock_ns=clock) as store:
+        store.acquire_lease(action.run_id, "another-worker", ttl_s=3600)
+
+    assert main(revoke) == EXIT_OK
+    assert output(capsys)["revoke-action"] == {"target": action.action_id, "revoked": [approval_id]}
+    (row,) = action_rows(path, "workflow_action_approvals")
+    assert row["revoked_reason"] == "Approver left org-[redacted]" and row["revoked_at_ns"] is not None
+    assert main(revoke) == EXIT_OK
+    assert output(capsys)["revoke-action"]["revoked"] == []
+    assert main(revoke[:3] + revoke[4:]) == EXIT_OK
+    assert capsys.readouterr().out == f"Revoked 0 approvals of {action.action_id}; none was in force\n"
+    code, value = inspect_durable(capsys, path, action.run_id)
+    assert code == EXIT_RUN_ACTION_UNRESOLVED
+    assert value["actions"]["items"][0]["approvals"][0]["revocation"] == "after_dispatch"
+    assert "Approver left" not in json.dumps(value)
+
+    with SQLiteWorkflowStore(path, clock_ns=clock) as store:
+        operator_actions.decide(store, host, action, "abandon")
+    code, value = inspect_durable(capsys, path, action.run_id)
+    assert (code, value["actions"]["unresolved"]) == (EXIT_RUN_ACTION_UNRESOLVED, [action.action_id])
+    assert (value["actions"]["items"][0]["state"], value["actions"]["items"][0]["next_action"]) == (
+        "unresolved", None)
+
+
+def test_revoke_action_refuses_what_it_cannot_revoke_and_never_upgrades_a_journal(tmp_path, capsys):
+    def revoke(*options, target="no-such-action"):
+        return main(["runs", *options, "--json", "revoke-action", target, "--reason", "stop"])
+
+    path, _ = durable_run(tmp_path)
+    before = path.read_bytes()
+    assert revoke("--journal", str(path)) == EXIT_JOB_STATE
+    assert "no external actions" in output(capsys)["error"]["message"]
+    assert path.read_bytes() == before and recorded_version(path) == [(1,)]
+
+    current = tmp_path / "current.db"
+    SQLiteWorkflowStore(current).close()
+    assert revoke("--journal", str(current)) == EXIT_JOB_STATE
+    assert output(capsys)["error"]["type"] == "RunNotFoundError"
+    assert revoke("--checkpoints", str(tmp_path)) == EXIT_INVALID_INPUT
+    assert "needs --journal" in output(capsys)["error"]["message"]
+    assert revoke("--journal", str(tmp_path / "missing.db")) == EXIT_LOCAL_ERROR
+    assert output(capsys)["error"]["type"] == "RunInspectionError"
+    assert not (tmp_path / "missing.db").exists()
+    assert main(["runs", "--journal", str(current), "--json", "revoke-action", "x", "--reason", ""]) == (
+        EXIT_INVALID_INPUT)
+    assert output(capsys)["error"]["type"] == "WorkflowValidationError"

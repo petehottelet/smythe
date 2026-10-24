@@ -111,7 +111,7 @@ and recovery controls.
         "elapsed_ms": 42500.0,
         "summed_node_ms": 61200.0,
         "phases_ms": {"routing": null, "planning": 3100.0, "execution": 52000.0, "…": "…"},
-        "waiting_ms": {"retry_backoff": 0.0, "admission": 900.0, "supervision": 0.0}
+        "waiting_ms": {"retry_backoff": 0.0, "admission": 900.0, "supervision": 0.0, "capacity": 0.0, "drain": 0.0}
       }
     ]
   }
@@ -124,14 +124,18 @@ Notes:
   handoff. Both are `null` for a caller-built graph that carries no task.
 - Node `result` values that aren't JSON-serializable are stored as their `str()` form.
 - `budget.max_budget_usd` is the cap the execution started with; resume honors it, not whatever the resuming Swarm was constructed with.
+- `budget.node_costs` records costs, never reservations. A node whose sent call never answered under a retry policy with `retain_uncertain_dispatch` holds that call's reservation here as recorded cost, with `cost_usd_unknown` and `cost_usd_is_estimate` in its `metadata`, so resume restores the exposure without a new version ([calls without an answer](execution.md#calls-without-an-answer)).
 - `budget.token_estimate_nodes` lists the nodes, including `__synthesis__` for an `LLM_MERGE` synthesis, whose recorded cost prices tokens at the blended `cost_per_token` rate. Resume restores them, so `Sentinel.cost_contains_token_estimates` still reports costs priced before the checkpoint. A value other than a list of node IDs stops resume with `BudgetValidationError`.
 - `control.revisions_used` is how much of the supervisor's `max_revisions` allowance the run has already spent. Resume seeds the executor from it, so the cap bounds the **run**, not each attempt: a crash-resume cycle cannot refill the allowance and revise past the limit the caller set.
 - `control.retry_policy` and `control.attempts_used` appear only for a run whose retry policy persists attempts, which makes the checkpoint version 5; see [attempt allowance](#attempt-allowance-version-5).
+- `control.revision_log`, present once a supervisor made a decision, lists the run's latest supervisor decisions; see [revision log](#revision-log).
+- `control.security_stop` appears once a [security stop](execution.md#security-stops) ended the run, which makes the checkpoint version 5; see [security stop](#security-stop-version-5).
+- `control.drain` appears in the failed checkpoint of a run that [drained its in-flight nodes](execution.md#draining-in-flight-work) under a termination policy: `{"settled": [...], "cancelled": [...], "deadline_hit": false}`. It is informational within version 4: resume does not read it, and a resumed run's checkpoints record only a drain of their own.
 - A node that a revision added carries `"added_by_revision": true` in its `metadata` (from 0.8.2). `LLMSupervisor` counts these nodes against `max_total_added_nodes`, so resume does not reset the count ([what the cap limits](supervisor.md#safety)). Nodes added before 0.8.2 have no marker and are not counted.
 - `task.done_when` carries the acceptance criteria forward. A resumed run that had forgotten them could not hold its own output to them.
 - `timing` records how long each call that worked on the execution took; see [timing segments](#timing-segments).
 - `graph.planning`, present only when a component recorded how the graph was planned, holds informational records keyed by namespace; see [graph planning records](#graph-planning-records).
-- A version 5 checkpoint adds a top-level `requires` list and the state it names, such as a `delivery_acceptance` record or an attempt allowance; see [required state features](#required-state-features-version-5).
+- A version 5 checkpoint adds a top-level `requires` list and the state it names, such as a `delivery_acceptance` record, an attempt allowance, nodes that name model profiles or a security stop; see [required state features](#required-state-features-version-5).
 - A completed version 5 checkpoint that was [re-evaluated](verifier.md#re-evaluation) adds `delivery_acceptance_history`, the decisions its current record superseded; see [decision history](#decision-history).
 
 ## Timing segments
@@ -183,6 +187,56 @@ are informational, so the checkpoint stays version 4. A value other than an
 object stops resume with `ValueError`. `smythe.RoutingDecision.from_dict()`
 reads the `routing` record back and rejects a version, method or key it does
 not know.
+
+When the [contribution lint](architecture.md#contribution-lint) finds
+parallel siblings in a routed plan that could only repeat each other's work, it
+writes `coordination` beside `routing`, one list of node ids per group:
+`{"version": 1, "duplicate_siblings": [["research-0", "research-1"]]}`. A plan
+it does not flag has no `coordination` key.
+
+## Revision log
+
+Once a [supervisor](supervisor.md#revision-log) has made a decision, applied
+or refused, `control.revision_log` lists the run's latest 32 decisions, oldest
+first:
+
+```json
+"control": {
+  "revisions_used": 1,
+  "revision_log": [
+    {
+      "after_node": "draft",
+      "applied": true,
+      "change": "+1",
+      "added": ["check"],
+      "dropped": [],
+      "rewired": [],
+      "retained": ["draft"],
+      "invalidated": [],
+      "preserved_gates": [],
+      "revisions_remaining_after": 1,
+      "added_total": 1,
+      "trigger": "node_completed",
+      "reason": "the answer needs a check",
+      "detail": null
+    }
+  ]
+}
+```
+
+The keys are those of the trace's [revision record](supervisor.md#what-a-revision-changed)
+with `applied`, the supervisor's `reason` and a refusal's `detail`, each at
+most 200 characters with account identifiers redacted. Entries hold node ids,
+never labels or results; each id list keeps its first 16, and `omitted_ids`,
+present only then, counts the ids left out. Resume continues the saved log, so
+it covers decisions made before a crash although the resumed run's trace does
+not.
+
+The log is informational: it does not change the checkpoint version or what
+resume does, and it is not a [required state feature](#required-state-features-version-5).
+A run without decisions saves no key. Resume and `smythe runs inspect` read a
+missing log, or one whose entries lack a key or hold a value of the wrong type,
+as empty. `smythe.checkpoint.revision_log_from_state(state)` reads it back.
 
 ## Verification state
 
@@ -243,12 +297,14 @@ the state features its reader must understand:
 "requires": ["delivery_acceptance"]
 ```
 
-This build knows three features: [`delivery_acceptance`](#delivery-acceptance-version-5),
-[`attempt_allowance`](#attempt-allowance-version-5), and `operator_decision`,
+This build knows five features: [`delivery_acceptance`](#delivery-acceptance-version-5),
+[`attempt_allowance`](#attempt-allowance-version-5),
+[`model_profiles`](#model-profiles-version-5), `operator_decision`,
 which a completed state lists while its record or a kept
 [earlier decision](#decision-history) is an
-[operator's decision](verifier.md#operator-decisions). A state lists those it
-needs in that order. A reader refuses, with
+[operator's decision](verifier.md#operator-decisions), and
+[`security_stop`](#security-stop-version-5). A state lists those it needs in
+that order. A reader refuses, with
 `ValueError` and before any provider call, a version 5 checkpoint whose
 `requires` is missing or is not a list of strings, or that lists a feature it
 does not know, whether the run finished or not. A later feature can therefore
@@ -401,7 +457,8 @@ and each node's spent attempts in `control`:
 ```
 
 - `retry_policy` holds the policy's fields (`RetryPolicy.to_dict()`); its
-  `persist_attempts` is `true`.
+  `persist_attempts` is `true`. `retain_uncertain_dispatch` appears, as
+  `true`, only when the policy sets it.
 - `attempts_used` maps a node ID to the `execution_generation` it last
   attempted and how many attempts it started there. Each attempt is saved
   before its call, so a crash during a call still counts it. A node whose
@@ -423,12 +480,63 @@ saved without an allowance. Other runs keep writing version 4 with
 returns the recorded `RetryPolicy` and `attempts_used` after these checks, or
 `None` without an allowance.
 
+## Model profiles (version 5)
+
+A run whose graph has a node that names a [model
+profile](execution.md#model-profiles) in `metadata.profile` writes every
+checkpoint as version 5 and lists `model_profiles` in `requires`. The node
+keeps the profile's name and model in its `metadata`:
+
+```json
+"metadata": {"profile": "sol", "model": "gpt-5.6-sol"}
+```
+
+A build that does not route profiles would call the run's provider for that
+node, so builds that read only versions 1 through 4 refuse the checkpoint,
+and so does a version 5 reader that does not know `model_profiles`. A
+version 5 state whose nodes name profiles without listing `model_profiles`,
+or that lists it with no node naming one, is refused with `ValueError`,
+finished or not, before any provider call.
+
+Resume routes each unfinished profiled node to the resuming `Swarm`'s
+profile of the same name, and refuses with `NoAllowedProfileError`, before
+any provider call, a node whose profile that Swarm does not allow or whose
+saved model differs from its profile's. A completed run returns its saved
+result without them. Runs without a profiled node keep writing version 4.
+`smythe.checkpoint.model_profiles_from_state(state)` returns the profile each
+node names, by node ID, after these checks.
+
+## Security stop (version 5)
+
+A run that a [security stop](execution.md#security-stops) ended writes its
+failed checkpoint, and any later one, as version 5, lists `security_stop` in
+`requires`, and records the stop in `control`:
+
+```json
+"control": {
+  "revisions_used": 0,
+  "security_stop": {"reason_code": "credential_leak", "at": 1751600042.5}
+}
+```
+
+`reason_code` is the developer's code (1-64 letters, digits, `.`, `_`, `:`
+or `-`), and `at` the wall time, in seconds since the epoch, when the
+executor met the stop. A run with a stop never resumes: this build raises its
+`SecurityStop` on resume and on re-evaluation, finished or not, before any
+provider call, and leaves the checkpoint as it is. Builds that read only
+versions 1 through 4 refuse it, and so does a version 5 reader that does not
+know `security_stop`, instead of resuming a run that was stopped. A version 5
+state that records a stop without listing it, lists it without one, or holds
+a stop that is not exactly a valid `reason_code` and a finite `at` is refused
+with `ValueError`. `smythe.checkpoint.security_stop_from_state(state)` returns
+the stop after these checks, or `None` without one.
+
 ## Resume semantics
 
 `swarm.resume(execution_id)` (or `await swarm.aresume(...)`):
 
 1. Loads the state and rejects unknown ids (`KeyError`) and unreadable versions (`ValueError`).
-2. Restores the complete task, validates saved budget policy, charges, and verification state. Conflicting task copies, unresolved accounting markers, or ambiguous verification decisions stop recovery. A completed snapshot with output and no pending verification work returns its validated stored result and task; a version 5 snapshot returns its checked [delivery acceptance record](#delivery-acceptance-version-5) too. An unfinished version 5 snapshot stops here unless the resuming `Swarm` has the strict policy it began with, and, with an [attempt allowance](#attempt-allowance-version-5), the retry policy it records.
+2. Restores the complete task, validates saved budget policy, charges, and verification state. Conflicting task copies, unresolved accounting markers, or ambiguous verification decisions stop recovery. A completed snapshot with output and no pending verification work returns its validated stored result and task; a version 5 snapshot returns its checked [delivery acceptance record](#delivery-acceptance-version-5) too. An unfinished version 5 snapshot stops here unless the resuming `Swarm` has the strict policy it began with, with an [attempt allowance](#attempt-allowance-version-5) the retry policy it records, and with [profiled nodes](#model-profiles-version-5) the profiles they name.
 3. Otherwise restores the graph, re-registers the recorded agents, and resets `running` / `failed` nodes to `pending`. It finishes saved regeneration intents and consumes pending verdicts before dispatch. A rejected generation invalidates affected `completed` and `skipped` results too; other finished nodes keep their recorded results.
 4. Restores per-node costs into the budget so the resumed run keeps counting against the original cap.
 5. Executes the remaining nodes on the async executor, one at a time unless the resuming Swarm has `parallel=True` (then up to `max_concurrency`), synthesizes over the full graph, decides delivery acceptance under a strict policy, and writes the final checkpoint.
@@ -447,10 +555,13 @@ resume. See [Cost guardrails](budgets.md).
 
 This build writes version `4` and reads versions `1` through `5`. It writes
 version `5` only for a state with a [delivery acceptance
-record](#delivery-acceptance-version-5) or an [attempt
-allowance](#attempt-allowance-version-5), so builds that read only versions 1
-through 4 refuse it instead of delivering output they cannot check or
-refilling attempts the run has spent. A version
+record](#delivery-acceptance-version-5), an [attempt
+allowance](#attempt-allowance-version-5), a node that names a [model
+profile](#model-profiles-version-5) or a [security
+stop](#security-stop-version-5), so builds that read only versions 1
+through 4 refuse it instead of delivering output they cannot check,
+refilling attempts the run has spent, calling the wrong provider or resuming
+a stopped run. A version
 5 reader also refuses any [required state feature](#required-state-features-version-5)
 it does not know.
 Version 2 added `control` and `task.done_when`; version 1 loads their original
@@ -467,6 +578,11 @@ without it restores no token estimates, as before the key existed, so
 So is `graph.planning`. Earlier builds read a saved graph key by key, so they
 ignore it when they resume and leave it out of the checkpoints they write; a
 graph without it restores `planning` as `None`.
+
+So is `control.revision_log`. Earlier builds read only the `control` keys they
+know, so they ignore the log when they resume and leave it out of the
+checkpoints they write; this build resumes a checkpoint without it with an
+empty log.
 
 Version 4 adds no field. It records that every MCP server listed under
 `agents` came from developer configuration: from 0.8.1 on, a model-generated

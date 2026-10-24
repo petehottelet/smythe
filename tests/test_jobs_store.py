@@ -824,3 +824,371 @@ def test_budget_overrun_is_derived_latched_and_blocks_every_admission(tmp_path, 
     )
     assert store.finalize_run(run_id) == RunStatus.BUDGET_OVERRUN.value
     assert store.get_run(run_id)["status"] == RunStatus.BUDGET_OVERRUN.value
+
+
+# ---------------------------------------------------------------------------
+# Integrity repair of succeeded operations
+# ---------------------------------------------------------------------------
+
+_RECORDED = [
+    {"relative_path": f"artifacts/glyph_0_/attempt-0001/artifact-0{index}.png",
+     "mime_type": "image/png", "sha256": letter * 64, "size_bytes": 123, "width": 1, "height": 1}
+    for index, letter in ((1, "a"), (2, "b"))
+]
+
+
+def _settle_accepted(store, attempt, artifacts, *, lease, accepted=True, cost=0, ceiling=0):
+    permit = store.prepare_call(attempt["attempt_id"], ceiling, lease=lease)
+    store.mark_call_dispatched(permit.call_id, lease=lease)
+    store.complete_call(permit.call_id, cost_microusd=cost, cost_is_complete=True,
+                        cost_is_estimate=False, artifacts=[dict(item) for item in artifacts],
+                        result_text="done", accepted=accepted, lease=lease)
+
+
+def _succeeded(tmp_path, store_factory, *, attempts=2, provider="offline", cost=0):
+    """A leased run whose one operation succeeded with two accepted artifacts."""
+    plan, approval = _plan(tmp_path, provider=provider, attempts=attempts)
+    store = store_factory(tmp_path / "jobs.db")
+    run_id = store.create_run(plan, approval, manifest_root=tmp_path)
+    operation = store.pending_operations(run_id)[0]
+    lease = store.acquire_run_lease(run_id, "worker-a")
+    attempt = store.begin_attempt(run_id, operation["operation_id"], lease=lease)
+    _settle_accepted(store, attempt, _RECORDED, lease=lease, cost=cost,
+                     ceiling=0 if provider == "offline" else 100_000)
+    store.finalize_run(run_id, lease=lease)
+    return store, run_id, operation, lease, store.snapshot(run_id)["artifacts"]
+
+
+def _observed(artifact, status, detail="observed"):
+    return {"artifact_id": artifact["artifact_id"], "relative_path": artifact["relative_path"],
+            "sha256": artifact["sha256"], "status": status, "detail": detail}
+
+
+def test_integrity_repair_queues_a_new_attempt_and_keeps_the_accepted_one(tmp_path, store_factory):
+    store, run_id, operation, lease, artifacts = _succeeded(tmp_path, store_factory)
+    accepted_id = artifacts[0]["attempt_id"]
+    findings = [_observed(artifacts[0], "changed", "SHA-256 differs from the recorded artifact"),
+                _observed(artifacts[1], "verified")]
+    before = store.snapshot(run_id)
+
+    queued = store.queue_integrity_repair(run_id, [operation["operation_key"]],
+                                          reason="artifact-01.png was overwritten",
+                                          findings=findings, lease=lease)
+
+    assert queued == [operation["operation_key"]]
+    snapshot = store.snapshot(run_id, include_events=True)
+    [row] = snapshot["operations"]
+    assert (row["status"], row["accepted_attempt_id"], row["attempt_count"]) == (
+        OperationStatus.PENDING.value, accepted_id, 1)
+    assert snapshot["status"] == RunStatus.APPROVED.value
+    assert snapshot["artifacts"] == before["artifacts"] and snapshot["cost"] == before["cost"]
+    event = snapshot["events"][-1]
+    assert (event["event_type"], event["operation_id"]) == ("integrity_repair_queued",
+                                                            operation["operation_id"])
+    assert event["payload"] == {"version": 1, "reason": "artifact-01.png was overwritten",
+                                "findings": findings}
+
+    repaired = store.begin_attempt(run_id, operation["operation_id"], lease=lease)
+
+    attempts = store.snapshot(run_id)["attempts"]
+    assert [item["reason"] for item in attempts] == [None, "artifact-01.png was overwritten"]
+    assert attempts[1]["parent_attempt_id"] == accepted_id
+    # The accepted attempt stays named while its replacement runs.
+    assert store.snapshot(run_id)["operations"][0]["accepted_attempt_id"] == accepted_id
+    replacement = [dict(item, relative_path=item["relative_path"].replace("0001", "0002"))
+                   for item in _RECORDED]
+    _settle_accepted(store, repaired, replacement, lease=lease)
+
+    after = store.snapshot(run_id)
+    assert after["operations"][0]["accepted_attempt_id"] == repaired["attempt_id"]
+    assert after["operations"][0]["attempt_count"] == 2
+    # Artifact rows are insert-only and recorded accepted flags are unchanged.
+    old = [item for item in after["artifacts"] if item["attempt_id"] == accepted_id]
+    assert old == before["artifacts"]
+    assert [item["accepted"] for item in after["artifacts"]] == [1, 1, 1, 1]
+    assert store.finalize_run(run_id, lease=lease) == RunStatus.COMPLETED.value
+    assert store.schema_version == 4
+
+
+def test_a_rejected_repair_attempt_keeps_the_earlier_accepted_attempt(tmp_path, store_factory):
+    store, run_id, operation, lease, artifacts = _succeeded(tmp_path, store_factory, attempts=3)
+    accepted_id = artifacts[0]["attempt_id"]
+    store.queue_integrity_repair(run_id, [operation["operation_id"]], reason="file deleted",
+                                 findings=[_observed(item, "missing") for item in artifacts],
+                                 lease=lease)
+    repaired = store.begin_attempt(run_id, operation["operation_id"], lease=lease)
+
+    _settle_accepted(store, repaired, [], lease=lease, accepted=False)
+
+    [row] = store.snapshot(run_id)["operations"]
+    assert row["status"] == OperationStatus.REJECTED.value
+    assert row["accepted_attempt_id"] == accepted_id
+    # A rejected repair is rerolled like any rejection; its reason is the reroll's.
+    store.queue_reroll(run_id, [operation["operation_id"]], reason="second try", lease=lease)
+    store.begin_attempt(run_id, operation["operation_id"], lease=lease)
+    assert _attempt_reasons(store, run_id) == [None, "file deleted", "second try"]
+
+
+@pytest.mark.parametrize("statuses,message", [
+    (("verified", "verified"), "no missing or changed accepted file"),
+    (("changed", "unreadable"), "is unreadable"),
+    (("missing", "unsafe"), "is unsafe"),
+    (("changed", "not_checked"), "is not_checked"),
+])
+def test_integrity_repair_needs_a_missing_or_changed_file_and_no_unknown_one(
+    tmp_path, store_factory, statuses, message,
+):
+    store, run_id, operation, lease, artifacts = _succeeded(tmp_path, store_factory)
+    before = store.snapshot(run_id, include_events=True)
+
+    with pytest.raises(InvalidTransitionError, match=message):
+        store.queue_integrity_repair(
+            run_id, [operation["operation_key"]], reason="operator review", lease=lease,
+            findings=[_observed(item, status) for item, status in zip(artifacts, statuses)])
+
+    assert store.snapshot(run_id, include_events=True) == before
+
+
+def test_integrity_repair_refuses_other_states_exhausted_attempts_and_stale_leases(
+    tmp_path, store_factory,
+):
+    store, run_id, operation, lease, artifacts = _succeeded(tmp_path, store_factory, attempts=1)
+    key = operation["operation_key"]
+    findings = [_observed(item, "changed") for item in artifacts]
+
+    def repair(**options):
+        options = {"reason": "operator review", "findings": findings, "lease": lease} | options
+        return store.queue_integrity_repair(run_id, [key], **options)
+
+    before = store.snapshot(run_id, include_events=True)
+    with pytest.raises(InvalidTransitionError, match="exhausted"):
+        repair()
+    with pytest.raises(RunLeaseError, match="requires a current lease token"):
+        repair(lease=None)
+    store.release_run_lease(run_id, "worker-a", lease=lease)
+    current = store.acquire_run_lease(run_id, "worker-a")
+    with pytest.raises(RunLeaseError, match="superseded"):
+        repair()
+    store.release_run_lease(run_id, "worker-a", lease=current)
+    after = store.snapshot(run_id, include_events=True)
+    assert after["operations"] == before["operations"] and after["artifacts"] == before["artifacts"]
+    assert "integrity_repair_queued" not in {event["event_type"] for event in after["events"]}
+
+    # Only a succeeded operation is repaired; other states use a reroll.
+    other_run = store.create_run(*_plan(tmp_path, provider="offline"), manifest_root=tmp_path,
+                                 allow_approval_reuse=True)
+    pending = store.pending_operations(other_run)[0]
+    with pytest.raises(InvalidTransitionError, match="state pending cannot be repaired"):
+        store.queue_integrity_repair(other_run, [pending["operation_key"]], reason="review",
+                                     findings=[])
+    _settle_attempt(store, other_run, pending["operation_id"])
+    with pytest.raises(InvalidTransitionError, match="state rejected cannot be repaired"):
+        store.queue_integrity_repair(other_run, [pending["operation_key"]], reason="review",
+                                     findings=[])
+    with pytest.raises(JobNotFoundError):
+        store.queue_integrity_repair(other_run, ["missing[0]"], reason="review", findings=[])
+
+
+def test_integrity_repair_refuses_after_a_budget_overrun(tmp_path, store_factory):
+    store, run_id, operation, lease, artifacts = _succeeded(
+        tmp_path, store_factory, provider="openai_image", cost=150_000)
+    assert store.get_run(run_id)["status"] == RunStatus.BUDGET_OVERRUN.value
+    before = store.snapshot(run_id, include_events=True)
+
+    with pytest.raises(JobBudgetError, match="latched"):
+        store.queue_integrity_repair(run_id, [operation["operation_key"]], reason="review",
+                                     findings=[_observed(item, "changed") for item in artifacts],
+                                     lease=lease)
+
+    assert store.snapshot(run_id, include_events=True) == before
+
+
+def test_integrity_repair_findings_must_observe_each_accepted_file_as_recorded(
+    tmp_path, store_factory,
+):
+    store, run_id, operation, lease, artifacts = _succeeded(tmp_path, store_factory)
+    first, second = (_observed(item, "changed") for item in artifacts)
+    before = store.snapshot(run_id, include_events=True)
+
+    for findings, problem in (
+        ([first], "every accepted artifact"),
+        ([first, second, first], "more than once"),
+        ([first, dict(second, sha256="c" * 64)], "every accepted artifact"),
+        ([first, dict(second, relative_path="artifacts/other.png")], "every accepted artifact"),
+        ([first, second, dict(first, artifact_id="f" * 32)], "not an accepted artifact"),
+        ([first, dict(second, status="broken")], "status"),
+        ([first, dict(second, detail=7)], "detail"),
+        ([first, {key: second[key] for key in ("artifact_id", "status")}], "keys"),
+        ([first, dict(second, extra=True)], "keys"),
+        ("changed", "list"),
+    ):
+        with pytest.raises(ValueError, match=problem):
+            store.queue_integrity_repair(run_id, [operation["operation_key"]], reason="review",
+                                         findings=findings, lease=lease)
+    for reason in ("", "  ", None, "x" * 2049):
+        with pytest.raises(ValueError, match="reason"):
+            store.queue_integrity_repair(run_id, [operation["operation_key"]], reason=reason,
+                                         findings=[first, second], lease=lease)
+    with pytest.raises(ValueError, match="operation key"):
+        store.queue_integrity_repair(run_id, [], reason="review", findings=[], lease=lease)
+    assert store.snapshot(run_id, include_events=True) == before
+
+
+def test_integrity_repair_reopens_a_version_4_database_without_migration(tmp_path, monkeypatch):
+    plan, approval = _plan(tmp_path, provider="offline")
+    database = tmp_path / "jobs.db"
+
+    def schema():
+        with closing(sqlite3.connect(database)) as db:
+            return (db.execute("PRAGMA user_version").fetchone()[0],
+                    sorted(db.execute("SELECT type, name, sql FROM sqlite_master")))
+
+    with SQLiteRunStore(database) as store:
+        run_id = store.create_run(plan, approval, manifest_root=tmp_path)
+        operation_id = store.pending_operations(run_id)[0]["operation_id"]
+        lease = store.acquire_run_lease(run_id, "worker-a")
+        attempt = store.begin_attempt(run_id, operation_id, lease=lease)
+        _settle_accepted(store, attempt, _RECORDED[:1], lease=lease)
+        [artifact] = store.snapshot(run_id)["artifacts"]
+        created = schema()
+        store.queue_integrity_repair(run_id, [operation_id], reason="file deleted",
+                                     findings=[_observed(artifact, "missing")], lease=lease)
+        store.release_run_lease(run_id, "worker-a", lease=lease)
+
+    def no_migration(*_args):
+        raise AssertionError("a version 4 database was migrated")
+
+    monkeypatch.setattr(SQLiteRunStore, "_migrate_schema", no_migration)
+    assert schema() == created and created[0] == 4
+    with SQLiteRunStore(database) as store:
+        lease = store.acquire_run_lease(run_id, "worker-b")
+        store.begin_attempt(run_id, operation_id, lease=lease)
+        assert _attempt_reasons(store, run_id) == [None, "file deleted"]
+    with SQLiteRunStore(database, read_only=True) as store:
+        assert store.snapshot(run_id)["version"] == 4
+    assert schema() == created
+
+
+# ---------------------------------------------------------------------------
+# Rechecked delivery decisions
+# ---------------------------------------------------------------------------
+
+_PALETTE_V2 = {"name": "brand-palette", "version": "2", "config_sha256": "e" * 64}
+
+
+def _recheck(operation, artifacts, outcome="accepted"):
+    """A recheck of every accepted artifact, shaped as ``JobRunner.recheck`` records it."""
+    result = {"accepted": "passed", "rejected": "rejected", "indeterminate": "error"}[outcome]
+    return {
+        "operation_id": operation["operation_id"],
+        "attempt_id": artifacts[0]["attempt_id"],
+        "outcome": outcome,
+        "validators": [{"validator": _PALETTE_V2, "outcome": result, "reports": []}],
+        "findings": [] if outcome == "accepted" else ["artifact-01.png: brand-palette: off palette"],
+        "artifacts": [{"relative_path": item["relative_path"], "sha256": item["sha256"]}
+                      for item in artifacts],
+    }
+
+
+def test_a_recheck_records_a_decision_and_changes_no_status_pointer_or_flag(tmp_path, store_factory):
+    store, run_id, operation, lease, artifacts = _succeeded(tmp_path, store_factory)
+    before = store.snapshot(run_id, include_events=True)
+    decision = _recheck(operation, artifacts, "rejected")
+
+    [payload] = store.record_reevaluation(run_id, [decision], reason="palette version 2",
+                                          lease=lease)
+
+    assert payload == {"version": 1, "attempt_id": artifacts[0]["attempt_id"],
+                       "reason": "palette version 2", "outcome": "rejected",
+                       "validators": decision["validators"], "findings": decision["findings"],
+                       "artifacts": decision["artifacts"]}
+    after = store.snapshot(run_id, include_events=True)
+    for name in ("status", "counts", "cost", "operations", "attempts", "artifacts", "updated_at_ns"):
+        assert after[name] == before[name]
+    event = after["events"][-1]
+    assert (event["event_type"], event["operation_id"], event["payload"]) == (
+        "delivery_acceptance_reevaluated", operation["operation_id"], payload)
+    [recorded] = store.delivery_reevaluations(run_id)[artifacts[0]["attempt_id"]]
+    assert recorded == payload | {"reevaluated_at_ns": event["created_at_ns"]}
+    [attempt] = store.inspection_snapshot(run_id)["attempts"]
+    assert attempt["delivery_reevaluations"] == [recorded]
+    # A later recheck is kept beside the earlier one, oldest first.
+    store.record_reevaluation(run_id, [_recheck(operation, artifacts)], reason="palette fixed",
+                              lease=lease)
+    assert [item["outcome"] for item in store.delivery_reevaluations(run_id)[
+        artifacts[0]["attempt_id"]]] == ["rejected", "accepted"]
+    assert store.schema_version == 4
+
+
+def test_a_recheck_must_decide_a_succeeded_operations_accepted_files_as_recorded(
+    tmp_path, store_factory,
+):
+    store, run_id, operation, lease, artifacts = _succeeded(tmp_path, store_factory)
+    valid = _recheck(operation, artifacts)
+    first, second = valid["artifacts"]
+    before = store.snapshot(run_id, include_events=True)
+
+    for decision, error, problem in (
+        (dict(valid, artifacts=[first]), ValueError, "every accepted artifact"),
+        (dict(valid, artifacts=[first, dict(second, sha256="c" * 64)]), ValueError,
+         "every accepted artifact"),
+        (dict(valid, artifacts=[first, first]), ValueError, "every accepted artifact"),
+        (dict(valid, artifacts=[first, dict(second, extra=1)]), ValueError, "relative_path"),
+        (dict(valid, attempt_id="f" * 32), InvalidTransitionError, "accepted attempt"),
+        (dict(valid, outcome="rejected"), ValueError, "outcome"),
+        (dict(valid, outcome="maybe"), ValueError, "outcome"),
+        (dict(valid, validators=[]), ValueError, "validator"),
+        (dict(valid, validators=[{"validator": _PALETTE_V2, "outcome": "fine"}]), ValueError,
+         "validator"),
+        (dict(valid, findings="none"), ValueError, "findings"),
+        (dict(valid, findings=[7]), ValueError, "findings"),
+        ({key: value for key, value in valid.items() if key != "findings"}, ValueError, "keys"),
+        (dict(valid, extra=True), ValueError, "keys"),
+        (dict(valid, operation_id=7), ValueError, "text"),
+        (dict(valid, validators=[{"validator": _PALETTE_V2, "outcome": "passed",
+                                  "reports": float("nan")}]), ValueError, "JSON"),
+        (dict(valid, operation_id="op_missing"), JobNotFoundError, "op_missing"),
+    ):
+        with pytest.raises(error, match=problem):
+            store.record_reevaluation(run_id, [decision], reason="review", lease=lease)
+    for reason in ("", "  ", None, "x" * 2049):
+        with pytest.raises(ValueError, match="reason"):
+            store.record_reevaluation(run_id, [valid], reason=reason, lease=lease)
+    for decisions, problem in (([], "at least one"), ("decision", "at least one"),
+                               ([valid, valid], "once")):
+        with pytest.raises(ValueError, match=problem):
+            store.record_reevaluation(run_id, decisions, reason="review", lease=lease)
+    # One refused decision records none of the others.
+    with pytest.raises(JobNotFoundError):
+        store.record_reevaluation(run_id, [valid, dict(valid, operation_id="op_missing")],
+                                  reason="review", lease=lease)
+    assert store.snapshot(run_id, include_events=True) == before
+
+    # An operation in any other state has no accepted output to recheck.
+    other_run = store.create_run(*_plan(tmp_path, provider="offline"), manifest_root=tmp_path,
+                                 allow_approval_reuse=True)
+    pending = store.pending_operations(other_run)[0]
+    with pytest.raises(InvalidTransitionError, match="state pending"):
+        store.record_reevaluation(other_run, [dict(valid, operation_id=pending["operation_id"])],
+                                  reason="review")
+
+
+def test_a_recheck_is_fenced_by_the_runs_current_lease(tmp_path, store_factory):
+    store, run_id, operation, lease, artifacts = _succeeded(tmp_path, store_factory)
+    decision = _recheck(operation, artifacts)
+    before = store.snapshot(run_id, include_events=True)
+
+    with pytest.raises(RunLeaseError, match="requires a current lease token"):
+        store.record_reevaluation(run_id, [decision], reason="review")
+    store.release_run_lease(run_id, "worker-a", lease=lease)
+    current = store.acquire_run_lease(run_id, "worker-a")
+    with pytest.raises(RunLeaseError, match="superseded"):
+        store.record_reevaluation(run_id, [decision], reason="review", lease=lease)
+    after = store.snapshot(run_id, include_events=True)
+    assert "delivery_acceptance_reevaluated" not in {event["event_type"] for event in after["events"]}
+    assert after["operations"] == before["operations"]
+
+    assert store.record_reevaluation(run_id, [decision], reason="review", lease=current)
+    with SQLiteRunStore(tmp_path / "jobs.db", read_only=True) as reader:
+        with pytest.raises(RunStoreError, match="read-only"):
+            reader.record_reevaluation(run_id, [decision], reason="review", lease=current)

@@ -110,7 +110,6 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   and an async `validate`, including an object whose `__call__` is async.
   Runs do not evaluate a policy, and `Swarm` takes none. See
   [delivery acceptance records](docs/verifier.md#delivery-acceptance-records).
-  and an async `validate`. See [delivery acceptance records](docs/verifier.md#delivery-acceptance-records).
 - `SwarmResult.acceptance` and `SwarmResult.rejected_output`, appended after
   `timing` so positional construction is unchanged, a read-only
   `SwarmResult.accepted` that is true only for an `accepted` record, and
@@ -173,8 +172,6 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   recorded statuses and `accepted` flags are unchanged. The HTML report shows
   it in a Delivery column. See
   [delivery eligibility](docs/jobs.md#delivery-eligibility).
-  not accept is returned as `rejected_output` with an empty `output`. See
-  [delivery acceptance](docs/checkpoint-format.md#delivery-acceptance-version-5).
 - Strict delivery acceptance on ordinary runs. `Swarm(acceptance=...)` and
   `Swarm.from_yaml(..., acceptance=...)` take an `AcceptancePolicy`; the
   default `None` and an advisory policy keep current behavior. A strict
@@ -246,8 +243,156 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   awaitables, and async protocol methods: `submit()`, `lookup()` and `read()`
   on a connector, whose `profile` must be a `ConnectorProfile`, and `verify()`
   and `still_authorized()` on a verifier, whose `identity` must be a name
-  without control characters. Other methods are not checked. Nothing
-  stores or dispatches actions yet. See [external actions](docs/actions.md).
+  without control characters. Other methods are not checked. See
+  [external actions](docs/actions.md).
+- Version 2 workflow journals have four tables for external actions:
+  `workflow_actions`, `workflow_action_attempts`, `workflow_action_approvals`
+  and the append-only `workflow_action_records`.
+  Action money is a separate `external_actions` accounting scope that never
+  enters a run's balances. `SQLiteWorkflowStore.audit()` also checks a run's
+  actions: intent digests, action keys, states, verdicts and record kinds,
+  approvals bound to their action's intent, and balances equal to the sums
+  of each action's attempts and records. `inspect_run()` adds an `actions`
+  block only for a run that has actions, without parameters, approval
+  assertions, revocation reasons, receipts, record payloads or error text. See
+  [external action records](docs/workflow-accounting.md#external-action-records).
+- Prepared external actions and host-verified approvals in `smythe.actions`.
+  `prepare_action(store, run_id, *, slot, intent, profile)` records a
+  logical action only for a completed durable run whose current delivery
+  decision is `accepted`, including an operator's, and only for content with
+  the exact SHA-256 and size of the accepted output, or of the published
+  document, whose file must still hold it. Advisory and earlier runs have no
+  recorded decision and are refused with `ActionNotAuthorized`. The same
+  intent again returns the slot's action; another intent raises
+  `WorkflowConflictError` while it is unfinished, and becomes the next
+  sequence with its own key once it is observed, reconciled or canceled.
+  `approve()` records an approval only when the host's verifier accepts the
+  assertion for exactly the action's intent digest, the principal belongs to
+  the intent's tenant, the nanoUSD ceiling covers the action's attempts and
+  readback, and the expiry is later than the journal's clock; an assertion is
+  recorded once per journal, so it never approves a second action.
+  `reject()` cancels an undispatched action for good under a verified
+  principal, `revoke()` is a fail-safe control that needs no principal and
+  stores its reason redacted, and `check_authority()` verifies the newest
+  approval again and checks expiry, revocation, consumption, the intent
+  digest and that the run's content is still accepted, intact and not
+  unavailable after a source removal. None needs a run lease. See
+  [approvals](docs/actions.md#approvals).
+- A durable dispatch journal for external actions in
+  `smythe.workflow_actions`, fenced by the run's lease. `begin_attempt()`
+  reserves the profile's write ceiling after checking the content as
+  `check_authority()` does and, in the same transaction, that no security
+  stop holds the run, the action is not dispatched, the approval is still its
+  newest, unrevoked, unconsumed and unexpired, fewer than `max_attempts`
+  attempts were dispatched and the spend fits the approval's ceiling.
+  `claim_dispatch()` checks again and commits the attempt as dispatched,
+  with the lease epoch, before anything is sent, returning an
+  `ActionDispatchPermit`; an attempt no longer authorized is released.
+  `record_receipt()` keeps the receipt with the external object's identity,
+  confirms its cost or keeps the write ceiling as unknown exposure, and
+  consumes the approval; `record_refused()` gives the reservation back and
+  leaves the approval for the next attempt; `record_ambiguous()` keeps the
+  write ceiling as unknown exposure. Connector error text is stored
+  redacted. A permit from a superseded lease session, or for an attempt
+  already settled, changes nothing and is kept as a `late_receipt` record.
+  `recover_actions()` releases prepared attempts and turns dispatched ones
+  into `outcome_unknown` without resending or releasing exposure, and
+  `reject()` releases an attempt prepared but not yet claimed. A run's
+  model-call latches do not block actions. The audit also checks that at
+  most one attempt is in flight and that a refused attempt never consumes an
+  approval. See [the dispatch journal](docs/actions.md#dispatch-journal).
+- `ActionRunner` in `smythe.actions` dispatches a run's prepared actions
+  through a connector, serially and under the run's lease, as the only retry
+  owner. `dispatch()` recovers what a stopped worker left in flight, checks
+  the approval and begins an attempt, reads the payload once and refuses
+  bytes that are not the bound content before the claim, then submits once
+  with the action's key and records the receipt, refusal or ambiguous
+  outcome; a receipt for another key or target is ambiguous. A receipt alone
+  never makes an action observed: `readback()` reads the receipt's object at
+  most `readback_reads` times per attempt, at the declared interval, and
+  records each read with its cost and a `smythe.action-readback` validation
+  report. Only the receipt's target holding the bound digest, the action's
+  key where exposed and at least the receipt's version makes the action
+  `observed`; a contradiction makes it `compensation_required`, and reads
+  that decide nothing leave it dispatched with `reconcile` next. Nothing is
+  resubmitted. `record_notice()` keeps a relayed service callback as an
+  untrusted record that can only prompt a readback. A connector whose profile
+  differs from the action's, or that retries on its own, is refused. See
+  [the action runner](docs/actions.md#action-runner).
+- `ActionRunner.reconcile()` settles an external action whose outcome a
+  dispatch left unknown, only as its connector profile declares. With
+  `lookup_by_key` it looks the action's key up, at most `readback_reads`
+  times per attempt, and reads back the receipt a lookup finds, making the
+  action `reconciled` or `compensation_required`. An empty lookup never
+  causes a submission, and shows that the write was not made only once a
+  declared `visibility_bound_s` plus the connector's timeout has passed since
+  the dispatch while the key is still inside its window; the action is then
+  `not_dispatched` again under its unconsumed approval. A deduplicating
+  service without lookups gets one same-key retry within `max_attempts`,
+  only while `dedupe_window_s` from the first dispatch, less the timeout, is
+  open and the approval and content still hold; a refused retry leaves the
+  outcome unknown. Anything else, including a connector with neither
+  declaration, records an `unresolved` finding with `operator_review` next
+  and sends nothing. Lookups and reads, including the readback of an attempt
+  dispatched after a `not_executed` finding, are charged against the ceiling
+  of the attempt's approval and never made past it, and the uncertain write
+  keeps its unknown exposure until a receipt reports its cost.
+  `smythe.workflow_actions` gains `record_lookup()`, `claim_retry()` and
+  `record_finding()`. See [reconciliation](docs/actions.md#reconciliation).
+- Revoked authority takes precedence over external action dispatch.
+  `stop_actions(store, run_id, reason)` in `smythe.actions` is a fail-safe
+  control that needs no principal or lease: it revokes every approval of the
+  run's actions, storing the reason redacted, and records an
+  `actions_stopped` event. No resume, recovery, lease or reopened journal
+  clears it; only a new approval reopens an action. A submission already
+  claimed still records its outcome, and reads and lookups that settle it go
+  on. `ActionRunner.dispatch_pending(run_id)` dispatches a run's waiting
+  actions serially under one lease, checking each action's authority again
+  before its claim and in the claim's transaction, so a revocation during a
+  submission refuses every later claim; a refused action is returned with
+  its `ActionProgress.refusal`. Action dispatch takes no drain policy.
+  Revoking never changes an action's state, and `inspect_run()` shows each
+  revoked approval's `revocation`: `before_dispatch`, `after_dispatch` or
+  `after_effect`. See [revocation](docs/actions.md#revocation).
+- `prepare_compensation(store, action_id, *, operation, parameters=None)` in
+  `smythe.actions` records a compensation as a new logical action. For an
+  action that is `observed`, `reconciled` or `compensation_required`, whose
+  connector profile declares `compensation="new_action"`, it writes the
+  operation and parameters, without content, to the object the action's
+  receipt named and its readback read. `PreparedAction.compensates_action_id`
+  names the action it undoes, and its slot, `<slot>/<sequence>/compensation`,
+  gives it its own key. It needs its own approval, since the original's binds
+  another intent digest, and makes its own attempts with their own receipt
+  and readback; the original's records never change. A connector without
+  compensation refuses it with `ActionStateError`, and the action stays
+  `compensation_required` with its unknown exposure. A security stop refuses
+  it as it refuses every action. See
+  [compensation](docs/actions.md#compensation).
+- Operator decisions on external actions in `smythe.actions`.
+  `resolve(store, action_id, decision, *, assertion, verifier, evidence=None,
+  note)` records `adopt_observed`, `not_executed` or `abandon` on an action
+  whose outcome reconciliation left open, only when the host's verifier
+  accepts the assertion for exactly `decision_sha256()`, which binds the
+  action, its state and attempts, the decision and the evidence, from a
+  principal of the intent's tenant; a security stop refuses every decision.
+  `adopt_observed` needs a readback that showed the bound content, or
+  evidence, and makes the action `reconciled` without a submission.
+  `not_executed` needs evidence and returns the action to `not_dispatched`
+  with duplicate risk: its earlier approval no longer authorizes a dispatch,
+  and only `approve(..., duplicate_risk=True)` with an assertion for
+  `duplicate_risk_sha256()`, bound to the attempts the decision found, does.
+  `abandon` closes the action in the new `unresolved` state. `ActionEvidence`
+  is kept as a SHA-256 and a redacted summary of at most 500 characters,
+  never its bytes. Decisions only append `decision` and `evidence` records:
+  no attempt, approval or balance changes, so unknown exposure stays.
+  `inspect_actions(store, run_id)` adds each action's duplicate risk and next
+  action and lists the unresolved actions. `smythe runs inspect` reports them
+  in an `actions` block and exits with 12 when the decision is `accepted` but
+  an external action is unresolved; codes 10 and 11 take precedence.
+  `smythe runs revoke-action` is the lease-free `revoke()` fail-safe, and
+  never upgrades a version 1 journal. See
+  [operator decisions](docs/actions.md#operator-decisions) and
+  [external actions in runs inspect](docs/runs.md#external-actions).
 - Jobs operations have a semantic input digest.
   `smythe.jobs.operation_input_digest()` hashes the provider kind and its
   adapter version (`smythe.jobs.providers.ADAPTER_VERSIONS`), the model,
@@ -534,9 +679,9 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   cannot check the output. See [source evidence](docs/source-evidence.md).
 - Failure classes. Every exception a node attempt raises has one class:
   `input_error`, `authority_denied`, `quality_defect`, `provider_rejected`,
-  `transient`, `unknown_outcome`, `terminal_accounting`, `persistence` or
-  `workflow`; `validator_error` and `security_stop` are named, but no
-  exception has them. Each failed attempt's trace span records its class as
+  `transient`, `unknown_outcome`, `terminal_accounting`, `persistence`,
+  `workflow` or `security_stop`; `validator_error` is named, but no
+  exception has it. Each failed attempt's trace span records its class as
   `metadata["failure_class"]`, which `Tracer.summary()` leaves out and
   checkpoints do not store. The read-only
   `ProviderRequestRejectedError.failure_class` is `authority_denied` for HTTP
@@ -599,8 +744,9 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   `artifact` block, exits with code 11 and names the next action
   `republish`. `Swarm.republish()` publishes the saved document again under
   a free name, which becomes current, with no provider call and the same
-  decision; re-evaluation needs an intact document, so it is refused until
-  then. See [published documents](docs/workflow-accounting.md#published-documents).
+  decision (a lineage run's is rendered and decided again); re-evaluation
+  needs an intact document, so it is refused until then. See
+  [published documents](docs/workflow-accounting.md#published-documents).
 - An opt-in `RetryPolicy` makes the executor the only retry owner of an
   ordinary run's node calls; `Swarm(retry_policy=...)` and both executors
   take one. A `RETRY` node then calls again only after a failure whose class
@@ -619,10 +765,11 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   `planning_provider`, and an `LLMSupervisor`'s when `max_revisions` lets it
   review; `Executor` and `AsyncExecutor` check the supervisor's with their
   own. Built-in providers declare it, and `AnthropicProvider` takes
-  `max_retries`, passed to the SDK only when set. Durable runs refuse the
-  policy, and checkpoints record it only with `persist_attempts`. Executors
-  also take `sleep` and `rng`, which replace the retry wait and its jitter.
-  Without a policy, retries are unchanged. See
+  `max_retries`, passed to the SDK only when set. Ordinary checkpoints record
+  the policy only with `persist_attempts`; durable runs record it in their
+  recipe, as described below. Executors also take `sleep` and `rng`, which
+  replace the retry wait and its jitter. Without a policy, retries are
+  unchanged. See
   [retry policy](docs/execution.md#retry-policy).
 - `RetryPolicy(persist_attempts=True)` keeps a node's allowance of attempts
   across crashes and resumes. Each attempt is saved as spent before its call,
@@ -640,9 +787,6 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   property, and `smythe.checkpoint.attempt_allowance_from_state()` reads the
   record. Other runs keep writing version 4. See
   [persisted attempts](docs/execution.md#persisted-attempts).
-  policy, and checkpoints do not record it. Executors also take `sleep` and
-  `rng`, which replace the retry wait and its jitter. Without a policy,
-  retries are unchanged. See [retry policy](docs/execution.md#retry-policy).
 - Under a `RetryPolicy`, an ordinary run classifies the native providers'
   failures as a durable journal does. A 401, 403, 404, 413 or 429 response
   from `OpenAIResponsesProvider` or `AnthropicMessagesProvider` whose body is
@@ -656,6 +800,70 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   stops the run. Neither leaves an unresolved marker, so the run resumes like
   any other failure. Without a policy, native failures still stop the run.
   See [retry policy](docs/execution.md#retry-policy).
+- `RetryPolicy(retain_uncertain_dispatch=True)` keeps the exposure of an
+  ordinary run's node call that was sent and never answered. When the node's
+  timeout, the policy's deadline or a cancellation, such as a `HALT`
+  sibling's failure or a run stopping on an interrupt, ends a call from
+  `AnthropicProvider`, `OpenAIProvider`, `OpenAIImageProvider`,
+  `GeminiProvider` or a custom provider before it answered, its reservation
+  becomes the node's recorded cost, flagged `cost_usd_unknown` and
+  `cost_usd_is_estimate`, instead of being released, so the run reports
+  `cost_is_complete=False` and version 4 checkpoints and resume keep the
+  amount and flags. `Sentinel.retain_unknown()` makes the transfer, also for
+  a verifier's reservation converted from a hold. Such a timeout raises the
+  new `UncertainDispatchError`, a `TimeoutError` of class `unknown_outcome`,
+  which the policy retries only when it lists that class; a retry reserves
+  again beside the kept exposure. A failure before the call is sent, or an
+  error the provider raises itself, still releases the reservation, native
+  providers keep their own settlement, and without the option nothing
+  changes. See [calls without an answer](docs/execution.md#calls-without-an-answer).
+- Durable runs take a `RetryPolicy`. `Swarm(run_store=..., retry_policy=...)`
+  retries a node only after a failure whose class the policy lists, so a 429
+  rejection is retried and a 401, 403, 404 or 413 is not, and a refused or
+  truncated reply, whose known charge the journal keeps, only when it lists
+  `quality_defect`. Each node starts from the attempts its current generation
+  has used, counted from the journal's rejected calls on every invocation, so
+  a crash or resume continues its `1 + max_retries` attempts instead of
+  refilling them, and a node with none left fails without a call. A node
+  whose latest call is a refused, truncated or unusable reply enters that
+  attempt again, so the journal replays the reply without a new call and the
+  policy decides as it did before the resume. The recipe records the policy
+  under `retry_policy`, without `persist_attempts`, so a run resumes under
+  the policy it started with: a `Swarm` without one uses the saved policy,
+  and a different policy, or one for a run that started without, raises
+  `WorkflowConflictError` before any call. Recipes without a policy keep
+  their bytes and their retries. The journal keeps no response headers, so a
+  durable run waits its backoff, never a `Retry-After`; every provider it
+  can call must declare `sdk_retries=0`, and a policy with
+  `retain_uncertain_dispatch` is refused, since the journal keeps every sent
+  call's exposure itself.
+  `SQLiteWorkflowStore.node_generation_calls()` lists a node generation's
+  settled calls, and executors take `attempts_spent=`, which journal-managed
+  calls need under a policy. See
+  [durable retry policy](docs/workflow-accounting.md#retry-policy).
+- `Swarm(termination=TerminationPolicy(drain_timeout_s=...))`, or
+  `termination=` on `AsyncExecutor`, drains the nodes in flight when a
+  failure stops a run or the budget refuses a ready node at admission: no
+  queued node starts and no retry is sent, each node in flight runs its
+  current attempt on, tool turns included, for up to `drain_timeout_s`, and
+  each node that finishes keeps and checkpoints its result and cost, without
+  supervision or regeneration. A node whose attempt fails during the drain,
+  or that is waiting to retry, returns to pending with its unused
+  reservation released, so a resume runs it again. Those still in flight
+  are then cancelled as before and the
+  original error is raised. A cancelled call keeps its exposure as without
+  a policy: a native provider's unresolved bill stays terminal, and another
+  provider's call keeps its reservation as unknown cost only under
+  `RetryPolicy(retain_uncertain_dispatch=True)`. A cancellation, an
+  interrupt and a failure of class `security_stop` never drain, and the
+  serial executor has nothing in flight to drain.
+  `AsyncExecutor.drain_record` and a failed
+  checkpoint's `control.drain` name the nodes the drain settled or
+  cancelled and whether its deadline ended it; the record is informational,
+  so checkpoints stay version 4. The time spent is the new `drain` wait in
+  `SwarmResult.timing` and `Tracer.timing()`. Without a policy, a failure
+  still cancels the nodes in flight at once. See
+  [draining in-flight work](docs/execution.md#draining-in-flight-work).
 - `jobs stop --drain-timeout-s SECONDS` bounds a pause's drain. That long
   after the request, the worker cancels each call still awaiting its provider
   and records it as `unknown_outcome`, keeping its full per-call ceiling as
@@ -726,6 +934,23 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   under `routing`; resume restores `graph.planning` from the saved plan
   without classifying again. The classifier prompt and durable recipes are
   unchanged. See [routing decisions](docs/architecture.md#routing-decisions).
+- Declarative routing rules and a single-worker tier.
+  `WhiteRabbit(single=..., rules=[...])` takes a single-worker architect, such
+  as `SimpleArchitect`, which the classifier is offered as `single`, and
+  `RoutingRule` values evaluated in order on the submitted Task before any
+  classifier call: the first that matches chooses its tier, and the decision
+  records the method `rule` with the rule's name and reason. Conditions read
+  only the goal (`goal_any`, `goal_none`), the number of constraints and
+  acceptance criteria (`max_constraints`, `max_done_when`), and context keys
+  and sizes (`context_keys`, `min_items`), never model output; Task data
+  cannot add or change a rule. A rule naming a tier the router does not
+  configure raises `ValueError` when the router is built, and without a
+  matching rule routing is unchanged. Such a router records routing policy
+  version 2. A durable recipe adds `single`, `rules` and
+  `routing_policy_version` only when they are configured, so a router without
+  them keeps its classifier prompt and recipe bytes; resuming with other rules
+  raises `WorkflowConflictError`, and a planned run replays its saved
+  decision. See [routing rules](docs/architecture.md#routing-rules).
 - `LineagePolicy` opts a durable run into artifact lineage:
   `Swarm(run_store=..., acceptance=<strict policy>, lineage=LineagePolicy())`,
   `Swarm.from_yaml(..., lineage=...)` and `WorkflowRuntime` take one. It
@@ -740,8 +965,24 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   node metadata. `ArtifactLineage` is the versioned record of a run's
   accepted artifact, delivery decision and each node's inputs as ids,
   versions and digests, with no source text; its reader rejects unknown
-  versions and keys. Runs do not write lineage records yet. See
-  [artifact lineage](docs/lineage.md).
+  versions and keys, blank ids, a node that lists a source reference twice,
+  in any key order, and a node listed before a node it depends on, which also
+  rules out dependency cycles. Records hash by their digest. A run with a
+  policy writes its record once when it completes, as a `lineage` journal
+  operation that the completed checkpoint applies with its decision:
+  `smythe.lineage.load_lineage()` reads it, and `inspect_run()` and
+  `list_runs()` never return it.
+  Each read step names its read profile and the source version and digest it
+  read, each model node or gate the context snapshot and sources it was
+  given and its agent's digest, and the synthesis its synthesizer; the
+  record also binds the published bytes' digest and the decision. A node
+  whose inputs are not all known, such as a model node without a context
+  snapshot, is `undeclared` and makes the coverage `partial`. A process lost
+  before the record commits writes it on resume without a call, one lost
+  after it replays it, and resuming a completed run whose record no longer
+  matches its journal gives `indeterminate`. Lineage runs refuse, before any
+  call, node and source ids their record cannot hold: blank ids and ids with
+  DEL. See [artifact lineage](docs/lineage.md).
 - `Swarm(reserve_for_checks=True)` holds allowance for a run's verifiers and
   its `LLM_MERGE` synthesis so other nodes cannot spend it. Under
   `max_budget_usd`, before any node runs, the run holds what each pending
@@ -805,6 +1046,417 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   bytes with `SQLiteRunStore.adopt_published_attempt()`; the Jobs schema
   stays at version 4. See
   [adopt published bytes](docs/jobs.md#adopt-published-bytes).
+- `jobs reroll RUN_ID OPERATION --repair-integrity --reason TEXT` regenerates
+  a succeeded operation whose accepted file was deleted, truncated or
+  overwritten. Under the run's lease, the runner hashes every file of the
+  accepted attempt again and queues the operation only when one is `missing`
+  or `changed` and the rest verify, so a verified success still cannot be
+  rerolled. Verified bytes, an unreadable or unsafe file and an exhausted
+  attempt allowance refuse the repair with exit code 6, and a budget overrun
+  with exit code 5. The run's artifact directory is claimed first, so one that
+  cannot be claimed also refuses it; a refused repair queues nothing. The
+  repair uses the run's original approval and attempt allowance. An
+  `integrity_repair_queued` event records the reason and each file's finding,
+  and the new attempt, linked to the one it replaces, records the reason. The
+  operation keeps naming its accepted attempt until a new attempt is accepted,
+  even when the repair attempt is rejected; artifact rows and their `accepted`
+  flags never change, and `resume` and `reroll` recheck only each operation's
+  current accepted attempt. In Python, `JobRunner.reroll(...,
+  repair_integrity=True)` records the findings with
+  `SQLiteRunStore.queue_integrity_repair()`; the Jobs schema stays at
+  version 4. See
+  [repair corrupted accepted outputs](docs/jobs.md#repair-corrupted-accepted-outputs).
+- `jobs recheck RUN_ID OPERATION... --reason TEXT` decides succeeded
+  operations' accepted files again under the current checks, without a
+  provider call. Delivery eligibility now uses the latest decision made
+  under the validators an operation requires now, the call's own or a
+  recheck's, so a registered validator's new version or configuration, or a
+  newer built-in artifact check, reports `validator_changed`: a recheck is
+  required. `JobRunner.recheck()` runs this release's built-in check and the
+  validators registered under the names the plan gives, at any version, so
+  it works where `resume` and `reroll` are refused. Under the run's lease it
+  hashes every accepted file again, reads each operation's files once into
+  memory, and records a `delivery_acceptance_reevaluated` event with the
+  reason, outcome, each validator's result, the findings and each file's
+  SHA-256 through `SQLiteRunStore.record_reevaluation()`. Statuses, accepted
+  attempts and `accepted` flags never change, so a rejecting recheck leaves
+  the operation succeeded but not eligible. A missing or changed file,
+  another state or another worker's lease refuses it with exit code 6 and
+  nothing recorded. `jobs inspect` lists each attempt's rechecks as
+  `delivery_reevaluations` and the HTML report shows them;
+  `inspect_job(..., validators=[...])` judges eligibility under the
+  validators registered now. The Jobs schema stays at version 4. See
+  [recheck accepted outputs](docs/jobs.md#recheck-accepted-outputs).
+- `jobs reroll RUN_ID [OPERATION...] --dry-run` previews what each named
+  operation, or every operation, calls for, before anything is dispatched.
+  It opens the Jobs database read-only, takes no lease, writes nothing,
+  calls no provider and exits 0. Each operation gets `reuse`, `recheck`,
+  `regenerate` or `review` with sorted reason codes from the reuse
+  decisions' vocabulary, its remaining attempts, and `new_plan_required`
+  when its regeneration needs a new plan and approval: it sends an
+  attachment whose bytes changed since the plan, which the preview
+  fingerprints again, has no attempt left, or the run's budget overran. The
+  document also gives each attachment's status, the run's remaining budget
+  and a count per action; a `regenerate` without `new_plan_required` for a
+  missing or changed accepted file is what an integrity repair admits.
+  Nothing is repaired
+  automatically and no other run's artifacts are offered. Without
+  `--dry-run`, `jobs reroll` still needs operations and `--reason`; its
+  operation keys may come before, between or after its options. In
+  Python, `JobRunner.repair_preview(run_id, operation_keys=None)` judges
+  under that runner's validators. `smythe.reuse.REASONS` gains
+  `outcome_unknown` (`review`) for an operation whose provider call may have
+  completed. See [preview repairs](docs/jobs.md#preview-repairs).
+- Contribution lint. `lint_contributions(graph, registry=None)` lists the
+  groups of parallel siblings that could only repeat each other's work: the
+  same dependency inputs, label, agent, model, required capabilities,
+  verification target, read step and image inputs. With a registry, agents
+  compare by persona, capabilities and MCP servers. A `Swarm` with a
+  `WhiteRabbit` router, ordinary or durable, records the groups of each new
+  plan as `graph.planning["coordination"]`; checkpoints and durable replay
+  keep the record. The lint is advisory and never changes a plan, and a plan
+  it does not flag records nothing. The generated-plan schema is unchanged.
+  [`examples/17_contribution_templates.py`](examples/17_contribution_templates.py)
+  defines `SubGraphTemplate` values whose workers each contribute distinct
+  evidence, capabilities, responsibilities or checkable outputs, and runs
+  offline. See [contribution lint](docs/architecture.md#contribution-lint).
+- Opt-in claim exchange between workers. A node in a graph you write that
+  sets `metadata["exchange"] = "claims"` is given, for each dependency whose
+  output carries a `source-evidence` block with a claim, a compact record in
+  place of that output: every claim with its supporting and contradicting
+  passages, scope, unresolved questions and conclusion, and each source's id,
+  version and digest without its text. Other dependencies, and the prompts
+  of nodes that do not opt in, are unchanged.
+  `smythe.evidence.claim_exchange(output)` makes the record. A durable run's
+  journaled request holds the compact records, so a resumed call is given
+  the same bytes; its context snapshot records their digests, and artifact
+  lineage declares the node's inputs. Another `exchange` value is refused
+  before any node call, and a generated plan cannot set the key. See
+  [claim exchange](docs/architecture.md#claim-exchange).
+- Reuse decisions for artifact lineage. `smythe.reuse.evaluate(record,
+  state)` compares an `ArtifactLineage` record, or None, with a
+  `CurrentState` (a developer's zero-cost `SourceCatalog`, the validator
+  identities, the acceptance policy digest, tool, component, context
+  assembly and agent identities, optional task changes, published-document
+  integrity and the `LineagePolicy`) and returns an `ItemDecision`: `reuse`,
+  `recheck`, `rerender`, `regenerate` or `review` for the item and each
+  node, with stable reason codes and the scope, recipe, policy, validator
+  set and source versions any kept result is kept under. A source counts as
+  current only when its id, version and digest all match, so equal bytes
+  under a new version regenerate; an unavailable or withdrawn source needs
+  review; a changed tool, decoder, component, context assembly, agent or
+  task regenerates the node and everything that depends on it, while other
+  branches are reused; a missing or changed document with current inputs is
+  rendered again; a changed validator set or policy calls for a recheck; a
+  decision other than `accepted` needs review; and a missing record or
+  undeclared coverage follows `undeclared_coverage`. Gates and the nodes
+  they judge are never reused in an item that computes anything again,
+  `reuse=False` turns reuse and rendering again into regeneration, and a
+  record in another access scope is invisible before any digest is
+  compared. A catalog that declares itself metered is refused. The
+  evaluator reads no store or file and its output is deterministic JSON
+  data; `Swarm.repair()` applies the plans made from it. See
+  [reuse decisions](docs/lineage.md#reuse-decisions).
+- A supervisor revision records what it changed. Its trace span's `revision`
+  record adds the completed results the run `retained`, the delivered results
+  it `invalidated` because a new step now follows them, the
+  `preserved_gates`, `revisions_remaining_after`, the revision-added nodes in
+  the graph (`added_total`) and the review's `trigger`; the earlier keys and
+  `summary()`'s keys are unchanged. Ordinary checkpoints keep the latest 32
+  decisions, applied or refused, in `control.revision_log`, which resume
+  extends: node ids only, at most 16 per list, and the supervisor's reason
+  and a refusal's detail redacted and cut to 200 characters. The log is
+  informational, so checkpoints stay version 4 and a run without decisions
+  saves no key. A durable run's journal is unchanged; its log is derived
+  when read from its `supervision` operations
+  (`smythe.workflow.revision_log()`). `smythe runs inspect` reports either
+  as `revision_log`. See [revision log](docs/supervisor.md#revision-log).
+- Model profiles route an ordinary run's nodes to developer-approved
+  providers and models. `Swarm(profiles=...)`, `Swarm.from_yaml()` and both
+  executors take `ModelProfile(name, provider, model, max_cost_per_call_usd,
+  requires=...)`. A node whose `metadata["profile"]` names one calls that
+  provider with that model and reserves the profile's ceiling, unless it
+  sets `estimated_cost_usd`; held checks and persisted attempts use the same
+  ceiling. Developer graphs, YAML, architects, templates and the nodes a
+  developer `Supervisor` adds can name a profile; a generated plan and an
+  `LLMSupervisor` proposal cannot. Other nodes and synthesis call the run's
+  provider. Before routing, planning or any node call, a run refuses with
+  `NoAllowedProfileError` (a `ValueError`, failure class `input_error`) a
+  profile whose provider does not declare `True` each feature it `requires`
+  (`tools`, `attachments`, `image_output`, `exact_accounting`), does not
+  support its model or prices the model as retired, or cannot call tools in
+  a run with a `tool_runtime`, and a node that names a profile the run does
+  not allow or sets another model than its profile's; a revision that adds
+  such a node is refused before it applies. While revisions remain, a
+  model-less `LLMSupervisor`, which reviews with the reviewed node's model,
+  is refused the same way when a profile calls another provider than its
+  own. Under a `RetryPolicy` each profile's provider must declare
+  `sdk_retries=0`. `ProviderFeatures.exact_accounting` is new: the native
+  providers declare `True`, the other built-in providers `False`.
+  Checkpoints of a run with a profiled node are version 5 and list
+  `model_profiles` in `requires`, so older readers refuse them instead of
+  calling the run's provider, and resume routes the nodes to the resuming
+  Swarm's profiles of the same names. Durable runs refuse profiles. See
+  [model profiles](docs/execution.md#model-profiles).
+- `Swarm(capacity_policy=CapacityPolicy(...))` limits the calls each provider
+  type and model takes on an ordinary run, and both executors take
+  `capacity_policy=`. `CapacityPolicy.limits` maps a model, or a
+  `(provider type name, model)` pair, to a `CapacityLimit` with
+  `max_in_flight` and `min_interval_s`; a field it leaves unset comes from the
+  new `Provider.capacity_hint(model)`, which returns None by default. The
+  async executor runs at most `max_in_flight` nodes of a model at once and
+  passes over a ready node whose model has no free slot, still ready and with
+  nothing reserved, to admit other ready work, so a full limit never stops the
+  run; a budget reservation that fails still does. Every node call, including
+  tool turns and retries, and an `LLM_MERGE` synthesis take turns in the order
+  they ask, start at least `min_interval_s` after the previous call that
+  started, and wait out the cooldown that a transient status error's
+  `Retry-After` starts, at most `cooldown_max_s`. A call that a timeout or a
+  cancellation stops while it waits takes no turn.
+  `round_robin=True` admits ready nodes in turn across branches, so one wide
+  fan-out cannot hold back another's work. Timing reports these waits as
+  `waiting_ms["capacity"]`, a key every timing record now has. A hint that is
+  not valid is refused before any call. Durable runs refuse the policy, and
+  checkpoints do not record it. Without a policy, admission and calls are
+  unchanged. See [provider capacity](docs/execution.md#provider-capacity).
+- A module entry in `tests/distribution_profile.json` can be a glob pattern,
+  so one entry excludes a family of repository-only test modules from the
+  source-archive profile. Every entry must still name an existing module.
+- An offline selector comparison harness,
+  `benchmarks/run_selector_comparison.py`. Four arms (a single worker, the
+  fixed pipeline, a generated plan, and adaptive selection, in which a
+  `WhiteRabbit` router applies developer routing rules and then a scripted
+  classifier) run on the task-shape suite and on the Astra pack's development
+  tasks with their sources. One strict acceptance policy per family decides
+  every arm, arms run in a seeded counterbalanced order with two attempts per
+  cell, every failed attempt is recorded and charged, and every adaptive
+  attempt is charged its selector cost and routing time. An Autotune campaign
+  then compares the generated plan (incumbent) with adaptive selection
+  (challenger), with the other two arms as references, under an evaluator
+  hash from an `EvaluatorManifest` and a `no_new_failures` regression gate,
+  which fails when a pinned reference output is not accepted or fails the
+  answer key, or a pinned planted defect is accepted. A held-out pack is
+  loaded only by path from outside the repository, verified against its
+  manifest. `benchmarks/offline_arms.py` is the shared runner for offline
+  arm harnesses, and `make_swarm` in `benchmarks/harness.py` builds
+  the `adaptive_selection` arm. The committed record,
+  `benchmarks/results/selector_comparison_offline.json`, is labeled offline
+  mechanics, not claimable, with zero API calls: fixtures rank no arm and
+  change no default. See
+  [selector comparison](benchmarks/README.md#selector-comparison-offline-mechanics).
+- Read-only repair plans for artifact lineage.
+  `Swarm.plan_repair(execution_ids=None, *, sources)` evaluates each run in
+  the Swarm's access scope, by default the heads of the archive, against
+  what a new run would use now and returns a `RepairPlan`: each run's
+  decision, derived status and predicted work (nodes reused and regenerated
+  by kind, read calls, model steps, publications, acceptance evaluations,
+  new runs, whether charges may be incurred and whether an allowance is
+  required), the catalog's answers, and a timestamp-free `plan_sha256` that
+  a later apply must match. Planning opens the journal again read-only,
+  takes no lease, writes nothing, calls no provider, reads no source and
+  describes each source once; a run that has not completed needs `review`
+  (`run_in_progress`), and a run in another scope is not found.
+  `archive_heads(store, scope)` follows predecessor links: a completed
+  successor whose decision is accepted supersedes its predecessor, and one
+  whose decision is not supersedes nothing and is not a head.
+  `smythe.reuse.derived_status()` computes the lifecycle status `current`,
+  `stale`, `invalid`, `restricted` or `superseded`, which is never stored.
+  `smythe runs inspect` adds a `lineage` block to durable lineage runs, in
+  JSON and text: coverage, source references, predecessor and successors,
+  the published document's integrity and the derived status, with no
+  source text and no new exit code. See
+  [plan a repair](docs/lineage.md#plan-a-repair) and
+  [lineage in runs inspect](docs/runs.md#lineage).
+- Reuse operations for durable successor runs. A successor of a completed
+  lineage run runs the predecessor's task and graph again as a new run, but
+  each node it keeps completes first from a `reuse` journal operation, keyed
+  `reuse/<node id>`, with the predecessor's text byte for byte, so one
+  changed source runs only its read, its extraction and what depends on
+  them, and the rerun nodes get the prompts a full recomputation would. Each
+  operation names the predecessor's store, run and lineage digest, the
+  node's generation and result digest, the digests of its lineage record and
+  source evidence, its reason codes and the repair plan's digest; it carries
+  no calls and no cost, and one checkpoint consumes it. Only a completed run
+  in the same store and access scope, whose lineage record has the named
+  digest, is reused from; a node whose saved result no longer has its
+  recorded digest, whose inputs are undeclared or used a removed source, a
+  gate and the nodes it judges or depends on, a node depending on one that
+  runs again, and a graph the successor's graph policy, read profiles,
+  models or agents cannot run are refused before the successor is created
+  or any call is made. A resumed successor replays its reuse operations
+  without reading the predecessor. Refreshing an unfinished successor's
+  sources, even one lost before it saved a kept node, runs its kept nodes
+  again, and a kept result naming a source removed from the successor is
+  never used. Its lineage names its `predecessor` and `repair`, each kept
+  node keeps its recorded inputs with `reused_from`, and inspection never
+  returns kept text. A new durable graph cannot carry a `repair` planning
+  record. `Swarm.repair()` starts successors. See
+  [reused results](docs/workflow-accounting.md#reused-results).
+- `EvidenceTriggeredSupervisor(inner, triggers, on_trigger=None)` reviews only
+  when a `ReviewTriggers` check fires after a completed node; otherwise it
+  returns no change without any call. Triggers read the graph and the node's
+  recorded state: the stages `review_after`, `fan_in` and `final`, and the
+  anomalies `failed_or_skipped`, `verifier_rejected_or_exhausted`,
+  `acceptance_not_accepted`, `contradiction_records`, `incomplete_output`,
+  `empty_or_short_output` (`min_output_chars`), `cost_over_estimate` and
+  `tool_errors` (`min_tool_errors`). A developer `on_trigger` can return a
+  `Revision` with no model call; an inner `LLMSupervisor` reviews with the
+  fired triggers and their evidence ahead of its unchanged prompt. Revisions
+  keep gate protection and strict acceptance obligations. Each triggered review
+  adds a `review_triggered` trace span, and a decision's `trigger` names the
+  triggers. Durable recipes record the triggers and replay journaled reviews;
+  they refuse `on_trigger`. Retry-owner and model-profile checks apply to a
+  wrapped `LLMSupervisor`. A node's tool calls that return errors are counted
+  in `metadata["tool_errors"]`. See
+  [evidence-triggered review](docs/supervisor.md#evidence-triggered-review).
+- `ModelProfile(fallback=...)` names another of the run's profiles for a
+  node's retries. After an attempt on the profile fails with a `transient`,
+  `provider_rejected` or `quality_defect` failure, the node's next attempt
+  calls the fallback instead: a new attempt within the node's allowance,
+  persisted attempts included, that waits the retry's backoff, reserves its
+  own profile's ceiling and, under a capacity policy, takes that provider
+  type and model's turn and in-flight slot. Fallbacks can form a chain. A
+  retry after any other failure, `unknown_outcome` included, calls the same
+  profile again. A node timeout that ends a sent, unanswered call is
+  `unknown_outcome` only under `RetryPolicy(retain_uncertain_dispatch=True)`;
+  without it the timeout is `transient`, and its retry calls the fallback
+  while the first call may still run and be charged. Each attempt's span on
+  `Tracer.spans` records its `profile` and, after a fallback,
+  `fallback_from`; `summary()` keeps its keys. A fallback that is
+  not one of the run's profiles, requires fewer features than the profile it
+  serves or loops back is refused when the Swarm or executor is built, and
+  each unfinished node is checked against every profile it may fall back to
+  before any call. Checkpoints are unchanged, and a resumed node's first
+  attempt calls the profile it names. See
+  [profile fallback](docs/execution.md#profile-fallback).
+- An offline trigger ablation harness, `benchmarks/run_trigger_ablation.py`.
+  Three arms (routine `LLMSupervisor` review on its default schedule,
+  `EvidenceTriggeredSupervisor` around the same reviewer with the default
+  `ReviewTriggers`, and no supervisor) run the same generated plans on four
+  clean fixture tasks and five that each plant an anomaly of a kind the
+  default triggers detect, under one strict acceptance policy with one
+  attempt per cell. A scripted reviewer decides each review from the run
+  state, never from trigger evidence. Task by task, the record keeps each
+  arm's supervision calls and their declared cost, the triggers that fired,
+  the revisions applied and the accepted outcomes. An Autotune campaign then
+  compares routine review (incumbent) with triggered review (challenger),
+  with no supervision as a reference arm, minimizing supervision calls while
+  the accepted-outcome rate must not regress. `run_cell` in
+  `benchmarks/offline_arms.py` takes an `attempt_runner`, so a harness with
+  arms of its own reuses the shared runner, with `execute_attempt` and
+  `attempt_record`. The committed record,
+  `benchmarks/results/trigger_ablation_offline.json`, is labeled offline
+  mechanics, not claimable, with zero API calls: fixtures show no measured
+  benefit and change no default. See
+  [trigger ablation](benchmarks/README.md#trigger-ablation-offline-mechanics).
+- Security stops. `RunControl.revoke(reason_code)`, on a control given to
+  `Swarm(run_control=...)` or to either executor, stops runs at once and for
+  good: `plan()`, `execute()` and `resume()` refuse to start under a revoked
+  control, and a run in progress admits no node and sends no call after it,
+  tool turns, supervisor reviews and synthesis included. The async executor
+  cancels the nodes in flight at once and never drains; a revocation during
+  a drain ends it without waiting for the deadline. A call that was sent and
+  not answered keeps its reservation as unknown cost, even without
+  `retain_uncertain_dispatch`. A `SecurityStop` that a tool runtime raises,
+  alone or in an exception group, stops the run the same way instead of
+  going back to the model. `SecurityStop.reason_code` is a short developer
+  code (1-64 letters, digits, `.`, `_`, `:` or `-`), and its failure class,
+  `security_stop`, is terminal. An ordinary run's checkpoints record the
+  stop as `control.security_stop` in version 5, listing `security_stop` in
+  `requires`, and resume and re-evaluation raise its `SecurityStop`. A
+  durable run is blocked in its journal with `blocked_reason`
+  `security_stop` and a `security_stop` event, which no latch or method
+  clears; `SQLiteWorkflowStore.security_stop()` stops any run, a completed
+  one too, without a lease, and `load_security_stop()` reads the stop.
+  Resuming, executing, re-evaluating or republishing a stopped durable run,
+  reusing its results and preparing or approving an external action for it
+  are refused, and `smythe runs inspect` shows the stop with the next action
+  `rerun`. See [security stops](docs/execution.md#security-stops).
+- In-place repair of completed lineage runs. `Swarm.republish()` on a run
+  with a lineage policy whose published document is missing or changed
+  renders the saved synthesis again, publishes it as a new file named for
+  its publication (`document-p1.md`) without replacing any file, and makes a
+  new decision on those bytes under the Swarm's policy, bound to that
+  publication, so identical bytes are decided again rather than copied. It
+  needs the saved synthesis to have the digest its lineage records and is
+  refused for an intact document, a changed renderer or synthesizer, and a
+  name already holding other bytes. Every new decision on a lineage run,
+  from republication, `Swarm.reevaluate()` or an operator, journals a
+  lineage record keyed `lineage/<sequence>` that names the decision, the
+  current publication and the deciding validators and supersedes the
+  earlier record, applied in the same checkpoint, so a later repair plan
+  finds nothing left to recheck or rerender. No node runs, nothing is read
+  or called, earlier publications, decisions and records stay in the
+  journal, and a process lost before the checkpoint is finished by the same
+  call again. A repair applied from a plan also binds its `plan_sha256` and
+  reason. `smythe runs inspect` lists superseded publications under
+  `artifact.superseded`. See
+  [repair a run in place](docs/lineage.md#repair-a-run-in-place).
+- Source restriction for artifact lineage.
+  `smythe.lineage.restrict_source(store, source_id, *, version=None,
+  scope=None, reason, purge=False)` withdraws a source's text from every
+  completed lineage run whose record names it, optionally only one version
+  or one access scope, compared before any digest. Each run journals the
+  same `source_tombstone` record that `remove_source` writes (identity,
+  digest, reason and the journal clock's time, no text) under its lease,
+  and a copy of its completed checkpoint applies it. `purge=True` deletes
+  each file the run published and records its path, SHA-256, reason and
+  time as an `artifact_purge` operation (`purged_artifacts()` reads them);
+  tombstones and purge records always remain. A run restricted this way,
+  or by a source removed from a lineage run
+  (`smythe.lineage.restricted_sources()`), never delivers its output again:
+  completed resume, inspection and document eligibility give
+  `indeterminate`, external actions refuse it as unavailable, and
+  `reevaluate`, `republish` and reuse in a successor refuse it. A repair
+  plan needs `review` for it while the catalog describes the withdrawn
+  text and allows `regenerate` from another version; its derived status
+  stays `restricted`. A successor holds its predecessor's tombstones, so it
+  is refused a withdrawn text as a context source and is restricted if it
+  reads one again. `smythe runs inspect` lists a lineage run's tombstones
+  and purged files. Text copied into journal checkpoints and provider
+  responses is not scrubbed. See
+  [restrict a source](docs/lineage.md#restrict-a-source).
+- Durable runs drain their in-flight calls under
+  `Swarm(run_store=store, termination=TerminationPolicy(drain_timeout_s=...))`.
+  When a failure stops the run, such as a `HALT` node's zero-cost rejection,
+  nothing more is admitted or sent, and the requests already sent may finish
+  until the deadline: a node answered in time settles its known charge and
+  keeps its result, the failed checkpoint consumes its call, and resume never
+  calls it again, so the run is not blocked. A node that had not sent its
+  request, such as one still counting its input tokens or a read step
+  resolving its destination, returns to pending without reserving or sending
+  it, so a drain never adds unknown exposure. A request still unanswered at
+  the deadline is cancelled and keeps unknown exposure at its quoted
+  ceiling, as without a policy, and a security stop still cancels at once.
+  The recipe records the policy under `termination` only when one is
+  configured, so existing recipes keep their bytes, and a run keeps its
+  policy: resuming without one uses the saved policy, and a different one
+  raises `WorkflowConflictError`. Unknown model-call exposure still has no
+  reconciliation path; a run it blocks needs a new run. See
+  [draining in-flight calls](docs/workflow-accounting.md#draining-in-flight-calls).
+- Applying a repair plan. `Swarm.repair(plan, *, plan_sha256,
+  max_total_budget_usd, reason, sources)` (and `arepair()`) makes the plan
+  again for the same runs and refuses it with `WorkflowConflictError`
+  unless it still has the approved digest. It needs a durable `run_store`
+  and a lineage policy, refuses a configured supervisor, and admits the new
+  runs only when their number times `max_budget_usd` fits
+  `max_total_budget_usd`, refusing an unbounded per-run budget when any may
+  incur charges (`WorkflowBudgetError`); every refusal comes before any run
+  is created or call made. Items are applied in plan order, each once:
+  `recheck` decides the run again and `rerender` publishes its document
+  again, both binding the plan's digest and reason, `regenerate` starts a
+  successor run that keeps the nodes the plan reuses and leaves the
+  repaired run's rows untouched, and `review` is reported. The first item
+  that raises or is not accepted stops the repair without a retry. A
+  `RepairResult` lists each item's outcome, decision, successor and work
+  (new runs, read and model calls, reused nodes, publications and
+  decisions). A successor that has not completed is a repair in progress:
+  it is no archive head, and a plan gives the run it repairs `review`
+  (`repair_in_progress`), naming it in `repairs_in_progress`, until
+  ordinary resume finishes it. Under `LineagePolicy(reuse=False)` a
+  regenerated item keeps no result and runs every node, and its document is
+  byte for byte a new run's. See
+  [apply a repair plan](docs/lineage.md#apply-a-repair-plan).
 
 ### Changed
 
@@ -857,10 +1509,6 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   segment per lease session, the call's elapsed time, the wall time since the
   run was created, and whether a session ended without releasing its lease.
   `SQLiteWorkflowStore.lease_sessions()` returns the same session bounds.
-- A durable run's `WorkflowBindingError` names the argument it refuses:
-  `run_store` and `verifier`, with the type that was passed, `memory`,
-  `tool_runtime` or `checkpoint_store`. One message used to cover memory,
-  tools and the checkpoint store. The exception is still a `ValueError`.
 - Trace span durations come from a monotonic clock, so a wall-clock
   adjustment during an attempt no longer distorts a span's `duration_ms` or
   `PlannerMemory`'s summed node time. `start_time` and `end_time` remain
@@ -873,16 +1521,18 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
 - **Durable workflow journals upgrade to format version 2, which Smythe
   0.9.x and earlier cannot open, even read-only. Back up journals before
   upgrading.** Version 2 adds the `tool` call phase to `CallKey` and
-  `CallScope`; its tables are unchanged. Opening a version 1 journal with
-  `SQLiteWorkflowStore(path)` upgrades it in one transaction that changes
-  only the recorded version, so every run, call, balance, reservation,
-  evidence row and the store identity are kept; an interrupted upgrade
-  rolls back. While any run holds an unexpired lease the upgrade raises
-  `WorkflowLeaseError`, so stop workers from earlier releases first.
-  `SQLiteWorkflowStore(path, read_only=True)` reads a version 1 journal
-  without upgrading it, and the new `store_version` property reports the
-  version. A store open for writing raises `WorkflowCorruptionError` and
-  writes nothing once another release changes the journal's version. See
+  `CallScope`, and the journal gains the external action tables. Opening a
+  version 1 journal with `SQLiteWorkflowStore(path)` upgrades it in one
+  transaction that creates those tables, empty, and changes the recorded
+  version, so every run, call, balance, reservation, evidence row and the
+  store identity are kept, as are tables that other tools added to the
+  file; an interrupted upgrade rolls back. While any run holds an unexpired
+  lease the upgrade raises `WorkflowLeaseError`, so stop workers from
+  earlier releases first. `SQLiteWorkflowStore(path, read_only=True)` reads
+  a version 1 journal without upgrading it, and the new `store_version`
+  property reports the version. A store open for writing raises
+  `WorkflowCorruptionError` and writes nothing once another release changes
+  the journal's version. See
   [journal upgrades](docs/workflow-accounting.md#journal-upgrades).
 - A Jobs approval token creates one run. `jobs run` with a token that already
   created a run in the same database exits with code 4 and names that run

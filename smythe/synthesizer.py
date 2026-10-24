@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+from contextlib import nullcontext
 from enum import Enum
 from typing import Any
 
@@ -247,8 +248,14 @@ class Synthesizer:
         model: str | None = None,
         budget: Sentinel | None = None,
         tracer: Tracer | None = None,
+        capacity: Any = None,
     ) -> str:
-        """Produce a single output from the completed graph."""
+        """Produce a single output from the completed graph.
+
+        ``capacity``, which ``Swarm`` passes under a ``capacity_policy``, is
+        the run's capacity limiter: an ``LLM_MERGE`` call then waits for its
+        provider type and model's turn as a node call does.
+        """
         self._check_bound_overrides(provider, model, budget, tracer)
         completed = _completed(graph)
         if not completed:
@@ -269,6 +276,7 @@ class Synthesizer:
                     model=model,
                     budget=budget,
                     tracer=tracer,
+                    capacity=capacity,
                 )
             )
         return self._concatenate(completed)
@@ -281,6 +289,7 @@ class Synthesizer:
         model: str | None = None,
         budget: Sentinel | None = None,
         tracer: Tracer | None = None,
+        capacity: Any = None,
     ) -> str:
         """Async variant for use inside an existing event loop."""
         self._check_bound_overrides(provider, model, budget, tracer)
@@ -302,6 +311,7 @@ class Synthesizer:
                 model=model,
                 budget=budget,
                 tracer=tracer,
+                capacity=capacity,
             )
         return self._concatenate(completed)
 
@@ -358,6 +368,7 @@ class Synthesizer:
         model: str | None = None,
         budget: Sentinel | None = None,
         tracer: Tracer | None = None,
+        capacity: Any = None,
     ) -> str:
         """Send all results to an LLM for intelligent synthesis."""
         resolved_provider = provider or self._provider
@@ -409,9 +420,12 @@ class Synthesizer:
             resolved_tracer.on_node_start(synth_node, phase="synthesis")
 
         try:
-            result = await resolved_provider.complete(
-                MERGE_SYSTEM_PROMPT, prompt, model=resolved_model
-            )
+            turn = (nullcontext() if capacity is None
+                    else capacity.call(resolved_provider, resolved_model or ""))
+            async with turn:
+                result = await resolved_provider.complete(
+                    MERGE_SYSTEM_PROMPT, prompt, model=resolved_model
+                )
             validate_completion_usage(result)
             _native_receipt(synth_node.metadata, result.native_receipt, phase="synthesis")
 

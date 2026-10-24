@@ -32,6 +32,29 @@ Valid reported charges that exceed a reservation are different: the ledger
 records the actual charge, then raises `BudgetReconciliationError` and stops
 execution. It never clamps an incurred charge to make a budget appear satisfied.
 
+## Calls sent without an answer
+
+On an ordinary run, a call that a node's timeout or a cancellation ends after
+it was sent releases its reservation and records no cost, although the
+provider may still charge for it. Under a
+[retry policy](execution.md#calls-without-an-answer) with
+`retain_uncertain_dispatch=True`, the ledger keeps that reservation as the
+node's recorded cost instead (`Sentinel.retain_unknown(node_id)`), with
+`cost_usd_unknown` and `cost_usd_is_estimate` on the node. `total_cost_usd`
+does not change, since the reservation already counted against the budget,
+and later admissions still see it. The run reports `cost_is_complete=False`
+and `cost_contains_estimates=True`: a reservation estimates the charge and
+does not confirm it. A node without a reservation, such as a serial node
+without an estimate, is marked unknown at no amount. A verifier's
+reservation converted from a [held allowance](#held-allowance-for-checks)
+is kept the same way, and other holds are untouched.
+
+Checkpoints record the kept amount in `budget.node_costs` and the flags in the
+node's metadata, so resume restores the exposure and its flags, and a retry or
+a resumed attempt adds its own charge to it. Native providers settle an
+interrupted call themselves, as an unresolved bill that keeps its live
+reservation and blocks resume.
+
 ## Per-call ceilings
 
 Under `max_budget_usd`, calls to `OpenAIImageProvider`,

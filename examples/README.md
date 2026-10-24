@@ -1,6 +1,6 @@
 # Smythe examples
 
-Examples 01–05, 08–16, and the acquisition-diligence example run offline
+Examples 01–05, 08–17, and the acquisition-diligence example run offline
 out of the box. A built-in `DemoProvider` returns deterministic responses so
 you can inspect planning, fan-out, budgets, recovery, and synthesis without an
 API key. Examples 06 and 07 are live MCP integration tours. These examples
@@ -12,7 +12,7 @@ pip install -e .            # from the repo root
 python examples/14_durable_text_workflow.py
 ```
 
-Examples 14, 15 and 16 explicitly select fixture responses even when API keys are set.
+Examples 14, 15, 16 and 17 explicitly select fixture responses even when API keys are set.
 Example 14 demonstrates planning, execution and recovery with zero provider calls.
 Example 16 reads its bundled sources from a server it starts on the loopback
 address and makes no other network request.
@@ -104,4 +104,5 @@ Use a new output filename for each export.
 | [14_durable_text_workflow.py](14_durable_text_workflow.py) | Plan and execute one journaled text run, inspect exact API-cost balances, then recover its cached output. [Native Astra version, saved graph limits, and scope](../docs/workflow-accounting.md). |
 | [15_strict_acceptance.py](15_strict_acceptance.py) | A draft passes its gate, then a later step drops a required section. Without a policy the defective brief is the output; a [strict acceptance policy](../docs/verifier.md#strict-delivery-acceptance) checks the exact text returned with a local final validator, rejects it and keeps it as `rejected_output`. Without a final validator the strict run is refused before any provider call. |
 | [16_source_to_artifact.py](16_source_to_artifact.py) | A durable research run from [bundled sources](source_to_artifact/sources/) to an accepted document: plan the reads, fetch each source with a [journaled read step](../docs/workflow-accounting.md#recorded-read-steps), stop the run part way as a lost process would, resume without reading a saved source again, publish the brief with its [source evidence](../docs/source-evidence.md), accept it under a strict policy, and [inspect](../docs/runs.md#research-runs) the document, reads, evidence and open questions. |
+| [17_contribution_templates.py](17_contribution_templates.py) | `SubGraphTemplate` values whose parallel workers each contribute something distinct: one extractor per source, one review by specialists with their own personas and capabilities, and documents that can each be checked alone. A `WhiteRabbit` routes the task to a `ConstrainedArchitect` that composes them, and the [contribution lint](../docs/architecture.md#contribution-lint) flags nothing in that plan. The lint records a repeated fan-out of identical workers under `graph.planning["coordination"]` and leaves the plan unchanged. |
 | [acquisition_diligence/](acquisition_diligence/) | **Complete acquisition-diligence example.** Task intake → generated `fork-join → adversarial → serial` topology → parallel specialists → red-team review → final memo, with committed expected artifacts (graph, trace, memo). |

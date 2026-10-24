@@ -4,12 +4,13 @@ from __future__ import annotations
 
 import asyncio
 import inspect
+from bisect import bisect_right
 from collections import deque
-from itertools import islice
+from itertools import islice, zip_longest
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Awaitable, Callable
 
-from smythe._failures import is_terminal
+from smythe._failures import SECURITY_STOP, RunControl, SecurityStop, classify_failure, is_terminal
 from smythe._redact import error_text
 from smythe.budget import BudgetValidationError, Sentinel, validate_token_count
 from smythe.executor_base import (
@@ -22,18 +23,39 @@ from smythe.executor_base import (
 from smythe.graph import ExecutionGraph, FailurePolicy, Node, NodeStatus
 from smythe.provider import Provider
 from smythe.registry import Registry
-from smythe.scheduling import RetryDeadlineError
+from smythe.scheduling import RetryDeadlineError, TerminationPolicy
 from smythe.tools import ToolRuntime
 from smythe.tracer import Tracer
 from smythe.verifier import VerificationRecoveryError
+from smythe.workflow_provider import _DrainRefused
 
 if TYPE_CHECKING:
     from smythe.acceptance import AcceptancePolicy
     from smythe.context import ContextSnapshot
-    from smythe.scheduling import RetryPolicy
+    from smythe.scheduling import CapacityPolicy, ModelProfile, RetryPolicy
     from smythe.supervisor import Supervisor
     from smythe.task import Task
     from smythe.verifier import Verifier
+
+
+def _branch(node: Node, order: dict[str, int]) -> int:
+    """The graph position of *node*'s first dependency, or -1 for a node without one."""
+    return order.get(node.depends_on[0], -1) if node.depends_on else -1
+
+
+def _in_turn(ready: deque[Node], order: dict[str, int], last: int | None) -> deque[Node]:
+    """*ready* ordered by turns across branches, from the branch after *last*.
+
+    A branch is the ready nodes that share a first dependency (see
+    ``_branch``), in their own order; each turn takes one node per branch.
+    """
+    branches: dict[int, list[Node]] = {}
+    for node in ready:
+        branches.setdefault(_branch(node, order), []).append(node)
+    keys = sorted(branches)
+    first = 0 if last is None else bisect_right(keys, last)
+    turns = zip_longest(*(branches[key] for key in keys[first:] + keys[:first]))
+    return deque(node for turn in turns for node in turn if node is not None)
 
 
 class AsyncExecutor(ExecutorBase):
@@ -48,11 +70,32 @@ class AsyncExecutor(ExecutorBase):
     Budget safety: estimated cost is reserved before each node is admitted,
     so concurrent admissions cannot collectively exceed the configured policy.
     Reservations are reconciled with reported cost or configured estimates on
-    completion, or released on failure/cancellation.
+    completion, or released on failure/cancellation; under a retry policy
+    with ``retain_uncertain_dispatch``, a sent call that never answered keeps
+    its reservation as unknown cost instead.
 
     Concurrency safety: ``max_concurrency`` caps in-flight provider
     calls, so a wide broadcast doesn't fire every call
     at once and trip provider rate limits.  None means unlimited.
+    Under a ``capacity_policy``, at most ``max_in_flight`` nodes of each
+    provider type and model run at once: a ready node whose model has no
+    free slot is passed over, still ready, for work behind it, and never
+    stops the run. With ``round_robin``, ready nodes take turns by branch.
+
+    Termination: a failure that stops the run, or a node refused at
+    admission, cancels the nodes in flight at once. Under ``termination``, a
+    :class:`~smythe.scheduling.TerminationPolicy`, the executor first stops
+    admission and lets their current attempts finish, tool turns included,
+    for up to ``drain_timeout_s``, starting no retry, then cancels the rest
+    and raises the original error; :attr:`drain_record` reports how the
+    drain ended.
+    ``sleep``, when given, also times the drain's deadline.
+
+    A security stop never drains: a revoked ``run_control``, even while the
+    run waits on its nodes or drains, or a ``SecurityStop`` a node raises,
+    cancels the nodes in flight at once, and each call that was sent and not
+    answered keeps its reservation as unknown cost. A revocation that ends a
+    drain raises ``SecurityStop`` with the run's original error as its cause.
     """
 
     DEFAULT_ESTIMATED_TOKENS = 2000
@@ -88,6 +131,12 @@ class AsyncExecutor(ExecutorBase):
         sleep: Callable[[float], Any] | None = None,
         rng: Any = None,
         attempts_used: dict[str, dict[str, int]] | None = None,
+        attempts_spent: Callable[[Node], int] | None = None,
+        profiles: tuple[ModelProfile, ...] | list[ModelProfile] = (),
+        default_model: str | None = None,
+        capacity_policy: CapacityPolicy | None = None,
+        termination: TerminationPolicy | None = None,
+        run_control: RunControl | None = None,
         acceptance: AcceptancePolicy | None = None,
     ) -> None:
         super().__init__(
@@ -108,11 +157,45 @@ class AsyncExecutor(ExecutorBase):
             sleep=sleep,
             rng=rng,
             attempts_used=attempts_used,
+            attempts_spent=attempts_spent,
+            profiles=profiles,
+            default_model=default_model,
+            capacity_policy=capacity_policy,
+            run_control=run_control,
         )
         self._estimated_tokens_per_node = validate_token_count(
             estimated_tokens_per_node, "estimated_tokens_per_node",
         )
         self._max_concurrency = validate_max_concurrency(max_concurrency)
+        if termination is not None and not isinstance(termination, TerminationPolicy):
+            raise TypeError(
+                f"termination must be a TerminationPolicy or None, not {type(termination).__name__}"
+            )
+        self._termination = termination
+        # The last run's drain: settled and cancelled node ids, and whether
+        # its deadline ended it.
+        self._drained: tuple[tuple[str, ...], tuple[str, ...], bool] | None = None
+        # Whether the current run is draining, so no node starts a retry, and
+        # the nodes waiting out a retry backoff, which have no call in flight.
+        self._draining = False
+        self._backing_off: set[str] = set()
+        # During a run under a run control, the task that ends once it is revoked.
+        self._revocation: asyncio.Task[None] | None = None
+
+    @property
+    def drain_record(self) -> dict[str, Any] | None:
+        """How the last run drained after a failure, or None when it did not drain.
+
+        ``settled`` names the nodes in flight whose work ended during the
+        drain, ``cancelled`` those it stopped, still in flight when it ended
+        or before a retry, and ``deadline_hit`` whether ``drain_timeout_s``
+        ended it. A Swarm's checkpoints save it as ``control["drain"]``.
+        """
+        if self._drained is None:
+            return None
+        settled, cancelled, deadline_hit = self._drained
+        return {"settled": list(settled), "cancelled": list(cancelled),
+                "deadline_hit": deadline_hit}
 
     def _schedule_state(
         self, graph: ExecutionGraph, active: dict[asyncio.Task[None], Node],
@@ -155,6 +238,8 @@ class AsyncExecutor(ExecutorBase):
 
     async def run(self, graph: ExecutionGraph) -> ExecutionGraph:
         """Execute every node, fanning out independent nodes concurrently."""
+        self._drained, self._draining = None, False
+        self._backing_off.clear()
         self.prepare_execution(graph)
         with self._tracer.phase("verification"):
             self.recover_verification(graph)
@@ -172,18 +257,41 @@ class AsyncExecutor(ExecutorBase):
         # then held it, for its admission wait.
         ready_at = dict.fromkeys((node.id for node in ready), self._tracer.now())
         held_s: dict[str, float] = {}
+        # Under a capacity policy: when a full limit first passed over each
+        # ready node, and the branch last admitted, for round-robin turns.
+        deferred_at: dict[str, float] = {}
+        last_branch: int | None = None
+        if self._run_control is not None:
+            self._revocation = asyncio.ensure_future(self._run_control.wait())
 
         try:
             while ready or active:
                 admission_error: Exception | None = None
+                capacity = self._capacity
+                if capacity is not None and capacity.policy.round_robin:
+                    ready = _in_turn(ready, order, last_branch)
+                passed: list[Node] = []
                 while ready and len(active) < concurrency:
                     node = ready.popleft()
+                    bucket = None
+                    if capacity is not None:
+                        provider, model, _ = self._node_route(node)
+                        bucket = capacity.bucket(provider, str(model))
+                    if bucket is not None and not capacity.try_acquire(bucket):
+                        # Its provider and model have no free slot: it stays
+                        # ready, and work behind it may start instead.
+                        passed.append(node)
+                        deferred_at.setdefault(node.id, self._tracer.now())
+                        continue
                     try:
+                        self.check_run_control()
                         self._reserve_node(node)
                     except Exception as exc:
                         # No provider call has started for this node. Stop
                         # admitting work, settle/cancel what is already in
                         # flight, then surface the admission failure.
+                        if bucket is not None:
+                            capacity.release(bucket)
                         if isinstance(exc, BudgetValidationError):
                             self.mark_accounting_invalid(node, exc)
                             self.notify_update(node)
@@ -195,26 +303,50 @@ class AsyncExecutor(ExecutorBase):
                     waited = self._tracer.since(
                         ready_at.pop(node.id, self._tracer.now()) + held_s.pop(node.id, 0.0),
                     )
-                    self._tracer.on_wait("admission", waited, node)
+                    # Time since a full limit passed it over waited for capacity.
+                    blocked = (min(waited, self._tracer.since(deferred_at.pop(node.id)))
+                               if node.id in deferred_at else 0.0)
+                    self._tracer.on_wait("admission", waited - blocked, node)
+                    if blocked:
+                        self._tracer.on_wait("capacity", blocked, node)
                     task = asyncio.create_task(
                         self._execute_node(node, graph),
                         name=f"smythe-node-{node.id}",
                     )
+                    if bucket is not None:
+                        # However the task ends, even cancelled before it starts,
+                        # it gives back the slot it holds then: a fallback moves it.
+                        capacity.slots[node.id] = bucket
+                        task.add_done_callback(
+                            lambda _, node_id=node.id: capacity.give_back(node_id))
+                        last_branch = _branch(node, order)
                     active[task] = node
+                ready.extendleft(reversed(passed))
 
                 if admission_error is not None:
-                    await self._cancel_and_settle(active)
-                    raise admission_error
+                    raise await self._stop_after(admission_error, active)
                 if not active:
                     break
 
                 done, _ = await asyncio.wait(
-                    active, return_when=asyncio.FIRST_COMPLETED,
+                    active if self._revocation is None else {*active, self._revocation},
+                    return_when=asyncio.FIRST_COMPLETED,
                 )
+                if self._revocation in done:
+                    # It ends only on a revocation, which is raised before
+                    # anything else is handled: the nodes in flight are
+                    # cancelled at once, below.
+                    self._revocation = None
+                    self.check_run_control()
                 first_error: Exception | None = None
                 just_completed: list[Node] = []
                 for task in sorted(done, key=lambda item: order[active[item].id]):
                     node = active.pop(task)
+                    if capacity is not None:
+                        # Its done callback may not have given back its slot
+                        # yet, and a node passed over for that slot must find
+                        # it free at the next admission.
+                        capacity.give_back(node.id)
                     try:
                         task.result()
                     except asyncio.CancelledError:
@@ -255,19 +387,24 @@ class AsyncExecutor(ExecutorBase):
                         for stale in (ready_at.keys() | held_s.keys()) - ready_ids:
                             ready_at.pop(stale, None)
                             held_s.pop(stale, None)
+                            deferred_at.pop(stale, None)
                         now = self._tracer.now()
                         for waiting in ready:
                             ready_at.setdefault(waiting.id, now)
 
                 if first_error is not None:
                     # HALT means no queued sibling may start after the error
-                    # is observed. Cancel in-flight siblings and always await
-                    # them so no provider task escapes the failed run.
-                    await self._cancel_and_settle(active)
-                    raise first_error
+                    # is observed. Cancel in-flight siblings, after a drain
+                    # policy has let them finish, and always await them so no
+                    # provider task escapes the failed run.
+                    raise await self._stop_after(first_error, active)
         except BaseException:
             await self._cancel_and_settle(active)
             raise
+        finally:
+            if self._revocation is not None:
+                self._revocation.cancel()
+                self._revocation = None
 
         if pending:
             failed = [n for n in graph.nodes if n.status == NodeStatus.FAILED]
@@ -301,6 +438,91 @@ class AsyncExecutor(ExecutorBase):
         self.reserve_node_budget(
             node, default_estimated_tokens=self._estimated_tokens_per_node,
         )
+
+    async def _stop_after(
+        self, error: Exception, active: dict[asyncio.Task[None], Node],
+    ) -> Exception:
+        """Cancel and settle the nodes in flight; under a drain policy, let them finish first.
+
+        Returns the error the run raises: *error*, or the ``SecurityStop`` of
+        a run control revoked during the drain, with *error* as its cause. A
+        failure of class ``security_stop``, or one that follows a recorded
+        security stop, cancels them at once, and so does a revocation during
+        the drain. A node admitted in the same pass as a refused one has not
+        begun an attempt, so it has no call to finish: it is cancelled before
+        it starts. Nor has a node waiting out a retry backoff: it is
+        cancelled at once and reported as cancelled by the drain.
+        """
+        if isinstance(error, SecurityStop):
+            self._record_security_stop(error)
+        if (self._termination is not None and active and self._security_stop is None
+                and classify_failure(error) != SECURITY_STOP):
+            self._draining = True
+            unstarted = {node.id for node in active.values() if node.status is NodeStatus.PENDING}
+            waiting = {node.id for node in active.values() if node.id in self._backing_off}
+            if (await self._cancel_and_settle(active, unstarted | waiting))[1]:
+                raise asyncio.CancelledError  # A cancelled run never drains.
+            await self._drain(active, waiting)
+            if self._run_control is not None and self._run_control.revoked:
+                stop = SecurityStop(self._run_control.reason_code)
+                stop.__cause__ = error
+                self._record_security_stop(stop)  # Before the stragglers are cancelled.
+                error = stop
+        await self._cancel_and_settle(active)
+        return error
+
+    async def _drain(self, active: dict[asyncio.Task[None], Node], stopped: set[str]) -> None:
+        """Let the nodes in flight finish, for up to the policy's ``drain_timeout_s``.
+
+        Nothing is admitted meanwhile, and no node starts a retry: one whose
+        attempt fails returns to pending with its reservation released, as a
+        cancelled node does, and joins *stopped*, the nodes the drain has
+        already cancelled. A node that finishes has already saved its result,
+        cost and status through its own completion path; it is neither
+        supervised nor regenerated, and its own failure does not replace the
+        run's. Nodes still in flight when the drain ends stay in *active* to
+        be cancelled. A cancellation of the run, a node that ends cancelled,
+        or a revocation of the run control ends the drain at once.
+        """
+        settled: list[str] = []
+        started = self._tracer.now()
+        deadline = asyncio.create_task(self._drain_wait(self._termination.drain_timeout_s))
+        revocation = set() if self._revocation is None else {self._revocation}
+        try:
+            while active and not deadline.done():
+                done, _ = await asyncio.wait(
+                    {deadline, *active, *revocation}, return_when=asyncio.FIRST_COMPLETED,
+                )
+                for task in done - {deadline, *revocation}:
+                    node = active.pop(task)
+                    try:
+                        task.result()
+                    except asyncio.CancelledError:
+                        raise
+                    except Exception:
+                        pass  # The node settled its own failure.
+                    if node.status is NodeStatus.PENDING:
+                        # Only a refused retry, or a call a durable drain
+                        # did not send, ends a node pending.
+                        stopped.add(node.id)
+                    else:
+                        settled.append(node.id)
+                if revocation & done:
+                    break  # A security stop is never delayed.
+        finally:
+            deadline_hit = deadline.done() and bool(active)
+            if deadline.done() and not deadline.cancelled():
+                deadline.exception()  # A wait that failed ends the drain like its deadline.
+            deadline.cancel()
+            self._tracer.on_wait("drain", self._tracer.since(started))
+            cancelled = stopped | {node.id for node in active.values()}
+            self._drained = (tuple(sorted(settled)), tuple(sorted(cancelled)), deadline_hit)
+
+    async def _drain_wait(self, seconds: float) -> None:
+        """Wait out a drain's timeout with the executor's ``sleep``, or ``asyncio.sleep``."""
+        waited = (self._sleep or asyncio.sleep)(seconds)
+        if inspect.isawaitable(waited):
+            await waited
 
     async def _cancel_and_settle(
         self, active: dict[asyncio.Task[None], Node],
@@ -364,6 +586,11 @@ class AsyncExecutor(ExecutorBase):
 
         # A resumed run continues the allowance its checkpoint recorded.
         for attempt in range(self._attempts_spent(node), attempts):
+            if last_exc is not None and self._draining:
+                # A drain lets an attempt in flight finish but starts no retry:
+                # the node returns to pending, so a resume runs it again.
+                self._requeue_cancelled(node)
+                return
             self._call_attempts[node.id] = attempt
             try:
                 delay = self._retry_wait_s(node, attempt, last_exc)
@@ -372,11 +599,14 @@ class AsyncExecutor(ExecutorBase):
                 break
             if delay:
                 started = self._tracer.now()
+                # A drain that begins meanwhile cancels the wait.
+                self._backing_off.add(node.id)
                 try:
                     waited = (self._sleep or asyncio.sleep)(delay)
                     if inspect.isawaitable(waited):
                         await waited
                 finally:
+                    self._backing_off.discard(node.id)
                     self._tracer.on_wait("retry_backoff", self._tracer.since(started), node)
             self._spend_attempt(node, attempt)
             node.status = NodeStatus.RUNNING
@@ -384,6 +614,7 @@ class AsyncExecutor(ExecutorBase):
             self._tracer.on_node_start(node, attempt=attempt)
 
             try:
+                self._route_attempt(node, last_exc)
                 # Cost recording happens inside acall_node (per provider call).
                 result = await self.acall_node(node, graph)
                 # Artifact writes are file I/O — keep them off the event
@@ -431,6 +662,11 @@ class AsyncExecutor(ExecutorBase):
                 if isinstance(exc, asyncio.CancelledError):
                     self._requeue_cancelled(node)
                     raise
+                if isinstance(exc, _DrainRefused):
+                    # A durable drain sent nothing for this attempt: like a
+                    # cancelled node, the node returns to pending.
+                    self._requeue_cancelled(node)
+                    return
                 last_exc = exc
                 self._tracer.on_node_error(node, exc)
                 self._end_failed_attempt(node)

@@ -14,6 +14,7 @@ from smythe.acceptance import (
 )
 from smythe.budget import BudgetValidationError, Sentinel
 from smythe.checkpoint import (
+    CheckpointStore,
     FileCheckpointStore,
     build_state,
     task_from_dict,
@@ -668,6 +669,146 @@ def test_revision_allowance_is_not_refilled_by_resume(tmp_path):
 
     added = [n.id for n in result.graph.nodes if n.id.startswith("added-")]
     assert len(added) == 1, f"resume refilled the revision allowance: {added}"
+
+
+class RefusedEveryTime(Supervisor):
+    """Proposes, after every node, to drop it: finished work, so each proposal is refused."""
+
+    def __init__(self, reason: str = "drop it") -> None:
+        self.reason = reason
+
+    async def review(self, graph, node, *, task, revisions_remaining):
+        return Revision(drop_node_ids=(node.id,), reason=self.reason)
+
+
+class MemoryStore(CheckpointStore):
+    """Keeps states in memory, detached as a file store would."""
+
+    def __init__(self) -> None:
+        self.states: dict[str, dict] = {}
+
+    def save(self, execution_id, state):
+        self.states[execution_id] = json.loads(json.dumps(state))
+
+    def load(self, execution_id):
+        state = self.states.get(execution_id)
+        return None if state is None else json.loads(json.dumps(state))
+
+    def delete(self, execution_id):
+        self.states.pop(execution_id, None)
+
+    def list_ids(self):
+        return sorted(self.states)
+
+
+def test_the_revision_log_survives_resume(tmp_path):
+    store = FileCheckpointStore(tmp_path)
+    provider = ScriptedProvider(fail_labels={"C"})
+
+    def swarm():
+        return Swarm(provider=provider, model="test-model", checkpoint_store=store,
+                     supervisor=RefusedEveryTime(), max_revisions=1)
+
+    with pytest.raises(RuntimeError, match="boom: C"):
+        swarm().execute(_serial_graph())
+    [execution_id] = store.list_ids()
+    state = store.load(execution_id)
+    saved = state["control"]["revision_log"]
+    assert [(entry["after_node"], entry["applied"]) for entry in saved] == [("a", False), ("b", False)]
+    assert saved[1]["retained"] == ["a", "b"] and saved[1]["revisions_remaining_after"] == 1
+    # Informational: the checkpoint stays version 4 and requires nothing new.
+    assert state["version"] == 4 and "requires" not in state
+
+    result = swarm().resume(execution_id)
+
+    log = store.load(execution_id)["control"]["revision_log"]
+    assert log[:2] == saved
+    assert [entry["after_node"] for entry in log] == ["a", "b", "c"]
+    assert [span["revision"]["after_node"] for span in result.trace if "revision" in span] == ["c"]
+
+
+def test_the_revision_log_keeps_its_latest_entries_within_a_fixed_size():
+    def run(width: int) -> list[dict]:
+        store = MemoryStore()
+        nodes = [Node(id=f"node-{index:03d}", label=f"step {index}") for index in range(width)]
+        swarm = Swarm(provider=ScriptedProvider(), model="test-model", checkpoint_store=store,
+                      supervisor=RefusedEveryTime("x" * 5_000), max_revisions=1, artifact_dir=None)
+        swarm.execute(ExecutionGraph(topology=[Topology.FORK_JOIN], nodes=nodes))
+        [state] = store.states.values()
+        return state["control"]["revision_log"]
+
+    small, large = run(40), run(160)
+
+    for log, width in ((small, 40), (large, 160)):
+        assert len(log) == 32
+        assert [entry["after_node"] for entry in log] == [
+            f"node-{index:03d}" for index in range(width - 32, width)]
+        assert all(len(entry["reason"]) == 200 for entry in log)
+        assert all(len(entry["retained"]) <= 16 for entry in log)
+        assert log[-1]["omitted_ids"] == width - 16
+    # Neither an entry nor the log grows with the graph or the number of reviews.
+    largest = max(len(json.dumps(entry)) for entry in large)
+    assert largest <= max(len(json.dumps(entry)) for entry in small) + 8
+    assert len(json.dumps(large)) <= 32 * (largest + len(", ")) < 32 * 1024
+
+
+def test_a_run_without_revisions_saves_no_revision_log(tmp_path):
+    store = FileCheckpointStore(tmp_path)
+    swarm = Swarm(provider=ScriptedProvider(), model="test-model", checkpoint_store=store)
+    result = swarm.execute(_serial_graph())
+    assert store.load(result.execution_id)["control"] == {"revisions_used": 0}
+
+
+@pytest.mark.parametrize("saved", [
+    None, "not a list", [{"after_node": "a"}], [{"after_node": 1, "applied": True}], ["entry"],
+])
+def test_a_missing_or_unreadable_revision_log_resumes_as_an_empty_one(tmp_path, saved):
+    """The log is informational: checkpoints that lack it, as older builds
+    wrote them, or hold one this build cannot read still resume."""
+    from smythe.checkpoint import revision_log_from_state
+
+    store = FileCheckpointStore(tmp_path)
+    provider = ScriptedProvider(fail_labels={"C"})
+
+    def swarm():
+        return Swarm(provider=provider, model="test-model", checkpoint_store=store,
+                     supervisor=RefusedEveryTime(), max_revisions=1)
+
+    with pytest.raises(RuntimeError, match="boom: C"):
+        swarm().execute(_serial_graph())
+    [execution_id] = store.list_ids()
+    state = store.load(execution_id)
+    if saved is None:
+        del state["control"]["revision_log"]
+    else:
+        state["control"]["revision_log"] = saved
+    store.save(execution_id, state)
+    assert revision_log_from_state(state) == []
+
+    swarm().resume(execution_id)
+
+    log = store.load(execution_id)["control"]["revision_log"]
+    assert [entry["after_node"] for entry in log] == ["c"]
+
+
+def test_an_older_style_reader_ignores_the_revision_log(tmp_path):
+    """Earlier builds read control.revisions_used and nothing else from control."""
+    store = FileCheckpointStore(tmp_path)
+    provider = ScriptedProvider(fail_labels={"C"})
+    with pytest.raises(RuntimeError, match="boom: C"):
+        Swarm(provider=provider, model="test-model", checkpoint_store=store,
+              supervisor=AlwaysRevises(), max_revisions=1).execute(_serial_graph())
+    [execution_id] = store.list_ids()
+    state = store.load(execution_id)
+    assert state["control"]["revision_log"][0]["applied"] is True
+
+    from smythe.checkpoint import checkpoint_requirements
+
+    # A build that reads version 4 accepts the state, and the allowance it
+    # enforces is where it always was; the log is one more key beside it.
+    assert state["version"] == 4 and checkpoint_requirements(state) == ()
+    assert set(state["control"]) == {"revisions_used", "revision_log"}
+    assert state["control"].get("revisions_used", 0) == 1
 
 
 # ---------------------------------------------------------------------------

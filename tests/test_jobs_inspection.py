@@ -538,3 +538,107 @@ def test_invalid_artifact_metadata_is_not_used_to_read_files(tmp_path, field, va
     snapshot["artifacts"][0][field] = value
     monkeypatch.setattr(os, "open", lambda *a, **kw: pytest.fail("invalid record opened"))
     assert inspect_job(store, "run")["artifact_integrity"]["counts"] == {"unsafe": 1}
+
+
+# ---------------------------------------------------------------------------
+# Eligibility under the current validators, after rechecks
+# ---------------------------------------------------------------------------
+
+
+def _palette(version):
+    from smythe.validation import ValidatorIdentity
+
+    return ValidatorIdentity.for_config("brand-palette", version, {"colors": ["#ff0000"]})
+
+
+def _rechecked_eligibility(rechecks, registered=None, *, record=True):
+    """Project one accepted operation whose plan names palette version 1."""
+    from smythe.jobs.delivery import annotate_delivery, artifact_spec_identity
+
+    artifact = {"mime_type": "image/png", "validators": [{"name": "brand-palette", "version": "1"}]}
+    builtin = artifact_spec_identity(artifact).to_dict()
+    results = [{"validator": builtin, "outcome": "passed", "reports": []},
+               {"validator": _palette("1").to_dict(), "outcome": "passed", "reports": []}]
+    recorded = {"version": 1, "scope": "artifacts", "attempt_id": "a1", "decision": "accepted",
+                "reasons": [], "validators": results,
+                "subjects": [{"path": "x.png", "sha256": "a" * 64, "size_bytes": 1,
+                              "published": True}]}
+    snapshot = {
+        "operations": [{"operation_id": "op", "accepted_attempt_id": "a1",
+                        "spec": {"artifact": artifact, "validators": [_palette("1").to_dict()]}}],
+        "attempts": [{"attempt_id": "a1", "operation_id": "op", "attempt_number": 1,
+                      "status": "succeeded"}],
+        "artifacts": [{"attempt_id": "a1", "operation_id": "op", "relative_path": "x.png",
+                       "sha256": "a" * 64, "accepted": 1, "integrity": {"status": "verified"}}],
+    }
+    [operation] = annotate_delivery(snapshot, {"a1": recorded} if record else {}, {"a1": rechecks},
+                                    registered)["operations"]
+    return operation["delivery_acceptance"], operation["delivery_eligibility"]
+
+
+def _recheck_record(version, outcome, at_ns):
+    from smythe.jobs.delivery import artifact_spec_identity
+
+    builtin = artifact_spec_identity({"mime_type": "image/png"}).to_dict()
+    passed = outcome == "accepted"
+    return {"version": 1, "attempt_id": "a1", "reason": f"palette {version}", "outcome": outcome,
+            "validators": [{"validator": builtin, "outcome": "passed", "reports": []},
+                           {"validator": _palette(version).to_dict(),
+                            "outcome": "passed" if passed else "rejected", "reports": []}],
+            "findings": [] if passed else ["x.png: brand-palette: off palette"],
+            "artifacts": [{"relative_path": "x.png", "sha256": "a" * 64}],
+            "reevaluated_at_ns": at_ns}
+
+
+def test_eligibility_uses_the_latest_decision_under_the_current_validators():
+    current = {"brand-palette": _palette("2")}
+    rejected, accepted = _recheck_record("2", "rejected", 1), _recheck_record("2", "accepted", 2)
+
+    # The call decided under palette version 1, so version 2 requires a recheck.
+    assert _rechecked_eligibility([]) == _rechecked_eligibility([], {"brand-palette": _palette("1")})
+    assert _rechecked_eligibility([])[1] == {"eligible": True, "reasons": []}
+    projection, eligibility = _rechecked_eligibility([], current)
+    assert projection["source"] == "recorded"
+    assert eligibility == {"eligible": False, "reasons": ["validator_changed"]}
+
+    # The latest recheck under version 2 decides, whatever came before it.
+    projection, eligibility = _rechecked_eligibility([rejected], current)
+    assert (projection["source"], projection["decision"]) == ("reevaluated", "rejected")
+    assert projection["reasons"] == ["x.png: brand-palette: off palette"]
+    assert eligibility == {"eligible": False, "reasons": ["not_accepted"]}
+    projection, eligibility = _rechecked_eligibility([rejected, accepted], current)
+    assert (projection["source"], projection["decision"]) == ("reevaluated", "accepted")
+    assert projection["validators"][1] == {"validator": _palette("2").to_dict(), "outcome": "passed"}
+    assert eligibility == {"eligible": True, "reasons": []}
+    assert _rechecked_eligibility([accepted, rejected], current)[1]["reasons"] == ["not_accepted"]
+
+    # Under the plan's version 1, the call's own decision is still the latest that applies.
+    projection, eligibility = _rechecked_eligibility([rejected])
+    assert projection["source"] == "recorded" and eligibility["eligible"] is True
+
+    # A legacy attempt without a recorded decision is decided by its recheck.
+    projection, eligibility = _rechecked_eligibility([accepted], current, record=False)
+    assert projection["source"] == "reevaluated" and eligibility["eligible"] is True
+    assert _rechecked_eligibility([], current, record=False)[1]["reasons"] == ["validator_unrecorded"]
+
+
+@pytest.mark.parametrize("change", [
+    {"attempt_id": "a0"}, {"version": 2}, {"outcome": "maybe"}, {"artifacts": "x.png"},
+    {"findings": None}, {"validators": [{"outcome": "passed"}]},
+], ids=["other-attempt", "other-version", "outcome", "artifacts", "findings", "validators"])
+def test_a_malformed_or_misplaced_recheck_never_decides(change):
+    recheck = _recheck_record("2", "accepted", 1) | change
+
+    projection, eligibility = _rechecked_eligibility([recheck], {"brand-palette": _palette("2")})
+
+    assert projection["source"] == "recorded"
+    assert eligibility == {"eligible": False, "reasons": ["validator_changed"]}
+
+
+def test_a_recheck_of_other_bytes_is_not_eligible():
+    recheck = _recheck_record("2", "accepted", 1)
+    recheck["artifacts"] = [{"relative_path": "x.png", "sha256": "b" * 64}]
+
+    _, eligibility = _rechecked_eligibility([recheck], {"brand-palette": _palette("2")})
+
+    assert eligibility == {"eligible": False, "reasons": ["record_mismatch"]}

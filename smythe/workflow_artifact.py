@@ -14,11 +14,13 @@ result hold the document's text.
 Each publication is journaled as a ``publication`` operation keyed
 ``publication/<sequence>``, whose result is a :class:`PublishedArtifact`
 record. :func:`current_artifact` is the one accessor for a run's current
-publication, the delivery decision that covers it, and whether it is eligible
-for delivery now: only with an ``accepted`` decision on the same bytes and a
-file that still holds them. A missing or changed file is never eligible;
+publication, the publications it superseded, the delivery decision that
+covers it, and whether it is eligible for delivery now: only with an
+``accepted`` decision on the same bytes and a file that still holds them. A
+missing or changed file is never eligible;
 :meth:`~smythe.workflow.WorkflowRuntime.republish` publishes the saved bytes
-again as a new file.
+again as a new file, or, for a run with artifact lineage, renders the saved
+synthesis again under the publication's own name and decides it again.
 """
 
 from __future__ import annotations
@@ -258,6 +260,26 @@ def publish_bytes(directory: Path, filename: str, data: bytes) -> str:
     raise WorkflowStateError(f"Every name for {filename!r} is already taken in {directory}")
 
 
+def publish_generation(directory: Path, filename: str, sequence: int, data: bytes) -> str:
+    """Publish *data* in a run's claimed *directory* under publication *sequence*'s own name.
+
+    The name is ``<stem>-p<sequence><suffix>``, such as ``document-p1.md``.
+    No file is replaced: a file there that already holds exactly *data*, as
+    one published by a process lost before it journaled the publication, is
+    reused, and one holding other bytes raises WorkflowStateError.
+    """
+    base = Path(filename)
+    name = f"{base.stem}-p{sequence}{base.suffix}"
+    try:
+        atomic_publish_bytes(directory / name, data)
+    except FileExistsError:
+        if not _holds(directory, name, data):
+            raise WorkflowStateError(
+                f"{name!r} in {directory} holds other bytes, and no file is ever replaced"
+            ) from None
+    return name
+
+
 def artifact_integrity(record: PublishedArtifact) -> dict[str, str]:
     """Whether *record*'s file still holds its published bytes, as ``status`` and ``detail``.
 
@@ -318,23 +340,32 @@ def read_publication(operation: dict[str, Any], sequence: int) -> PublishedArtif
         record = PublishedArtifact.from_dict(result["artifact"])
     except (TypeError, ValueError) as error:
         raise WorkflowStateError(f"Saved publication {sequence} is invalid") from error
-    bound = ({"sequence": record.sequence, "republishes": inputs.get("republishes"),
-              "sha256": record.sha256, "size_bytes": record.size_bytes}
-             if "republishes" in inputs else
-             {"sequence": record.sequence, "synthesis": record.synthesis,
-              "output_sha256": record.output_sha256, "renderer": record.renderer})
+    if "renderer" in inputs:
+        # A rendered document; a lineage run's republication also names the
+        # publication it replaces and the repair that asked for it.
+        bound = {"sequence": record.sequence, "synthesis": record.synthesis,
+                 "output_sha256": record.output_sha256, "renderer": record.renderer}
+        if "republishes" in inputs:
+            bound.update(republishes=inputs["republishes"], repair=inputs.get("repair"))
+    else:  # The bytes of an earlier publication, published again.
+        bound = {"sequence": record.sequence, "republishes": inputs.get("republishes"),
+                 "sha256": record.sha256, "size_bytes": record.size_bytes}
     if record.sequence != sequence or bound != inputs:
         raise WorkflowStateError(f"Saved publication {sequence} does not match its operation")
     return record
 
 
+def applied_publications(store: Any, run_id: str) -> list[PublishedArtifact]:
+    """The run's publications that a checkpoint applied, in sequence order; only reads are made."""
+    return [read_publication(operation, sequence)
+            for sequence, operation in enumerate(publications(store, run_id))
+            if operation["state"] == "applied"]
+
+
 def latest_publication(store: Any, run_id: str) -> PublishedArtifact | None:
     """The run's current publication: the one with the highest sequence a checkpoint applied."""
-    latest = None
-    for sequence, operation in enumerate(publications(store, run_id)):
-        if operation["state"] == "applied":
-            latest = read_publication(operation, sequence)
-    return latest
+    applied = applied_publications(store, run_id)
+    return applied[-1] if applied else None
 
 
 def _current_decision(store: Any, run_id: str) -> DeliveryAcceptance | None:
@@ -380,13 +411,16 @@ class CurrentArtifact:
     ``no_decision``; ``not_accepted``; ``record_mismatch`` when the decision
     binds other bytes; and ``artifact_missing``, ``artifact_changed``,
     ``artifact_unsafe`` or ``artifact_unreadable`` from the integrity check.
-    It is derived on every read and never stored.
+    ``superseded`` holds the earlier publications a checkpoint applied,
+    oldest first, whose files stay as they are. It is derived on every read
+    and never stored.
     """
 
     publication: PublishedArtifact
     decision: DeliveryAcceptance | None
     integrity: dict[str, str]
     reasons: tuple[str, ...]
+    superseded: tuple[PublishedArtifact, ...] = ()
 
     @property
     def eligible(self) -> bool:
@@ -397,7 +431,9 @@ class CurrentArtifact:
         return {"publication": self.publication.to_dict(), "path": str(self.publication.path),
                 "decision": None if self.decision is None else self.decision.decision.value,
                 "integrity": dict(self.integrity),
-                "delivery_eligibility": {"eligible": self.eligible, "reasons": list(self.reasons)}}
+                "delivery_eligibility": {"eligible": self.eligible, "reasons": list(self.reasons)},
+                "superseded": [{"sequence": item.sequence, "name": item.name, "sha256": item.sha256}
+                               for item in self.superseded]}
 
 
 def current_artifact(store: Any, run_id: str) -> CurrentArtifact | None:
@@ -405,17 +441,18 @@ def current_artifact(store: Any, run_id: str) -> CurrentArtifact | None:
 
     The current publication is the one with the highest sequence that a
     checkpoint applied: the first publication, or the latest
-    republication. The decision is the one that covers the run's completed
-    output (see :class:`CurrentArtifact`); it must bind the published bytes,
-    which the file must still hold, for the artifact to be eligible for
-    delivery. Returns None when the run has published nothing. Only reads are
-    made, so a store opened read-only will do. Resuming a run, republishing
-    it and ``smythe runs inspect`` all read a run's artifact through this
-    accessor.
+    republication, which supersedes the others. The decision is the one that
+    covers the run's completed output (see :class:`CurrentArtifact`); it must
+    bind the published bytes, which the file must still hold, for the
+    artifact to be eligible for delivery. Returns None when the run has
+    published nothing. Only reads are made, so a store opened read-only will
+    do. Resuming a run, republishing it and ``smythe runs inspect`` all read a
+    run's artifact through this accessor.
     """
-    publication = latest_publication(store, run_id)
-    if publication is None:
+    applied = applied_publications(store, run_id)
+    if not applied:
         return None
+    publication = applied[-1]
     decision = _current_decision(store, run_id)
     integrity = artifact_integrity(publication)
     reasons = []
@@ -428,7 +465,7 @@ def current_artifact(store: Any, run_id: str) -> CurrentArtifact | None:
             reasons.append("record_mismatch")
     if integrity["status"] != "verified":
         reasons.append("artifact_" + integrity["status"])
-    return CurrentArtifact(publication, decision, integrity, tuple(reasons))
+    return CurrentArtifact(publication, decision, integrity, tuple(reasons), tuple(applied[:-1]))
 
 
 def artifact_problems(current: CurrentArtifact | None, output: Any) -> list[str]:

@@ -179,18 +179,24 @@ rejection that a later attempt already followed. Replayed retries still wait
 their backoff. A rejected call that nothing followed is sent again as a new
 call. Resuming a halted run therefore gives the rejected step one new call,
 and a `RETRY` node whose attempts were all rejected gets one new call, for its
-final attempt.
+final attempt. A run under a [retry policy](#retry-policy) continues each
+node's attempts instead of refilling them.
 
 In a parallel run, a node that fails cancels the other nodes that are still
 running. A zero-cost rejection fails its node under `HALT`, the default, and
 under `RETRY` once the final attempt is rejected. A node that `SKIP` skips
 cancels nothing. A cancelled node whose generation request was already sent
 holds unknown exposure at its quoted ceiling, so the run is blocked with
-`unknown_exposure` and resuming it fails. Runs that execute one node at a time
-(`parallel=False`, the default, or `max_concurrency=1`) have no other call in
-flight. A node's `timeout_s` also cancels a call that was already sent, with
-the same result, even in a serial run. A generated plan cannot set a timeout
-below 60 seconds.
+`unknown_exposure` and resuming it fails. Under a [termination
+policy](#draining-in-flight-calls) the run first waits for those requests and
+sends no other: a node answered within the deadline keeps its known charge and
+its result, and only a request still unanswered at the deadline holds unknown
+exposure. A [security stop](#security-stops) cancels the running nodes at
+once, with or without a policy, and blocks the run with `security_stop`
+instead. Runs that execute one node at a time (`parallel=False`, the default,
+or `max_concurrency=1`) have no other call in flight. A node's `timeout_s`
+also cancels a call that was already sent, with the same result, even in a
+serial run. A generated plan cannot set a timeout below 60 seconds.
 
 `result.total_cost_usd` is a compatibility projection of confirmed charges.
 `workflow_accounting` reports exact `confirmed_nanousd`, `reserved_nanousd`,
@@ -199,6 +205,139 @@ below 60 seconds.
 all recorded phases and failed attempts, using the adapter's dated published
 token prices. It does not represent a reconciled account invoice or hardware,
 human, and external service costs. No historical benchmark is repriced.
+
+### Retry policy
+
+`Swarm(run_store=store, retry_policy=RetryPolicy(...))` puts a durable run's
+node calls under a [retry policy](execution.md#retry-policy). A `RETRY` node
+then calls again only after a failure whose class the policy lists,
+`transient` by default: a 429 rejection is retried, and a 401, 403, 404 or 413
+rejection is not. A refused or `max_tokens` reply keeps its known charge in
+the journal, as a rejected call, and is retried only when the policy lists
+`quality_defect`; otherwise it still stops the run. The recipe records the
+policy's fields under `retry_policy`, except `persist_attempts`, and a recipe
+without a policy keeps its bytes and the retries described above.
+
+The journal is the record of each node's attempts. Each time a node starts,
+it continues from the attempts its current generation has used: every call
+of that generation that the journal settled as rejected counts, on whichever
+invocation it was made. A crash, a halted run and every resume therefore
+share the node's `1 + max_retries` attempts (one without `RETRY`) instead of
+refilling them, and an attempt whose call was rejected is never sent again.
+When the generation's latest call is a refused, truncated or unusable reply,
+whose known charge the journal keeps, the node enters that attempt again
+instead, and the journal replays the reply without a call: a reply the
+policy does not retry stops the run again, as it does without a policy, and
+one it retries is followed by the next attempt, within the cap. A node with
+no attempt left fails without a call, with a `RuntimeError` that
+names its allowance, and its failure policy settles it; a new run starts
+fresh. A call that was accepted, reserved but never sent, or sent without a
+known charge is not counted, so entering its attempt again replays, sends or
+refuses it as before. A regenerated node starts a new generation with a fresh
+allowance. `persist_attempts` makes no difference: the journal keeps every
+attempt.
+
+The journal keeps no response headers, so a durable run never reads a
+`Retry-After`: the wait before a retry is the jittered backoff that doubles
+from `retry_backoff_s`, at most `backoff_max_s`, and no wait with the default
+`retry_backoff_s=0`. `deadline_s` is measured within one process and starts
+again when the run resumes.
+
+A run keeps the policy it started with. Resuming with a `Swarm` that sets no
+`retry_policy` uses the saved one. A different policy, a policy for a run
+that started without one, and a saved policy this release cannot read raise
+`WorkflowConflictError` before any call. Every provider the run can call must
+declare `sdk_retries=0`, as the native and offline providers do; otherwise
+the run is refused with `WorkflowBindingError` before it is created or, on
+resume, before any call. A policy with `retain_uncertain_dispatch` is refused
+the same way: the journal keeps the exposure of every call it sends itself.
+
+### Draining in-flight calls
+
+`Swarm(run_store=store, parallel=True, termination=TerminationPolicy(drain_timeout_s=30))`
+has a durable run [drain the nodes in flight](execution.md#draining-in-flight-work)
+when a failure stops it, such as a `HALT` node's zero-cost rejection. No node
+is admitted, no retry is sent, and no request is sent that a node had not
+sent yet. The run waits up to `drain_timeout_s` seconds for the requests
+already sent:
+
+- A node whose response arrives within the deadline settles its known charge
+  and keeps its result, and the failed checkpoint consumes its call. The run
+  is not blocked: resuming it runs the failed node and the nodes that never
+  started, and never calls the settled node again.
+- A node whose request is still unanswered at the deadline is cancelled, as
+  without a policy. The request was sent, so it holds unknown exposure at its
+  quoted ceiling and the run is blocked with `unknown_exposure`.
+- A node that had not sent its request returns to pending without reserving
+  or sending it, and resuming the run sends it. An input-token count already
+  sent, which is free, may still answer, and the journal keeps its quote. A
+  read step that has resolved its destination returns its reservation, with a
+  `call_released` event whose reason is `run_draining`.
+- A [security stop](#security-stops) never waits: a revocation during the
+  drain cancels the nodes in flight at once.
+
+Only a request already sent when the failure stopped the run can hold
+unknown exposure, with or without a policy, so a drain never adds any.
+
+The journal's calls record how each node's call ended; a durable checkpoint
+keeps no `control.drain` summary. A model call claims its dispatch right after
+its reservation, without yielding, so a cancellation never leaves one reserved
+but unsent. A read step reserves its call before it resolves its destination,
+so one cancelled meanwhile, by the deadline, a security stop or a failure
+without a policy, keeps its reservation, as does a call of a process lost
+between its reservation and its dispatch claim. Resuming the run sends that
+call under its reservation, and the run releases it once it can no longer be
+sent, as [recovery boundaries](#recovery-boundaries) describe. Recovery holds
+each call that a lost process sent without a saved response as unknown
+exposure.
+
+The recipe records the policy under `termination`, as
+`{"drain_timeout_s": ...}`, only when one is configured, so a recipe without
+one keeps its bytes. A run keeps the policy it started with: resuming with a
+`Swarm` that sets no `termination` uses the saved one, and a different policy,
+or a policy for a run that started without one, raises
+`WorkflowConflictError` before any call.
+
+The journal has no way to reconcile unknown model-call exposure: a run
+blocked with `unknown_exposure`, whether a drain's deadline or a cancellation
+without a policy left it, stays blocked, and its exposure stays recorded as
+unknown. Once the cause is resolved, run the task again as a new run.
+
+### Security stops
+
+A durable run takes a [run control](execution.md#security-stops) as ordinary
+runs do: `Swarm(run_store=store, run_control=control)`. The control is not
+part of the recipe. Once it is revoked, or a tool runtime raises
+`SecurityStop`, the run admits no node and sends no call, its synthesis is not
+called, and the nodes in flight are cancelled at once. A cancelled call that
+was already sent holds unknown exposure at its quoted ceiling, as after a
+`HALT`. The run is then blocked in the journal before its failed checkpoint
+is saved: its status becomes `blocked`, its `blocked_reason` becomes
+`security_stop`, and a `security_stop` event records the reason code, never
+provider text.
+
+`store.security_stop(run_id, reason_code)` does the same for any run,
+unfinished or completed, without a lease, from any process that can open the
+journal. The first stop stands: stopping a stopped run again records nothing
+and returns the first stop, and `store.load_security_stop(run_id)` returns it
+as `{"reason_code", "at_ns"}`, on the journal's clock, or `None`. After a
+stop no new call is prepared and no call is reserved or dispatched. Calls
+already dispatched still settle when their evidence arrives, and keep unknown
+exposure without it; neither an overrun, unknown exposure nor conflicting
+evidence replaces the reason, and no method clears it. Resuming, executing,
+re-evaluating or republishing a stopped run raises its `SecurityStop` before
+any lease is taken, whatever the resuming Swarm's control. A successor run
+never reuses a stopped run's results, and its output cannot be prepared or
+approved as an [external action](actions.md), whose authority check refuses
+it too. Earlier releases admit no new call for a stopped run either, since
+any `blocked_reason` closes admission, but they still return a completed
+run's saved result.
+
+`store.inspect_run(run_id)` and `smythe runs inspect` show the reason and the
+unknown exposure, and the next action is `rerun`. The journal has no way to
+reconcile unknown model-call exposure, so a stopped run's exposure stays
+recorded as unknown: once the cause is resolved, run the task again as a new
+run.
 
 ### Money units
 
@@ -258,10 +397,11 @@ one exception is a [read step](#recorded-read-steps) whose profile declares it
 free and safe to send again, which is read again as a new call.
 
 A call that was reserved but never dispatched, as when a process is killed
-between the reservation and the dispatch claim, keeps its reservation while
-the run can still send it. When its node runs again at the same generation,
-resuming sends it under that reservation and its saved quote, without counting
-its input again. The run releases it once it can no longer be sent:
+between the reservation and the dispatch claim, or a read step is cancelled
+while it resolves its destination, keeps its reservation while the run can
+still send it. When its node runs again at the same generation, resuming sends
+it under that reservation and its saved quote, without counting its input
+again. The run releases it once it can no longer be sent:
 
 - when a checkpoint records a regeneration that moved its node to a later
   generation, including a regeneration that resuming applies, because a node
@@ -315,8 +455,8 @@ existing evidence and read-only inspection retain their behavior.
 
 Resume requires the same component descriptions, model configuration, budget,
 retry backoff, concurrency policy, gate validator,
-[acceptance policy](#strict-delivery-acceptance) and
-[renderer](#published-documents), apart from the
+[acceptance policy](#strict-delivery-acceptance),
+[renderer](#published-documents) and [lineage policy](lineage.md), apart from the
 [price versions](#price-versions) of saved provider descriptions. It does not
 refill allowances. An
 inspected pending plan can be edited before execution; a stale graph from an
@@ -504,8 +644,99 @@ SHA-256, go to the renderer's file name or, when that is taken, the next free
 numbered name, so a changed file keeps its bytes, and the next `publication`
 operation, applied by a new completed checkpoint, becomes current. It calls no
 provider, runs no validator and leaves the decision as it is, since that binds
-the same bytes. A run whose current file is intact is left as it is. Operation
-kinds are free text, so publication needs no journal upgrade.
+the same bytes. A run whose current file is intact is left as it is. A run
+with a [lineage policy](lineage.md#repair-a-run-in-place) is repaired in place
+instead: its saved synthesis is rendered again, published under the new
+publication's own name (`document-p1.md`) and decided again, still without a
+provider call. The accessor's `superseded` lists the earlier publications a
+checkpoint applied, whose files stay where they are. Operation kinds are free
+text, so publication needs no journal upgrade.
+
+## Lineage records
+
+A run with a [lineage policy](lineage.md) journals one more operation when it
+completes. After the `acceptance` operation, a `lineage` operation records the
+run's [lineage](lineage.md#the-record-a-run-writes): its published document,
+its decision, and each node's result and inputs as ids, versions and digests.
+It is keyed `lineage` while every node is at generation 0 and
+`lineage/<digest>` after that, following the synthesis key, and the completed
+checkpoint consumes it with the synthesis, publication and decision in one
+transaction. It is assembled once, from targeted loads of the operations and
+snapshots it names, so checkpoint saves read what they did before; it holds
+no calls and no cost. `inspect_run()`, `list_runs()` and journal events never
+return it, and `smythe.lineage.load_lineage(store, run_id)` reads it.
+Resuming a completed run assembles it again and gives an `indeterminate`
+decision when the saved record no longer matches. Each later decision, by
+re-evaluation or republication, journals a `lineage` operation keyed by its
+decision sequence, `lineage/<sequence>` (or `lineage/<digest>/<sequence>`),
+whose inputs name the record it supersedes; the checkpoint that applies the
+decision applies it too. Operation kinds are free text, so lineage needs no
+journal upgrade.
+
+## Reused results
+
+A successor of a completed lineage run is a new run, under its own recipe and
+budget, of the predecessor's task and completed graph: every node starts
+pending without its result or history, the inherited planning records are
+dropped, and each node either keeps the predecessor's result or runs again.
+`Swarm.repair()` starts one for each `regenerate` item of a
+[repair plan](lineage.md#apply-a-repair-plan), under an explicit allowance
+for its budget.
+
+- **Reuse operations.** Before any node runs, each kept node completes from a
+  `reuse` operation keyed `reuse/<node id>`. Its inputs name the predecessor
+  (`store_id`, `run_id` and the `lineage_sha256` of its record), the node and
+  its `generation` there, the `result_sha256`, the digests of the node's
+  lineage record and of the source evidence its text carries (`records`),
+  the reason codes the reuse was decided with and the repair plan's
+  `plan_sha256`. Its result holds the text and those records. The next
+  checkpoint consumes each operation once, with the completed node. A reuse
+  operation carries no calls and no cost: the successor's accounting holds
+  only the calls of the nodes that run again, and the predecessor's rows are
+  never changed.
+- **Checked before anything is created.** The predecessor must be in the
+  same store, completed, with an applied lineage record in the successor's
+  access scope, compared first, whose digest is the one named. A kept node's
+  saved result must have the digest its record gives, its inputs must be
+  declared, and no source its record or source evidence names may have been
+  [removed](tasks.md#remove-a-source) from the predecessor. Gates, the nodes
+  they judge or depend on, and nodes that depend on a node that runs again
+  are never kept. The graph must also suit the successor's own
+  configuration, which may differ from the predecessor's: its graph policy,
+  the read profiles its read steps name, its node models and its agents. A
+  refusal creates no run, so nothing is left to resume, and makes no call.
+- **Same text, same prompts.** A kept result is the predecessor's text byte
+  for byte, so the nodes that run again are given exactly what a full
+  recomputation would give them.
+- **Recovery.** A process lost after a reuse operation commits replays it on
+  resume without reading the predecessor; one lost before it commits checks
+  the predecessor again first. Refreshing an unfinished successor's sources
+  runs its kept nodes again, like every other node, even when it was lost
+  before it saved any of them; their reuse operations then stay unapplied.
+  A kept result is never used once a source its record or source evidence
+  names is removed from the successor itself.
+- **Records.** The successor's graph holds one planning record, `repair`:
+  the predecessor, the plan digest and the reason. Its
+  [lineage](lineage.md#reuse-in-a-successor-run) names its `predecessor` and
+  `repair`, and each kept node keeps its recorded inputs with `reused_from`.
+  A new graph that carries a `repair` planning record, or `lineage_reuse`
+  node metadata, is refused. `inspect_run()`, `list_runs()`, journal events
+  and `smythe runs inspect` never return kept text.
+- **Withdrawn text.** The successor's first checkpoint applies a copy of each
+  of the predecessor's `source_tombstone` operations, so text
+  [withdrawn](lineage.md#restrict-a-source) from the predecessor is withdrawn
+  from the successor too.
+
+## Restricted runs
+
+`smythe.lineage.restrict_source` journals a `source_tombstone` operation in
+each completed lineage run whose record names the withdrawn text, and, with
+`purge=True`, an `artifact_purge` operation keyed
+`artifact-purge/<publication sequence>` for each published file it deletes. A
+copy of the run's completed checkpoint applies them under the run's lease;
+they hold no calls, no cost and no source text, and the run's calls,
+balances and earlier checkpoints are unchanged
+([restrict a source](lineage.md#restrict-a-source)).
 
 ## Recorded read steps
 
@@ -654,7 +885,8 @@ native `OpenAIResponsesProvider` for `gpt-6-astra` and `gpt-5.6-sol`, native
 `AnthropicMessagesProvider` for `claude-fable-5-1`, and stateless
 `OfflineProvider` plan/echo fixtures. Both native providers use their global
 endpoints. The path binds the built-in simple, LLM, and constrained architects,
-WhiteRabbit routing, static registries, LLM supervision, synthesis strategies,
+WhiteRabbit routing, static registries, LLM and
+[evidence-triggered](supervisor.md#evidence-triggered-review) supervision, synthesis strategies,
 token verification, gates judged by a
 [registered validator](verifier.md#gate-validators-in-durable-workflows)
 declared with `LocalOnly(..., role="validator")`,
@@ -691,7 +923,7 @@ combination with the test behind it.
 hashes, and events. `store.lease_sessions(execution_id)` returns the
 journal-clock bounds of each lease session, which a durable result reports as
 its [timing](execution.md#timing). `store.audit(execution_id)` verifies accounting and evidence
-bindings. Open `SQLiteWorkflowStore(path, read_only=True)` for inspection without
+bindings, including a run's [external action records](#external-action-records). Open `SQLiteWorkflowStore(path, read_only=True)` for inspection without
 schema changes or provider construction, including a journal from an earlier
 release ([journal upgrades](#journal-upgrades)). From the command line,
 `smythe runs --journal <path> inspect <run id>` reports the same balances,
@@ -707,13 +939,77 @@ Opening an existing file never changes its permissions. API keys are
 excluded from stored provider descriptions. Ordinary summaries and traces do
 not include raw responses or encrypted reasoning.
 
+## External action records
+
+A version 2 journal has four tables for [external actions](actions.md):
+`workflow_actions` holds each logical action with its intent, connector
+profile, state and balances; `workflow_action_attempts` its numbered attempts;
+`workflow_action_approvals` the approvals and rejections bound to its intent
+digest; and `workflow_action_records` its readbacks, lookups, notices, late
+receipts, findings, decisions and evidence. Records are append-only: SQLite
+refuses to update or delete them. In this release, `smythe.actions` writes
+[prepared actions](actions.md#prepared-actions), including
+[compensations](actions.md#compensation), whose `compensates_action_id`
+names the action they undo, and their
+[approvals, rejections and revocations](actions.md#approvals), including a
+run's [action stop](actions.md#stopping-a-runs-actions), which also adds an
+`actions_stopped` event; `smythe.workflow_actions` writes their attempts and
+late receipts in the [dispatch journal](actions.md#dispatch-journal); the
+[action runner](actions.md#readback) writes readback records, each charged
+its read's cost, and its [reconciliation](actions.md#reconciliation) writes
+lookup records, each charged its lookup's cost, and finding records; and
+[`record_notice()`](actions.md#notices) keeps notices, marked untrusted; and
+an [operator's decision](actions.md#operator-decisions) writes a decision
+record and an evidence record of the digest and summary it rests on.
+
+Action money is its own accounting scope, `external_actions`, in whole
+nanoUSD. It never enters a run's balances or `workflow_accounting`, which stay
+equal to the run's call ledger. `store.audit()` also checks a run's actions:
+each intent hashes to its recorded digest and names its profile's connector
+and one of its operations, each key is `action_key(store_id, run_id, slot,
+sequence)`, every state, verdict and record kind is known, approvals bind
+their action's intent digest, attempts are numbered from 1 under an approval,
+at most one attempt is prepared or dispatched and the action's state agrees
+with it, only an attempt that may have taken effect consumes an approval,
+and an action's confirmed, reserved and unknown amounts equal the sums of its
+attempts' costs, reservations and exposure and its records' costs. A
+mismatch raises `WorkflowCorruptionError`.
+
+An action's state and its accounting are kept apart. A write whose outcome
+is unknown keeps its write ceiling as unknown exposure while reconciliation
+looks it up, reads it back, retries it under deduplication or finds that it
+was not made, and after the action is reconciled: only a receipt that
+reports the write's cost turns that exposure into the attempt's confirmed
+cost. Each lookup and read is confirmed at the profile's read ceiling, and
+the action runner makes none that would take the action past the ceiling of
+the attempt's approval, including the reads of an attempt dispatched after
+reconciliation found that the write was not made, which share that budget
+with its lookups. A reconciled action can therefore still carry unknown
+exposure, and no attempt, cost or record is removed when its outcome is
+settled.
+
+For a run with actions, `inspect_run()` adds an `actions` block after its
+other keys: the scope's totals and, for each action, its identity, intent
+digest, operation and target, state and balances, with its attempts,
+approvals (principal, verifier, ceiling, expiry, consumption, revocation time
+and, for a revoked approval, whether the
+[revocation](actions.md#revoking-after-dispatch) came before any dispatch,
+after one or after its effect) and records by digest. It never includes
+parameters, approval assertions, revocation reasons, receipts, record
+payloads or error text. A run without actions inspects exactly as before.
+
 ## Journal upgrades
 
 The journal records its format version, which `store.store_version` reports.
 This release writes version 2, which adds the `tool` call phase of
-[recorded read steps](#recorded-read-steps); its tables are the same as
-version 1's. Smythe 0.9.x and earlier write version 1 and
-cannot open a version 2 journal, even read-only: they raise
+[recorded read steps](#recorded-read-steps) and the
+[external action tables](#external-action-records). Version 1 has every other
+table. Each version requires its own tables: a journal missing one, or a
+version 1 journal that already has an action table, is refused with
+`WorkflowCorruptionError`. Tables that other tools, such as a backup or
+replication tool, add to the file are kept, including through the upgrade.
+Smythe 0.9.x and earlier write version 1 and cannot open a version 2 journal,
+even read-only: they raise
 `WorkflowCorruptionError("Unsupported workflow journal version")`.
 
 Back up each journal before this release opens it for writing, and keep the
@@ -738,11 +1034,13 @@ journal; it is created with your default file permissions.
   and replay work as before, including while an earlier release's worker holds
   a run.
 - `SQLiteWorkflowStore(path)` upgrades a version 1 journal in the transaction
-  that opens it. The upgrade changes only the recorded version: every run,
-  call, balance, reservation, receipt, evidence row, checkpoint and event keeps
-  its bytes, and the store identity is unchanged. Concurrent openers upgrade
-  it once. An interrupted upgrade, including a killed process, rolls back and
-  leaves a version 1 journal.
+  that opens it. The upgrade creates the external action tables, empty, and
+  changes the recorded version; nothing else changes: every run, call,
+  balance, reservation, receipt, evidence row, checkpoint and event keeps its
+  bytes, the store identity is unchanged, and so is the file's mode.
+  Concurrent openers upgrade it once. An interrupted upgrade, including a
+  killed process, rolls back and leaves a version 1 journal without the new
+  tables.
 - Stop workers from earlier releases first. Those workers check the version
   only when they open the journal, so while any run holds an unexpired lease
   the upgrade raises `WorkflowLeaseError` and leaves the journal at version 1

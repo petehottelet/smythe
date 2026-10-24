@@ -2,19 +2,36 @@
 
 ``RetryPolicy`` makes the executor the only retry owner of a node's calls:
 which failure classes it calls again for, how long it waits first, and the
-deadline that bounds a node's attempts and waits together. The validators
-here check every policy's fields the same way.
+deadline that bounds a node's attempts and waits together. ``ModelProfile``
+routes the nodes that name it to a developer-approved provider and model, and
+can name the profile that their retries fall back to. ``CapacityPolicy`` limits how many calls each provider type and model takes
+at once and how often one starts, and can admit ready work in turn across
+branches. ``TerminationPolicy`` lets the async executor drain the nodes in
+flight when a failure stops a run, instead of cancelling them at once. The
+validators here check every policy's fields the same way.
 """
 
 from __future__ import annotations
 
+import asyncio
+import inspect
 import math
-from dataclasses import dataclass, fields
+import re
+from collections.abc import Mapping
+from contextlib import asynccontextmanager
+from dataclasses import dataclass, field, fields
+from types import MappingProxyType
+from typing import TYPE_CHECKING, Any
 
 from smythe._failures import (
     AUTHORITY_DENIED, INPUT_ERROR, PROVIDER_REJECTED, QUALITY_DEFECT, TRANSIENT, UNKNOWN_OUTCOME,
     _http_status, status_failure_class,
 )
+from smythe.budget import _validate_usd
+from smythe.provider import Provider
+
+if TYPE_CHECKING:
+    from smythe.graph import Node
 
 # The classes of a failed call a policy may list. A failure whose exception is
 # terminal stops the run whatever the list says.
@@ -30,6 +47,16 @@ class RetryDeadlineError(TimeoutError):
     the next retry would end at or after it. Its class is ``deadline``, which
     is never retried; the node's failure policy settles it like any other
     failure.
+    """
+
+
+class UncertainDispatchError(TimeoutError):
+    """A node attempt timed out after its provider call was sent.
+
+    Raised in place of the node's ``TimeoutError`` under a retry policy with
+    ``retain_uncertain_dispatch``, when the call had not answered: it may
+    still be charged, so the node keeps its reservation as unknown cost. Its
+    class is ``unknown_outcome``, retried only when the policy lists it.
     """
 
 
@@ -74,6 +101,13 @@ class RetryPolicy:
     allowance in its ``execution_generation`` instead of refilling it, and
     resumes only under an equal policy. Its deadline starts again in each
     process.
+
+    With ``retain_uncertain_dispatch``, a node call that the executor's
+    timeout, a cancellation or an interruption ends after it was sent, before
+    the provider answered, keeps its reservation as the node's recorded cost,
+    marked unknown and, with an amount, estimated, instead of releasing it,
+    so checkpoints save the exposure and resume restores it. Such a timeout
+    raises ``UncertainDispatchError``, class ``unknown_outcome``.
     """
 
     retry_classes: frozenset[str] = frozenset({TRANSIENT})
@@ -81,12 +115,19 @@ class RetryPolicy:
     backoff_max_s: float = 60.0
     deadline_s: float | None = None
     persist_attempts: bool = False
+    retain_uncertain_dispatch: bool = False
 
     def to_dict(self) -> dict:
-        """The policy's fields as JSON-ready values, as a checkpoint records them."""
-        return {"retry_classes": sorted(self.retry_classes),
+        """The policy's fields as JSON-ready values, as a checkpoint records them.
+
+        ``retain_uncertain_dispatch`` is recorded only when set.
+        """
+        data = {"retry_classes": sorted(self.retry_classes),
                 "honor_retry_after": self.honor_retry_after, "backoff_max_s": self.backoff_max_s,
                 "deadline_s": self.deadline_s, "persist_attempts": self.persist_attempts}
+        if self.retain_uncertain_dispatch:
+            data["retain_uncertain_dispatch"] = True
+        return data
 
     @classmethod
     def from_dict(cls, data: object) -> RetryPolicy:
@@ -111,7 +152,7 @@ class RetryPolicy:
             raise ValueError(
                 f"retry_classes may list only {sorted(RETRYABLE_CLASSES)}, not {unknown}"
             )
-        for name in ("honor_retry_after", "persist_attempts"):
+        for name in ("honor_retry_after", "persist_attempts", "retain_uncertain_dispatch"):
             if type(getattr(self, name)) is not bool:
                 raise ValueError(f"{name} must be a bool, got {getattr(self, name)!r}")
         deadline = self.deadline_s
@@ -121,6 +162,126 @@ class RetryPolicy:
         object.__setattr__(self, "backoff_max_s",
                            validate_seconds(self.backoff_max_s, "backoff_max_s"))
         object.__setattr__(self, "deadline_s", deadline)
+
+
+@dataclass(frozen=True)
+class CapacityLimit:
+    """How much of one provider type and model a run's calls may take.
+
+    ``max_in_flight`` caps the nodes using the model that the async executor
+    runs at once, and so their calls. ``min_interval_s`` is the least time
+    between the starts of two calls. None leaves a field to the provider's
+    ``capacity_hint()``, and without a hint the field sets no limit.
+    """
+
+    max_in_flight: int | None = None
+    min_interval_s: float | None = None
+
+    def __post_init__(self) -> None:
+        cap = self.max_in_flight
+        if cap is not None and (type(cap) is not int or cap < 1):
+            raise ValueError(f"max_in_flight must be an integer >= 1 or None, got {cap!r}")
+        if self.min_interval_s is not None:
+            object.__setattr__(self, "min_interval_s",
+                               validate_seconds(self.min_interval_s, "min_interval_s"))
+
+
+@dataclass(frozen=True)
+class CapacityPolicy:
+    """Opt-in limits on the calls each provider type and model takes, and fair admission.
+
+    ``limits`` maps a model name, or a ``(provider type name, model)`` pair
+    such as ``("OpenAIResponsesProvider", "gpt-6-astra")``, to a
+    :class:`CapacityLimit`. For each field a pair's value wins, then the
+    model's, then the provider's ``capacity_hint(model)``. A ready node whose
+    model has no free slot is passed over, still ready, and other ready work
+    is admitted instead; its wait is a ``capacity`` wait, never a failure.
+
+    A transient status error whose ``Retry-After`` asks for a wait cools its
+    provider type and model down: no call to them starts for that long, at
+    most ``cooldown_max_s`` (0 turns cooldowns off). With ``round_robin``,
+    the async executor admits ready nodes in turn across branches, a branch
+    being the ready nodes that share a first dependency (nodes without one
+    share a branch), so one wide fan-out cannot hold back another's work.
+    """
+
+    limits: Mapping[str | tuple[str, str], CapacityLimit] = field(default_factory=dict)
+    round_robin: bool = False
+    cooldown_max_s: float = 60.0
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.limits, Mapping):
+            raise ValueError(f"limits must map models to CapacityLimit, got {self.limits!r}")
+        for key, limit in self.limits.items():
+            pair = (isinstance(key, tuple) and len(key) == 2
+                    and all(isinstance(part, str) for part in key))
+            if not isinstance(key, str) and not pair:
+                raise ValueError(
+                    f"A limit's key must be a model or a (provider type name, model) pair, "
+                    f"got {key!r}"
+                )
+            if not isinstance(limit, CapacityLimit):
+                raise ValueError(f"The limit for {key!r} must be a CapacityLimit, got {limit!r}")
+        if type(self.round_robin) is not bool:
+            raise ValueError(f"round_robin must be a bool, got {self.round_robin!r}")
+        object.__setattr__(self, "limits", MappingProxyType(dict(self.limits)))
+        object.__setattr__(self, "cooldown_max_s",
+                           validate_seconds(self.cooldown_max_s, "cooldown_max_s"))
+
+
+def _capacity_limit(policy: CapacityPolicy, provider: Any, model: str) -> CapacityLimit:
+    """The limit *policy* sets for calls to *model* on *provider*, its hint filling gaps.
+
+    Raises ValueError for a hint that is not None or a dict of
+    ``CapacityLimit`` fields with valid values.
+    """
+    name = type(provider).__name__
+    declare = getattr(provider, "capacity_hint", None)
+    hint = None if declare is None else declare(model)
+    if hint is not None:
+        unknown = sorted(map(repr, set(hint) - {"max_in_flight", "min_interval_s"})
+                         if isinstance(hint, dict) else ())
+        if not isinstance(hint, dict) or unknown:
+            raise ValueError(
+                f"{name}.capacity_hint({model!r}) must return None or a dict of "
+                f"max_in_flight and min_interval_s, got {hint!r}"
+            )
+        try:
+            hint = CapacityLimit(**hint)
+        except ValueError as exc:
+            raise ValueError(f"{name}.capacity_hint({model!r}) is not valid: {exc}") from None
+    layers = [policy.limits.get((name, model)), policy.limits.get(model), hint]
+    return CapacityLimit(**{
+        item.name: next((getattr(layer, item.name) for layer in layers
+                         if layer is not None and getattr(layer, item.name) is not None), None)
+        for item in fields(CapacityLimit)
+    })
+
+
+@dataclass(frozen=True)
+class TerminationPolicy:
+    """How the async executor stops a run after a failure: drain, then cancel.
+
+    Without a policy, a failure cancels every node in flight at once. Under
+    one, a failure that stops the run, or a node the budget refuses to admit,
+    stops admission: no queued node starts. Each node in flight runs its
+    current attempt on, including any further tool turns it takes, for up to
+    ``drain_timeout_s`` seconds, and each node that finishes keeps and saves
+    its result and cost as usual, without supervision or regeneration. No
+    retry starts: a node whose attempt fails, or that is waiting to retry,
+    returns to pending for a resume. Those still in flight
+    at the deadline are cancelled, as without a policy, and the run raises
+    its original error. A cancellation, an interrupt such as
+    ``KeyboardInterrupt``, and a failure of class ``security_stop`` never
+    drain. The serial executor has nothing in flight to drain. A durable run's
+    journal sends no call during a drain: only the calls already sent settle.
+    """
+
+    drain_timeout_s: float
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "drain_timeout_s",
+                           validate_seconds(self.drain_timeout_s, "drain_timeout_s", positive=True))
 
 
 def _retry_after_s(error: BaseException) -> float | None:
@@ -145,6 +306,132 @@ def _retry_after_s(error: BaseException) -> float | None:
     return None
 
 
+class _Bucket:
+    """One provider type and model: its limit, the slots in use, and its next call start."""
+
+    __slots__ = ("limit", "in_flight", "not_before", "turn", "freed")
+
+    def __init__(self, limit: CapacityLimit) -> None:
+        self.limit = limit
+        self.in_flight = 0
+        # No call starts before this reading of the tracer's clock.
+        self.not_before = -math.inf
+        # Held by the one call waiting for its start; the others queue in order.
+        # Only calls in one async run's event loop ever queue for it.
+        self.turn = asyncio.Lock()
+        # Set when a slot is given back, for a node waiting to move its slot here.
+        self.freed = asyncio.Event()
+
+
+class _CapacityLimiter:
+    """The capacity that one run's calls take under a :class:`CapacityPolicy`.
+
+    Slots and call starts are kept per provider type and model, on *tracer*'s
+    monotonic clock, and each wait is recorded as its ``capacity`` wait.
+    ``sleep(seconds)`` waits, and is awaited when it returns an awaitable.
+    """
+
+    def __init__(self, policy: CapacityPolicy, tracer: Any, sleep: Any) -> None:
+        self.policy = policy
+        self._tracer = tracer
+        self._sleep = sleep
+        self._buckets: dict[tuple[type, str], _Bucket] = {}
+        # The bucket whose slot each node the async executor admitted holds,
+        # or None while the node waits to move its slot (see call()).
+        self.slots: dict[str, _Bucket | None] = {}
+
+    def bucket(self, provider: Any, model: str) -> _Bucket:
+        """The state of calls to *model* on *provider*'s type, its limit read on first use."""
+        key = (type(provider), model)
+        if key not in self._buckets:
+            self._buckets[key] = _Bucket(_capacity_limit(self.policy, provider, model))
+        return self._buckets[key]
+
+    @staticmethod
+    def try_acquire(bucket: _Bucket) -> bool:
+        """Take one of *bucket*'s slots; False, taking none, when they are all in use."""
+        cap = bucket.limit.max_in_flight
+        if cap is not None and bucket.in_flight >= cap:
+            return False
+        bucket.in_flight += 1
+        return True
+
+    @staticmethod
+    def release(bucket: _Bucket) -> None:
+        bucket.in_flight -= 1
+        bucket.freed.set()
+
+    def give_back(self, node_id: str) -> None:
+        """Give back the slot that *node_id* holds, if any, as its task ends."""
+        bucket = self.slots.pop(node_id, None)
+        if bucket is not None:
+            self.release(bucket)
+
+    async def _move(self, node_id: str, bucket: _Bucket) -> bool:
+        """Move *node_id*'s slot to *bucket*, waiting for a free one; whether it waited.
+
+        The slot it holds is given back first, so a node waiting here holds
+        none and cannot keep another node from the slot that one waits for.
+        """
+        held, self.slots[node_id] = self.slots[node_id], None
+        if held is not None:
+            self.release(held)
+        waited = False
+        while not self.try_acquire(bucket):
+            waited = True
+            bucket.freed.clear()
+            await bucket.freed.wait()
+        self.slots[node_id] = bucket
+        return waited
+
+    @asynccontextmanager
+    async def call(self, provider: Any, model: str, node: Any = None):
+        """Make one call to *model* on *provider* once its turn comes.
+
+        The call starts no sooner than ``min_interval_s`` after the previous
+        call's start and after any cooldown, and calls take their turns in
+        the order they ask. A call claims its start only once it begins, so a
+        call cancelled while it waits claims none and the next call's turn is
+        spaced from the calls that started. A transient status error it
+        raises whose ``Retry-After`` asks for a wait starts a cooldown of that
+        length, at most the policy's ``cooldown_max_s``. An admitted *node*
+        whose call goes to another provider type or model than its slot's,
+        as a fallback's does, first moves its slot there.
+        """
+        bucket = self.bucket(provider, model)
+        started, waited = self._tracer.now(), bucket.turn.locked()
+        try:
+            node_id = getattr(node, "id", None)
+            if node_id in self.slots and self.slots[node_id] is not bucket:
+                waited = await self._move(node_id, bucket) or waited
+            async with bucket.turn:
+                while True:
+                    now = self._tracer.now()
+                    start = max(now, bucket.not_before)
+                    if start <= now:
+                        break
+                    waited = True
+                    pause = self._sleep(start - now)
+                    if inspect.isawaitable(pause):
+                        await pause
+                    # Only a cooldown that began during the wait moves the start.
+                    if bucket.not_before <= start:
+                        break
+                bucket.not_before = (max(start, self._tracer.now())
+                                     + (bucket.limit.min_interval_s or 0.0))
+        finally:
+            if waited:
+                self._tracer.on_wait("capacity", self._tracer.since(started), node)
+        try:
+            yield
+        except Exception as error:
+            asked = _retry_after_s(error)
+            if asked is not None and self.policy.cooldown_max_s:
+                until = self._tracer.now() + min(asked, self.policy.cooldown_max_s)
+                bucket.not_before = max(bucket.not_before, until)
+            raise
+
+
 def _attempt_records(data: object) -> dict[str, tuple[int, int]]:
     """Read attempts used, ``{node_id: {"execution_generation": g, "attempts": n}}``.
 
@@ -166,3 +453,169 @@ def _attempt_records(data: object) -> dict[str, tuple[int, int]]:
                 raise ValueError(f"{name} in attempts_used of {node_id!r} must be an integer >= 0")
         records[node_id] = values
     return records
+
+
+# The node metadata key that names a node's model profile. Only developer code
+# sets it: a generated plan may set no metadata but ``role`` (smythe.loader).
+PROFILE_KEY = "profile"
+# What a profile may require: each is a ``ProviderFeatures`` field that its
+# provider must declare True for the profile's model.
+PROFILE_REQUIREMENTS = frozenset({"tools", "attachments", "image_output", "exact_accounting"})
+_PROFILE_NAME = re.compile(r"[A-Za-z][A-Za-z0-9_.-]{0,63}")
+# The failure classes after which a node's next attempt calls its profile's
+# fallback. Never unknown_outcome, whose call may still run and be charged; a
+# node timeout of a sent call has that class only under
+# retain_uncertain_dispatch, and is transient otherwise.
+FALLBACK_CLASSES = frozenset({TRANSIENT, PROVIDER_REJECTED, QUALITY_DEFECT})
+
+
+class NoAllowedProfileError(ValueError):
+    """No allowed model profile can serve a node; raised before any provider call.
+
+    A node names a profile the run does not allow or sets a model other than
+    its profile's, or a profile's provider does not support its model, does
+    not declare a feature the profile requires, or prices the model with a
+    table that retires it. It is raised too for an ``LLMSupervisor`` without
+    a model of its own that could review a node whose profile calls another
+    provider than the supervisor's.
+    """
+
+
+@dataclass(frozen=True)
+class ModelProfile:
+    """A developer-approved provider and model that a node can name to be routed to them.
+
+    A node whose ``metadata["profile"]`` is ``name`` calls ``provider`` with
+    ``model``, and reserves ``max_cost_per_call_usd`` for each call unless it
+    sets ``estimated_cost_usd``. ``requires`` lists the features the provider
+    must declare ``True`` for the model through ``Provider.feature_support()``:
+    ``tools``, ``attachments``, ``image_output`` and ``exact_accounting``.
+
+    ``fallback`` names another of the run's profiles, which requires at least
+    the same features. After an attempt on this profile fails with a class in
+    ``FALLBACK_CLASSES`` (``transient``, ``provider_rejected`` or
+    ``quality_defect``), the node's next attempt, when its failure policy and
+    any retry policy make one, calls the fallback instead. Fallbacks may form
+    a chain that never returns to a profile it left; a retry after any other
+    failure, such as ``unknown_outcome``, calls the same profile again. A node
+    timeout of a sent, unanswered call is ``unknown_outcome`` only under
+    ``RetryPolicy(retain_uncertain_dispatch=True)``, and ``transient``
+    otherwise.
+    """
+
+    name: str
+    provider: Provider
+    model: str
+    max_cost_per_call_usd: float
+    requires: frozenset[str] = frozenset()
+    fallback: str | None = None
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.name, str) or not _PROFILE_NAME.fullmatch(self.name):
+            raise ValueError(
+                f"A model profile name must match {_PROFILE_NAME.pattern!r}, got {self.name!r}"
+            )
+        fallback = self.fallback
+        if fallback is not None and (not isinstance(fallback, str) or fallback == self.name
+                                     or not _PROFILE_NAME.fullmatch(fallback)):
+            raise ValueError(
+                f"Model profile {self.name!r} needs another profile's name as its fallback, "
+                f"got {fallback!r}"
+            )
+        if not isinstance(self.provider, Provider):
+            raise TypeError(
+                f"Model profile {self.name!r} needs a Provider, not {type(self.provider).__name__}"
+            )
+        if not isinstance(self.model, str) or not self.model.strip():
+            raise ValueError(f"Model profile {self.name!r} needs a model name, got {self.model!r}")
+        requires = self.requires
+        if isinstance(requires, (str, bytes)) or not hasattr(requires, "__iter__"):
+            raise ValueError(f"requires must be a set of features, got {requires!r}")
+        requires = frozenset(requires)
+        unknown = ", ".join(sorted(map(repr, requires - PROFILE_REQUIREMENTS)))
+        if unknown:
+            raise ValueError(
+                f"requires may list only {sorted(PROFILE_REQUIREMENTS)}, not {unknown}"
+            )
+        object.__setattr__(self, "requires", requires)
+        object.__setattr__(self, "max_cost_per_call_usd",
+                           _validate_usd(self.max_cost_per_call_usd, "max_cost_per_call_usd"))
+
+
+def profile_map(profiles: object) -> dict[str, ModelProfile]:
+    """*profiles*, a sequence of ``ModelProfile`` with distinct names, by name.
+
+    Each fallback must name one of them that requires at least the features
+    the profile it serves requires, and no chain of fallbacks may loop.
+    """
+    if profiles is None:
+        return {}
+    if isinstance(profiles, (str, bytes, Mapping)) or not hasattr(profiles, "__iter__"):
+        raise TypeError("profiles must be a sequence of ModelProfile")
+    named: dict[str, ModelProfile] = {}
+    for profile in profiles:
+        if not isinstance(profile, ModelProfile):
+            raise TypeError(f"profiles must hold ModelProfile, not {type(profile).__name__}")
+        if profile.name in named:
+            raise ValueError(f"Model profile names must be distinct; {profile.name!r} repeats")
+        named[profile.name] = profile
+    for first in named.values():
+        current, chain = first, [first.name]
+        while current.fallback is not None:
+            following = named.get(current.fallback)
+            if following is None:
+                raise ValueError(
+                    f"Model profile {current.name!r} falls back to {current.fallback!r}, which is "
+                    "not one of the profiles"
+                )
+            missing = sorted(current.requires - following.requires)
+            if missing:
+                raise ValueError(
+                    f"Model profile {current.name!r} falls back to {following.name!r}, which "
+                    f"does not require {missing}"
+                )
+            if following.name in chain:
+                raise ValueError(
+                    f"Model profile fallbacks must not loop: {' -> '.join(chain)} -> "
+                    f"{following.name}"
+                )
+            current = following
+            chain.append(current.name)
+    return named
+
+
+def fallback_chain(profile: ModelProfile, profiles: Mapping[str, ModelProfile]) -> list[ModelProfile]:
+    """*profile*, then each profile that its attempts fall back to, in order.
+
+    *profiles* is a :func:`profile_map`, whose fallbacks are known not to loop.
+    """
+    chain = [profile]
+    while chain[-1].fallback is not None:
+        chain.append(profiles[chain[-1].fallback])
+    return chain
+
+
+def node_profile(node: Node, profiles: Mapping[str, ModelProfile]) -> ModelProfile | None:
+    """The profile *node* names in ``metadata["profile"]``, or None when it names none.
+
+    Raises ``NoAllowedProfileError`` when the name is not one of *profiles*,
+    or when the node sets a ``model`` other than that profile's: the model a
+    node records is the one it calls.
+    """
+    if PROFILE_KEY not in node.metadata:
+        return None
+    name = node.metadata[PROFILE_KEY]
+    profile = profiles.get(name) if isinstance(name, str) else None
+    if profile is None:
+        allowed = (f"its profiles are {sorted(profiles)}" if profiles
+                   else "it has none; pass them as Swarm(profiles=...)")
+        raise NoAllowedProfileError(
+            f"Node {node.id!r} names model profile {name!r}, which this run does not allow: "
+            + allowed
+        )
+    if node.metadata.get("model", profile.model) != profile.model:
+        raise NoAllowedProfileError(
+            f"Node {node.id!r} sets model {node.metadata['model']!r}, but its profile "
+            f"{profile.name!r} calls {profile.model!r}"
+        )
+    return profile

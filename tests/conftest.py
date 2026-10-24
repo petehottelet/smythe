@@ -1,5 +1,6 @@
 """Explicit source-package profile; full-checkout coverage remains the default."""
 
+from fnmatch import fnmatchcase
 import ipaddress
 import json
 import os
@@ -70,9 +71,14 @@ def pytest_configure(config):
         )
 
 
+def _excluded_module(name):
+    """Whether the profile excludes test module *name*, by exact name or glob pattern."""
+    return any(fnmatchcase(name, entry) for entry in PROFILE["excluded_modules"])
+
+
 def pytest_ignore_collect(collection_path, config):
     if config.getoption("distribution") and collection_path.parent == TESTS:
-        if collection_path.name in PROFILE["excluded_modules"]:
+        if _excluded_module(collection_path.name):
             return True
     return None
 

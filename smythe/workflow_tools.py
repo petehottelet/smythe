@@ -649,6 +649,7 @@ class JournaledReadTool:
                 f"Read step {self.profile.name!r} was dispatched without a saved response, "
                 "or its charge is unknown; it cannot be sent again"
             )
+        context._check_dispatch()
         if record["quote_id"] is None:
             # The quote is the profile's declared per-call ceiling, local evidence.
             evidence_id = store.append_quote_evidence(context.lease, call_id, {
@@ -668,6 +669,8 @@ class JournaledReadTool:
             # Nothing was sent: the call returns its reservation and may be sent later.
             store.release_before_dispatch(context.lease, call_id, refused.args[0])
             raise self._fail(f"destination refused before dispatch ({refused.args[0]})") from None
+        # A drain that began meanwhile sends nothing: the reservation returns.
+        context._check_dispatch(reserved=call_id)
         permit = store.claim_dispatch(context.lease, call_id, self._request_sha)
         cutoff = _Cutoff(self.profile.timeout_s)
         interrupted: BaseException | None = None

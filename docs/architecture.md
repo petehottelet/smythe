@@ -54,14 +54,16 @@ memory, and resume. [Task handoff semantics](tasks.md).
 
 | Tier | Class | Decision surface |
 |---|---|---|
+| Single worker | `SimpleArchitect` | One node does the whole task |
 | Deterministic | `DeterministicArchitect` | Python constructs the exact graph |
 | Constrained | `ConstrainedArchitect` | A model selects from approved `SubGraphTemplate` values |
 | Autonomous | `LLMArchitect` | A model generates a task-specific graph |
 
-`WhiteRabbit` can route tasks between those tiers, matching the classifier's
-reply without regard to case or surrounding punctuation. The registry then
-assigns nodes to agents by required capabilities, including capabilities
-hydrated from external skill inventories.
+`WhiteRabbit` can route tasks between those tiers, first by the
+[routing rules](#routing-rules) a developer gives it, then by a classifier
+whose reply it matches without regard to case or surrounding punctuation. The
+registry then assigns nodes to agents by required capabilities, including
+capabilities hydrated from external skill inventories.
 
 **Changed in 0.8.1:** model output is data. `LLMArchitect` reads a generated
 plan under a strict schema (`smythe.loader.build_graph_from_model_output`): a
@@ -95,22 +97,95 @@ same task and params: resume rebuilds each saved selection, and a repair prompt
 can name a node id, so a builder that relies on `Node`'s random default id can
 make resume fail with `WorkflowConflictError`.
 
+### Routing rules
+
+`WhiteRabbit(rules=[...])` applies developer-written `RoutingRule` values
+before any classifier call. They are evaluated in order on the submitted
+`Task` snapshot, and the first that matches chooses its tier, so a stable
+transformation can take the single-worker path and a familiar or separable
+task an approved template without a classification call:
+
+```python
+from smythe import RoutingRule, SimpleArchitect, WhiteRabbit
+
+router = WhiteRabbit(
+    single=SimpleArchitect(),
+    deterministic={"weekly-report": report_architect},
+    constrained=template_architect,
+    autonomous=llm_architect,
+    rules=[
+        RoutingRule("stable-transform", "single", "a stable transformation needs one worker",
+                    goal_any=("translate", "reformat"), max_constraints=2),
+        RoutingRule("familiar-report", "deterministic:weekly-report",
+                    "the weekly report has a fixed shape", goal_any=("weekly report",)),
+        RoutingRule("separable-chapters", "constrained",
+                    "each chapter can be edited in parallel from a template",
+                    min_items=("chapters", 3)),
+    ],
+)
+```
+
+A rule matches when every condition it sets holds; a rule without conditions
+matches every task.
+
+| Condition | Holds when |
+|---|---|
+| `goal_any` | the goal contains any of these phrases, ignoring case |
+| `goal_none` | the goal contains none of these phrases, ignoring case |
+| `context_keys` | each key is a top-level key of `Task.context` |
+| `min_items=(key, n)` | `Task.context[key]` is a list or object with at least `n` items |
+| `max_constraints` | the task lists at most this many constraints |
+| `max_done_when` | the task lists at most this many acceptance criteria |
+
+A rule's `tier` names a configured tier as a routing decision records it:
+`single`, `deterministic:<key>` with the key as configured, `constrained` or
+`autonomous`. A tier the router does not configure, duplicate rule names, or
+a value other than a `RoutingRule` (subclasses included) raises `ValueError`
+when the router is built. When no rule matches, routing continues as before:
+the classifier chooses, and without one the autonomous tier plans.
+`RoutingRule.matches(task)` evaluates a single rule.
+
+Rules are developer configuration, never Task or plan data. They read only
+the goal, constraints, context keys and sizes, and acceptance criteria of the
+frozen Task snapshot, never model output, and nothing in `Task.context` can
+add, change or skip a rule.
+
+`single` is a first-class single-worker tier, such as `SimpleArchitect`,
+which plans one node for the whole task. The classifier is offered it as
+`single` only when it is configured, so a router without it sends the same
+classifier prompt as before. Under a
+[retry policy](execution.md#retry-policy), its provider is checked with every
+other tier's before any call.
+
+A router with rules or a single tier records `policy_version` 2 in its
+decisions: rules in order, then the classifier, else the autonomous tier.
+Other routers record 1. A durable run's recipe adds the router's `single`,
+`rules` and `routing_policy_version` only when they are configured, so other
+recipes keep their bytes. Resume compares them exactly: a run resumed with
+other rules, another single tier or another policy version raises
+`WorkflowConflictError` before any call, and a run that has planned replays
+its saved decision without evaluating rules again. New runs can therefore
+return to an earlier routing policy without changing the recipes of runs
+already in progress.
+
 ### Routing decisions
 
 `WhiteRabbit.decide(task)` and `adecide(task)` return the chosen architect
 with a `RoutingDecision` that records the choice; `route()` and `aroute()`
 still return only the architect. The record holds:
 
-- `tier`: `deterministic:<key>`, `constrained` or `autonomous`, one of the
-  `alternatives` the classifier is offered;
-- `method`: `classifier` when the reply named a configured tier,
+- `tier`: `single`, `deterministic:<key>`, `constrained` or `autonomous`, one
+  of the `alternatives` the router offers;
+- `method`: `rule` when a [routing rule](#routing-rules) chose the tier,
+  `classifier` when the reply named a configured tier,
   `fallback_no_classifier` without a classifier, or `fallback_unmatched` when
   the reply named none; both fallbacks choose `autonomous`;
 - `matched_token`: the reply as normalized and matched, such as
   `deterministic:faq`, for the `classifier` method only. The raw reply is
   never recorded;
-- `reasons`, which explain the choice, and `policy_version`, the version of
-  the routing policy that made it;
+- `reasons`, which explain the choice (for a rule, its name and its own
+  `reason`), and `policy_version`, the version of the routing policy that
+  made it;
 - `usage`: the classifier call's tokens, reported `cost_usd` and its
   `cost_usd_is_estimate` and `cost_usd_unknown` flags as booleans, or `null`
   without a call. A cost or flag the provider's result omits records as
@@ -135,7 +210,8 @@ In a durable run, the `planning` operation's result carries the decision under
 before these records existed restores `None`. A router other than
 `WhiteRabbit`, or a subclass that overrides `route()` or `aroute()`, is called
 as before and records nothing. The record changes neither the classifier's
-prompt nor a durable recipe.
+prompt nor a durable recipe; only [rules and a single tier](#routing-rules)
+do.
 
 ### Topology vocabulary
 
@@ -153,6 +229,98 @@ artifact generation.
 instructions in the planning request and saved recipe. Answer requirements
 remain in `Task.constraints`, which reaches every executor.
 [Bounded planning example](workflow-accounting.md#freeze-graph-limits).
+
+### Contribution lint
+
+Parallel workers add value when each receives distinct evidence, a distinct
+capability, a distinct responsibility or an output that can be checked on its
+own. `smythe.lint_contributions(graph, registry=None)` lists the groups of
+parallel siblings that differ in none of these. Nodes share a group when they
+have the same dependency inputs (`depends_on` as a set), so neither can depend
+on the other, and the same label, required capabilities, verification target,
+read step, `attach_dep_artifacts` setting, agent and `metadata["model"]`. An
+agent that `registry` holds compares by what it gives a worker: its persona,
+capabilities and MCP servers. The generalist agents a registry creates for
+unassigned nodes are therefore the same worker. Other agents compare by
+`agent_id`. Each group lists node ids in graph order.
+
+A `Swarm` whose `WhiteRabbit` router records its
+[routing decision](#routing-decisions), ordinary or durable, lints each new
+plan once its agents are assigned and records the groups it finds as
+`graph.planning["coordination"]`:
+
+```json
+"coordination": {
+  "version": 1,
+  "duplicate_siblings": [["research-0", "research-1", "research-2"]]
+}
+```
+
+The lint is advisory: it never changes, refuses or reorders a plan. A plan it
+does not flag records nothing, so that graph is saved as before. Checkpoints
+keep the record, and resume restores it. A durable run's `planning` operation
+saves it in its graph, and resume replays it without linting again.
+
+Contributions are expressed with ordinary node fields in graphs and templates
+you write. The schema of a generated plan is unchanged, so a model cannot
+declare them. The
+[contribution templates example](../examples/17_contribution_templates.py)
+defines `SubGraphTemplate` values whose workers each contribute something
+distinct, and a repeated fan-out that the lint flags.
+
+### Claim exchange
+
+A worker that builds on other workers' findings may need their claims, their
+citations and the questions they leave open, but not their full output. A
+node in a graph you write opts into claim exchange with
+`metadata["exchange"] = "claims"`:
+
+```python
+from smythe.graph import ExecutionGraph, Node, Topology
+
+graph = ExecutionGraph([Topology.FORK_JOIN], [
+    Node(id="poll", label="Extract the claims of the 2019 poll"),
+    Node(id="audit", label="Extract the claims of the 2026 audit"),
+    Node(id="brief", label="Write the billing brief", depends_on=["poll", "audit"],
+         metadata={"exchange": "claims"}),
+])
+```
+
+For each dependency whose output carries a
+[`source-evidence` block](source-evidence.md#carry-evidence-in-an-artifact)
+with at least one claim, the node is given a compact record in place of that
+output: `smythe.evidence.CLAIM_EXCHANGE_NOTE`, then the block rendered again
+with every claim, its supporting and contradicting passages, scope,
+unresolved questions and proposed conclusion, and each source record's id,
+version and digest without its text. The rest of the output is left out.
+Artifact files a dependency produced are still listed after the record.
+A dependency without such a block, or whose block cannot be read or holds no
+claim, is given in full, and a skipped one as before.
+`smythe.evidence.claim_exchange(output)` returns the record, or `None` when
+the output is given in full.
+
+Prompts change only for nodes that opt in; every other node, including a
+sibling of one that does, is sent the same bytes as before. A node that opts
+in gives up context: it no longer sees a dependency's reasoning or any text
+outside its claims. A final
+[`SourceEvidenceValidator`](source-evidence.md#check-evidence-mechanically)
+checks the delivered artifact as before, so the node's own output needs its
+own evidence block; the exchanged records keep the exact quotes, source ids,
+versions and digests those checks compare.
+
+The value must be `"claims"`. A `Swarm` refuses any other value with
+`ValueError` before any node call, and a durable run with
+`WorkflowBindingError` before it saves its graph; an executor used directly
+raises the `ValueError` when the node starts. In a durable run, the node's
+journaled request holds the compact records, so a resumed call is given the
+same bytes, and with [context assembly](tasks.md#context-snapshots) its
+snapshot holds each record's digest as the text the node saw. Artifact
+[lineage](lineage.md#coverage) declares such a node's inputs when each digest
+is that of the dependency's recorded result or, for a result that carries a
+claim record, of its compact record.
+
+Claim exchange is developer configuration. A generated plan's node metadata
+may hold only `role`, so a model cannot opt a node in.
 
 ## 2. Durable execution envelope
 

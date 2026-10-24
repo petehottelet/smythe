@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Any, Callable
 from uuid import uuid4
 
+from smythe._failures import RunControl, SecurityStop
 from smythe._run_inspection import result_view
 from smythe.acceptance import (
     GENERATED_GATE_KEY,
@@ -29,7 +30,7 @@ from smythe.acceptance import (
     text_sha256,
     validate_acceptance_obligations,
 )
-from smythe.budget import BudgetValidationError, Sentinel
+from smythe.budget import BudgetValidationError, Sentinel, _validate_usd
 from smythe.context import ContextSource, snapshot_sources
 from smythe.evidence import SourceRecord
 from smythe.checkpoint import (
@@ -45,7 +46,10 @@ from smythe.checkpoint import (
     drop_untrusted_mcp_servers,
     graph_from_dict,
     graph_to_dict,
+    model_profiles_from_state,
     reset_incomplete_nodes,
+    revision_log_from_state,
+    security_stop_from_state,
     supersede_delivery_acceptance,
     task_from_dict,
     timing_segments,
@@ -55,7 +59,9 @@ from smythe.executor_base import (
     DEFAULT_MAX_TOOL_ITERATIONS,
     ExecutorBase,
     check_pending_nodes,
+    check_profile_support,
     check_provider_support,
+    check_supervisor_profiles,
     validate_max_concurrency,
     validate_max_revisions,
     validate_retry_backoff_s,
@@ -64,7 +70,9 @@ from smythe.graph import SYNTHESIS_NODE_ID, ExecutionGraph, NodeStatus
 from smythe.lineage import LineagePolicy, snapshot_lineage_policy
 from smythe.memory import PlannerMemory
 from smythe.tools import ToolRuntime
-from smythe.planner import Architect, DeterministicArchitect, LLMArchitect, SimpleArchitect
+from smythe.planner import (
+    Architect, DeterministicArchitect, LLMArchitect, SimpleArchitect, _record_coordination,
+)
 from smythe.constrained_planner import ConstrainedArchitect
 from smythe.router import RoutingDecision, WhiteRabbit
 from smythe.provider import (
@@ -77,8 +85,13 @@ from smythe.provider import (
     _response_error_marker,
 )
 from smythe.registry import Registry
-from smythe.scheduling import RetryPolicy
-from smythe.supervisor import LLMSupervisor, Supervisor
+from smythe.reuse import RepairPlan, RepairResult, SourceCatalog, _journal_work, repair_plan
+from smythe.scheduling import (
+    ModelProfile, RetryPolicy, node_profile, profile_map,
+)
+from smythe.scheduling import CapacityPolicy, _capacity_limit
+from smythe.scheduling import TerminationPolicy
+from smythe.supervisor import Supervisor, _model_reviewer
 from smythe.synthesizer import SynthesisStrategy, Synthesizer, deliverable_sources
 from smythe.task import Task, snapshot_task, task_snapshots_equal, task_to_dict
 from smythe.tracer import Tracer
@@ -91,7 +104,7 @@ from smythe.verifier import (
 from smythe.workflow_artifact import MarkdownRenderer, PublishedArtifact
 from smythe.workflow_binding import LocalOnly, WorkflowBindingError, _BoundLocal
 from smythe.workflow_policy import WorkflowGraphPolicy, snapshot_graph_policy
-from smythe.workflow_store import SQLiteWorkflowStore
+from smythe.workflow_store import SQLiteWorkflowStore, WorkflowBudgetError, WorkflowConflictError
 from smythe.workflow_tools import READ_STEP_KEY, ReadProfile
 
 logger = logging.getLogger("smythe.swarm")
@@ -389,9 +402,24 @@ class Swarm:
     ``WhiteRabbit`` classifier's, each ``LLMArchitect`` or
     ``ConstrainedArchitect`` that could plan it, and an ``LLMSupervisor``'s
     when ``max_revisions`` allows a review. Otherwise the run is refused
-    before routing, planning or any node call. Durable runs refuse it. A policy
-    with ``persist_attempts`` is saved with the run's checkpoints, with each
+    before routing, planning or any node call. A policy with
+    ``persist_attempts`` is saved with the run's checkpoints, with each
     node's attempts, so resume continues the allowance instead of refilling it.
+    A durable run records the policy in its recipe and counts each node's
+    attempts from its journal, so its resume continues them too.
+
+    ``termination``, a :class:`~smythe.scheduling.TerminationPolicy`, has the
+    async executor drain the nodes in flight when a failure stops the run:
+    no queued node starts and no retry is sent, the nodes in flight may finish
+    their current attempts, tool turns included, and save their results
+    until ``drain_timeout_s``, and the rest are cancelled before the
+    original error is raised. The failed checkpoint
+    records how the drain ended under ``control["drain"]``, for information
+    only. Serial ``execute()`` has nothing in flight to drain. A durable run
+    records the policy in its recipe and sends no call during the drain: a
+    call already sent and answered within it keeps its known charge, one
+    still unanswered at the deadline keeps unknown exposure, and resume keeps
+    the run's policy.
 
     ``lineage``, a :class:`~smythe.lineage.LineagePolicy`, opts each durable
     run into artifact lineage under a declared access scope. It needs a
@@ -407,6 +435,45 @@ class Swarm:
     merge converts its own hold, a regeneration holds again for the
     verifiers it resets, and holds are never spend. Holds are not saved;
     resume holds again. Durable runs refuse it.
+
+    ``profiles``, a sequence of :class:`~smythe.scheduling.ModelProfile`
+    with distinct names, are the provider and model routes an ordinary run
+    allows. A node whose ``metadata["profile"]`` names one calls its provider
+    with its model and reserves its ceiling; developer graphs, architects,
+    templates and supervisors can set the key, and a generated plan or an
+    ``LLMSupervisor`` proposal cannot. Every other node and synthesis call the
+    run's provider. Before routing or planning, and before any node call,
+    each profile must fit: its provider declares ``True`` every feature it
+    requires, supports its model, does not price the model as retired, and
+    can call tools in a run with a ``tool_runtime``. While ``max_revisions``
+    lets an ``LLMSupervisor`` without a model of its own review, every
+    profile must call the supervisor's provider. A node that names a profile
+    the run does not allow, or sets another model than its profile's, is
+    refused as well, all with ``NoAllowedProfileError``. A revision that adds
+    such a node is refused before it applies, like any invalid revision.
+    Checkpoints of a run with profiled nodes are version 5, and resume routes
+    them to the resuming Swarm's profiles of the same names. Durable runs
+    refuse profiles.
+
+    ``capacity_policy``, a :class:`~smythe.scheduling.CapacityPolicy`, limits
+    each provider type and model's calls on an ordinary run: every node call,
+    tool turn and retry, and an ``LLM_MERGE`` synthesis, waits for its turn
+    (``min_interval_s`` and ``Retry-After`` cooldowns), and the async
+    executor runs at most ``max_in_flight`` nodes of a model at once,
+    passing over a ready node that has no free slot instead of stopping the
+    run. Capacity waits are reported under ``timing["waiting_ms"]["capacity"]``.
+    Nothing about it is saved. Durable runs refuse it.
+
+    ``run_control``, a :class:`~smythe._failures.RunControl`, stops this
+    Swarm's runs for security once it is revoked: ``plan``, ``execute`` and
+    ``resume`` refuse to start, and a run in progress admits no node and
+    sends no call after it, including supervision and synthesis. The async
+    executor cancels the calls in flight at once, without a ``termination``
+    drain, and a call that was sent and not answered keeps its reservation
+    as unknown cost. The run raises ``SecurityStop``, as it does when a tool
+    runtime raises one. An ordinary run's failed checkpoint records the stop
+    under ``control["security_stop"]`` as version 5, and a durable run's
+    journal blocks it with ``security_stop``; neither ever resumes.
     """
 
     def __init__(
@@ -442,13 +509,38 @@ class Swarm:
         retry_policy: RetryPolicy | None = None,
         lineage: LineagePolicy | None = None,
         reserve_for_checks: bool = False,
+        profiles: Sequence[ModelProfile] = (),
+        capacity_policy: CapacityPolicy | None = None,
+        termination: TerminationPolicy | None = None,
+        run_control: RunControl | None = None,
     ) -> None:
         Sentinel(max_budget_usd)  # Reject malformed policy before planning can call a provider.
+        if run_control is not None and not isinstance(run_control, RunControl):
+            raise TypeError(
+                f"run_control must be a RunControl or None, not {type(run_control).__name__}"
+            )
+        self.run_control = run_control
+        self._profiles = profile_map(profiles)
+        if self._profiles and run_store is not None:
+            raise WorkflowBindingError(
+                "profiles route ordinary runs only; durable text workflows refuse them"
+            )
         if type(reserve_for_checks) is not bool:
             raise TypeError(
                 f"reserve_for_checks must be True or False, not {type(reserve_for_checks).__name__}"
             )
         self.reserve_for_checks = reserve_for_checks
+        if capacity_policy is not None and not isinstance(capacity_policy, CapacityPolicy):
+            raise TypeError(
+                f"capacity_policy must be a CapacityPolicy or None, "
+                f"not {type(capacity_policy).__name__}"
+            )
+        if capacity_policy is not None and run_store is not None:
+            raise WorkflowBindingError(
+                "capacity_policy is not supported by durable text workflows, whose journal "
+                "admits each call when it is made"
+            )
+        self.capacity_policy = capacity_policy
         if renderer is not None and run_store is None:
             raise WorkflowBindingError("renderer requires a durable run_store")
         if renderer is not None and artifact_dir is None:
@@ -459,6 +551,11 @@ class Swarm:
                 f"retry_policy must be a RetryPolicy or None, not {type(retry_policy).__name__}"
             )
         self.retry_policy = retry_policy
+        if termination is not None and not isinstance(termination, TerminationPolicy):
+            raise TypeError(
+                f"termination must be a TerminationPolicy or None, not {type(termination).__name__}"
+            )
+        self.termination = termination
         if graph_policy is not None and run_store is None:
             raise WorkflowBindingError("graph_policy requires a durable run_store")
         if lineage is not None and run_store is None:
@@ -778,11 +875,19 @@ class Swarm:
         call. An ``LLM_MERGE`` synthesis, which no node estimate covers, is
         still refused before planning. With a ``WhiteRabbit`` router, the
         graph's ``planning["routing"]`` records the
-        :class:`~smythe.router.RoutingDecision` that chose its architect.
+        :class:`~smythe.router.RoutingDecision` that chose its architect, and
+        ``planning["coordination"]`` any parallel siblings that
+        :func:`~smythe.planner.lint_contributions` flags.
         """
+        self._check_run_control()
         if self._run_store is not None:
             return asyncio.run(self._workflow_runtime().plan(task))
         return self._plan(task, Tracer(), executing=False)
+
+    def _check_run_control(self) -> None:
+        """Refuse to start or resume any run once this Swarm's run control is revoked."""
+        if self.run_control is not None:
+            self.run_control.check()
 
     def _plan_for_execution(self, task: Task, tracer: Tracer) -> ExecutionGraph:
         """Plan *task* for execute(); a subclass's plan() stays authoritative."""
@@ -812,7 +917,8 @@ class Swarm:
         A tool runtime offers tools to every node, and an ``LLM_MERGE``
         synthesis calls the run's model, so both are known before any plan.
         So is a retry policy, which needs a provider whose SDK sends each
-        call once, as does an ``LLMSupervisor``'s provider.
+        call once, as does an ``LLMSupervisor``'s provider, and so is each
+        model profile a node may name.
         """
         if self._tool_runtime is not None or self.retry_policy is not None:
             check_provider_support(self._provider, str(self.model), node_id=None,
@@ -820,25 +926,40 @@ class Swarm:
                                    retry_owner=self.retry_policy is not None)
         self._check_synthesis_support(self.max_budget_usd)
         self._check_retry_owners()
+        self._admit_profiles()
+
+    def _admit_profiles(self) -> None:
+        """Refuse, with ``NoAllowedProfileError``, a profile that could not serve its nodes.
+
+        While ``max_revisions`` lets an ``LLMSupervisor`` review, so is one it
+        could not review its nodes with (see ``check_supervisor_profiles``).
+        """
+        for profile in self._profiles.values():
+            check_profile_support(profile, tools=self._tool_runtime is not None)
+        if self.max_revisions > 0:
+            check_supervisor_profiles(self.supervisor, self._profiles)
 
     def _check_retry_owners(
         self, graph: ExecutionGraph | None = None, *, planning: bool = False,
     ) -> None:
         """Under a retry policy, refuse every call the run can make that an SDK may send again.
 
-        Nodes and synthesis call the run's provider. An ``LLMSupervisor``
-        that ``max_revisions`` lets review calls its own provider, with its
-        model or else the reviewed node's: the run's model before a plan
-        exists, then each of *graph*'s. With *planning*, so are the calls
-        routing and planning could make (see ``_planning_calls``).
+        Nodes and synthesis call the run's provider, and profiled nodes their
+        profile's. An ``LLMSupervisor`` that ``max_revisions`` lets review,
+        on its own or inside an ``EvidenceTriggeredSupervisor``,
+        calls its own provider, with its model or else the reviewed node's:
+        the run's model before a plan exists, then each of *graph*'s. With
+        *planning*, so are the calls routing and planning could make (see
+        ``_planning_calls``).
         """
         if self.retry_policy is None:
             return
         calls = [(self._provider, self.model)]
+        calls += [(profile.provider, profile.model) for profile in self._profiles.values()]
         if planning:
             calls += _planning_calls(self._router, self._architect)
-        supervisor = self.supervisor
-        if isinstance(supervisor, LLMSupervisor) and self.max_revisions > 0:
+        supervisor = _model_reviewer(self.supervisor)
+        if supervisor is not None and self.max_revisions > 0:
             if supervisor._model:
                 models = {supervisor._model}
             elif graph is None:
@@ -855,6 +976,16 @@ class Swarm:
         check = getattr(self._synthesizer, "check_merge_support", None)
         if check is not None:
             check(provider=self._provider, model=self.model, max_budget_usd=max_budget_usd)
+        if self.capacity_policy is not None:
+            # The run's model, which a merge calls, has its capacity hint read now.
+            _capacity_limit(self.capacity_policy, self._provider, str(self.model))
+
+    def _merge_capacity(self, executor: ExecutorBase) -> dict[str, Any]:
+        """The run's capacity limiter as synthesis arguments, for the built-in Synthesizer."""
+        limiter = getattr(executor, "_capacity", None)
+        if limiter is None or type(self._synthesizer) is not Synthesizer:
+            return {}
+        return {"capacity": limiter}
 
     def _check_planning_support(self, *, executing: bool) -> None:
         """Reject, before routing or planning, a run its provider cannot serve.
@@ -892,11 +1023,13 @@ class Swarm:
         """Reject, before any node runs, nodes or a synthesis the provider cannot serve.
 
         Under a retry policy, synthesis and supervision must send each call
-        once too, even when no node is left to run.
+        once too, even when no node is left to run. Each model profile must
+        fit, as before planning.
         """
+        self._admit_profiles()
         check_pending_nodes(self._provider, graph, max_budget_usd=budget.max_budget_usd,
                             tools=self._tool_runtime is not None,
-                            retry_owner=self.retry_policy is not None)
+                            retry_owner=self.retry_policy is not None, profiles=self._profiles)
         self._check_synthesis_support(budget.max_budget_usd)
         self._check_retry_owners(graph)
 
@@ -937,6 +1070,7 @@ class Swarm:
 
     async def aplan(self, task: Task) -> ExecutionGraph:
         """Async variant of plan() — safe to call from a running event loop."""
+        self._check_run_control()
         if self._run_store is not None:
             return await self._workflow_runtime().plan(task)
         return await self._aplan(task, Tracer(), executing=False)
@@ -965,7 +1099,8 @@ class Swarm:
         call. Under a strict policy, each gate of a plan that *architect*
         generated rather than built from developer code is marked with
         ``GENERATED_GATE_KEY``, so that gate does not accept output on its own.
-        A *routing* decision becomes ``graph.planning["routing"]``.
+        A *routing* decision becomes ``graph.planning["routing"]``, and the
+        groups the contribution lint finds, if any, ``graph.planning["coordination"]``.
         """
         self._refuse_read_steps(graph)
         for agent in architect_registry.list_agents():
@@ -980,6 +1115,8 @@ class Swarm:
         if routing is not None:
             # The Swarm writes only this key; the architect may have set others.
             graph.planning = {**(graph.planning or {}), "routing": routing.to_dict()}
+            # Agents are assigned, so the advisory lint can compare them.
+            _record_coordination(graph, self._registry)
         return graph
 
     @staticmethod
@@ -1013,6 +1150,7 @@ class Swarm:
         was loaded via from_yaml().
         If parallel=True, uses the async executor for concurrent nodes.
         """
+        self._check_run_control()
         task_or_graph = self._resolve_input(task_or_graph)
         if self._run_store is not None:
             return asyncio.run(self._workflow_runtime().execute(
@@ -1038,6 +1176,7 @@ class Swarm:
         Admits up to ``max_concurrency`` ready nodes at once when
         ``parallel=True``, and one node at a time otherwise.
         """
+        self._check_run_control()
         task_or_graph = self._resolve_input(task_or_graph)
         if self._run_store is not None:
             return await self._workflow_runtime().execute(
@@ -1082,12 +1221,17 @@ class Swarm:
             ),
             acceptance=self._acceptance,
             retry_policy=self.retry_policy,
+            profiles=tuple(self._profiles.values()), default_model=self.model,
+            capacity_policy=self.capacity_policy,
+            termination=self.termination,
+            run_control=self.run_control,
         )
         self._active_executor = executor
         try:
             self._check_dispatch_support(graph, budget)
             self._hold_check_budget(executor, graph, budget)
             graph = await executor.run(graph)
+            executor.check_run_control()
             with tracer.phase("synthesis"):
                 output = await self._synthesizer.asynthesize(
                     graph,
@@ -1095,6 +1239,7 @@ class Swarm:
                     model=self.model,
                     budget=budget,
                     tracer=tracer,
+                    **self._merge_capacity(executor),
                 )
             acceptance = self._decide(graph, output, task, tracer)
         except BaseException as exc:
@@ -1150,12 +1295,16 @@ class Swarm:
             ),
             acceptance=self._acceptance,
             retry_policy=self.retry_policy,
+            profiles=tuple(self._profiles.values()), default_model=self.model,
+            capacity_policy=self.capacity_policy,
+            run_control=self.run_control,
         )
         self._active_executor = executor
         try:
             self._check_dispatch_support(graph, budget)
             self._hold_check_budget(executor, graph, budget)
             graph = executor.run(graph)
+            executor.check_run_control()
             with tracer.phase("synthesis"):
                 output = self._synthesizer.synthesize(
                     graph,
@@ -1163,6 +1312,7 @@ class Swarm:
                     model=self.model,
                     budget=budget,
                     tracer=tracer,
+                    **self._merge_capacity(executor),
                 )
             acceptance = self._decide(graph, output, task, tracer)
         except BaseException as exc:
@@ -1199,6 +1349,12 @@ class Swarm:
         decision, or until there is one an undecided record that binds the
         run's policy and task. So are the states of a run whose retry policy
         persists attempts, which record it and each node's attempts used.
+        A run's supervisor decisions, once there are any, add the bounded
+        ``revision_log`` to ``control``, which keeps the version.
+        A run that drained after a failure records how under ``drain``,
+        which is informational and leaves the version unchanged. A run that a
+        security stop ended records it under ``security_stop``, which makes
+        the state version 5, so that no build resumes it.
         """
         if self._checkpoint_store is None:
             return
@@ -1209,6 +1365,15 @@ class Swarm:
             if self.retry_policy is not None and self.retry_policy.persist_attempts:
                 control["retry_policy"] = self.retry_policy.to_dict()
                 control["attempts_used"] = getattr(self._active_executor, "attempts_used", {})
+            revision_log = getattr(self._active_executor, "revision_log", None)
+            if revision_log:
+                control["revision_log"] = revision_log
+            drain = getattr(self._active_executor, "drain_record", None)
+            if drain is not None:
+                control["drain"] = drain
+            stop = getattr(self._active_executor, "security_stop", None)
+            if stop is not None:
+                control["security_stop"] = stop
             state = build_state(
                 control=control,
                 execution_id=execution_id,
@@ -1303,12 +1468,27 @@ class Swarm:
         The saved document's bytes go to a new file in the run's directory,
         which becomes the run's current publication; no file is replaced, no
         provider is called, and the delivery decision, which binds the same
-        bytes, is unchanged. Returns the current record. See
+        bytes, is unchanged. Returns the current record. A run with a lineage
+        policy instead renders its saved synthesis again into a file named for
+        the new publication, decides the new bytes again under this Swarm's
+        policy and supersedes its lineage record; an intact document is then
+        refused, as there is nothing to repair. See
         ``smythe.workflow.WorkflowRuntime.republish``.
         """
         if self._run_store is None:
             raise ValueError("republish needs a durable run_store")
         return await self._workflow_runtime().republish(execution_id)
+
+    async def _arerender(self, execution_id: str, *, plan_sha256: str,
+                         reason: str) -> PublishedArtifact:
+        """Apply a repair plan's ``rerender`` item: republish a lineage run, recording the plan."""
+        return await self._workflow_runtime().republish(
+            execution_id, plan_sha256=plan_sha256, reason=reason)
+
+    async def _arecheck(self, execution_id: str, *, plan_sha256: str, reason: str) -> SwarmResult:
+        """Apply a repair plan's ``recheck`` item: decide a lineage run again under this Swarm's policy."""
+        return await self._workflow_runtime().reevaluate(
+            execution_id, plan_sha256=plan_sha256, reason=reason)
 
     def remove_source(self, execution_id: str, source_id: str, reason: str, *,
                       removed_at: str | None = None) -> SourceRecord:
@@ -1332,6 +1512,146 @@ class Swarm:
         return await self._workflow_runtime().remove_source(
             execution_id, source_id, reason, removed_at=removed_at)
 
+    def plan_repair(self, execution_ids: Sequence[str] | None = None, *,
+                    sources: SourceCatalog) -> RepairPlan:
+        """Plan what durable runs' accepted artifacts call for now, changing nothing.
+
+        Each run in this Swarm's lineage access scope, by default each head
+        of the archive (:func:`~smythe.reuse.archive_heads`), is evaluated
+        (:func:`~smythe.reuse.evaluate`) against what a new run of this
+        Swarm would use: its strict policy's validators, its read profiles,
+        synthesizer, context assembly and agents, and the sources that
+        *sources*, a zero-cost :class:`~smythe.reuse.SourceCatalog`,
+        describes. The journal is opened again read-only, so no lease is
+        taken, nothing is written, no provider is called and no source is
+        read. Returns a :class:`~smythe.reuse.RepairPlan`; its
+        ``plan_sha256`` is a staleness guard, not an authorization. See
+        ``smythe.reuse.repair_plan``.
+        """
+        if self._run_store is None:
+            raise ValueError("plan_repair needs a durable run_store")
+        if self._lineage is None:
+            raise ValueError("plan_repair needs a lineage policy, whose access scope it plans in")
+        recipe = self._workflow_runtime().recipe
+        with SQLiteWorkflowStore(self._run_store.path, read_only=True) as store:
+            return repair_plan(store, recipe, sources, execution_ids)
+
+    def repair(self, plan: RepairPlan, *, plan_sha256: str, max_total_budget_usd: float,
+               reason: str, sources: SourceCatalog) -> RepairResult:
+        """Apply a repair plan.  Sync wrapper around arepair()."""
+        return asyncio.run(self.arepair(plan, plan_sha256=plan_sha256, reason=reason,
+                                        max_total_budget_usd=max_total_budget_usd,
+                                        sources=sources))
+
+    async def arepair(self, plan: RepairPlan, *, plan_sha256: str, max_total_budget_usd: float,
+                      reason: str, sources: SourceCatalog) -> RepairResult:
+        """Apply a repair plan's items in order, each once, under an explicit allowance.
+
+        *plan* comes from :meth:`plan_repair`, approved by *plan_sha256*. It
+        is made again from *sources* for the same runs and must still have
+        that digest, or ``WorkflowConflictError`` is raised. Repair needs a
+        ``run_store`` and a lineage policy (``ValueError``) and refuses a
+        supervisor (``WorkflowBindingError``). The ``regenerate`` items' new
+        runs, at ``max_budget_usd`` each, must fit *max_total_budget_usd*,
+        and an unbounded ``max_budget_usd`` is refused when any may incur
+        charges (``WorkflowBudgetError``). Refusals precede any write or call.
+
+        ``recheck`` decides the run again and ``rerender`` publishes its
+        document again, binding the digest and *reason*; ``regenerate``
+        starts a successor run that keeps the nodes marked ``reuse``, leaving
+        the repaired run as it is; ``reuse`` and ``review`` change nothing.
+        The first item that raises or is not ``accepted`` stops the repair,
+        unretried. A successor left unfinished is a repair in progress that
+        :meth:`resume` finishes. Returns a :class:`~smythe.reuse.RepairResult`;
+        see the lineage guide.
+        """
+        from smythe.workflow import _nanousd, _repair_record
+
+        if self._run_store is None:
+            raise ValueError("repair needs a durable run_store; ordinary runs have no lineage")
+        if self._lineage is None:
+            raise ValueError("repair needs a lineage policy, whose access scope it repairs in")
+        if self.supervisor is not None:
+            raise WorkflowBindingError(
+                "repair refuses a supervisor, which could change the graph a successor reuses")
+        if not isinstance(plan, RepairPlan):
+            raise TypeError(f"plan must be a RepairPlan, not {type(plan).__name__}")
+        _repair_record(plan_sha256, reason)
+        if plan.plan_sha256 != plan_sha256:
+            raise ValueError("plan_sha256 is not the digest of the plan given")
+        allowance = _nanousd(_validate_usd(max_total_budget_usd, "max_total_budget_usd"))
+        self._check_run_control()
+        items = plan.to_dict()["items"]
+        if self.plan_repair([item["run_id"] for item in items],
+                            sources=sources).plan_sha256 != plan_sha256:
+            raise WorkflowConflictError(
+                "The repair plan is stale: planned again now, it calls for other work")
+        new = [item["work"] for item in items if item["action"] == "regenerate"]
+        if self.max_budget_usd is None and any(work["may_incur_charges"] for work in new):
+            raise WorkflowBudgetError(
+                "A repair whose new runs may incur charges needs max_budget_usd for each run")
+        runs = sum(work["new_runs"] for work in new)
+        if self.max_budget_usd is not None and runs * _nanousd(self.max_budget_usd) > allowance:
+            raise WorkflowBudgetError(
+                f"The repair starts {runs} new runs of up to {self.max_budget_usd} USD each, "
+                f"more than max_total_budget_usd={max_total_budget_usd}")
+        entries, successors, decisions, stopped = [], [], {}, False
+        for item in items:
+            entry = {"run_id": item["run_id"], "action": item["action"]}
+            if stopped or item["action"] in ("reuse", "review"):
+                outcome = {"reuse": "kept", "review": "reported"}.get(item["action"])
+                entries.append({**entry, "outcome": "unapplied" if stopped else outcome,
+                                "work": _journal_work(None, None)})
+                continue
+            entry.update(await self._repair_item(item, plan_sha256, reason))
+            decision = entry.pop("record", None)
+            if "successor_run_id" in entry:
+                successors.append(entry["successor_run_id"])
+            if decision is not None:
+                decisions[entry.get("successor_run_id", item["run_id"])] = decision
+                entry["decision"] = decision.decision.value
+            entry["outcome"] = "applied" if decision is not None and decision.accepted else "failed"
+            stopped = entry["outcome"] == "failed"
+            entries.append(entry)
+        return RepairResult(plan_sha256, entries, successors, decisions)
+
+    async def _repair_item(self, item: dict[str, Any], plan_sha256: str,
+                           reason: str) -> dict[str, Any]:
+        """Apply one ``recheck``, ``rerender`` or ``regenerate`` item, once.
+
+        Returns its decision as ``record`` (absent when it raised, with its
+        ``error``), the run a ``regenerate`` item started, and its ``work``.
+        """
+        from smythe.workflow import current_decision
+
+        store, run_id, action = self._run_store, item["run_id"], item["action"]
+        runtime, done = self._workflow_runtime(), {}
+        before = _journal_work(store, None if action == "regenerate" else run_id)
+        try:
+            if action == "recheck":
+                done["record"] = (await self._arecheck(
+                    run_id, plan_sha256=plan_sha256, reason=reason)).acceptance
+            elif action == "rerender":
+                await self._arerender(run_id, plan_sha256=plan_sha256, reason=reason)
+                done["record"] = current_decision(store, run_id)["record"]
+            else:
+                done["record"] = (await runtime._run_successor(
+                    run_id, lineage_sha256=item["lineage_sha256"],
+                    reuse={node["id"]: node["reasons"] for node in item["nodes"]
+                           if node["action"] == "reuse"},
+                    plan_sha256=plan_sha256, reason=reason,
+                    max_concurrency=self._execution_concurrency())).acceptance
+        except Exception as error:  # The item failed; nothing retries it.
+            done["error"] = f"{type(error).__name__}: {error}"
+        # A successor exists once its run was created, even when it then failed.
+        target = getattr(runtime, "run_id", None) if action == "regenerate" else run_id
+        if action == "regenerate" and target is not None:
+            done["successor_run_id"] = target
+        after = _journal_work(store, target)
+        done["work"] = {unit: after[unit] - before[unit] for unit in after}
+        done["work"]["new_runs"] = int("successor_run_id" in done)
+        return done
+
     def _load_checkpoint(self, execution_id: str) -> dict[str, Any]:
         """The saved state of *execution_id*, at a checkpoint version this build reads."""
         state = self._checkpoint_store.load(execution_id)
@@ -1353,11 +1673,17 @@ class Swarm:
     ) -> tuple[DeliveryAcceptance | None, ExecutionGraph, Task | None, Sentinel]:
         """A saved state's delivery acceptance record, graph, task and restored costs.
 
-        Refuses a durable run's graph, conflicting task copies and accounting
-        that resume cannot continue: invalid usage, an accounting error or an
-        unresolved native response failure.
+        Refuses a run a security stop ended with its ``SecurityStop``, a
+        durable run's graph, conflicting task copies, model profiles its
+        ``requires`` list does not match, and accounting that resume cannot
+        continue: invalid usage, an accounting error or an unresolved native
+        response failure.
         """
         acceptance = delivery_acceptance_from_state(state)
+        model_profiles_from_state(state)
+        stop = security_stop_from_state(state)
+        if stop is not None:
+            raise SecurityStop(stop["reason_code"])
 
         graph = graph_from_dict(state["graph"])
         if graph.run_ref is not None:
@@ -1444,7 +1770,9 @@ class Swarm:
 
         A durable ``run_store`` run journals the decision as a new
         ``acceptance`` operation and checkpoint; its recipe may differ from
-        this Swarm's only in its acceptance policy and gate verifier. See
+        this Swarm's only in its acceptance policy and gate verifier. A run
+        with a lineage policy also journals the new decision's lineage record,
+        which supersedes the earlier one. See
         ``smythe.workflow.WorkflowRuntime.reevaluate``.
 
         *operator*, an :class:`~smythe.acceptance.OperatorDecision`, records an
@@ -1560,8 +1888,11 @@ class Swarm:
         without one. Resumed work runs one node at a time
         unless this Swarm has ``parallel=True``; a durable ``run_store``
         run keeps the concurrency its first execution recorded and resumes
-        only under the acceptance policy its recipe records.
+        only under the acceptance policy its recipe records. A run that a
+        security stop ended never resumes: its ``SecurityStop`` is raised
+        before anything runs, whatever this Swarm's ``run_control``.
         """
+        self._check_run_control()
         if self._run_store is not None:
             return await self._workflow_runtime().resume(
                 execution_id, max_concurrency=self._execution_concurrency(),
@@ -1649,7 +1980,13 @@ class Swarm:
             retry_policy=self.retry_policy,
             # Like revisions_used: a crash must not refill a node's attempts.
             attempts_used=allowance[1] if allowance is not None else None,
+            profiles=tuple(self._profiles.values()), default_model=self.model,
+            capacity_policy=self.capacity_policy,
+            termination=self.termination,
+            run_control=self.run_control,
         )
+        # Informational: decisions after resume extend the log the run saved.
+        executor.revision_log = revision_log_from_state(state)
         self._active_executor = executor
         tracer.add_phase("recovery", tracer.since(recovery_started))
         try:
@@ -1657,6 +1994,7 @@ class Swarm:
             # Holds are not saved, so a resumed run holds again.
             self._hold_check_budget(executor, graph, budget)
             graph = await executor.run(graph)
+            executor.check_run_control()
             with tracer.phase("synthesis"):
                 output = await self._synthesizer.asynthesize(
                     graph,
@@ -1664,6 +2002,7 @@ class Swarm:
                     model=self.model,
                     budget=budget,
                     tracer=tracer,
+                    **self._merge_capacity(executor),
                 )
             acceptance = self._decide(graph, output, task, tracer)
         except BaseException as exc:
@@ -1707,6 +2046,7 @@ class Swarm:
         acceptance: AcceptancePolicy | None = None,
         read_tools: tuple[ReadProfile, ...] | list[ReadProfile] = (),
         lineage: LineagePolicy | None = None,
+        profiles: Sequence[ModelProfile] = (),
     ) -> Swarm:
         """Create a Swarm pre-loaded with a YAML-defined execution graph.
 
@@ -1714,7 +2054,8 @@ class Swarm:
         defined in the YAML file.  Call execute() with the loaded graph
         to run it.  A delivery acceptance policy comes only from the
         ``acceptance`` argument, never from the file, and so do the read
-        profiles that the file's read steps name and the ``lineage`` policy.
+        profiles that the file's read steps name, the ``lineage`` policy and
+        the model ``profiles`` that its nodes' ``metadata.profile`` names.
         """
         from smythe.loader import load_graph
 
@@ -1731,6 +2072,7 @@ class Swarm:
             acceptance=acceptance,
             read_tools=read_tools,
             lineage=lineage,
+            profiles=profiles,
         )
         if instance._graph_policy is not None:
             instance._graph_policy.validate(graph, default_model=instance.model)
@@ -1739,10 +2081,20 @@ class Swarm:
         return instance
 
     def _stamp_model(self, graph: ExecutionGraph) -> None:
-        """Tag every node with the swarm's model so the executor knows which to call."""
+        """Tag every node with the swarm's model so the executor knows which to call.
+
+        A profiled node gets its profile's model instead. Every node is checked
+        before any is tagged: one that names a profile this Swarm does not
+        allow, or that sets another model than its profile's, raises
+        ``NoAllowedProfileError``.
+        """
+        models = []
         for node in graph.nodes:
+            profile = node_profile(node, self._profiles)
+            models.append(self.model if profile is None else profile.model)
+        for node, model in zip(graph.nodes, models):
             if "model" not in node.metadata:
-                node.metadata["model"] = self.model
+                node.metadata["model"] = model
 
     @staticmethod
     def _refuse_read_steps(graph: ExecutionGraph) -> None:
@@ -1811,4 +2163,5 @@ class Swarm:
             artifact_dir=self.artifact_dir, retry_policy=self.retry_policy,
             lineage=self._lineage,
             reserve_for_checks=self.reserve_for_checks,
+            run_control=self.run_control, termination=self.termination,
         )

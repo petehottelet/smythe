@@ -363,6 +363,72 @@ def test_record_values_are_validated(change):
         ArtifactLineage.from_dict(data)
 
 
+def test_a_source_listed_twice_is_refused_whatever_its_key_order():
+    data = record_data()
+    again = {key: SOURCE[key] for key in reversed(list(SOURCE))}
+    data["nodes"][1]["inputs"]["sources"] = [dict(SOURCE), again]
+    with pytest.raises(ValueError, match="more than once"):
+        ArtifactLineage.from_dict(data)
+    # Another version of the same source is another reference.
+    data["nodes"][1]["inputs"]["sources"] = [dict(SOURCE), {**again, "version": "v4"}]
+    assert len(ArtifactLineage.from_dict(data).nodes[1]["inputs"]["sources"]) == 2
+
+
+def test_each_node_id_is_listed_once():
+    data = record_data()
+    # A second, otherwise valid entry for "write": only its id is wrong.
+    data["nodes"].append(deepcopy(data["nodes"][2]))
+    with pytest.raises(ValueError, match="distinct"):
+        ArtifactLineage.from_dict(data)
+
+
+def test_records_are_hashable_by_their_digest():
+    record = ArtifactLineage.from_dict(record_data())
+    shuffled = ArtifactLineage.from_dict(reordered(record_data()))
+    assert hash(record) == hash(shuffled) == hash(record.sha256)
+    assert {record, shuffled} == {record} and {record: 1}[shuffled] == 1
+    assert hash(replace(record, access_scope="tenant-b")) != hash(record)
+
+
+@pytest.mark.parametrize("change,message", [
+    pytest.param(set_at(("nodes", 0, "depends_on"), ["write"]), "after it", id="cycle"),
+    pytest.param(lambda data: data["nodes"].reverse(), "after it", id="reverse-order"),
+    pytest.param(lambda data: data["nodes"].insert(0, data["nodes"].pop(1)), "after it",
+                 id="before-its-dependency"),
+    pytest.param(set_at(("nodes", 1, "depends_on"), ["missing"]), "does not list",
+                 id="unknown-dependency"),
+])
+def test_each_node_follows_the_nodes_it_depends_on(change, message):
+    data = record_data()
+    change(data)
+    with pytest.raises(ValueError, match=message):
+        ArtifactLineage.from_dict(data)
+
+
+# Each places one blank id everywhere it is used, so that only its blankness is wrong.
+BLANK_IDS = {
+    "store": [("run", "store_id"), ("predecessor", "store_id")],
+    "run": [("run", "run_id")],
+    "node": [("nodes", 1, "id"), ("nodes", 2, "depends_on", 0)],
+    "source": [("nodes", 1, "inputs", "sources", 0, "source_id")],
+    "predecessor": [("predecessor", "run_id"), ("nodes", 1, "reused_from", "run_id")],
+}
+
+
+@pytest.mark.parametrize("place", sorted(BLANK_IDS))
+@pytest.mark.parametrize("blank", [" ", "  "], ids=["space", "unicode-space"])
+def test_ids_must_not_be_blank(place, blank):
+    data = successor_data()
+    for path in BLANK_IDS[place]:
+        at(data, path[:-1])[path[-1]] = blank
+    with pytest.raises(ValueError, match="blank"):
+        ArtifactLineage.from_dict(data)
+    # The same record with a visible id is valid.
+    for path in BLANK_IDS[place]:
+        at(data, path[:-1])[path[-1]] = "x" + blank
+    ArtifactLineage.from_dict(data)
+
+
 def test_a_declared_node_names_what_it_was_given():
     data = record_data()
     del data["nodes"][1]["inputs"]["context"]

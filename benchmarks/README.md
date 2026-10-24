@@ -29,6 +29,8 @@ publishing benchmark updates.
 | Original self-baselines and pre-correction framework record | Diagnostic | Preserved because they found payload, assembly, and measurement defects; superseded by corrected campaigns |
 | [Retired evidence](archive/README.md) | Superseded, diagnostic, and historical | The first glyph fan-out campaign, the browser renderer timing study (all six sessions missed the pacing target), superseded partitions, and review records, byte for byte in one SHA-256-pinned archive |
 | [Control ablation](control_ablation.md) | Mechanism scope | Objective gates remain valuable; routine LLM supervision and judged-prose gating are not default quality paths |
+| [Selector comparison](#selector-comparison-offline-mechanics) | Offline mechanics; not claimable | Four selection arms and an Autotune campaign with reference arms on fixtures for both task families; ranks no arm and changes no default |
+| [Trigger ablation](#trigger-ablation-offline-mechanics) | Offline mechanics; not claimable | Routine, evidence-triggered and no supervision on fixtures with planted anomalies, and an Autotune campaign with a reference arm; shows no measured benefit and changes no default |
 | [Jobs at 5,000 operations](jobs_scale_5000_20260907_results.md) | **Claimable correctness observation** | One offline schema-v3 campaign: 5,000 accepted identical fixtures after a hard kill, safe resume, and eight explicit rerolls; zero accepted work reissued and zero calls on completed resume. No comparative timing or model-quality claim. |
 | [Astra/Sol amended study](results/astra_20260913_main/README.md) | **Human review complete; claimable within recorded descriptive scope** | All 200 workflows retained, 191 automatically accepted; all eight flagged answers accepted by human review at 4/4. Anonymous judging, graph/phase breakdowns and task-clustered comparisons. One failed call retains its full $0.169645 reserve. Reused synthetic tasks; all earlier diagnostics and charges remain separate. |
 
@@ -423,6 +425,107 @@ they cannot establish whole-workflow cost.
 
 Full writeup, including the two invalidated arms and why they are
 published anyway: [control_ablation.md](control_ablation.md).
+
+## Selector comparison (offline mechanics)
+
+Which graph should a task get: one strong worker, a fixed template, a
+generated plan, or a selector that picks among them per task?
+[run_selector_comparison.py](run_selector_comparison.py) is the harness for
+that comparison, run offline on fixtures. Its model steps answer with fixture
+content and declared usage, so the
+[record](results/selector_comparison_offline.json) establishes mechanics,
+never an arm ranking, and changes no default.
+
+| Arm | What it is |
+|---|---|
+| `single_worker` | One worker receives the whole task; no planning call |
+| `fixed_template` | The research → analyze → write pipeline, identified by its hash |
+| `generated_plan` | The `LLMArchitect` plans a task-specific graph |
+| `adaptive_selection` | A `WhiteRabbit` router applies developer [routing rules](../docs/architecture.md#routing-rules), then a scripted classifier, to pick one of the other three |
+
+- Both evidence sets: the [task-shape suite](tasks_shapes/) and the Astra
+  pack's development (pilot) tasks with their supplied sources, loaded with
+  manifest verification.
+- One strict acceptance policy per family decides every arm's runs, so the
+  validator identities are identical across arms. Astra outputs are also
+  checked against the answer key, apart from acceptance.
+- Arms run in a seeded, counterbalanced (Williams) order with two attempts per
+  cell. One task per family plants a failure in every arm's first attempt, and
+  every failed attempt stays in the record and is charged.
+- Every adaptive attempt is charged its selector cost (zero for a rule, the
+  classifier's declared usage otherwise) and records its routing time from the
+  run's timing.
+- An Autotune campaign compares the incumbent `generated_plan` with the
+  challenger `adaptive_selection`, with `single_worker` and `fixed_template`
+  as [reference arms](../docs/optimize.md#reference-arms), on task-indexed
+  trials. Its evaluator hash comes from an
+  [evaluator manifest](../docs/optimize.md#evaluator-manifests) that binds the
+  split manifests, validator identities and fixture price, and an
+  evaluator-side `no_new_failures` gate checks pinned regression cases in
+  every arm: a reference output must stay accepted and, where the family has
+  an answer key, pass it, and a planted defect must stay rejected. Its
+  thresholds are placeholders.
+- No held-out pack is committed. `--heldout-pack DIR` loads one in the Astra
+  pack format from outside the repository, verified against its manifest, as
+  the supplied-source holdout split, and the record must then be written
+  outside the repository too. Without it, the holdout split reuses the
+  development tasks and the record says so.
+
+```bash
+python benchmarks/run_selector_comparison.py   # writes results/selector_comparison_offline.json
+```
+
+[offline_arms.py](offline_arms.py) is the shared runner for offline arm
+harnesses: fixture providers, strict acceptance, attempt records, the
+counterbalanced schedule and offline record labels. A harness with arms of
+its own passes its own attempt runner to `run_cell`.
+
+## Trigger ablation (offline mechanics)
+
+Does removing routine model review lose accepted outcomes once deterministic
+triggers decide when a review happens?
+[run_trigger_ablation.py](run_trigger_ablation.py) is the harness for that
+ablation, run offline on fixtures with the shared runner. A scripted reviewer
+decides every review and the anomalies are planted where the triggers look, so
+the [record](results/trigger_ablation_offline.json) establishes mechanics,
+never a measured benefit, and changes no default.
+
+| Arm | What it is |
+|---|---|
+| `routine` | `LLMSupervisor` on its default schedule: a review when a multi-input join becomes ready and when the graph finishes |
+| `triggered` | [`EvidenceTriggeredSupervisor`](../docs/supervisor.md#evidence-triggered-review) around the same `LLMSupervisor`, with the default `ReviewTriggers` |
+| `none` | No supervisor |
+
+- Every arm runs the same generated plans, the fork-join research plan with a
+  gate on some tasks, with one fixture worker and one strict acceptance policy
+  that requires a Findings and a Risks section. Both supervised arms may revise
+  twice. The scripted reviewer decides from the run state the review prompt
+  shows, never from trigger evidence: a completed step whose output is empty,
+  notes an input that was not covered, or is a failing verdict gets one step
+  that revises the deliverable.
+- Four clean tasks, and five that each plant one anomaly of a kind the default
+  triggers detect: an empty risk investigation, a failed or a truncated one
+  under a skip policy, contradicting source evidence, and a gate that rejects
+  the deliverable after its regeneration. An anomaly no trigger detects would
+  be reviewed only on a routine schedule; the fixtures do not include one.
+- One attempt per cell, one node at a time, in a seeded counterbalanced order.
+  Task by task, the record keeps each arm's supervision calls and their
+  declared cost, the triggers that fired, the revisions applied and the
+  outcomes strict acceptance accepted. A revision cannot turn a gate's
+  rejection into an accepted outcome in any arm.
+- An Autotune campaign compares the incumbent `routine` with the challenger
+  `triggered`, with `none` as a [reference arm](../docs/optimize.md#reference-arms),
+  on task-indexed trials that cover every fixture task in each paired split.
+  Its primary objective is supervision calls, and the accepted-outcome rate
+  must not regress. Its other thresholds are placeholders, and its holdout
+  split reuses the fixture tasks.
+
+```bash
+python benchmarks/run_trigger_ablation.py   # writes results/trigger_ablation_offline.json
+```
+
+Live evaluation, with a model reviewer and anomalies nobody planted, needs an
+approved budget and decided thresholds.
 
 ## Coming soon
 

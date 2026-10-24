@@ -8,7 +8,9 @@ from an earlier commit, refusals, and acknowledgements that did or did not
 reach the caller. A fault schedule can refuse a delivery before it commits,
 commit it and then lose the acknowledgement, deliver it twice, or hold it at a
 ``Gate``; ``send`` and ``deliver`` reorder requests in flight. Sources are
-versioned records a workflow reads, changed with ``change_source``.
+versioned records a workflow reads, changed with ``change_source``; a version
+whose access is revoked (``revoke_source``), or a source deleted with its
+history (``delete_source``), can no longer be read.
 
 A request may name a ``Target``, a tenant's collection. Its idempotency key
 and object then belong to that tenant: another tenant, or a caller naming
@@ -215,6 +217,7 @@ class FixtureService:
         self._condition = threading.Condition()
         self._sources: dict[str, list[SourceRecord]] = {}
         self._source_reads: Counter[str] = Counter()
+        self._revoked: set[tuple[str, int]] = set()  # (source id, version)
         self._objects: dict[str, list[ObjectRecord]] = {}
         # (tenant, request key) -> (receipt, expiry)
         self._keys: dict[tuple[str | None, str], tuple[Receipt, int | None]] = {}
@@ -246,14 +249,34 @@ class FixtureService:
             return record
 
     def read_source(self, source_id: str, version: int | None = None) -> SourceRecord:
-        """Read the latest or a named version; each successful read is counted."""
+        """Read the latest or a named version; each successful read is counted.
+
+        A revoked version cannot be read, even as the latest.
+        """
+        with self._condition:
+            matches = [record for record in self._sources.get(source_id, ())
+                       if version is None or record.version == version]
+            if not matches or (source_id, matches[-1].version) in self._revoked:
+                raise NotFound(f"Unknown source {source_id!r} version {version}")
+            self._source_reads[source_id] += 1
+            return matches[-1]
+
+    def revoke_source(self, source_id: str, version: int | None = None) -> SourceRecord:
+        """Revoke access to the latest or a named version, which stays in the history."""
         with self._condition:
             matches = [record for record in self._sources.get(source_id, ())
                        if version is None or record.version == version]
             if not matches:
                 raise NotFound(f"Unknown source {source_id!r} version {version}")
-            self._source_reads[source_id] += 1
+            self._revoked.add((source_id, matches[-1].version))
             return matches[-1]
+
+    def delete_source(self, source_id: str) -> None:
+        """Delete a source and its whole history, as a retention rule would."""
+        with self._condition:
+            if self._sources.pop(source_id, None) is None:
+                raise NotFound(f"Unknown source {source_id!r}")
+            self._revoked = {item for item in self._revoked if item[0] != source_id}
 
     def _source(self, source_id, version, content):
         if type(content) is not str:
@@ -473,12 +496,17 @@ class FixtureService:
         with self._condition:
             return self._condition.wait_for(lambda: self._active == 0, timeout)
 
+    def _revocations(self, source_id: str) -> dict:
+        """``{"revoked": [versions]}`` for a source with a revoked version, else nothing."""
+        versions = sorted(version for name, version in self._revoked if name == source_id)
+        return {"revoked": versions} if versions else {}
+
     def snapshot(self) -> dict:
         """The service's complete state as detached JSON data, ignoring visibility delay.
 
-        Targets, tenants' keys and notices appear only once a request names a
-        target or the outbox is in use, so a snapshot without them keeps its
-        original shape.
+        Targets, tenants' keys, notices and a source's revoked versions appear
+        only once a request names a target, the outbox is in use or a version
+        is revoked, so a snapshot without them keeps its original shape.
         """
         with self._condition:
             requests = {}
@@ -513,7 +541,8 @@ class FixtureService:
                     source_id: {"version": history[-1].version, "content": history[-1].content,
                                 "sha256": history[-1].sha256,
                                 "reads": self._source_reads[source_id],
-                                "history": [asdict(record) for record in history]}
+                                "history": [asdict(record) for record in history],
+                                **self._revocations(source_id)}
                     for source_id, history in self._sources.items()},
                 "deliveries": [dict(entry) for entry in self._deliveries],
                 "in_flight": [{"request_key": message.request_key, "object_id": message.object_id,

@@ -2,9 +2,21 @@
 
 **Preview.** `smythe.actions` defines the contract types for actions that
 write accepted content to a service outside Smythe, such as publishing a post.
-Smythe does not yet store, approve or dispatch actions, and these types may
-change before it does. `import smythe` does not load the module; import
-`smythe.actions` explicitly.
+It [prepares actions](#prepared-actions) in a durable run's
+[journal](workflow-accounting.md#external-action-records), bound to the run's
+accepted content, and records [verified approvals](#approvals) of them.
+`smythe.workflow_actions` keeps the [dispatch journal](#dispatch-journal) of
+each attempt, and the [action runner](#action-runner) makes those attempts
+through your connector, reads their results back,
+[reconciles](#reconciliation) outcomes a dispatch left unknown and keeps the
+service's [notices](#notices) as untrusted records.
+[Revocation](#revocation) takes precedence over dispatch, and a
+[compensation](#compensation) is a new action with its own approval. An
+[operator](#operator-decisions) records a verified decision on an outcome
+that reconciliation left open, and [inspection](#inspecting-actions) shows
+what each action needs next. These types and functions may
+change before they leave preview. `import smythe` loads neither module;
+import them explicitly.
 
 An external action has three parts that this page describes:
 
@@ -100,11 +112,11 @@ profile = ConnectorProfile(
 | `operations` | required | At least one distinct operation name; stored sorted. |
 | `deduplicates` | `False` | The service answers a repeated key from its earlier commit. |
 | `dedupe_window_s` | `None` | How long the service remembers a key, in positive seconds; `None` declares no expiry. Only with `deduplicates=True`. |
-| `lookup_by_key` | `False` | `lookup()` finds an earlier submission by its key. |
+| `lookup_by_key` | `False` | `lookup()` finds an earlier submission by its key: within `dedupe_window_s` when the service deduplicates, and without expiry when it does not. |
 | `lookup_by_object` | `False` | `read()` returns an object's current bytes. |
 | `visibility_bound_s` | `None` | The longest a commit can stay invisible to lookups and reads; `None` means unbounded. |
 | `cancellation` | `"unsupported"` | A submitted write cannot be canceled; no other value is accepted. |
-| `compensation` | `"unsupported"` | `"new_action"` when a separately approved action can undo an effect. |
+| `compensation` | `"unsupported"` | `"new_action"` when a separately approved action can undo an effect; see [compensation](#compensation). |
 | `write_ceiling_nanousd`, `read_ceiling_nanousd` | `0` | The most one write or one read can cost, in whole nanoUSD. |
 | `max_attempts` | `1` | The most attempts one action may make. |
 | `readback_reads` | `1` | How many reads may check a write's result. |
@@ -171,13 +183,800 @@ synchronous host code that misbehaves.
 
 | State | Meaning |
 |---|---|
-| `not_dispatched` | No attempt is in flight. |
-| `dispatched` | An attempt was sent and its result is not yet known. |
+| `not_dispatched` | No attempt has been sent, the last one was refused, or [reconciliation](#reconciliation) or an [operator](#operator-decisions) found that the last one was never made. |
+| `dispatched` | An attempt was sent, and no read has confirmed its result yet. |
 | `outcome_unknown` | An attempt may or may not have taken effect. |
 | `observed` | A read of the target showed the intended result. |
-| `reconciled` | An uncertain outcome was resolved from the service's records. |
+| `reconciled` | An uncertain outcome was resolved from the service's records, or an operator adopted it. |
 | `compensation_required` | The target does not hold the intended result. |
 | `canceled` | The action closed before any dispatch. |
+| `unresolved` | An operator [abandoned](#operator-decisions) the action with its effect unknown, unverified or wrong. It is closed and keeps its exposure. |
 
 `ActionStateError` reports a transition that an action's recorded state does
 not allow.
+
+## Prepared actions
+
+An action delivers the accepted output of one completed
+[durable run](workflow-accounting.md). `prepare_action()` records it in the
+run's journal before anything is sent:
+
+```python
+from smythe.actions import ActionIntent, ActionTarget, ContentRef, prepare_action
+from smythe.workflow_artifact import current_artifact
+
+document = current_artifact(store, run_id).publication.path.read_bytes()
+action = prepare_action(
+    store, run_id, slot="publish",
+    intent=ActionIntent("publish", ActionTarget("acme", "posts"),
+                        parameters={"title": "Launch notes"},
+                        content=ContentRef.for_bytes(document, "text/markdown"),
+                        connector=profile.name, connector_version=profile.version),
+    profile=profile,
+)
+print(action.action_key, action.ceiling_nanousd)
+```
+
+The run must have completed under a
+[strict acceptance policy](verifier.md#strict-acceptance-in-durable-workflows)
+whose current decision is `accepted`, made by the policy, a re-evaluation or
+an [operator](verifier.md#operator-decisions). An advisory run, or one from an
+earlier release, has no recorded decision and cannot prepare actions; Smythe
+never assumes one. A `rejected`, `needs_review` or `indeterminate` decision is
+refused too. The intent's content must have exactly the SHA-256 and size of
+the accepted output: the
+[published document](workflow-accounting.md#published-documents) for a run
+with a renderer, whose file must still hold those bytes, and the output text
+as UTF-8 otherwise. A run that a
+[security stop](workflow-accounting.md#security-stops) holds is refused
+whatever its decision. The intent must name the profile's connector and one of
+its operations. A refusal raises `ActionNotAuthorized` and records nothing.
+
+`prepare_action()` returns a `PreparedAction`: its `action_id`, `run_id`,
+`slot`, `sequence`, `action_key`, `intent`, `profile`, `state`,
+`ceiling_nanousd` and `compensates_action_id`, which is None except for a
+[compensation](#compensation). The ceiling is the cost of `max_attempts`
+writes and `readback_reads` reads at the profile's ceilings, which an
+[approval](#approvals) must cover.
+No attempt, read or [reconciliation](#reconciliation) lookup is made that
+would take the action's confirmed, reserved and unknown nanoUSD past its
+approval's ceiling, so lookups share the budget of the reads.
+`load_action(store, action_id)` reads it again.
+
+A slot names one place an action goes in a run. Its first action has
+sequence 1. Preparing the same intent and profile again returns the slot's
+latest action, whatever its state, so a rejected action stays closed. Another
+intent or profile raises `WorkflowConflictError` while that action is
+unfinished: a changed intent is a new action, never a retry. Once it is
+`observed`, `reconciled` or `canceled`, the next intent becomes the slot's
+next sequence, with its own action key.
+
+Preparing needs no run lease. Only your trusted host code calls these
+functions: a generated plan, source text or model output cannot create an
+action or an approval.
+
+## Approvals
+
+Smythe does not authenticate users; your host's
+[approval verifier](#connectors-and-approval-verifiers) does. An approval
+covers one logical action and at most one effect: exactly the action's intent
+digest, up to a nanoUSD ceiling and until an expiry.
+
+```python
+from smythe.actions import approve, check_authority
+
+assertion = identity_host.issue(action.intent.digest(), ...)   # your host's approval flow
+approval = approve(store, action.action_id, assertion, identity_host,
+                   ceiling_nanousd=action.ceiling_nanousd, expires_at_ns=expiry_ns)
+assert check_authority(store, action.action_id, identity_host) == approval
+```
+
+`approve(store, action_id, assertion, verifier, *, ceiling_nanousd,
+expires_at_ns)` returns an `ActionApproval`: the `approval_id`, `action_id`,
+verified `principal`, `ceiling_nanousd` and `expires_at_ns`. It refuses:
+
+- an assertion the verifier does not accept for exactly this action's intent
+  digest: forged, expired, revoked or issued for another intent. The
+  verifier raises `ApprovalRejected`, which propagates;
+- a principal whose tenant is not the intent target's, or whom
+  `still_authorized()` no longer authorizes, with `ApprovalRejected`;
+- a ceiling below the action's `ceiling_nanousd`, and an expiry that is not
+  later than the journal's clock, with `WorkflowValidationError`, before the
+  verifier is called;
+- an action that is `observed`, `reconciled`, `canceled`,
+  `compensation_required` or `unresolved`, with `ActionStateError`;
+- for an action an operator found [not executed](#duplicate-risk), an
+  approval without `duplicate_risk=True`, and `duplicate_risk=True` for any
+  other action, with `ActionStateError`; and
+- content the run can no longer deliver, with `ActionNotAuthorized`.
+
+An assertion is recorded once in a journal. The same approval again returns
+it; the assertion presented for any other action raises `ApprovalRejected`,
+even one whose intent is identical, as when two runs accepted the same
+document. Issue a new assertion for each approval. The newest approval of an
+action supersedes earlier ones, so a new approval can renew or replace one.
+
+This differs from the Jobs [approval token](jobs.md#validate-plan-and-approve),
+an acknowledgment of a plan and its spend ceiling that anyone with the
+manifest can compute. It names no principal and has no expiry or revocation.
+
+`reject(store, action_id, assertion, verifier)` cancels an action that was
+never dispatched. Its assertion is verified as an approval's is, and the
+rejection is recorded with the principal. The action is `canceled` for good,
+across restarts: preparing the same intent in its slot returns it, and it can
+no longer be approved. An attempt begun in the
+[dispatch journal](#dispatch-journal) but not yet claimed is released with
+its reservation, since nothing was sent. Rejecting it again changes nothing.
+
+`revoke(store, action_or_approval_id, reason)` revokes one approval, or every
+approval of an action, and returns the IDs it revoked. It is a fail-safe
+control: it needs no principal and no lease. The reason is stored with
+account identifiers redacted. A revoked approval never authorizes the action
+again, and its assertion cannot be recorded again; only a new approval
+reopens the action. Revoking never undoes an effect, and
+[`stop_actions()`](#stopping-a-runs-actions) revokes the approvals of
+every action of a run at once.
+
+`check_authority(store, action_id, verifier)` returns the approval that
+authorizes the action now, or raises `ActionNotAuthorized` naming why not. It
+checks that:
+
+- the action is not `observed`, `reconciled`, `canceled`,
+  `compensation_required` or `unresolved`;
+- its newest approval is not revoked or consumed, has not expired on the
+  journal's clock, binds the action's intent digest, covers its ceiling,
+  accepts any [duplicate risk](#duplicate-risk) and was recorded by this
+  verifier;
+- the verifier accepts the stored assertion again, for the same principal,
+  and still authorizes that principal; and
+- the content is still deliverable, as for `prepare_action()`: no security
+  stop holds the run, the run's current decision is still `accepted`, the
+  published file still holds the bound bytes, and no source the accepted
+  output came from has been [removed](tasks.md#remove-a-source) since, and no
+  source a lineage run's record names has been
+  [restricted](lineage.md#restrict-a-source), either of which makes the
+  content unavailable.
+
+An approval row written into the journal by other means never authorizes
+anything: the verifier must vouch for its assertion. `check_authority()` only
+reads, so it works on a store opened read-only. The verifier is called
+outside any journal transaction, so a check describes one moment: a
+revocation made at the host, or with `revoke()`, after a check returns is
+seen by the next check, not that one. Approval and the work it authorizes
+can happen in different processes, so check again immediately before acting.
+
+The journal keeps each assertion so that it can be verified again; protect
+the journal accordingly. `inspect_run()` shows each approval's principal,
+verifier identity, ceiling, expiry, consumption and revocation time, and for
+a revoked approval when the [revocation](#revoking-after-dispatch) came. It
+never shows assertions or revocation reasons.
+
+## Dispatch journal
+
+`smythe.workflow_actions` records each attempt of an action in the run's
+journal, so that a worker that stops part way leaves a state that another
+can recover. The [action runner](#action-runner) makes these calls for you;
+host code that dispatches by itself makes them in this order, holding the
+run's lease, which fences dispatch on the completed run:
+
+```python
+from smythe.actions import ConnectorRefused, check_authority
+from smythe.workflow_actions import (
+    begin_attempt, claim_dispatch, record_ambiguous, record_receipt, record_refused,
+    recover_actions,
+)
+
+lease = store.acquire_lease(run_id, worker_id, ttl_s=60)
+recover_actions(store, lease)  # settle what a stopped worker left in flight
+approval = check_authority(store, action.action_id, identity_host)
+attempt = begin_attempt(store, lease, action.action_id, approval.approval_id)
+permit = claim_dispatch(store, lease, attempt["attempt_id"])
+try:
+    receipt = connector.submit(action.action_key, action.intent, document,
+                               action.profile.timeout_s)
+except ConnectorRefused as error:
+    record_refused(store, permit, error)
+except Exception as error:  # anything else may follow a commit
+    record_ambiguous(store, permit, error)
+else:
+    record_receipt(store, permit, receipt)
+store.release_lease(lease)
+```
+
+Attempts are numbered from 1, and every attempt sends the action's one
+[key](#action-keys). An attempt is in one of these states:
+
+| State | Meaning |
+|---|---|
+| `prepared` | Begun under an approval, with its write ceiling reserved. Nothing was sent. |
+| `dispatched` | Its dispatch is claimed: the request may have been sent. |
+| `acknowledged` | The service's receipt names the object it committed. |
+| `refused` | The service definitely committed nothing. |
+| `outcome_unknown` | The write may or may not have taken effect. |
+| `released` | Given up before its dispatch was claimed. Nothing was sent. |
+
+### Attempts and outcomes
+
+`begin_attempt(store, lease, action_id, approval_id)` begins the action's
+next attempt under its approval and reserves the profile's
+`write_ceiling_nanousd`. It checks the content again, as `check_authority()`
+does. Then, in the transaction that makes the reservation, it checks that no
+security stop holds the run, that the run is completed, that the action is
+`not_dispatched`, and that *approval_id* is still the action's newest
+approval, unrevoked, unconsumed and unexpired. Fewer than `max_attempts`
+attempts may have been dispatched; a released attempt does not count. The
+action's confirmed, reserved and unknown nanoUSD plus the write ceiling must
+fit the approval's ceiling, or `WorkflowBudgetError` is raised. It does not
+call the verifier: call `check_authority()` first. It returns the attempt as
+`inspect_run()` shows it. Beginning again under the same approval returns the
+same prepared attempt, a newer approval releases an attempt prepared under an
+older one, and `reject()` releases a prepared attempt as it cancels the
+action.
+
+`claim_dispatch(store, lease, attempt_id)` checks the same conditions again
+and commits the attempt and its action as `dispatched`, with the lease's
+epoch and the time, before anything is sent. It returns an
+`ActionDispatchPermit`, whose secret token the journal keeps only as a
+digest. Each attempt is claimed once. When the approval or the content no
+longer authorizes the attempt, it is released with its reservation and
+`ActionNotAuthorized` is raised.
+
+The permit then records the outcome of the one submission:
+
+- `record_receipt(store, permit, receipt)`: the attempt is `acknowledged`.
+  The receipt must name the action's key, its target's tenant and collection
+  and, when the intent names an object, that object; otherwise
+  `WorkflowValidationError` is raised and the answer should be recorded as
+  ambiguous. The receipt is kept with the external object's identity, and it
+  consumes the approval. Its `cost_nanousd` is confirmed. A receipt without
+  a cost confirms zero only for a profile whose write ceiling is zero;
+  otherwise the reservation becomes unknown exposure. The action stays
+  `dispatched`, because a receipt alone does not show that the target holds
+  the intended result.
+- `record_refused(store, permit, error)`: the attempt is `refused` at zero
+  cost. Its reservation is given back, and the action is `not_dispatched`
+  again with its approval unconsumed, so the same approval can authorize the
+  next attempt. The refusal counts toward `max_attempts`. A refused
+  [same-key retry](#reconciliation) leaves the action `outcome_unknown`
+  instead, since it says nothing about the earlier attempt.
+- `record_ambiguous(store, permit, error)`: the attempt and its action are
+  `outcome_unknown`, and the reserved write ceiling becomes unknown exposure.
+  `begin_attempt()` then refuses the action, so dispatch never sends the
+  write again. Only [reconciliation](#reconciliation) makes another attempt
+  possible: `claim_retry()` claims a same-key retry, and a `not_executed`
+  finding from `record_finding()` returns the action to `not_dispatched`, so
+  that the next attempt can begin. The attempt keeps its exposure until a
+  receipt that a lookup finds reports the write's cost, which
+  `record_lookup()` confirms.
+
+Connector error text is stored with account identifiers redacted, at most
+500 characters. Recording the same outcome again returns it. An approval is
+consumed by the receipt of an effect, never by a refused attempt; a consumed
+approval authorizes nothing further.
+
+### Leases and late receipts
+
+`begin_attempt()`, `claim_dispatch()` and `recover_actions()` need the
+run's current lease and raise `WorkflowLeaseError` for an expired or
+superseded one. A permit records an outcome without the lease while the
+run's lease epoch is still the one it was claimed under, so a worker whose
+lease lapsed can still record the answer it holds until another worker
+acquires the lease. After that, or once the attempt's outcome is recorded or
+recovered, a permit changes nothing: its receipt or error is kept as a
+`late_receipt` record, marked trusted because only the claim's permit can
+write it, and `WorkflowLeaseError` or `ActionStateError` is raised. A late
+receipt carries no cost, because the attempt keeps its exposure.
+
+### Recovery
+
+`recover_actions(store, lease)` settles the attempts that a stopped worker
+left in flight. Call it once after acquiring the lease and before
+dispatching: it treats every attempt in flight as abandoned. A prepared
+attempt was never sent, so it is released with its reservation and does not
+count toward `max_attempts`. A dispatched attempt without an outcome may have
+reached the service, so it and its action become `outcome_unknown` with the
+reason `recovered after dispatch`, and its write ceiling becomes unknown
+exposure. Recovery audits the run's actions first and sends nothing. Neither
+recovery nor a stopped worker ever releases unknown exposure;
+[reconciliation](#reconciliation) resolves an unknown outcome as far as the
+connector's declarations allow.
+
+### The local transaction boundary
+
+Each step is one local SQLite transaction in the journal. The claim commits
+the `dispatched` record before the request is sent, so the journal always
+knows that a request may have gone out. That commit is not a transaction
+with the service: no local commit can include the remote API. A worker may
+stop after the claim but before the request leaves, while the service
+commits it, or after the service answers but before the outcome is recorded.
+The journal looks the same in each case, `dispatched`, and recovery turns it
+into `outcome_unknown` rather than sending it again. A worker that stops
+before its claim leaves at most a `prepared` attempt, which recovery releases
+safely, because nothing is sent without a claim.
+
+`check_authority()` calls the host's verifier outside any journal
+transaction, and `begin_attempt()` and `claim_dispatch()` read the run's
+decision, sources and published file just before their write transactions.
+Inside those transactions they check again what the journal alone records:
+revocation, expiry, consumption, the newest approval, a security stop and the
+run's completion. A `revoke()` therefore stops every later claim, while a
+revocation known only to the host, or a change to the published file, after
+the last check is seen by the next check. A run's `budget_overrun` and
+`unknown_exposure` latches close admission to its model calls and do not
+block actions, which keep their own accounting scope; a security stop does.
+
+`inspect_run()` shows each attempt's number, approval, state, lease epoch,
+receipt digest and balances, and each late receipt by its digest. It never
+shows dispatch tokens, receipts or error text. Each transition adds an
+`action_attempt` event, and each late receipt an `action_late_receipt`
+event, carrying only identifiers and the new state.
+
+## Action runner
+
+`ActionRunner` dispatches a run's prepared actions through your connector,
+one at a time, reads their results back and reconciles unknown outcomes:
+
+```python
+from smythe.actions import ActionRunner
+
+runner = ActionRunner(store, connector, identity_host, lease_ttl_s=60)
+progress = runner.dispatch(run_id, action.action_id)       # one submission
+if progress.next_action == "readback":
+    progress = runner.readback(run_id, action.action_id)   # independent reads
+if progress.next_action == "reconcile":
+    progress = runner.reconcile(run_id, action.action_id)  # lookups or a same-key retry
+print(progress.state, progress.next_action)
+```
+
+`ActionRunner(store, connector, verifier, *, owner_id=None, lease_ttl_s=60,
+sleep=time.sleep, clock=time.monotonic)` checks the connector and verifier
+as `check_connector()` and `check_verifier()` do. The runner is the only
+retry owner: each attempt submits once, and only
+[reconciliation](#reconciliation) submits again, with the same key, to a
+service that deduplicates it, within `max_attempts`. Your connector must
+make one request per call, with any client retries turned off; a connector
+that exposes `max_retries` must set it to 0, or `TypeError` is raised. Each
+step holds the run's lease as `owner_id`, a new name by default, and
+releases it when the step ends. Before submitting, and before each read or
+lookup and the wait that precedes it, it renews the lease for
+`lease_ttl_s` beyond the connector's timeout and that wait, up to a day, so a
+wait longer than the lease does not lose it. Each step first
+[recovers](#recovery) whatever a stopped worker left in flight. While
+another worker's lease is live, a step raises `WorkflowLeaseError`. `sleep`
+and `clock`, in seconds, space the reads and lookups. Dispatch is serial and
+runs outside the asynchronous node executor, so its scheduling and
+[drain](execution.md#draining-in-flight-work) policies never apply to writes:
+the runner takes no termination policy, and a
+[revocation](#revocation) refuses the next claim at once.
+
+Every step refuses, with `WorkflowConflictError`, an action of another run
+and a connector whose `profile` is not exactly the one the action was
+prepared with.
+
+### Dispatch
+
+`runner.dispatch(run_id, action_id)` makes the action's next attempt:
+
+1. It checks the approval with `check_authority()`, including a security
+   stop on the run, and begins the attempt under it with `begin_attempt()`.
+2. It reads the payload once: the run's current
+   [published document](workflow-accounting.md#published-documents), or its
+   output text as UTF-8 for a run without a renderer. The bytes must have
+   exactly the SHA-256 and size of the intent's content. Otherwise the
+   attempt is released, unclaimed, and `ActionNotAuthorized` is raised:
+   nothing is sent.
+3. It claims the dispatch and calls the connector's `submit()` once, with the
+   action's key, intent and the bytes it checked, which it never reads
+   again. A change to the file after the check cannot reach the service.
+4. It records the outcome. A receipt is recorded with `record_receipt()`, a
+   `ConnectorRefused` with `record_refused()`, and any other exception with
+   `record_ambiguous()`. A receipt that names another key or target, or a
+   value that is not a `ConnectorReceipt`, is recorded as ambiguous.
+
+A refusal leaves the action `not_dispatched` under the same, unconsumed
+approval, so `dispatch()` can try again while attempts remain. `dispatch()`
+never sends an ambiguous outcome again; only
+[reconciliation](#reconciliation) can. A receipt never shows the result by
+itself: the action stays `dispatched` until a read does.
+
+### Pending actions
+
+`runner.dispatch_pending(run_id)` dispatches each of the run's actions that
+waits for dispatch, one at a time, under one lease: its `not_dispatched`
+actions with attempts left that were prepared with the connector's profile,
+in slot and sequence order. Actions of another profile are left to a runner
+with that connector. Each is dispatched as `dispatch()` does, so its
+authority is checked again before each claim, and once more in the claim's
+transaction. It returns one `ActionProgress` per action. An action that is
+refused, because its approval was revoked or is missing, a security stop
+holds the run, its content is no longer deliverable or its ceiling leaves no
+room, has `refusal` set to the reason and `next_action` None, and nothing is
+sent for it; the others go on.
+
+### Readback
+
+`runner.readback(run_id, action_id)` reads the object an acknowledged attempt
+committed, at the target its receipt names, with the connector's `read()`. It
+makes at most the profile's `readback_reads` reads per attempt in all,
+however often it is called, `readback_interval_s` apart, and only when the
+profile declares `lookup_by_object`. Each read is appended as a `readback`
+record, charged the profile's `read_ceiling_nanousd` as confirmed cost
+against the action, and no read is made that would take the action's
+confirmed, reserved and unknown nanoUSD past the ceiling of the attempt's
+approval. Without an acknowledged attempt, it reads nothing.
+
+Each read's verdict is a `ValidationReport` from the validator
+`READBACK_VALIDATOR` (`smythe.action-readback`, version 1), whose path names
+the object as `tenant/collection/object_id`:
+
+| Read | Outcome | Action |
+|---|---|---|
+| The object is the receipt's target, holds bytes whose SHA-256 is the intent's content digest, carries the action's key when the connector exposes one, and has at least the receipt's version | `passed` | `observed`, or `reconciled` when an earlier attempt's outcome is still unknown |
+| Another tenant's, collection's or object's target (`target_mismatch`), other bytes (`content_mismatch`) or another key (`key_mismatch`) | `rejected` | `compensation_required` |
+| No object (`not_visible`), a failed read (`read_failed`) or a version older than the receipt's (`stale_version`) | `error` | stays `dispatched` |
+
+The digest is recomputed from the bytes the read returned, never taken from
+the service. For an intent without content, the bytes must be the canonical
+JSON of its parameters. The first passed or rejected read settles the action.
+Reads that decide nothing leave the attempt acknowledged but unverified; once
+none are left, or none fits under the approval's ceiling, the next action is
+`reconcile`. An empty read alone never shows that nothing was written, and
+nothing is submitted again.
+
+Each record holds the attempt, the read's number, the report and, for an
+object, its target, content digest, size, media type, version and key; a
+failed read's error text is kept with account identifiers redacted. Records
+never hold the object's bytes. `inspect_run()` shows them by kind and digest,
+and each read adds an `action_readback` event with the record's identifier
+and the action's state.
+
+### Reconciliation
+
+A lost acknowledgement, or a worker that stopped after its claim, leaves an
+action `outcome_unknown`: the service may or may not have committed the
+write. `runner.reconcile(run_id, action_id)` settles that outcome only as far
+as the connector's profile allows, and never by guessing:
+
+```python
+progress = runner.reconcile(run_id, action.action_id)
+if progress.next_action == "dispatch":           # the write was shown not to have been made
+    progress = runner.dispatch(run_id, action.action_id)
+elif progress.next_action == "operator_review":  # the outcome stays unknown
+    notify_an_operator(action.action_id)         # your host's escalation
+```
+
+| The profile declares | `reconcile()` | Results |
+|---|---|---|
+| `lookup_by_key` | Calls `lookup()` with the action's key, at most `readback_reads` times per attempt in all, `readback_interval_s` apart, until one finds the receipt. Reads the receipt's object back with `read()`, which needs `lookup_by_object`. Never submits. | `reconciled` when a read shows the intended result, `compensation_required` when it shows another; `not_dispatched` when an empty lookup proves the write was not made; otherwise `outcome_unknown`, with `operator_review` next. |
+| `deduplicates`, without `lookup_by_key` | Submits once more with the same key, as the action's next attempt, while the key's window is open, and reads its receipt back. | `reconciled` or `compensation_required`; `outcome_unknown` after a refused or ambiguous retry, with `reconcile` next, which retries again while attempts remain; otherwise `operator_review`. |
+| Neither | Sends nothing. | `outcome_unknown`, with `operator_review` next, at once. |
+
+**An empty lookup is not proof.** An empty lookup never causes a submission.
+It shows that the write was not made only when all of these hold on the
+journal's clock: the profile declares `visibility_bound_s`; that bound plus
+the connector's `timeout_s` has passed since the latest dispatch claim, so a
+commit would be visible by now; and the key is still inside its window. The
+finding is then `not_executed`, and the action returns to `not_dispatched`
+under its unconsumed approval, so `dispatch()` can send it again while
+attempts remain; that attempt counts toward `max_attempts`. Without a
+declared bound, before the bound has passed, or once the key's window may
+have closed, empty lookups leave the outcome unknown.
+
+**The key's window** is `dedupe_window_s` from the action's first dispatch
+claim, the earliest the service can have committed the key; `None` declares
+no expiry. A call made now may take up to `timeout_s` to reach the service,
+so the window counts as open only while now plus `timeout_s` is still inside
+it. A connector should declare `lookup_by_key` only when `lookup()` finds a
+key for that long: for a service that does not deduplicate, without expiry.
+
+**A same-key retry** is made only while the key's window is open, when
+attempts remain under `max_attempts` and when `check_authority()` and the
+payload check pass, as for `dispatch()`. `claim_retry()` in
+`smythe.workflow_actions` checks again in the journal and claims the retry
+as `dispatched` before it is sent. A deduplicating service answers it from
+the earlier commit, and that receipt is read back. A refused retry says
+nothing about the earlier attempt, so the action stays `outcome_unknown`. A
+revoked or expired approval, a security stop, changed content or a closed
+window means that nothing is sent.
+
+**Unresolved outcomes.** What reconciliation cannot settle gets an
+`unresolved` finding with its reason, and the next action is
+`operator_review` until another attempt begins, or until an
+[operator decision](#operator-decisions) settles it. An acknowledged attempt
+whose reads are used up, or no longer fit under the approval's ceiling,
+without confirming the receipt is unresolved in the same way. Reconciling
+again makes no lookup or read beyond the bounds and records no duplicate
+finding.
+
+**Records and accounting.** Each lookup is a `lookup` record holding the
+attempt, the lookup's number and the receipt it found, or a failed lookup's
+error text, redacted; an answer that names another key, tenant, collection
+or object proves nothing. Reads are `readback` records as above. Each lookup
+and read is charged the profile's `read_ceiling_nanousd` as confirmed cost
+against the action, and none is made that would take the action's
+confirmed, reserved and unknown nanoUSD past the ceiling of the attempt's
+approval. Lookups and reads share that budget: an attempt dispatched after a
+`not_executed` finding has only the room that the lookups left for its
+reads, and once no read fits, its next action is `reconcile`, which records
+an `unresolved` finding. Findings are `finding` records holding the
+attempt, the finding, its reason, the records it rests on and the number of
+attempts. Each lookup adds an `action_lookup` event and each finding an
+`action_finding` event.
+The ambiguous attempt keeps its write ceiling as unknown exposure, even once
+the action is reconciled or found not executed, until a receipt that reports
+a cost confirms it: state and accounting are separate. No attempt or record
+is removed, and no confirmed cost is reduced.
+
+Host code that reconciles by itself calls `record_lookup()`, `claim_retry()`
+and `record_finding()` in `smythe.workflow_actions` under the run's lease.
+
+### Notices
+
+A service may report its commits with callbacks. `record_notice(store,
+payload)` keeps one that your host relays:
+
+```python
+from smythe.actions import record_notice
+
+action = record_notice(store, {"key": key, "target": {"tenant": "acme", "collection": "posts"},
+                               "notice": callback_body})
+if action is not None:
+    runner.readback(action.run_id, action.action_id)
+```
+
+The payload is a JSON object of at most 64 KiB as canonical JSON, which names
+the action key it reports as `key` and the action's target as `target`;
+other fields are kept as they are. A notice whose key names an action of the
+journal is kept with that action as an untrusted `notice` record, with an
+`action_notice` event; a notice under any other key is not kept. It returns
+the action only when the action is `dispatched` and the notice names its
+tenant and collection, and None otherwise. A notice never changes an action's
+state: anyone can send one, so it can only prompt a readback, which reads the
+object the receipt names and decides by itself. A notice for another tenant,
+for an action not yet dispatched or for one already settled prompts nothing.
+It needs no lease.
+
+### Progress
+
+Every step returns an `ActionProgress`: the `action_id`, its `state`, its
+latest `attempt` as `inspect_run()` shows it, the `report` of the step's
+last read, or None, the `next_action`, and the `refusal` of an action that
+[`dispatch_pending()`](#pending-actions) refused, or None:
+
+| `next_action` | When |
+|---|---|
+| `dispatch` | The action is `not_dispatched` and attempts remain. |
+| `readback` | An acknowledged attempt has reads left that fit under its approval's ceiling. |
+| `reconcile` | The outcome is unknown, or the reads did not settle it. |
+| `operator_review` | Reconciliation found it can do no more: the outcome stays unknown or unverified. |
+| `compensate` | The action is `compensation_required`: a [compensation](#compensation) can undo its effect where the connector supports one. |
+| None | The action is settled or `unresolved`, has used every attempt, or `dispatch_pending()` refused it. |
+
+Errors from the journal's checks, such as `ActionNotAuthorized`,
+`ActionStateError` and `WorkflowBudgetError`, propagate unchanged from every
+step but `dispatch_pending()`, which reports them as refusals.
+
+## Revocation
+
+Revoked authority takes precedence over dispatch, and never undoes an
+effect. A submission whose dispatch was claimed has left, or may have left,
+for the service, and no revocation can recall it: its receipt, refusal or
+ambiguous outcome is still recorded when it arrives, and the reads and
+lookups that settle it go on, since they send no write. Every later claim
+is refused.
+
+### Stopping a run's actions
+
+```python
+from smythe.actions import stop_actions
+
+revoked = stop_actions(store, run_id, "approver access withdrawn")
+```
+
+`stop_actions(store, run_id, reason)` revokes every approval of every
+action of the run, in one transaction, and returns the IDs it revoked. Like
+`revoke()`, it is a fail-safe control that needs no principal and no lease,
+so it works while a worker holds the run's lease with a submission in
+flight. The reason is stored with account identifiers redacted on each
+revoked approval, and an `actions_stopped` event lists their IDs.
+
+Nothing clears the stop: no resume of the run, new lease, recovery or
+reopened journal makes a revoked approval authorize again. Each action is
+refused, by `check_authority()`, `begin_attempt()` and the claim's own
+transaction, until it gets a new approval, which reopens that action only.
+An action prepared after the stop needs its first approval as usual.
+Stopping again revokes the approvals recorded since the last stop.
+
+A [security stop](workflow-accounting.md#security-stops) is different: it
+blocks the whole run, and every action of it, for good, and leaves the
+approvals as they were.
+
+### Revoking after dispatch
+
+A revocation changes no action state: an `observed` action stays
+`observed`, and an unknown outcome keeps its exposure. `inspect_run()`
+shows when each revoked approval was revoked, as its `revocation`:
+
+| `revocation` | Meaning |
+|---|---|
+| `before_dispatch` | No attempt under the approval may have taken effect. |
+| `after_dispatch` | An attempt under it had been dispatched, and its outcome is unknown. |
+| `after_effect` | A receipt, the attempt's own or one a lookup found, shows that a write under it took effect, which the revocation does not undo. |
+
+A claim checks revocation in its own transaction, so an attempt dispatched
+under a revoked approval was always dispatched before the revocation. To
+undo an effect, a connector that supports it takes a new, separately
+approved [compensation](#compensation).
+
+## Compensation
+
+When a connector's profile declares `compensation="new_action"`, a separate
+action can undo the effect of one whose result a read has shown:
+
+```python
+from smythe.actions import approve, prepare_compensation
+
+undo = prepare_compensation(store, action.action_id, operation="update",
+                            parameters={"retracted": True})
+assertion = identity_host.issue(undo.intent.digest(), ...)   # its own approval
+approve(store, undo.action_id, assertion, identity_host,
+        ceiling_nanousd=undo.ceiling_nanousd, expires_at_ns=expiry_ns)
+runner.dispatch(run_id, undo.action_id)
+runner.readback(run_id, undo.action_id)
+```
+
+`prepare_compensation(store, action_id, *, operation, parameters=None)`
+records a new logical action whose `compensates_action_id` names the
+original. The original must be `observed`, `reconciled` or
+`compensation_required`. The compensation's intent writes `operation`, one
+of the profile's operations, with `parameters` and no content, to the object
+that the original's receipt named and its readback read, through the
+original's connector profile. Its slot is `<slot>/<sequence>/compensation`,
+after the original's slot and sequence, so it has its own action key.
+Preparing the same operation and parameters again returns it; others raise
+`WorkflowConflictError` while it is unfinished. It needs no lease.
+
+A compensation is authorized like any other action, and never by the
+original's approval: an approval binds one intent digest, so the verifier
+refuses the original's assertion, and the journal refuses an assertion that
+it recorded for another action. The compensation needs its own approval and
+makes its own attempts, with its own receipt and readback, which checks that
+the object holds the canonical JSON of its parameters. The original's
+attempts, approvals, records, state and balances never change; each
+action's inspection shows the link. Because a compensation delivers none of
+the run's content, a later decision that no longer accepts the run's output
+does not refuse it. A [security stop](workflow-accounting.md#security-stops)
+does, as it refuses every action.
+
+`prepare_compensation()` raises `ActionStateError` for an action whose
+effect no read has shown, and for a profile that declares
+`compensation="unsupported"`: nothing is recorded, and the action stays
+`compensation_required`, or as it was, with its unknown exposure, for an
+[operator](#operator-decisions) to resolve. An operation the profile does
+not declare raises `WorkflowValidationError`, and a run that a security stop
+holds raises `ActionNotAuthorized`.
+
+## Operator decisions
+
+Reconciliation settles an outcome only as far as the connector's
+declarations allow. When it can do no more, the action's next action is
+`operator_review`: a person looks at the service and decides. Smythe
+records that decision only when your host's
+[approval verifier](#connectors-and-approval-verifiers) authenticates it,
+and the decision never authorizes a write by itself.
+
+```python
+from smythe.actions import ActionEvidence, decision_sha256, resolve
+
+evidence = ActionEvidence.for_bytes(audit_log_export, "No write under the action's key in the audit log")
+digest = decision_sha256(store, action.action_id, "not_executed", evidence)
+assertion = identity_host.issue(digest, ...)   # your host's approval flow
+resolve(store, action.action_id, "not_executed", assertion=assertion, verifier=identity_host,
+        evidence=evidence, note="Checked the service's audit log with its support team")
+```
+
+`resolve(store, action_id, decision, *, assertion, verifier, evidence=None,
+note)` records one of `ACTION_DECISIONS` and returns the action:
+
+| Decision | Applies to | Needs | The action becomes |
+|---|---|---|---|
+| `adopt_observed` | `outcome_unknown`, or `dispatched` with an acknowledged latest attempt | a `readback` record whose object held the bound content, or `evidence` | `reconciled`; nothing is submitted |
+| `not_executed` | `outcome_unknown` | `evidence` | `not_dispatched`, with [duplicate risk](#duplicate-risk) |
+| `abandon` | `outcome_unknown`, `dispatched` with an acknowledged latest attempt, or `compensation_required` | nothing more | `unresolved`, closed |
+
+A readback record shows the bound content when its object is in the
+intent's tenant and collection, is the intent's object when it names one,
+holds bytes whose SHA-256 is the content digest, and carries the action's
+key when the read showed one: for example, reads that found the right bytes
+at a version older than the receipt's, which decide nothing by themselves.
+An acknowledged write is never found `not_executed`, and an attempt whose
+dispatch is claimed but not recorded refuses every decision until its
+outcome is recorded or [recovered](#recovery). Anything else raises
+`ActionStateError`, and a missing `evidence` raises
+`WorkflowValidationError`.
+
+**Authority.** `decision_sha256(store, action_id, decision, evidence=None)`
+is the digest the assertion must approve. It binds the action's key and
+intent digest, its state and number of attempts, the decision and the
+evidence, so an assertion decides one action at one point in its history:
+the action's approval assertion, an assertion for another decision or other
+evidence, and one issued before the action changed are all refused. The
+verifier must return a principal of the intent's tenant and still authorize
+it, as for [`approve()`](#approvals); its refusals raise `ApprovalRejected`.
+The verifier is called outside any journal transaction, and an action that
+changes meanwhile raises `WorkflowConflictError`. A
+[security stop](workflow-accounting.md#security-stops) on the run refuses
+every decision with `ActionNotAuthorized`. No lease is needed.
+
+**Records.** Decisions only append. Each is a `decision` record holding the
+decision, the state and number of attempts it was made in, the principal,
+the verifier's identity, the digest the assertion approved, the records it
+rests on and `note`, kept with account identifiers redacted and at most 500
+characters, with an `action_decision` event. No attempt, approval, cost or
+balance changes: an uncertain write keeps its unknown exposure after
+`adopt_observed` or `abandon`, as after reconciliation. An `unresolved`
+action is closed like `compensation_required`: no approval authorizes it,
+nothing reads or reconciles it, preparing the same intent returns it, and
+its slot takes no other intent.
+
+### Evidence
+
+`ActionEvidence(sha256, summary)` names evidence your host keeps, such as an
+export from the service: its SHA-256 and a summary. The summary is kept with
+account identifiers redacted and at most 500 characters.
+`ActionEvidence.for_bytes(data, summary)` hashes the bytes. The journal keeps
+an `evidence` record of the digest and summary, never the bytes, and the
+decision's assertion binds both.
+
+### Duplicate risk
+
+An operator's `not_executed` rests on evidence, not on a lookup that proves
+absence, so another dispatch may repeat an effect the action already had.
+The action returns to `not_dispatched`, but its earlier approval no longer
+authorizes a dispatch, even unconsumed: `check_authority()`,
+`begin_attempt()` and the claim refuse it. Only a new approval that accepts
+the risk does:
+
+```python
+from smythe.actions import approve, duplicate_risk_sha256
+
+assertion = identity_host.issue(duplicate_risk_sha256(store, action.action_id), ...)
+approve(store, action.action_id, assertion, identity_host, ceiling_nanousd=action.ceiling_nanousd,
+        expires_at_ns=expiry_ns, duplicate_risk=True)
+```
+
+`duplicate_risk_sha256(store, action_id)` binds the action's key and intent
+digest and the number of attempts the latest `not_executed` decision found,
+so an approval accepts one decision's risk: after another uncertain attempt
+and decision, it no longer authorizes, and the next dispatch needs a new
+one. The journal enforces this on its own as well: `begin_attempt()` and the
+claim refuse a duplicate-risk approval that an attempt within the latest
+decision's count was made under. The journal keeps the approval's
+`duplicate_risk` flag. An approval
+with `duplicate_risk=True` is refused for an action without that risk. A
+`not_executed` finding from [reconciliation](#reconciliation) proves absence
+and leaves no duplicate risk.
+
+### Inspecting actions
+
+`inspect_actions(store, run_id)` shows a run's actions as an operator needs
+them, reading a journal opened read-only:
+
+| Field | Meaning |
+|---|---|
+| `accounting_scope`, `unit` | `external_actions` and `nanoUSD` |
+| `confirmed_nanousd`, `reserved_nanousd`, `unknown_nanousd` | The run's action balances |
+| `unresolved` | The IDs of actions whose effect is unknown, unverified, wrong or abandoned: `outcome_unknown`, `compensation_required` and `unresolved` actions, and `dispatched` ones with no read left to confirm them |
+| `items` | Each action as `inspect_run()` shows it: identity, intent digest, operation, target, state, balances, attempts, approvals by principal, verifier, ceiling, expiry, consumption and revocation, and records by kind and digest, with `duplicate_risk` and `next_action` |
+
+`next_action` is as [progress](#progress) names it, except that a
+`not_dispatched` action that no approval authorizes needs `approve`, or
+`approve_duplicate_risk` while it carries duplicate risk. Assertions,
+parameters, receipts, error text, evidence summaries, notes and record
+payloads are never shown. From the command line,
+[`smythe runs inspect`](runs.md#external-actions) prints the same block and
+exits with 12 while accepted output has an unresolved action, and
+[`smythe runs revoke-action`](runs.md#revoke-an-actions-approvals) is the
+fail-safe [`revoke()`](#approvals). Decisions and approvals stay in the
+Python API, because only your host can construct the verifier and the
+connector.

@@ -248,7 +248,9 @@ def test_timing_reports_phase_totals_waits_and_elapsed_time():
             "execution": 3000.0, "verification": 1000.0, "synthesis": 500.0,
             "supervision": 0.0, "checkpoint": 250.0, "waiting": 2500.0,
         },
-        "waiting_ms": {"retry_backoff": 2000.0, "admission": 500.0, "supervision": 0.0},
+        "waiting_ms": {
+            "retry_backoff": 2000.0, "admission": 500.0, "supervision": 0.0, "capacity": 0.0, "drain": 0.0,
+        },
     }
 
 

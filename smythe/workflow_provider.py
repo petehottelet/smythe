@@ -59,6 +59,13 @@ class ProviderRequestRejectedError(PicklableError, RuntimeError):
         return status_failure_class(self.status_code) or PROVIDER_REJECTED
 
 
+class _DrainRefused(Exception):
+    """A call the run's drain kept from being reserved or sent; nothing was spent.
+
+    Its node returns to pending, as a cancelled node does, so a resume makes the call.
+    """
+
+
 class WorkflowQuoteError(ResponseQuoteError, WorkflowError):
     """A managed quote failed; resume the same logical call explicitly.
 
@@ -119,6 +126,9 @@ class WorkflowProviderContext:
         self._pool_lock = asyncio.Lock()
         self._call_locks = {}
         self._failed = False
+        # Whether the run drains after a failure, as its runtime reports it.
+        # Only the calls already sent may then settle (see _check_dispatch).
+        self.draining = lambda: False
 
     @property
     def lease(self) -> LeaseToken:
@@ -153,6 +163,17 @@ class WorkflowProviderContext:
             from smythe.workflow_store import WorkflowStateError
 
             raise WorkflowStateError("This provider context stopped after a journal persistence failure")
+
+    def _check_dispatch(self, reserved=None) -> None:
+        """Refuse a request not yet sent while the run drains, releasing a *reserved* call ID.
+
+        A drain waits only for the calls already sent, so it never adds
+        unknown exposure that an immediate cancellation would not.
+        """
+        if self.draining():
+            if reserved is not None:
+                self.store.release_before_dispatch(self.lease, reserved, "run_draining")
+            raise _DrainRefused("The run is draining after a failure; the call was not sent")
 
     def for_call(self, provider_id: str, key: CallKey) -> JournaledProvider:
         from smythe.workflow_store import CallKey
@@ -276,6 +297,7 @@ class JournaledProvider(Provider):
                 receipt=record.get("receipt"),
             ), record, replayed=True)
 
+        context._check_dispatch()
         if record["quote_id"] is None:
             if descriptor["kind"] == "offline":
                 evidence = RawResponseEnvelope(prepared, _json_dump({
@@ -295,6 +317,9 @@ class JournaledProvider(Provider):
         # Configuration/SDK/session failures are still pre-dispatch failures.
         # Do not claim a one-shot attempt until its transport is ready.
         backend = await context._backend(self.provider_id)
+        # A drain that began during the count sends nothing; past this check
+        # the call is reserved, claimed and sent without yielding.
+        context._check_dispatch()
         store.reserve_call(context.lease, call_id, record["quote_id"])
         permit = store.claim_dispatch(context.lease, call_id, prepared.request_sha256)
         try:

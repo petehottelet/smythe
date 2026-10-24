@@ -196,7 +196,12 @@ from the journal's copy:
   [eligibility](workflow-accounting.md#published-documents) then follow the
   new decision. A decision binds the keys of the tombstones the run held
   when it was made, so one made before the removal never counts after it: a
-  re-evaluation stopped before the removal is decided again, not finished.
+  re-evaluation stopped before the removal is decided again, not finished;
+- a [lineage](lineage.md) run whose record names the removed text is
+  [restricted](lineage.md#a-restricted-run) instead: no later decision
+  delivers its output, and `reevaluate` refuses it.
+  [`restrict_source`](lineage.md#restrict-a-source) removes a source's text
+  from every completed lineage run that used it at once.
 
 This is a tombstone, not an erasure: the journal's earlier records keep what
 they hold, including saved requests, read responses, snapshots and outputs,

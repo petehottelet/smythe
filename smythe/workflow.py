@@ -15,6 +15,7 @@ from pathlib import Path
 from types import MappingProxyType
 from uuid import uuid4
 
+from smythe._failures import SECURITY_STOP, RunControl, SecurityStop
 from smythe._money import FLOOR, NANOUSD, to_units
 from smythe.acceptance import (
     AcceptanceDecision, AcceptanceMode, AcceptancePolicy, AcceptanceSource, DeliveryAcceptance,
@@ -31,18 +32,34 @@ from smythe.context import (
     sources_key, sources_sha256, text_sha256 as output_sha256,
 )
 from smythe.evidence import (
-    SOURCE_EVIDENCE_OPERATION, SOURCE_TOMBSTONE_OPERATION, SourceRecord, _removed_sources,
-    _tombstone_operations, source_evidence_inputs, source_evidence_key, source_evidence_result,
-    source_tombstone_key,
+    SOURCE_EVIDENCE_OPERATION, SOURCE_TOMBSTONE_OPERATION, SourceRecord, _journal_tombstone,
+    _removed_sources, _tombstone_operations, load_source_tombstones, source_evidence_inputs,
+    source_evidence_key, source_evidence_result, source_tombstone_key,
 )
-from smythe.executor_base import REJECTED_GENERATIONS_KEY, SUPPORTED_PROMPT_ASSEMBLY_VERSIONS, ExecutorBase
-from smythe.graph import ExecutionGraph, NodeStatus, Revision, snapshot_run_ref
-from smythe.lineage import LINEAGE_REUSE_KEY, snapshot_lineage_policy
+from smythe.executor_base import (
+    REJECTED_GENERATIONS_KEY, SUPPORTED_PROMPT_ASSEMBLY_VERSIONS, ExecutorBase, _exchanges_claims,
+    check_provider_support,
+)
+from smythe.graph import (
+    REVISION_ADDED_KEY, ExecutionGraph, Node, NodeStatus, Revision, _deliverable_ids,
+    snapshot_run_ref,
+)
+from smythe.lineage import (
+    LINEAGE_OPERATION, LINEAGE_RECORD_VERSION, LINEAGE_REUSE_KEY, ArtifactLineage, build_lineage,
+    lineage_key, load_lineage, restricted_sources, snapshot_lineage_policy,
+)
+from smythe.lineage import _REPAIR, _plain
+from smythe.lineage import _id as _lineage_id
 from smythe.registry import Registry
 from smythe.provider import ProviderResponseError
+from smythe.reuse import REASONS
+from smythe.scheduling import PROFILE_KEY, RetryPolicy, TerminationPolicy
 from smythe.task import Task, snapshot_task, task_from_dict, task_to_dict
-from smythe.tracer import Tracer
-from smythe.validation import ValidationOutcome, _json_sha256
+from smythe.tracer import (
+    REVIEW_TRIGGER, REVISION_LOG_LIMIT, Tracer, revision_context, revision_log_entry,
+    revision_record,
+)
+from smythe.validation import ValidationOutcome, ValidatorIdentity, _json_sha256
 from smythe.validators import SourceEvidenceValidator
 from smythe.verifier import (
     ADVISORY_VERDICT_KEY, TOKEN_VERIFIER_IDENTITY, TokenVerifier, Verdict, Verifier,
@@ -50,8 +67,9 @@ from smythe.verifier import (
 )
 from smythe.workflow_artifact import (
     PUBLICATION_OPERATION, MarkdownRenderer, PublishedArtifact, artifact_problems, claim_directory,
-    current_artifact, owner_bytes, publication_key, publications, publish_bytes, read_publication,
-    read_published, render_document, renderer_settings,
+    current_artifact, latest_publication, owner_bytes, publication_key, publications,
+    publish_bytes, publish_generation, read_publication, read_published, render_document,
+    renderer_settings,
 )
 from smythe.workflow_binding import (
     CallScope, ComponentBinding, LocalOnly, WorkflowBindingError, bind_component,
@@ -106,7 +124,22 @@ MAX_NODE_ID_CHARS = 256
 # 1, which context_sources selects, records each call's context snapshot and
 # renders its prompt from it, with sources and dependency outputs marked as
 # untrusted data.
-RECIPE_BEHAVIOR_FIELDS = MappingProxyType({"prompt_assembly": (1, 1), "context_assembly": (0, 0)})
+#
+# retry_policy is the run's RetryPolicy as _retry_record gives it, or None,
+# which recipes without the field mean: node failure policies retry every
+# failure that is not terminal and resume refills each node's retries. Under a
+# policy, CallKey.attempt continues from the attempts the journal shows a
+# node's generation used (WorkflowRuntime._attempts_used), so a run keeps the
+# policy it started with.
+#
+# termination is the run's TerminationPolicy as _termination_record gives it,
+# or None, which recipes without the field mean: a failure that stops the run
+# cancels the calls in flight at once. Under a policy the executor first
+# drains them until the deadline, so a sibling answered in time keeps its
+# known charge instead of becoming unknown exposure.
+RECIPE_BEHAVIOR_FIELDS = MappingProxyType({"prompt_assembly": (1, 1), "context_assembly": (0, 0),
+                                           "retry_policy": (None, None),
+                                           "termination": (None, None)})
 # The values this release supports for a behavior-version field. A configured
 # value outside them is refused, and so is a saved recipe that records one,
 # for example a recipe a newer release wrote.
@@ -116,7 +149,16 @@ _BEHAVIOR_VERSIONS = MappingProxyType({"prompt_assembly": SUPPORTED_PROMPT_ASSEM
 # run's sources starts every node's next generation without it.
 _GENERATION_KEYS = ("artifacts", "artifacts_discarded", "verification_receipt",
                     "verification_target_generation", ADVISORY_VERDICT_KEY, "regeneration_intent",
-                    "workflow_supervision", CONTEXT_SNAPSHOT_KEY)
+                    "workflow_supervision", CONTEXT_SNAPSHOT_KEY, LINEAGE_REUSE_KEY)
+# Node metadata recording execution or accounting history, which a new graph
+# cannot carry and a successor's graph starts without.
+_HISTORY_KEYS = ("execution_generation", "regenerations_used", "verification_receipt",
+                 "regeneration_intent", "workflow_supervision", "native_receipts", "response_error",
+                 "accounting_invalid", "accounting_error", "workflow_accounting_invalid", "cost_usd",
+                 "cost_usd_unknown", "cost_usd_is_estimate", ADVISORY_VERDICT_KEY,
+                 REJECTED_GENERATIONS_KEY, CONTEXT_SNAPSHOT_KEY, LINEAGE_REUSE_KEY)
+# The journal operation kind, and key prefix, of a result a successor run reuses.
+_REUSE = "reuse"
 _PROVIDER_FIELDS = frozenset({"kind", "adapter_version", "decoder_version", "endpoint_scope",
                               "price_version", "supported_models", "config"})
 
@@ -162,9 +204,43 @@ def _snapshot_behavior_settings(settings):
 
 
 def _supported_behavior(name, value):
+    if name == "retry_policy":
+        if value is None:
+            return True
+        try:
+            policy = RetryPolicy.from_dict(value)
+        except ValueError:  # Including a field a newer release records.
+            return False
+        # The journal keeps a sent call's exposure itself, never the executor.
+        return (not policy.retain_uncertain_dispatch
+                and _canonical(_retry_record(policy)) == _canonical(value))
+    if name == "termination":
+        if value is None:
+            return True
+        try:
+            policy = TerminationPolicy(**value)
+        except (TypeError, ValueError):  # Including a field a newer release records.
+            return False
+        return _canonical(_termination_record(policy)) == _canonical(value)
     versions = _BEHAVIOR_VERSIONS.get(name)
     # Versions are integers; a bool or float equal to one is not a version.
     return versions is None or (type(value) is int and value in versions)
+
+
+def _retry_record(policy):
+    """The recipe's record of a durable run's RetryPolicy.
+
+    ``persist_attempts`` is left out: the journal records every attempt of a
+    durable run, with or without it.
+    """
+    record = policy.to_dict()
+    del record["persist_attempts"]
+    return record
+
+
+def _termination_record(policy):
+    """The recipe's record of a durable run's TerminationPolicy."""
+    return {"drain_timeout_s": policy.drain_timeout_s}
 
 
 def _snapshot_read_tools(read_tools):
@@ -182,6 +258,26 @@ def _snapshot_read_tools(read_tools):
             raise WorkflowBindingError(f"read_tools declares {profile.name!r} more than once")
         profiles[profile.name] = profile
     return MappingProxyType(profiles)
+
+
+def _check_lineage_id(value, what):
+    """Refuse a *what* id that a lineage record could not hold, by the record's own rule.
+
+    That rule is stricter than the journal's: a node id that is only
+    whitespace, or holds DEL, keys the node's calls but cannot name it in a
+    record, so the run would make its calls and then fail at completion.
+    """
+    try:
+        _lineage_id(value, f"a lineage {what.lower()} id")
+    except ValueError as error:
+        raise WorkflowBindingError(f"{what} id {value!r} cannot be recorded: {error}") from error
+
+
+def _check_lineage_sources(lineage, sources):
+    """Refuse, under a lineage policy, sources whose ids its record could not hold."""
+    if lineage is not None:
+        for source in sources or ():
+            _check_lineage_id(source.source_id, "Source")
 
 
 def _hash(value):
@@ -281,7 +377,8 @@ def _synthesis_key(graph, *, scoped):
 
 
 def _decision_inputs(synthesis_key, policy_sha256, task_digest, output_sha256, strategy,
-                     sources, used_fallback, sequence=0, tombstones=(), operator=None):
+                     sources, used_fallback, sequence=0, tombstones=(), operator=None,
+                     publication=None, repair=None):
     """Everything a decision binds; its hash keys the acceptance operation.
 
     A re-evaluation's decision also binds its *sequence*, so deciding the
@@ -290,7 +387,10 @@ def _decision_inputs(synthesis_key, policy_sha256, task_digest, output_sha256, s
     (*tombstones*, see :func:`_tombstone_keys`): the removals it was made
     under. A decision made before a removal therefore never matches one made
     after it. An operator's decision binds *operator* (see
-    :func:`_operator_inputs`).
+    :func:`_operator_inputs`). A decision on a lineage run's republished
+    document binds that *publication*'s sequence, so it is never one made
+    for another publication of the same bytes, and a decision a repair plan
+    asked for binds its *repair* (see :func:`_repair_record`).
     """
     inputs = {
         "synthesis": synthesis_key, "output_sha256": output_sha256,
@@ -304,7 +404,45 @@ def _decision_inputs(synthesis_key, policy_sha256, task_digest, output_sha256, s
         inputs["tombstones"] = list(tombstones)
     if operator is not None:
         inputs["operator"] = operator
+    if publication is not None:
+        inputs["publication"] = publication
+    if repair is not None:
+        inputs["repair"] = repair
     return inputs
+
+
+def _repair_record(plan_sha256, reason):
+    """What a repair binds: ``{"plan_sha256", "reason"}``, or None when neither is given.
+
+    Raises ``WorkflowBindingError`` unless both are given, a SHA-256 and 1-256
+    characters of text without control characters, or neither is.
+    """
+    if plan_sha256 is None and reason is None:
+        return None
+    repair = {"plan_sha256": plan_sha256, "reason": reason}
+    try:
+        _REPAIR(repair, "repair")
+    except ValueError as error:
+        raise WorkflowBindingError(str(error)) from error
+    return repair
+
+
+def _binds_its_records(store, run_id, inputs, record):
+    """Whether a decision's *inputs* bind a valid repair and an applied publication of *record*'s bytes.
+
+    Only a decision on a republished document binds a publication; others pass.
+    """
+    publication = inputs.get("publication")
+    try:
+        _REPAIR(inputs.get("repair"), "repair")
+        if publication is None:
+            return True
+        operation = (store.load_operation(run_id, publication_key(publication))
+                     if type(publication) is int and publication > 0 else None)
+        return (operation is not None and operation["state"] == "applied"
+                and read_publication(operation, publication).sha256 == record.output_sha256)
+    except (ValueError, WorkflowStateError):
+        return False
 
 
 def _tombstone_keys(store, run_id):
@@ -376,6 +514,86 @@ def current_decision(store, run_id):
     return history[-1] if history else None
 
 
+def revision_log(store, run_id):
+    """A durable run's supervisor decisions, oldest first, as ordinary checkpoints log them.
+
+    The journal keeps no log: each entry (see
+    :func:`smythe.tracer.revision_log_entry`) is derived when read from a
+    ``supervision`` operation a checkpoint applied, which holds the graph the
+    supervisor reviewed, the revisions it had left and its proposal. A
+    decision was applied when the next review, or else the run's checkpoint,
+    has one revision fewer left, and refused when it has as many; the journal
+    keeps no refusal's reason, so its ``detail`` is None. A review that
+    proposed no change, None or an empty revision, is not listed, and one
+    whose supervisor raised is listed as refused. At most
+    ``REVISION_LOG_LIMIT`` entries, the latest, are returned. Only reads are
+    made, so a store opened read-only will do. An evidence-triggered
+    supervisor's ``trigger`` is read again, from the reviewed graph, with the
+    triggers the run's recipe records.
+    """
+    operations = [operation for operation in store.list_operations(run_id, "supervision")
+                  if operation["applied_revision"] is not None]
+    saved = store.get_checkpoint(run_id)
+    used = None if saved is None else saved["checkpoint"].get("revisions_used")
+    config = store.load_run(run_id)["config"]
+    allowed = config.get("max_revisions")
+    triggers = _recipe_triggers(config)
+    remaining = [operation["inputs"].get("revisions_remaining") for operation in operations]
+    remaining.append(allowed - used if type(allowed) is int and type(used) is int else None)
+    entries = []
+    for index, operation in enumerate(operations):
+        inputs, result = operation["inputs"], operation["result"]
+        proposal, error = result.get("revision"), result.get("local_error_type")
+        if error is None and (proposal is None or not (
+                proposal["add_nodes"] or proposal["drop_node_ids"] or proposal["rewire"])):
+            # Like Revision.is_empty: the executor neither applies nor refuses it.
+            continue
+        before, after = remaining[index], remaining[index + 1]
+        applied = (before - after == 1 if type(before) is int and type(after) is int
+                   and before - after in (0, 1) else None)
+        graph = graph_from_dict(inputs["graph"])
+        delivered = _deliverable_ids(graph.nodes)
+        reviewed = next((item for item in graph.nodes if item.id == inputs["node_id"]), None)
+        fired = triggers.fired(graph, reviewed) if triggers and reviewed is not None else ()
+        revision = None if proposal is None else Revision(
+            add_nodes=tuple(node_from_dict(item) for item in proposal["add_nodes"]),
+            drop_node_ids=tuple(proposal["drop_node_ids"]),
+            rewire={key: tuple(value) for key, value in proposal["rewire"].items()},
+        )
+        added = []
+        if applied and revision is not None:
+            # The change apply_revision made to the graph the supervisor reviewed.
+            added = [item.id for item in revision.add_nodes]
+            for item in revision.add_nodes:
+                item.metadata[REVISION_ADDED_KEY] = True
+            graph.nodes = [item for item in graph.nodes if item.id not in revision.drop_node_ids]
+            graph.nodes += revision.add_nodes
+            for item in graph.nodes:
+                item.depends_on = list(revision.rewire.get(item.id, item.depends_on))
+        context = revision_context(graph, revisions_remaining_after=after,
+                                   delivered_before=delivered, added=added,
+                                   trigger=",".join(item.name for item in fired) or REVIEW_TRIGGER)
+        record = revision_record(Node(label="", id=str(inputs["node_id"])), revision, context)
+        entries.append(revision_log_entry(
+            record, applied=applied, reason=None if proposal is None else proposal.get("reason"),
+            detail=None if error is None else f"supervisor raised {error}",
+        ))
+    return entries[-REVISION_LOG_LIMIT:]
+
+
+def _recipe_triggers(config):
+    """The evidence triggers a run's recipe records for its supervisor, or None."""
+    from smythe.supervisor import ReviewTriggers
+
+    described = (config.get("components") or {}).get("supervisor") or {}
+    if described.get("type") != "evidence_triggered_supervisor":
+        return None
+    try:
+        return ReviewTriggers.from_dict(described.get("triggers"))
+    except (TypeError, ValueError):  # Informational: an unreadable record names no trigger.
+        return None
+
+
 def _reevaluation_policies(store, run_id):
     """The policies a durable run's re-evaluations decided under."""
     return {decision["record"].policy_sha256 for decision in decision_history(store, run_id)
@@ -405,28 +623,51 @@ def _held_record(record, output, problems, task_digest):
     )
 
 
+def _restricted(record):
+    """The reason a tombstone that restricts a lineage run gives."""
+    return (f"source {record.source_id!r} that the run's lineage records was withdrawn "
+            f"({record.tombstone}); the output derived from it is restricted")
+
+
+def _restriction_problems(store, run_id):
+    """Why a lineage run's derived output is restricted, one reason each; empty when it is not.
+
+    Each tombstone that withdraws a source text the run's lineage record
+    names (:func:`~smythe.lineage.restricted_sources`) restricts the run
+    whatever decision follows it, so completed resume, external actions,
+    reuse, re-evaluation and republication all refuse its output. Only
+    reads are made.
+    """
+    return [_restricted(record) for record in restricted_sources(store, run_id)]
+
+
 def _removal_problems(store, run_id, considered):
     """The sources a completed run delivered from that were removed after its decision.
 
     *considered* holds the tombstone keys the decision binds (see
     :func:`_decision_inputs`), empty without a decision. Any other tombstone
-    came after the decision, whichever checkpoint applied either. One reason
-    each; only reads are made.
+    came after the decision, whichever checkpoint applied either. A
+    tombstone that restricts a lineage run (:func:`_restriction_problems`)
+    is a problem whatever decision followed it. One reason each; only reads
+    are made.
     """
+    restricted = restricted_sources(store, run_id)
+    problems = [_restricted(record) for record in restricted]
     saved = store.get_checkpoint(run_id)
     binding = None if saved is None else saved["checkpoint"].get("context_sources")
     if not isinstance(binding, dict) or type(binding.get("revision")) is not int:
-        return []
+        return problems
     operation = store.load_operation(run_id, sources_key(binding["revision"]))
     if operation is None:
-        return []
+        return problems
     delivered = {(source.source_id, source.sha256)
                  for source in sources_from_operation(operation, binding["revision"])}
-    return [f"source {record.source_id!r} was removed from the run after this decision "
-            f"({record.tombstone}); re-evaluate the run"
-            for record, _ in _tombstone_operations(store, run_id)
-            if (record.source_id, record.sha256) in delivered
-            and source_tombstone_key(record.source_id, record.sha256) not in considered]
+    delivered -= {(record.source_id, record.sha256) for record in restricted}
+    return problems + [f"source {record.source_id!r} was removed from the run after this decision "
+                       f"({record.tombstone}); re-evaluate the run"
+                       for record, _ in _tombstone_operations(store, run_id)
+                       if (record.source_id, record.sha256) in delivered
+                       and source_tombstone_key(record.source_id, record.sha256) not in considered]
 
 
 def _decision_problems(store, run_id, graph, output, record, *, task, policy_sha256,
@@ -439,7 +680,8 @@ def _decision_problems(store, run_id, graph, output, record, *, task, policy_sha
     (*policy_sha256*) or, for a re-evaluation, the policy it names, and under
     tombstones the journal holds. With *removed*, a source the run delivered
     from that was removed after the decision
-    (:meth:`WorkflowRuntime.remove_source`) is a problem too. An empty list
+    (:meth:`WorkflowRuntime.remove_source`), and any tombstone that restricts
+    a lineage run (:func:`_restriction_problems`), is a problem too. An empty list
     means the record holds. Only reads are made, so a store opened read-only
     will do.
     """
@@ -448,19 +690,21 @@ def _decision_problems(store, run_id, graph, output, record, *, task, policy_sha
     holds = decision is not None and decision["record"].to_dict() == record.to_dict()
     considered = []
     if holds:
-        sequence = decision["sequence"]
+        sequence, bound = decision["sequence"], decision["inputs"]
         deciding = record.policy_sha256 if sequence else policy_sha256
-        considered = decision["inputs"].get("tombstones", [])
+        considered = bound.get("tombstones", [])
         if type(considered) is not list or any(type(key) is not str for key in considered):
             considered, holds = [], False
         inputs = _decision_inputs(
             _synthesis_key(graph, scoped=True), deciding, task_sha256(task),
             record.output_sha256, record.strategy, record.sources, record.used_fallback,
             sequence=sequence, tombstones=considered, operator=_operator_inputs(record),
+            publication=bound.get("publication"), repair=bound.get("repair"),
         )
         # A decision binds each tombstone once, sorted; the journal keeps them all.
-        holds = (holds and record.policy_sha256 == deciding and decision["inputs"] == inputs
+        holds = (holds and record.policy_sha256 == deciding and bound == inputs
                  and decision["operation_key"] == _decision_key(inputs)
+                 and _binds_its_records(store, run_id, bound, record)
                  and (not considered or (considered == sorted(set(considered))
                                          and set(considered) <= set(_tombstone_keys(store, run_id)))))
     if not holds:
@@ -469,6 +713,110 @@ def _decision_problems(store, run_id, graph, output, record, *, task, policy_sha
     if removed:
         problems += _removal_problems(store, run_id, considered)
     return problems
+
+
+def _successor_graph(graph):
+    """Reset a completed run's saved *graph* in place as the graph its successor starts from.
+
+    Nodes become pending without results, history or generation metadata,
+    and the graph loses its run reference and planning records.
+    """
+    graph.run_ref = graph.planning = None
+    for node in graph.nodes:
+        node.status, node.result = NodeStatus.PENDING, None
+        for key in (*_HISTORY_KEYS, *_GENERATION_KEYS):
+            node.metadata.pop(key, None)
+
+
+def _predecessor(store, reference, scope):
+    """Read the records of the run *reference* names, which a successor in *store* reuses.
+
+    *reference* is ``{"store_id", "run_id", "lineage_sha256"}``. The run must
+    have completed with an applied lineage record in access *scope*,
+    compared first, whose digest is ``lineage_sha256``, and no security stop
+    may hold it. Returns its saved graph and registry description, the
+    record, and the ``(source_id, sha256)`` of each source removed from it.
+    """
+    run_id = reference["run_id"]
+    if store.load_run(run_id)["blocked_reason"] == SECURITY_STOP:
+        raise WorkflowStateError(
+            f"Run {run_id!r} is held by a security stop; nothing is reused from it")
+    saved = store.get_checkpoint(run_id)
+    try:
+        lineage, removed = load_lineage(store, run_id), set(_removed_sources(store, run_id))
+    except ValueError as error:
+        raise WorkflowStateError(f"Run {run_id!r} holds an invalid lineage or tombstone") from error
+    state = {} if saved is None else saved["checkpoint"]
+    if state.get("status") != "completed" or lineage is None:
+        raise WorkflowStateError(f"Run {run_id!r} has not completed with a lineage record")
+    if lineage.access_scope != scope:
+        raise WorkflowStateError(f"Run {run_id!r} has no lineage record in access scope {scope!r}")
+    if lineage.sha256 != reference["lineage_sha256"]:
+        raise WorkflowStateError(f"The lineage record of run {run_id!r} is not the one given")
+    return graph_from_dict(state["graph"]), state["registry"], lineage, removed
+
+
+def _reused(predecessor, node_id):
+    """The ``reuse`` operation result for *node_id* from :func:`_predecessor`'s records.
+
+    It holds the node's ``text``, its ``lineage`` record and the
+    ``source_evidence`` its text carries, or None. The record must declare
+    the node's inputs, the saved result must be the one it records, and no
+    source either names may have been removed. Raises ``WorkflowStateError``
+    otherwise.
+    """
+    graph, _, lineage, removed = predecessor
+    entry = next((item for item in lineage.nodes if item["id"] == node_id), None)
+    node = next((item for item in graph.nodes if item.id == node_id), None)
+    evidence = problem = None
+    if entry is None or node is None:
+        problem = "the run has no such node"
+    elif entry["coverage"] != "declared":
+        problem = "its inputs are undeclared"
+    elif (node.status is not NodeStatus.COMPLETED or not isinstance(node.result, str)
+          or node_generation(node) != entry["generation"]
+          or output_sha256(node.result) != entry["result_sha256"]):
+        problem = "its saved result is not the one its lineage records"
+    else:
+        evidence = source_evidence_result(node.result)["source_evidence"]
+        if _reused_sources(entry, evidence) & removed:
+            problem = "a source it used was removed from the run"
+    if problem:
+        raise WorkflowStateError(
+            f"Node {node_id!r} of run {lineage.run['run_id']!r} cannot be reused: {problem}")
+    return {"text": node.result, "lineage": _plain(entry), "source_evidence": evidence}
+
+
+def _reused_sources(entry, evidence):
+    """The ``(source_id, sha256)`` of each source a node's lineage *entry* or *evidence* names."""
+    return {(item["source_id"], item["sha256"])
+            for item in (*entry["inputs"]["sources"], *(evidence or {}).get("sources", ()))}
+
+
+def _reuse_digests(result):
+    """What a ``reuse`` operation's inputs bind of its *result* (see :func:`_reused`)."""
+    entry, evidence = result["lineage"], result["source_evidence"]
+    return {"generation": entry["generation"], "result_sha256": entry["result_sha256"],
+            "records": {"lineage_node": _hash(entry),
+                        "source_evidence": None if evidence is None else _hash(evidence)}}
+
+
+def _reuse_matches(node_id, inputs, result):
+    """Whether a ``reuse`` operation's *result* is node *node_id*'s, as its *inputs* bind it."""
+    try:
+        return (result["lineage"]["id"] == inputs["node_id"] == node_id
+                and isinstance(result["text"], str)
+                and output_sha256(result["text"]) == inputs["result_sha256"]
+                and _reuse_digests(result) == {key: inputs[key] for key in (
+                    "generation", "result_sha256", "records")})
+    except (KeyError, TypeError):
+        return False
+
+
+def _refuse_security_stop(store, run):
+    """Raise the ``SecurityStop`` that blocks *run*, a ``load_run`` record, if any."""
+    if run["blocked_reason"] == SECURITY_STOP:
+        raise SecurityStop(store.load_security_stop(run["run_id"])["reason_code"])
 
 
 class WorkflowBudget:
@@ -568,7 +916,31 @@ class WorkflowRuntime:
 
     ``lineage``, a :class:`~smythe.lineage.LineagePolicy`, needs a strict
     ``acceptance`` policy. The recipe records it only when it is configured,
-    and compares it exactly on every entry, like ``graph_policy``.
+    and compares it exactly on every entry, like ``graph_policy``. The run
+    then journals its :class:`~smythe.lineage.ArtifactLineage` once, after
+    its decision, and the completed checkpoint applies it with the decision.
+    Each later decision, which :meth:`reevaluate` or :meth:`republish` makes,
+    journals a record that supersedes it.
+
+    ``termination``, a :class:`~smythe.scheduling.TerminationPolicy`, has the
+    executor drain the nodes in flight when a failure stops the run. No call
+    that was not sent yet is reserved or sent: its node returns to pending. A
+    call answered before ``drain_timeout_s`` settles its known charge, and the
+    failed checkpoint consumes its node's result, so resume does not call it
+    again. A call still unanswered at the deadline is cancelled and keeps its
+    unknown exposure, as without a policy. The recipe records the policy only
+    when one is configured, and a run keeps it: resume uses the saved one and
+    refuses a different one.
+
+    ``run_control``, a :class:`~smythe._failures.RunControl`, is not part of
+    the recipe. Once it is revoked, the run's executor admits no node and
+    sends no call, and synthesis is not called. A run that a security stop
+    ends, from the control or a tool runtime, is blocked in the journal with
+    ``security_stop`` (:meth:`SQLiteWorkflowStore.security_stop
+    <smythe.workflow_store.SQLiteWorkflowStore.security_stop>`) before its
+    failed checkpoint is saved. Resuming, executing, re-evaluating or
+    republishing a run so blocked raises its ``SecurityStop`` before any
+    lease is taken.
     """
 
     def __init__(self, *, store, model, max_budget_usd, provider, architect, registry,
@@ -577,17 +949,30 @@ class WorkflowRuntime:
                  max_concurrency, graph_policy=None, behavior_settings=None, acceptance=None,
                  read_tools=(), context_sources=None, renderer=None, artifact_dir=None,
                  retry_policy=None, lineage=None,
-                 reserve_for_checks=False):
+                 reserve_for_checks=False, run_control=None, termination=None):
         if type(store) is not SQLiteWorkflowStore:
             raise WorkflowBindingError(
                 f"run_store must be SQLiteWorkflowStore itself, not {type(store).__name__}"
             )
         Sentinel(max_budget_usd)
         # Each unsupported argument is named, so a caller knows what to remove.
-        if retry_policy is not None:
+        if retry_policy is not None and not isinstance(retry_policy, RetryPolicy):
             raise WorkflowBindingError(
-                "retry_policy is not supported by durable text workflows, whose journal "
-                "settles rejected calls; use node failure policies and retry_backoff_s"
+                f"retry_policy must be a RetryPolicy or None, not {type(retry_policy).__name__}"
+            )
+        if retry_policy is not None and retry_policy.retain_uncertain_dispatch:
+            raise WorkflowBindingError(
+                "retry_policy with retain_uncertain_dispatch is not supported by durable text "
+                "workflows, whose journal keeps the exposure of every call it sends itself"
+            )
+        if run_control is not None and not isinstance(run_control, RunControl):
+            raise WorkflowBindingError(
+                f"run_control must be a RunControl or None, not {type(run_control).__name__}"
+            )
+        self.run_control = run_control
+        if termination is not None and not isinstance(termination, TerminationPolicy):
+            raise WorkflowBindingError(
+                f"termination must be a TerminationPolicy or None, not {type(termination).__name__}"
             )
         if reserve_for_checks:
             raise WorkflowBindingError(
@@ -669,7 +1054,8 @@ class WorkflowRuntime:
         self.max_revisions, self.verifier = max_revisions, verifier
         self.gate_validator = verifier if validator else None
         self.acceptance = acceptance
-        self.undecided = self.saved_acceptance = None
+        # decision_key is the acceptance operation this session's run decided under.
+        self.undecided = self.saved_acceptance = self.decision_key = None
         # The strict policy the bound run's recipe records, by digest.
         self.run_policy_sha256 = None
         self.max_concurrency = max_concurrency
@@ -694,12 +1080,23 @@ class WorkflowRuntime:
             settings = MappingProxyType({**settings, "context_assembly": version})
         elif settings.get("context_assembly", 0):
             context_sources = ()
+        _check_lineage_sources(lineage, context_sources)
+        if retry_policy is not None:
+            settings = MappingProxyType({**settings, "retry_policy": _retry_record(retry_policy)})
+        if termination is not None:
+            settings = MappingProxyType({**settings,
+                                         "termination": _termination_record(termination)})
         self._behavior_settings = settings
         # The sources a run that has recorded none records as revision 0;
         # None when this runtime configures no context assembly.
         self._supplied_sources = context_sources
         self.behavior = {}
         self.recipe = self._describe()
+        if settings.get("retry_policy") is not None:
+            # Refused before a run exists; each session checks its bound providers too.
+            self._check_retry_owner([self.provider, *(
+                provider for component in self.sources.values() if component is not None
+                for provider in component.workflow_providers())])
         self.checkpoint_version = _checkpoint_version(self.recipe)
         self.graph = None
         self.executor = None
@@ -821,6 +1218,15 @@ class WorkflowRuntime:
         return {"version": 1, "store_id": self.store.store_id, "run_id": self.run_id,
                 "recipe_sha256": self.run["config_sha256"]}
 
+    def _check_retry_owner(self, providers):
+        """Under a retry policy, refuse a provider whose SDK may send a call again unseen."""
+        for provider in providers:
+            try:
+                check_provider_support(provider, self.model, node_id=None, check_model=False,
+                                       retry_owner=True)
+            except ValueError as error:
+                raise WorkflowBindingError(str(error)) from error
+
     def _bind(self):
         # Planners run _check_plan on each candidate inside their retry loops.
         binding = ComponentBinding(self.run_id, "workflow", "execution", self._component_call,
@@ -901,6 +1307,33 @@ class WorkflowRuntime:
         self._worker_keys.setdefault((node.id, node_generation(node)), set()).add(result.key)
         return result
 
+    def _attempts_used(self, node):
+        """The attempts *node*'s current generation used, as its journal shows: its rejected calls.
+
+        A rejection counts on any invocation, including one that a resume
+        moved past to a new invocation, so resume continues a retry policy's
+        cap instead of refilling it. A call that is not settled, or whose
+        result was accepted, is not counted: entering its attempt again sends,
+        refuses or replays it as before. When the latest provider call is a
+        reply rejected with its known charge, such as a refusal, its attempt
+        is entered again so the journal replays the reply without a call: a
+        reply the policy does not retry stops the node again, and one it
+        retries is followed by the next attempt. An attempt that ended before
+        its request leaves no rejected call, so the count is never below one
+        past the latest rejected attempt: an attempt whose call was rejected
+        is never sent again.
+        """
+        calls = self.store.node_generation_calls(self.run_id, node.id, node_generation(node))
+        replies = [call for call in calls if call["key"]["phase"] in ("execution", "verification")]
+        if replies:
+            latest = max(replies, key=lambda call: (
+                call["key"]["attempt"], call["key"]["invocation"], call["key"]["turn"]))
+            if latest["result_state"] == "rejected" and not _is_http_rejection(
+                    self.store.lookup_call(self.run_id, CallKey(**latest["key"]))):
+                return latest["key"]["attempt"]
+        rejected = [call for call in calls if call["result_state"] == "rejected"]
+        return max([len(rejected)] + [call["key"]["attempt"] + 1 for call in rejected])
+
     def _read_call(self, node, attempt):
         """Bind a read step's attempt to its journal call, in the ``tool`` phase.
 
@@ -948,6 +1381,9 @@ class WorkflowRuntime:
                 task_sha256=task_sha256(task_from_dict(run["task"])),
             )
         self._bind()
+        if self.behavior.get("retry_policy") is not None:
+            # A resumed run keeps its saved policy, configured here or not.
+            self._check_retry_owner(self.providers.values())
         lease = self.store.acquire_lease(self.run_id, uuid4().hex, ttl_s=60)
         self.context = WorkflowProviderContext(self.store, lease, self.providers)
         self.budget = WorkflowBudget(self.store, self.run_id, self.max_budget_usd)
@@ -999,6 +1435,9 @@ class WorkflowRuntime:
         graph.validate()
         json_snapshot(graph_to_dict(graph))
         self._validate_graph_policy(graph)
+        if fresh and isinstance(graph.planning, dict) and "repair" in graph.planning:
+            # Only a successor run records its predecessor (see _run_successor).
+            raise WorkflowBindingError("A new workflow cannot carry a repair record")
         for node in graph.nodes:
             # The journal keys a node's calls by "node/<id>" and its supervision
             # decisions by "supervision/<id>/<generation>", each at most 512
@@ -1015,16 +1454,19 @@ class WorkflowRuntime:
                     f"Node id {shown!r} cannot key the workflow journal: node ids must be "
                     f"at most {MAX_NODE_ID_CHARS} characters, with no control characters"
                 ) from error
+            if self.lineage is not None:
+                # The completed run's record names each node by its id.
+                _check_lineage_id(node.id, "Node")
             if fresh and (node.status is not NodeStatus.PENDING or node.result is not None):
                 raise WorkflowBindingError("A new workflow requires pending nodes without prior results")
-            if fresh and any(key in node.metadata for key in (
-                "execution_generation", "regenerations_used", "verification_receipt",
-                "regeneration_intent", "workflow_supervision", "native_receipts", "response_error",
-                "accounting_invalid", "accounting_error", "workflow_accounting_invalid", "cost_usd",
-                "cost_usd_unknown", "cost_usd_is_estimate", ADVISORY_VERDICT_KEY,
-                REJECTED_GENERATIONS_KEY, CONTEXT_SNAPSHOT_KEY, LINEAGE_REUSE_KEY,
-            )):
+            if fresh and any(key in node.metadata for key in _HISTORY_KEYS):
                 raise WorkflowBindingError("A new workflow cannot inherit execution or accounting history")
+            # Claim exchange is a developer setting: a generated plan's metadata
+            # holds only a role (smythe.loader), so no plan can set it.
+            try:
+                _exchanges_claims(node)
+            except ValueError as error:
+                raise WorkflowBindingError(str(error)) from error
             if self._context_version and graph.task is None and "task_context" in node.metadata:
                 # Snapshots carry a run's Task, never text a graph supplies in its place.
                 raise WorkflowBindingError(
@@ -1047,6 +1489,12 @@ class WorkflowRuntime:
                 )
             if READ_STEP_KEY in node.metadata:
                 self._check_read_step(node)
+            if PROFILE_KEY in node.metadata:
+                # A journaled call binds the run's provider; profiles route ordinary runs only.
+                raise WorkflowBindingError(
+                    f"Node {node.id!r} names model profile {node.metadata[PROFILE_KEY]!r}, but "
+                    "durable text workflows call only the run's provider; run it without run_store"
+                )
             validate_workflow_model(self.execution_provider, node.metadata.get("model", self.model))
             if node.agent_id is not None and self.registry.get(node.agent_id) is None and (
                 registry is None or registry.get(node.agent_id) is None
@@ -1124,9 +1572,10 @@ class WorkflowRuntime:
         self._validate_graph_policy(self.graph)
         self.registry.workflow_description()
         generations = {node.id: node_generation(node) for node in self.graph.nodes}
-        # A call claims its dispatch right after its reservation, without
-        # yielding, so a reserved call seen here was left by a killed process
-        # or a failed claim. Nodes call only at their current generation, so
+        # A model call claims its dispatch right after its reservation,
+        # without yielding, so a reserved call seen here was left by a killed
+        # process, a failed claim, or a read step cancelled while it resolved
+        # its destination. Nodes call only at their current generation, so
         # one of a superseded generation, including one that a regeneration
         # applied on resume superseded, is never sent: release it. A completed
         # run sends nothing more, so it releases every reservation left.
@@ -1351,6 +1800,11 @@ class WorkflowRuntime:
                 # The run writes only this key; the architect may have set others.
                 graph.planning = {**(graph.planning or {}), "routing": routing.to_dict()}
             self._prepare_graph(graph, fresh=True)
+            if routing is not None:
+                # Agents are assigned now, so the advisory lint can compare them.
+                from smythe.planner import _record_coordination
+
+                _record_coordination(graph, self.registry)
             result = {"graph": graph_to_dict(graph), "registry": self.registry.workflow_description()}
             if routing is not None:
                 result["routing"] = routing.to_dict()
@@ -1398,6 +1852,7 @@ class WorkflowRuntime:
         if reference["store_id"] != self.store.store_id:
             raise WorkflowConflictError("Graph belongs to a different workflow store")
         run = self.store.load_run(reference["run_id"])
+        _refuse_security_stop(self.store, run)
         if (reference["recipe_sha256"] != run["config_sha256"]
                 or _canonical(task_to_dict(value.task)) != _canonical(run["task"])):
             raise WorkflowConflictError("Graph Task or recipe differs from its durable run")
@@ -1450,7 +1905,9 @@ class WorkflowRuntime:
                                   self.undecided.task_sha256)
 
     async def resume(self, run_id, *, max_concurrency):
-        async with self._session(self.store.load_run(run_id)):
+        run = self.store.load_run(run_id)
+        _refuse_security_stop(self.store, run)
+        async with self._session(run):
             state = self._restore()
             if state is None:
                 task = task_from_dict(self.run["task"])
@@ -1460,6 +1917,120 @@ class WorkflowRuntime:
                 await self._plan(task)
             return await self._execute(max_concurrency, state=state)
 
+    async def _run_successor(self, predecessor_id, *, lineage_sha256, reuse, plan_sha256, reason,
+                             max_concurrency):
+        """Run a successor of the completed lineage run *predecessor_id*, reusing some results.
+
+        The successor is a new run of the predecessor's task and saved graph
+        (:func:`_successor_graph`). Each node in *reuse*, a mapping of node id
+        to the reason codes (:data:`smythe.reuse.REASONS`) of its decision,
+        completes with the predecessor's result (:meth:`_seed_reuse`); every
+        other node runs again. The graph's only planning record, ``repair``,
+        names the predecessor (with *lineage_sha256*), *plan_sha256* and
+        *reason*, as the successor's lineage will.
+
+        Everything is checked before the run is created, so a refusal leaves
+        no run that a later resume would plan from its task: a lineage policy
+        (with reuse on to reuse anything) and no supervisor; a completed
+        predecessor in this store and access scope whose lineage record has
+        *lineage_sha256* (:func:`_predecessor`); reused nodes that
+        :func:`_reused` allows, that depend only on reused nodes, and that are
+        no gate or node a gate judges or depends on; context sources that hold
+        no text removed from the predecessor; and a graph this runtime's
+        configuration can run (:meth:`_check_successor_graph`). The successor
+        holds the predecessor's source tombstones from its first checkpoint,
+        so it never derives from withdrawn text again, even one it reads anew.
+        Raises ``WorkflowBindingError`` for a request that breaks these rules,
+        ``WorkflowStateError`` for predecessor records that refuse it, and
+        ``ValueError``, as for any graph, for a node model the provider does
+        not support.
+        """
+        if self.lineage is None or (reuse and not self.lineage.reuse):
+            raise WorkflowBindingError("Reusing results needs a lineage policy with reuse on")
+        if self.sources["supervisor"] is not None:
+            raise WorkflowBindingError("A successor run cannot have a supervisor review reused results")
+        if not isinstance(reuse, Mapping) or not all(
+                type(node_id) is str and type(codes) in (list, tuple)
+                and all(type(code) is str and code in REASONS for code in codes)
+                for node_id, codes in reuse.items()):
+            raise WorkflowBindingError("reuse must map node ids to lists of reason codes")
+        reference = {"store_id": self.store.store_id, "run_id": predecessor_id,
+                     "lineage_sha256": lineage_sha256}
+        try:
+            _REPAIR({"plan_sha256": plan_sha256, "reason": reason}, "repair")
+        except ValueError as error:
+            raise WorkflowBindingError(str(error)) from error
+        predecessor = _predecessor(self.store, reference, self.lineage.access_scope)
+        graph, registry = predecessor[0], predecessor[1]
+        unknown = sorted(reuse.keys() - {node.id for node in graph.nodes})
+        if unknown:
+            raise WorkflowBindingError(f"Run {predecessor_id!r} has no node {unknown[0]!r} to reuse")
+        gated = {item for node in graph.nodes if node.verifies is not None
+                 for item in (node.id, node.verifies, *node.depends_on)}
+        for node in graph.nodes:
+            if node.id in reuse and (node.id in gated or not reuse.keys() >= set(node.depends_on)):
+                raise WorkflowBindingError(
+                    f"Node {node.id!r} cannot be reused: gates, the nodes they judge or depend "
+                    "on, and nodes depending on a node that runs again always run again"
+                )
+        results = {node_id: _reused(predecessor, node_id) for node_id in reuse}
+        inherited = load_source_tombstones(self.store, predecessor_id)
+        for source in self._supplied_sources or ():
+            if (source.source_id, source.sha256) in predecessor[3]:
+                raise WorkflowStateError(
+                    f"Source {source.source_id!r} was removed from run {predecessor_id!r}; a "
+                    "successor is never given its text")
+        _successor_graph(graph)
+        self._check_obligations(graph)
+        self._check_successor_graph(graph, registry)
+        async with self._session(self._new_run(graph.task)):
+            # Agents a plan registered are the predecessor's; configured ones are current.
+            for agent in Registry.from_workflow_description(registry).list_agents():
+                if self.registry.get(agent.id) is None:
+                    self.registry.register(agent)
+            self._prepare_graph(graph, fresh=True)
+            # Text withdrawn from the predecessor is withdrawn from its successor too.
+            for record in inherited:
+                self._pending_operations.add(
+                    _journal_tombstone(self.store, self.context.lease, record)["operation_id"])
+            graph.planning = {"repair": {"predecessor": reference, "plan_sha256": plan_sha256,
+                                         "reason": reason}}
+            for node in graph.nodes:
+                if node.id in results:
+                    node.metadata[LINEAGE_REUSE_KEY] = {
+                        "version": 1, "predecessor": reference, "node_id": node.id,
+                        **_reuse_digests(results[node.id]), "reasons": sorted(set(reuse[node.id])),
+                        "plan_sha256": plan_sha256,
+                    }
+            self._save("planned")
+            return await self._execute(max_concurrency)
+
+    def _check_successor_graph(self, graph, registry):
+        """Refuse a successor's *graph* that this runtime cannot run, before the run exists.
+
+        These are :meth:`_validate_graph`'s checks of the runtime's
+        configuration, which may differ from the predecessor's: the graph
+        policy, each read step's profile and input, each node's model, each
+        node's agent, which the configured registry or the predecessor's
+        saved *registry* description holds, and task context under context
+        assembly. The graph met the others when the predecessor ran it.
+        """
+        self._validate_graph_policy(graph)
+        saved, configured = Registry.from_workflow_description(registry), self.sources["registry"]
+        for node in graph.nodes:
+            if (self.recipe.get("context_assembly", 0) and graph.task is None
+                    and "task_context" in node.metadata):
+                raise WorkflowBindingError(
+                    f"Node {node.id!r} carries task_context metadata without a Task; context "
+                    "assembly renders the run's Task, so give the graph a Task instead"
+                )
+            if READ_STEP_KEY in node.metadata:
+                self._check_read_step(node)
+            validate_workflow_model(self.provider, node.metadata.get("model", self.model))
+            if node.agent_id is not None and saved.get(node.agent_id) is None and (
+                    configured is None or configured.get(node.agent_id) is None):
+                raise WorkflowBindingError(f"Node {node.id!r} names an unknown agent")
+
     async def refresh_context(self, run_id, sources):
         """Give an unfinished run new sources, to be re-evaluated when it resumes.
 
@@ -1468,7 +2039,9 @@ class WorkflowRuntime:
         at its next generation, so that resuming runs each node again with a
         new snapshot. Nothing is called now, and earlier snapshots, calls and
         charges stay in the journal. A run whose checkpoint is still
-        ``planned`` has run nothing and only adopts the revision. Sources
+        ``planned`` has run nothing and only adopts the revision, except that
+        a successor run stops reusing its predecessor's results, which were
+        bound to the sources it started with: its nodes run again too. Sources
         equal to the current ones change nothing. Returns the source revision
         the run now uses.
 
@@ -1477,6 +2050,7 @@ class WorkflowRuntime:
         accounting is unresolved.
         """
         sources = snapshot_sources(sources)
+        _check_lineage_sources(self.lineage, sources)
         async with self._session(self.store.load_run(run_id)):
             if not self._context_version:
                 raise WorkflowStateError("Workflow does not use context assembly; it has no sources")
@@ -1514,6 +2088,10 @@ class WorkflowRuntime:
                     node.status, node.result = NodeStatus.PENDING, None
                     for key in _GENERATION_KEYS:
                         node.metadata.pop(key, None)
+            for node in self.graph.nodes:
+                # A successor's reused results, whether saved yet or not, were
+                # bound to its earlier sources, so their nodes run again too.
+                node.metadata.pop(LINEAGE_REUSE_KEY, None)
             self.execution_concurrency = state.get("max_concurrency")
             self._save(status)
             return revision
@@ -1537,7 +2115,10 @@ class WorkflowRuntime:
         - a completed run's decision, made before the removal, no longer
           holds: resuming or inspecting the run gives ``indeterminate``, and
           :meth:`reevaluate` decides again, under a source evidence
-          validator that holds the tombstone rather than the text.
+          validator that holds the tombstone rather than the text;
+        - a lineage run whose record names the source is restricted instead
+          (:func:`~smythe.lineage.restricted_sources`): no decision delivers
+          its output again.
 
         Earlier records keep what they hold: the journal's requests, read
         responses, snapshots and outputs, and a published document. Removing
@@ -1594,7 +2175,7 @@ class WorkflowRuntime:
                     f"({tombstone.tombstone}); {advice}"
                 )
 
-    async def reevaluate(self, run_id, *, operator=None):
+    async def reevaluate(self, run_id, *, operator=None, plan_sha256=None, reason=None):
         """Record a new delivery decision for a completed run's saved output.
 
         This runtime's strict policy decides: its final validators run on the
@@ -1622,27 +2203,41 @@ class WorkflowRuntime:
         also bind the decision and operator. Only a current ``needs_review``
         or ``indeterminate`` decision can be resolved; any other stands.
 
-        Raises ``WorkflowBindingError`` without a strict policy or *operator*;
-        ``WorkflowStateError`` for a run whose recipe has no strict policy, an
-        unfinished run, unresolved accounting, a saved output, task, source
-        generation or record that no longer matches the journal, so changed
-        output is never accepted, a run with a renderer whose published
-        document is missing or changed (:meth:`republish` publishes it again
-        first), or a current decision an operator cannot resolve;
+        On a run with a lineage policy, whose lineage must still match its
+        journal, the new decision's lineage supersedes the run's record in the
+        same checkpoint (:meth:`_supersede_lineage`). *plan_sha256* and
+        *reason* name the repair plan that asked for a policy's decision, as a
+        validator change calls for; the decision and its lineage bind them.
+
+        Raises ``WorkflowBindingError`` without a strict policy or *operator*,
+        and for *plan_sha256* or *reason* without the other, invalid, or given
+        with *operator*; ``WorkflowStateError`` for a run whose recipe has no
+        strict policy, or no lineage policy when given a plan, an unfinished
+        run, unresolved accounting, a saved output, task, source generation,
+        record or lineage that no longer matches the journal, so changed
+        output is never accepted, a lineage run that a source tombstone
+        restricts (:func:`~smythe.lineage.restricted_sources`), a run with a
+        renderer whose published document is missing or changed
+        (:meth:`republish` publishes it again first), or a current decision an
+        operator cannot resolve;
         ``WorkflowConflictError`` for a recipe that differs in anything else;
         and whatever the operator's verifier raises, such as
         ``ApprovalRejected``, before anything is journaled.
         """
-        from smythe.swarm import _delivery_sources
-
         if self.acceptance is None and operator is None:
             raise WorkflowBindingError("reevaluate needs a strict acceptance policy")
+        repair = _repair_record(plan_sha256, reason)
+        if repair is not None and operator is not None:
+            raise WorkflowBindingError("A repair plan asks for a policy's decision, not an operator's")
         run = self.store.load_run(run_id)
+        _refuse_security_stop(self.store, run)
         if "acceptance" not in run["config"]:
             raise WorkflowStateError(
                 "Workflow ran without a strict acceptance policy, so it has no delivery decision "
                 "to re-evaluate; run the task again under one"
             )
+        if repair is not None and "lineage" not in run["config"]:
+            raise WorkflowStateError("Workflow has no lineage policy, so it records no repair plan")
         # A runtime without a policy writes the checkpoint version the recipe does.
         self.checkpoint_version = _checkpoint_version(run["config"])
         async with self._session(run, reevaluating=True):
@@ -1651,38 +2246,65 @@ class WorkflowRuntime:
                 raise WorkflowStateError(
                     "Only a completed workflow can be re-evaluated; resume it to finish it"
                 )
-            self._check_completed()
-            output, record = state["output"], self.saved_acceptance
-            if not isinstance(output, str):
-                raise WorkflowStateError("Completed workflow output is not text")
-            # A source removed after the decision is why a run is re-evaluated.
-            problems = _decision_problems(
-                self.store, self.run_id, self.graph, output, record,
-                task=task_from_dict(self.run["task"]), policy_sha256=self.run_policy_sha256,
-                removed=False,
-            )
-            sources, used_fallback = _delivery_sources(self.graph, record.strategy)
-            if ([AcceptanceSource(node.id, node_generation(node)) for node in sources]
-                    != list(record.sources) or used_fallback != record.used_fallback):
-                problems.append("the saved graph no longer delivers the sources its record bound")
-            if problems:
-                raise WorkflowStateError("Workflow cannot be re-evaluated: " + "; ".join(problems))
+            output, record = self._decided_output(state, "re-evaluated")
+            publication = None
             if self.renderer is not None:
                 # A decision covers the document only while its published file holds it.
-                damaged = artifact_problems(current_artifact(self.store, self.run_id), output)
+                current = current_artifact(self.store, self.run_id)
+                damaged = artifact_problems(current, output)
                 if damaged:
                     raise WorkflowStateError(
                         "Workflow cannot be re-evaluated: " + "; ".join(damaged)
                         + "; publish its document again with republish() first"
                     )
+                publication = current.publication
+            if self.lineage is not None and (problems := self._lineage_problems()):
+                raise WorkflowStateError("Workflow cannot be re-evaluated: " + "; ".join(problems))
             if operator is None:
-                decided = await self._decide(self._synthesis_key(), output, reevaluation=True)
+                decided = await self._decide(self._synthesis_key(), output, reevaluation=True,
+                                             repair=repair)
+                validators = self.acceptance.validator_identities
             else:
                 decided = await self._operator_decide(operator, record)
+                validators = None
+            if self.lineage is not None:
+                await self._supersede_lineage(self._synthesis_key(), publication, validators, repair)
             self.execution_concurrency = state.get("max_concurrency")
             self._save("completed", output=output, acceptance=decided)
             self.saved_acceptance = decided
             return self._result(output, decided)
+
+    def _decided_output(self, state, action):
+        """A completed run's saved output and decided record, while all the record binds holds.
+
+        The output, task and source generations must be those the record
+        binds, the record must be the journal's current decision (see
+        :func:`_decision_problems`), and the saved graph must still deliver
+        the sources it binds. A source removed after the decision is not a
+        problem: it is why a run is decided again. Raises
+        ``WorkflowStateError``, saying the run cannot be *action*, otherwise.
+        """
+        from smythe.swarm import _delivery_sources
+
+        self._check_completed()
+        output, record = state["output"], self.saved_acceptance
+        if not isinstance(output, str):
+            raise WorkflowStateError("Completed workflow output is not text")
+        problems = _decision_problems(
+            self.store, self.run_id, self.graph, output, record,
+            task=task_from_dict(self.run["task"]), policy_sha256=self.run_policy_sha256,
+            removed=False,
+        )
+        sources, used_fallback = _delivery_sources(self.graph, record.strategy)
+        if ([AcceptanceSource(node.id, node_generation(node)) for node in sources]
+                != list(record.sources) or used_fallback != record.used_fallback):
+            problems.append("the saved graph no longer delivers the sources its record bound")
+        # No new decision or publication delivers what a lineage run derived
+        # from withdrawn text.
+        problems += _restriction_problems(self.store, self.run_id)
+        if problems:
+            raise WorkflowStateError(f"Workflow cannot be {action}: " + "; ".join(problems))
+        return output, record
 
     def _check_completed(self):
         """Refuse a completed run that still holds unresolved control or accounting."""
@@ -1726,6 +2348,11 @@ class WorkflowRuntime:
             raise WorkflowBindingError("Execution concurrency exceeds the saved workflow policy")
         validate_verification_checkpoint(self.graph, version=3, completed=False)
         reset_incomplete_nodes(self.graph)
+        await self._seed_reuse()
+        saved_policy = self.behavior.get("retry_policy")
+        retry_policy = None if saved_policy is None else RetryPolicy.from_dict(saved_policy)
+        saved_termination = self.behavior.get("termination")
+        termination = None if saved_termination is None else TerminationPolicy(**saved_termination)
         self.executor = AsyncExecutor(
             provider=self.execution_provider, registry=self.registry, tracer=self.trace,
             budget=self.budget, max_concurrency=self.execution_concurrency, artifact_dir=None,
@@ -1739,7 +2366,18 @@ class WorkflowRuntime:
             prompt_assembly=self.behavior.get("prompt_assembly", 1),
             acceptance=self.acceptance, read_call_factory=self._read_call,
             context_assembler=self._context_snapshot if self._context_version else None,
+            # Under the run's policy each node starts from the attempts its journal shows.
+            retry_policy=retry_policy,
+            attempts_spent=None if retry_policy is None else self._attempts_used,
+            run_control=self.run_control,
+            # A node that settles during a drain saves through its own
+            # update, and the failed checkpoint below consumes its calls too.
+            termination=termination,
         )
+        executor = self.executor
+        # A drain waits only for the calls already sent: no other call is
+        # reserved or sent while it lasts.
+        self.context.draining = lambda: executor._draining
         self._save()
         try:
             # A crash can follow node acceptance but precede its review.
@@ -1761,26 +2399,74 @@ class WorkflowRuntime:
                 return {"output": output}
 
             key = self._synthesis_key()
+            self.executor.check_run_control()
             final = await self._operation_result(
                 key, "synthesis", {"graph": graph_to_dict(self.graph)}, synthesize,
             )
-            output = final["output"]
+            output, publication = final["output"], None
             if self.renderer is not None:
                 # The published document is the output delivered and decided.
-                output = await self._publish_output(key, output)
+                output, publication = await self._publish_output(key, output)
             await self._record_source_evidence(output)
             acceptance = None if self.acceptance is None else await self._decide(key, output)
-            # The completed checkpoint consumes the synthesis and the decision together.
+            if self.lineage is not None:
+                await self._record_lineage(key, publication)
+            # The completed checkpoint consumes the synthesis, the decision and
+            # the lineage together.
             self._save("completed", output=output, acceptance=acceptance)
         except BaseException:
+            stop = self.executor.security_stop
+            if stop is not None:
+                # Before the failed checkpoint, so the stop holds whatever follows.
+                self.store.security_stop(self.run_id, stop["reason_code"])
             self._save("failed")
             raise
-        if self.renderer is not None and acceptance is not None:
+        if acceptance is not None:
             # As on completed resume, delivery needs the published file
-            # intact, including one a lost process published before.
-            acceptance = self._held(acceptance, output, artifact_problems(
-                current_artifact(self.store, self.run_id), output))
+            # intact, including one a lost process published before, and a
+            # lineage run must hold no text withdrawn from it before it ended.
+            problems = [] if self.renderer is None else artifact_problems(
+                current_artifact(self.store, self.run_id), output)
+            if self.lineage is not None:
+                problems += _restriction_problems(self.store, self.run_id)
+            acceptance = self._held(acceptance, output, problems)
         return self._result(output, acceptance)
+
+    async def _seed_reuse(self):
+        """Complete each node a successor reuses with its predecessor's result, before any node runs.
+
+        The result comes from the node's ``reuse/<node id>`` operation, whose
+        inputs its ``lineage_reuse`` metadata holds and which the next
+        checkpoint consumes. Only a new operation loads and checks the
+        predecessor (:func:`_predecessor`, :func:`_reused`); a committed one
+        replays. Either way, the sources removed from this run are checked
+        too. Raises ``WorkflowStateError`` for a result its inputs do not
+        bind or that used a source removed from this run.
+        """
+        loaded, removed = [], None
+
+        async def reuse(inputs):
+            if not loaded:
+                loaded.append(_predecessor(self.store, inputs["predecessor"],
+                                           self.lineage.access_scope))
+            return _reused(loaded[0], inputs["node_id"])
+
+        for node in self.graph.nodes:
+            inputs = node.metadata.get(LINEAGE_REUSE_KEY)
+            if inputs is None or node.status is NodeStatus.COMPLETED:
+                continue
+            result = await self._operation_result(f"{_REUSE}/{node.id}", _REUSE, inputs, reuse)
+            if not _reuse_matches(node.id, inputs, result):
+                raise WorkflowStateError(
+                    f"The saved reuse of node {node.id!r} does not match its inputs")
+            if removed is None:
+                removed = set(_removed_sources(self.store, self.run_id))
+            if _reused_sources(result["lineage"], result["source_evidence"]) & removed:
+                # The run never uses a removed source's text again, kept or not.
+                raise WorkflowStateError(
+                    f"Node {node.id!r} cannot be reused: a source it used was removed from "
+                    "this run")
+            node.status, node.result = NodeStatus.COMPLETED, result["text"]
 
     def _artifact_directory(self):
         """The bound run's own directory, ``<artifact_dir>/<run id>``."""
@@ -1790,14 +2476,16 @@ class WorkflowRuntime:
         """Bind the run's directory to the run, and check it can publish without replacing."""
         claim_directory(self._artifact_directory(), owner_bytes(self.store.store_id, self.run_id))
 
-    async def _publication(self, inputs_at, data_for, record_for):
+    async def _publication(self, inputs_at, data_for, record_for, *, qualified=False):
         """Run the publication whose inputs are ``inputs_at(sequence)``; return its record.
 
         The sequence is that of the operation that already has those inputs,
         which then replays, or else the next free one. ``data_for()`` gives
         the bytes to publish, which ``record_for(sequence, name, data)``
-        records once they are published. The run's directory must already be
-        claimed in this session.
+        records once they are published, under the renderer's file name or
+        the next free numbered one, or, *qualified*, under the sequence's own
+        name (:func:`~smythe.workflow_artifact.publish_generation`). The run's
+        directory must already be claimed in this session.
         """
         saved = publications(self.store, self.run_id)
         sequence = next((number for number, operation in enumerate(saved)
@@ -1805,8 +2493,9 @@ class WorkflowRuntime:
         inputs = inputs_at(sequence)
 
         async def publish(_):
-            data = data_for()
-            name = publish_bytes(self._artifact_directory(), self.renderer_filename, data)
+            data, directory = data_for(), self._artifact_directory()
+            name = (publish_generation(directory, self.renderer_filename, sequence, data)
+                    if qualified else publish_bytes(directory, self.renderer_filename, data))
             return {"artifact": record_for(sequence, name, data).to_dict()}
 
         result = await self._operation_result(publication_key(sequence), PUBLICATION_OPERATION,
@@ -1814,8 +2503,8 @@ class WorkflowRuntime:
         return read_publication({"kind": PUBLICATION_OPERATION, "inputs": inputs, "result": result},
                                 sequence)
 
-    async def _publish_output(self, synthesis_key, text):
-        """Render the synthesized *text* and publish the document; return the document's text.
+    async def _publish_output(self, synthesis_key, text, *, republishes=None, repair=None):
+        """Render the synthesized *text* and publish it; return the document's text and record.
 
         A ``publication`` operation keyed ``publication/<sequence>`` records
         the file, bound to the synthesis it rendered. A process lost after
@@ -1823,13 +2512,18 @@ class WorkflowRuntime:
         committed renders the document again and checks that it has the
         recorded SHA-256, or else reads the published file. The text
         returned is exactly the published bytes; whether the file still holds
-        them is checked when the run's result is built.
+        them is checked when the run's result is built. A lineage run's
+        republication names the publication it *republishes* and its *repair*
+        in the operation's inputs, and takes the sequence's own file name.
         """
         rendered = []
 
         def inputs_at(sequence):
-            return {"sequence": sequence, "synthesis": synthesis_key,
-                    "output_sha256": text_sha256(text), "renderer": self.recipe["renderer"]}
+            inputs = {"sequence": sequence, "synthesis": synthesis_key,
+                      "output_sha256": text_sha256(text), "renderer": self.recipe["renderer"]}
+            if republishes is not None:
+                inputs.update(republishes=republishes, repair=repair)
+            return inputs
 
         def render():
             rendered.append(render_document(self.bound_renderer, text, self.graph.task))
@@ -1843,7 +2537,8 @@ class WorkflowRuntime:
                 synthesis=synthesis_key, output_sha256=text_sha256(text),
             )
 
-        record = await self._publication(inputs_at, render, record_for)
+        record = await self._publication(inputs_at, render, record_for,
+                                         qualified=republishes is not None)
         data = rendered[-1] if rendered else render()
         if hashlib.sha256(data).hexdigest() != record.sha256:
             data = read_published(record)
@@ -1852,9 +2547,9 @@ class WorkflowRuntime:
                     f"The published document {record.name!r} is missing or changed, and the "
                     "renderer no longer makes its bytes from the saved synthesis"
                 )
-        return data.decode("utf-8")
+        return data.decode("utf-8"), record
 
-    async def republish(self, run_id):
+    async def republish(self, run_id, *, plan_sha256=None, reason=None):
         """Publish a completed run's document again, as a new file; return the current record.
 
         When the current publication's file is missing or changed, the saved
@@ -1868,16 +2563,37 @@ class WorkflowRuntime:
         validated or called. A run whose current file still holds its bytes
         is left as it is, and its current record is returned.
 
-        Raises ``WorkflowStateError`` for a run without a renderer, a run that
-        has not completed or published, and a saved output that is not the
-        published document.
+        A run with a lineage policy is repaired in place instead
+        (:meth:`_republish_lineage`): its saved synthesis is rendered again,
+        published under the new publication's own name and decided again, and
+        a run whose file still holds its bytes is refused, as there is nothing
+        to repair. *plan_sha256* and *reason* name the repair plan that asked
+        for it; only such a run records them.
+
+        Raises ``WorkflowBindingError`` for *plan_sha256* or *reason* without
+        the other, or invalid, and ``WorkflowStateError`` for a run without a
+        renderer, a run that has not completed or published, a lineage run that
+        a source tombstone restricts (:func:`~smythe.lineage.restricted_sources`),
+        a saved output that is not the published document, and a plan for a run
+        without a lineage policy.
         """
-        async with self._session(self.store.load_run(run_id)):
+        repair = _repair_record(plan_sha256, reason)
+        run = self.store.load_run(run_id)
+        _refuse_security_stop(self.store, run)
+        if "lineage" in run["config"]:
+            return await self._republish_lineage(run, repair)
+        if repair is not None:
+            raise WorkflowStateError("Workflow has no lineage policy, so it records no repair plan")
+        async with self._session(run):
             if self.renderer is None:
                 raise WorkflowStateError("Workflow has no renderer, so it publishes no artifact")
             state = self._restore()
             if state is None or state["status"] != "completed":
                 raise WorkflowStateError("Only a completed workflow can publish its document again")
+            restricted = _restriction_problems(self.store, self.run_id)
+            if restricted:
+                raise WorkflowStateError("Workflow cannot publish its document again: "
+                                         + "; ".join(restricted))
             current, output = current_artifact(self.store, self.run_id), state["output"]
             if current is None:
                 raise WorkflowStateError("Workflow has no published document to publish again")
@@ -1904,6 +2620,74 @@ class WorkflowRuntime:
             self.execution_concurrency = state.get("max_concurrency")
             self._save("completed", output=output, acceptance=self.saved_acceptance)
             return record
+
+    async def _republish_lineage(self, run, repair):
+        """Repair a completed lineage run's damaged document in place; return its new record.
+
+        The recipe may differ from this runtime's only in its acceptance
+        policy and gate verifier, so a changed renderer or synthesizer, which
+        calls for a successor run, raises ``WorkflowConflictError``. The saved
+        decision must still hold (:meth:`_decided_output`), the current file
+        must be missing or changed, and the saved synthesis must have the
+        digest the run's current lineage records, which must still match its
+        journal. The synthesis is then rendered again and published as the
+        next ``publication`` operation, which names the publication it
+        republishes and *repair*, under that publication's own name, so no
+        file is replaced; the new bytes, usually the earlier ones, get a new
+        decision under this runtime's policy that binds the publication and
+        *repair*; and the new decision's lineage supersedes the run's record.
+        One completed checkpoint applies all three. No node runs, nothing is
+        read or called, and earlier publications, decisions and lineage stay
+        in the journal. A process lost before that checkpoint is finished by
+        the same call again, which reuses a file it already published with
+        the same bytes.
+        """
+        async with self._session(run, reevaluating=True):
+            if self.renderer is None:
+                raise WorkflowStateError("Workflow has no renderer, so it publishes no artifact")
+            state = self._restore()
+            if state is None or state["status"] != "completed":
+                raise WorkflowStateError("Only a completed workflow can publish its document again")
+            output, _ = self._decided_output(state, "published again")
+            current = current_artifact(self.store, self.run_id)
+            if current is None:
+                raise WorkflowStateError("Workflow has no published document to publish again")
+            if current.integrity["status"] == "verified":
+                raise WorkflowStateError(
+                    f"Nothing to repair: the published document {current.publication.name!r} "
+                    "still holds its bytes"
+                )
+            if current.integrity["status"] not in ("missing", "changed"):
+                raise WorkflowStateError("Workflow cannot be published again: "
+                                         + "; ".join(artifact_problems(current, output)))
+            key = self._synthesis_key()
+            synthesis = self.store.load_operation(self.run_id, key)
+            text = None if synthesis is None or synthesis["result"] is None else (
+                synthesis["result"].get("output"))
+            try:
+                lineage = load_lineage(self.store, self.run_id)
+            except ValueError:
+                lineage = None  # Reported below.
+            if lineage is not None and [output_sha256(text) if isinstance(text, str) else None] != [
+                    node["result_sha256"] for node in lineage.nodes if node["kind"] == "synthesis"]:
+                raise WorkflowStateError(
+                    "The saved synthesis no longer has the digest its lineage records, so it is not "
+                    "published again; a changed synthesis is made again in a successor run"
+                )
+            problems = self._lineage_problems()
+            if problems:
+                raise WorkflowStateError("Workflow cannot be published again: " + "; ".join(problems))
+            self._claim_artifact_directory()
+            output, publication = await self._publish_output(
+                key, text, republishes=current.publication.sequence, repair=repair)
+            decided = await self._decide(key, output, reevaluation=True,
+                                         publication=publication.sequence, repair=repair)
+            await self._supersede_lineage(key, publication, self.acceptance.validator_identities,
+                                          repair)
+            self.execution_concurrency = state.get("max_concurrency")
+            self._save("completed", output=output, acceptance=decided)
+            self.saved_acceptance = decided
+            return publication
 
     def _synthesis_key(self):
         """The synthesis operation's key for this run (see :func:`_synthesis_key`)."""
@@ -1935,6 +2719,137 @@ class WorkflowRuntime:
 
         await self._operation_result(source_evidence_key(inputs), SOURCE_EVIDENCE_OPERATION,
                                      inputs, read)
+
+    async def _record_lineage(self, synthesis_key, publication):
+        """Journal the completed run's lineage once, as a ``lineage`` operation.
+
+        Its key follows the synthesis key (:func:`~smythe.lineage.lineage_key`)
+        and its inputs name the synthesis, decision and publication it binds;
+        the completed checkpoint consumes it with them. A committed record
+        replays and is never assembled again.
+        """
+        inputs = {"version": LINEAGE_RECORD_VERSION, "synthesis": synthesis_key,
+                  "acceptance": self.decision_key,
+                  "publication": None if publication is None else publication.sequence}
+
+        async def assemble(saved):
+            return {"lineage": self._lineage(saved).to_dict()}
+
+        await self._operation_result(lineage_key(synthesis_key), LINEAGE_OPERATION, inputs,
+                                     assemble)
+
+    async def _supersede_lineage(self, synthesis_key, publication, validators, repair):
+        """Journal the lineage of the decision just made, superseding the run's current record.
+
+        The record names that decision (:attr:`decision_key`), *publication*,
+        the run's current one or None, and *validators*, those of the policy
+        that decided, or for None those of the record it supersedes, whose
+        decision an operator resolved. Its ``lineage`` operation is keyed by
+        the decision's sequence (:func:`~smythe.lineage.lineage_key`), and
+        its inputs also name the digest of the record it supersedes
+        (``supersedes``) and the *repair* that asked for it. The next
+        completed checkpoint applies it with the decision. A committed record
+        replays and is never assembled again.
+        """
+        previous = load_lineage(self.store, self.run_id)
+        inputs = {"version": LINEAGE_RECORD_VERSION, "synthesis": synthesis_key,
+                  "acceptance": self.decision_key,
+                  "publication": None if publication is None else publication.sequence,
+                  "validators": (_plain(previous.acceptance["validators"]) if validators is None
+                                 else [identity.to_dict() for identity in validators]),
+                  "supersedes": previous.sha256, "repair": repair}
+
+        async def assemble(saved):
+            return {"lineage": self._lineage(saved).to_dict()}
+
+        await self._operation_result(
+            lineage_key(synthesis_key, _decision_sequence(self.decision_key)), LINEAGE_OPERATION,
+            inputs, assemble)
+
+    def _lineage(self, inputs):
+        """The bound run's lineage, assembled from the journal records *inputs* name.
+
+        Targeted loads read the synthesis, decision and publication
+        operations, each node's snapshot at its final generation, the read
+        behind each read step's result (named by the node's receipt) and the
+        ``reuse`` operation of each node a successor reused. A record that
+        supersedes another names its decision's validators too. Nothing is
+        called or written.
+        """
+        def completed(key, kind):
+            operation = self.store.load_operation(self.run_id, key) if type(key) is str else None
+            if operation is None or operation["kind"] != kind or operation["state"] == "started":
+                raise WorkflowStateError(f"Lineage names a {kind} operation the journal does not hold")
+            return operation
+
+        decision = DeliveryAcceptance.from_dict(
+            completed(inputs["acceptance"], "acceptance")["result"].get("delivery_acceptance"))
+        publication = inputs["publication"]
+        if publication is not None:
+            publication = read_publication(
+                completed(publication_key(publication), PUBLICATION_OPERATION), publication)
+        snapshots, reads = {}, {}
+        for node in self.graph.nodes:
+            if READ_STEP_KEY in node.metadata:
+                receipts = [entry.get("receipt") for entry in node.metadata.get("native_receipts", ())
+                            if isinstance(entry, dict) and entry.get("phase") == "tool"]
+                call_id = receipts[-1].get("workflow_call_id") if receipts and isinstance(
+                    receipts[-1], dict) else None
+                if type(call_id) is str:
+                    reads[node.id] = self.store.load_replay(call_id)
+            elif self._context_version:
+                operation = self.store.load_operation(
+                    self.run_id, context_key(node.id, node_generation(node)))
+                if operation is not None and operation["kind"] == "context":
+                    snapshots[node.id] = ContextSnapshot.from_dict(operation["inputs"].get("snapshot"))
+        reused = {node.id: (node.metadata[LINEAGE_REUSE_KEY]["predecessor"]["run_id"],
+                            completed(f"{_REUSE}/{node.id}", _REUSE)["result"]["lineage"])
+                  for node in self.graph.nodes if LINEAGE_REUSE_KEY in node.metadata}
+        repair = (self.graph.planning or {}).get("repair")
+        validators = inputs.get("validators")
+        return build_lineage(
+            self.graph, self.run["config"], snapshots, reads, publication,
+            (inputs["acceptance"], decision), self.registry.workflow_description(),
+            synthesis=(inputs["synthesis"],
+                       completed(inputs["synthesis"], "synthesis")["result"]["output"]),
+            sources=self.context_sources, reused=reused,
+            predecessor=None if repair is None else repair["predecessor"],
+            repair=None if repair is None else {"plan_sha256": repair["plan_sha256"],
+                                                "reason": repair["reason"]},
+            validators=None if validators is None else [
+                ValidatorIdentity.from_dict(item) for item in validators],
+        )
+
+    def _lineage_problems(self):
+        """Why a completed run's current lineage no longer matches its journal; empty when it does.
+
+        The current record, the latest a checkpoint applied, must be the one
+        of the run's current decision: the record the run wrote when it
+        completed, or the one that decision superseded it with (see
+        :meth:`_supersede_lineage`), naming the run's current publication and
+        the record before it. It is assembled again from the records its
+        operation names and must have the saved record's digest.
+        """
+        applied = [item for item in self.store.list_operations(self.run_id, LINEAGE_OPERATION)
+                   if item["applied_revision"] is not None]
+        if not applied:
+            return ["the journal holds no applied lineage record for the run"]
+        operation, inputs = applied[-1], applied[-1]["inputs"]
+        decision = current_decision(self.store, self.run_id)
+        publication = latest_publication(self.store, self.run_id)
+        try:
+            saved = ArtifactLineage.from_dict(operation["result"].get("lineage"))
+            sequence = decision["sequence"]
+            holds = (operation["operation_key"] == lineage_key(self._synthesis_key(), sequence)
+                     and inputs["acceptance"] == decision["operation_key"]
+                     and inputs["publication"] == (None if publication is None
+                                                   else publication.sequence)
+                     and (not sequence or inputs["supersedes"] == ArtifactLineage.from_dict(
+                         applied[-2]["result"].get("lineage")).sha256)
+                     and saved.sha256 == self._lineage(inputs).sha256)
+        except (TypeError, ValueError, KeyError, IndexError, WorkflowError):
+            holds = False
+        return [] if holds else ["the run's lineage record does not match its journal"]
 
     def _unusable_evidence_validators(self):
         """Why each source evidence validator of the strict policy cannot check this run, by identity.
@@ -1978,11 +2893,11 @@ class WorkflowRuntime:
         return unusable
 
     def _acceptance_inputs(self, synthesis_key, output_sha256, strategy, sources, used_fallback,
-                           sequence=0, tombstones=()):
+                           sequence=0, tombstones=(), publication=None, repair=None):
         """Everything a decision binds; its hash keys the acceptance operation."""
         return _decision_inputs(synthesis_key, self.acceptance.sha256, self.undecided.task_sha256,
                                 output_sha256, strategy, sources, used_fallback, sequence,
-                                tombstones)
+                                tombstones, publication=publication, repair=repair)
 
     def _next_decision_sequence(self, inputs_at):
         """A re-evaluation's decision sequence: one past every decision the journal holds.
@@ -2001,14 +2916,16 @@ class WorkflowRuntime:
             return latest
         return latest + 1
 
-    async def _decide(self, synthesis_key, output, *, reevaluation=False):
+    async def _decide(self, synthesis_key, output, *, reevaluation=False, publication=None,
+                      repair=None):
         """Decide delivery acceptance for exactly *output* as a journal operation.
 
         Final validators run once, locally, and the decision is committed
         before the completed checkpoint consumes it. A run interrupted before
         that commit decides again on the same output; a committed decision is
         read back and never made again. A *reevaluation* decides under the
-        next decision sequence (see :meth:`reevaluate`).
+        next decision sequence (see :meth:`reevaluate`), binding the
+        republished *publication* and the *repair* it was made for, if any.
         """
         from smythe.swarm import _delivery_sources, _synthesis_strategy
 
@@ -2021,7 +2938,7 @@ class WorkflowRuntime:
 
         def inputs_at(sequence):
             return self._acceptance_inputs(synthesis_key, text_sha256(output), strategy, bound,
-                                           used_fallback, sequence, tombstones)
+                                           used_fallback, sequence, tombstones, publication, repair)
 
         sequence = self._next_decision_sequence(inputs_at) if reevaluation else 0
         inputs = inputs_at(sequence)
@@ -2034,7 +2951,8 @@ class WorkflowRuntime:
             )
             return {"delivery_acceptance": record.to_dict()}
 
-        result = await self._operation_result(_decision_key(inputs), "acceptance", inputs, decide)
+        self.decision_key = _decision_key(inputs)
+        result = await self._operation_result(self.decision_key, "acceptance", inputs, decide)
         try:
             record = DeliveryAcceptance.from_dict(result.get("delivery_acceptance"))
         except (TypeError, ValueError) as error:
@@ -2044,7 +2962,7 @@ class WorkflowRuntime:
                 or record.policy_sha256 != self.acceptance.sha256
                 or self._acceptance_inputs(synthesis_key, record.output_sha256, record.strategy,
                                            record.sources, record.used_fallback,
-                                           sequence, tombstones) != inputs):
+                                           sequence, tombstones, publication, repair) != inputs):
             raise WorkflowStateError("Saved delivery acceptance does not match its output")
         self.trace.on_acceptance(record)
         return record
@@ -2073,7 +2991,8 @@ class WorkflowRuntime:
         async def write(_):
             return {"delivery_acceptance": decided.to_dict()}
 
-        result = await self._operation_result(_decision_key(inputs), "acceptance", inputs, write)
+        self.decision_key = _decision_key(inputs)
+        result = await self._operation_result(self.decision_key, "acceptance", inputs, write)
         if result.get("delivery_acceptance") != decided.to_dict():
             raise WorkflowStateError("Saved delivery acceptance does not match its output")
         self.trace.on_acceptance(decided)
@@ -2085,9 +3004,11 @@ class WorkflowRuntime:
         The saved output must match the record's digest, the task and source
         generations must be those it binds, and the record must be the
         journal's current decision (see :func:`_decision_problems`), which a
-        re-evaluation may have made under another policy. A mismatch gives an
-        ``indeterminate`` record for the saved output, never acceptance. Runs
-        without a strict policy have no record.
+        re-evaluation may have made under another policy. A run with a lineage
+        policy must also hold the applied lineage record of that decision, as
+        its journal still makes it. A mismatch gives an ``indeterminate``
+        record for the saved output, never acceptance. Runs without a strict
+        policy have no record.
         """
         record = self.saved_acceptance
         if record is None:
@@ -2100,6 +3021,9 @@ class WorkflowRuntime:
         if self.renderer is not None:
             # The delivered document must also be published intact.
             problems += artifact_problems(current_artifact(self.store, self.run_id), output)
+        if self.lineage is not None:
+            # So must the lineage that records how it was made.
+            problems += self._lineage_problems()
         return self._held(record, output, problems)
 
     def _held(self, record, output, problems):
@@ -2163,6 +3087,11 @@ class WorkflowRuntime:
 class _WorkflowSupervisor:
     def __init__(self, runtime):
         self.runtime = runtime
+
+    @property
+    def triggers(self):
+        """The bound supervisor's evidence triggers, which the executor traces; None without."""
+        return getattr(self.runtime.bound["supervisor"], "triggers", None)
 
     async def review(self, graph, node, *, task, revisions_remaining):
         runtime = self.runtime
@@ -2235,8 +3164,8 @@ class _WorkflowSupervisor:
         for call in runtime.store.inspect_run(runtime.run_id)["calls"]:
             call_key = call["key"]
             if call_key["scope_id"] in reused:
-                runtime.trace.on_revision(
-                    node, proposal, applied=False,
+                runtime.executor._trace_revision(
+                    node, graph, proposal, applied=False,
                     detail="Revision adds a node whose id already has calls in the durable journal",
                 )
                 return None
@@ -2244,8 +3173,8 @@ class _WorkflowSupervisor:
             if (call_key["phase"] in {"execution", "verification", "tool"}
                     and call_key["scope_id"].startswith("node/") and target in generations
                     and call_key["generation"] == generations[target]):
-                runtime.trace.on_revision(
-                    node, proposal, applied=False,
+                runtime.executor._trace_revision(
+                    node, graph, proposal, applied=False,
                     detail="Revision targets work already admitted in the durable journal",
                 )
                 return None
@@ -2255,8 +3184,8 @@ class _WorkflowSupervisor:
             runtime.store.load_operation(runtime.run_id, context_key(target, generation)) is not None
             for target, generation in generations.items()
         ):
-            runtime.trace.on_revision(
-                node, proposal, applied=False,
+            runtime.executor._trace_revision(
+                node, graph, proposal, applied=False,
                 detail="Revision targets work already admitted in the durable journal",
             )
             return None
@@ -2274,6 +3203,7 @@ class _WorkflowSupervisor:
                 runtime.executor._inherit_execution_context(additions, candidate)
                 runtime._validate_graph(candidate)
             except (ValueError, TypeError, KeyError) as error:
-                runtime.trace.on_revision(node, proposal, applied=False, detail=str(error))
+                runtime.executor._trace_revision(node, graph, proposal, applied=False,
+                                                 detail=str(error))
                 return None
         return proposal

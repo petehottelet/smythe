@@ -337,7 +337,7 @@ working without extra services.
 | P1 | Strict final acceptance and complete deliverables | An opt-in policy checks the exact output returned, after synthesis and after any step a supervisor added. Every requested output part is required, so a terminal node that returns only its own increment fails. Exhausted regeneration, an unreadable verdict or a failed validator never produces an accepted result; the rejected output stays inspectable. Runs report execution, acceptance and cost separately. Advisory gates keep their current behavior. In progress: ordinary runs take a [strict policy](docs/verifier.md#strict-delivery-acceptance) that decides on the exact output returned, counts only gates the developer supplied, refuses before any call a graph whose output it could not decide, and refuses a supervisor revision that would leave the output unchecked. Complete-deliverable validators and durable workflows are not covered yet. |
 | P1 | Elapsed-time and outcome records | Record wall time separately from summed node time, split into routing, planning, queueing, execution, verification, synthesis and recovery, together with the acceptance result. Existing fields keep their meaning. |
 | P2 | Deterministic validators in durable workflows | Versioned, developer-registered local validators join `TokenVerifier` in durable text workflows. Each acceptance decision is stored with the output it judged. Resume revalidates when that record is missing, and a changed validator needs a new decision. |
-| P2 | Graph selection | Compare a strong single worker, fixed templates and generated plans on newly frozen held-out tasks, charging selection, planning, failed attempts and checks. Record why each run chose its tier. Current evidence is mixed: generated plans recorded lower wall time on the [task-shape suite](benchmarks/shape_suite.md) and higher mean wall time on [Astra's supplied-source tasks](benchmarks/astra_findings.md). In progress: a `WhiteRabbit` router records each [routing decision](docs/architecture.md#routing-decisions) on the planned graph, with the classifier's usage or, in durable runs, its journal calls. |
+| P2 | Graph selection | Compare a strong single worker, fixed templates and generated plans on newly frozen held-out tasks, charging selection, planning, failed attempts and checks. Record why each run chose its tier. Current evidence is mixed: generated plans recorded lower wall time on the [task-shape suite](benchmarks/shape_suite.md) and higher mean wall time on [Astra's supplied-source tasks](benchmarks/astra_findings.md). In progress: a `WhiteRabbit` router records each [routing decision](docs/architecture.md#routing-decisions) on the planned graph, with the classifier's usage or, in durable runs, its journal calls. Declarative [routing rules](docs/architecture.md#routing-rules), evaluated on the submitted task before any classifier call, can send a task to a first-class single-worker tier, a template or a generated plan, and durable recipes record the rules and their policy version. The held-out comparison is not run yet. |
 | P2 | Broader complete-workflow cost evidence | Extend the completed Astra evidence to harder external tasks using the native ledger, declared prices, failed attempts and all optimization trials. |
 
 ### Then: recorded context, governed actions and reuse
@@ -376,7 +376,14 @@ connector or paid run.
    with deterministic stage and anomaly triggers; reserve LLM review for a
    result that supplies evidence the pending plan should change. A replan
    records what it keeps, invalidates and adds, and cannot bypass final
-   acceptance
+   acceptance. In progress: an opt-in
+   [evidence-triggered supervisor](docs/supervisor.md#evidence-triggered-review)
+   reviews only when a declared stage or an anomaly in the run's recorded state
+   fires, such as a skipped input, an exhausted gate, listed contradictions or
+   empty output, and gives the reviewer that evidence; a developer action can
+   replan with no model call. Every replan is logged with the triggers that
+   prompted it and keeps gate protection and strict acceptance. A default
+   change waits for an ablation that shows no loss of accepted outcomes
 4. **Failure-aware scheduling** — classify failures before retrying, with one
    retry owner and a shared deadline per operation; an opt-in drain policy
    that stops new paid work while in-flight results settle; and admission that
@@ -385,7 +392,18 @@ connector or paid run.
 5. **Artifact lineage and selective repair** — accepted artifacts record the
    sources, validators and tools they depend on. A changed source or validator
    invalidates its dependents, and a repair plan shows what will be reused,
-   rechecked or regenerated before dispatch
+   rechecked or regenerated before dispatch. In progress: strict durable runs
+   opt into [lineage records](docs/lineage.md) of ids, versions and digests;
+   a pure evaluator says what each record calls for under the current
+   sources, tools and validators; a read-only
+   [repair plan](docs/lineage.md#plan-a-repair) lists each run's decision,
+   derived status and predicted work, which `smythe runs inspect`
+   summarizes without a source catalog; `Swarm.repair`
+   [applies a reviewed plan](docs/lineage.md#apply-a-repair-plan) under an
+   explicit allowance, regenerating affected work in successor runs; and a
+   [source restriction](docs/lineage.md#restrict-a-source) withdraws a
+   source's text from every run that used it, optionally deleting their
+   published documents
 6. **Integrate asset policy with Jobs v1** — manifest-native production brand
    masters, OCR and perceptual brand validators, select-from-N curation, and
    deterministic export bundles built from accepted attempt pointers

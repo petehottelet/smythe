@@ -1092,3 +1092,190 @@ def test_refused_supervisor_review_applies_no_revision(caplog, stop_reason):
     assert [n.id for n in graph.nodes] == ["n0"]
     assert "refused, filtered or stopped early" in caplog.text
     assert f"stop_reason={stop_reason!r}" in caplog.text
+
+
+# ---------------------------------------------------------------------------
+# What a revision kept, invalidated and added
+# ---------------------------------------------------------------------------
+
+
+class ActsAfter(Supervisor):
+    """Returns *revision* after the node *node_id*, or raises *raises* there; else no change."""
+
+    def __init__(self, node_id: str, revision: Revision | None = None, *,
+                 raises: Exception | None = None) -> None:
+        self._node_id, self._revision, self._raises = node_id, revision, raises
+
+    async def review(self, graph, node, *, task, revisions_remaining):
+        if node.id != self._node_id:
+            return None
+        if self._raises is not None:
+            raise self._raises
+        return self._revision
+
+
+def _diff_graph() -> ExecutionGraph:
+    """research feeds a gated draft and separate notes; draft and notes are delivered."""
+    nodes = [
+        Node(id="research", label="research"),
+        Node(id="draft", label="draft", depends_on=["research"]),
+        Node(id="judge", label="judge", depends_on=["draft"], verifies="draft"),
+        Node(id="notes", label="notes", depends_on=["research"]),
+    ]
+    for node in nodes:
+        node.metadata["model"] = "test-model"
+    return ExecutionGraph(topology=[Topology.SERIAL], nodes=nodes)
+
+
+def _supervised_run(supervisor, *, max_revisions=2, acceptance=None, graph=None):
+    """Run *graph* (the diff graph by default) serially; return the executor, tracer and graph."""
+    tracer = Tracer()
+    executor = Executor(
+        provider=EchoProvider(), registry=Registry(), tracer=tracer, artifact_dir=None,
+        supervisor=supervisor, max_revisions=max_revisions, acceptance=acceptance,
+    )
+    graph = graph or _diff_graph()
+    executor.run(graph)
+    return executor, tracer, graph
+
+
+def _revision_records(tracer):
+    return [(span["status"], span["revision"]) for span in tracer.summary() if "revision" in span]
+
+
+DIFF_CASES = {
+    "add": ("notes",
+            Revision(add_nodes=(Node(id="summary", label="summary", depends_on=["notes"]),),
+                     reason="summarize the notes"),
+            {"change": "+1", "added": ["summary"], "dropped": [], "rewired": [],
+             "retained": ["research", "draft", "judge", "notes"], "invalidated": ["notes"],
+             "preserved_gates": ["judge"], "added_total": 1}),
+    "drop": ("research",
+             Revision(drop_node_ids=("notes",), reason="notes are redundant"),
+             {"change": "-1", "added": [], "dropped": ["notes"], "rewired": [],
+              "retained": ["research"], "invalidated": [], "preserved_gates": ["judge"],
+              "added_total": 0}),
+    "rewire": ("research",
+               Revision(add_nodes=(Node(id="facts", label="facts", depends_on=["research"]),),
+                        rewire={"draft": ("research", "facts")}, reason="check facts first"),
+               {"change": "+1 ~1", "added": ["facts"], "dropped": [], "rewired": ["draft"],
+                "retained": ["research"], "invalidated": [], "preserved_gates": ["judge"],
+                "added_total": 1}),
+}
+
+
+@pytest.mark.parametrize("case", sorted(DIFF_CASES))
+def test_an_applied_revision_records_what_it_kept_invalidated_and_added(case):
+    after, revision, expected = DIFF_CASES[case]
+    executor, tracer, _ = _supervised_run(ActsAfter(after, revision))
+
+    [(status, record)] = _revision_records(tracer)
+    assert status == "revision_applied"
+    assert record == {"after_node": after, **expected, "revisions_remaining_after": 1,
+                      "trigger": "node_completed"}
+    [entry] = executor.revision_log
+    assert entry == {"after_node": after, "applied": True, **expected,
+                     "revisions_remaining_after": 1, "trigger": "node_completed",
+                     "reason": revision.reason, "detail": None}
+
+
+def test_an_added_node_counts_toward_added_total_until_dropped():
+    first = Revision(add_nodes=(Node(id="extra", label="extra", depends_on=["notes"]),))
+    revisions = iter([first, Revision(drop_node_ids=("extra",))])
+
+    class Twice(Supervisor):
+        async def review(self, graph, node, *, task, revisions_remaining):
+            return next(revisions) if node.id in {"research", "draft"} else None
+
+    executor, _, graph = _supervised_run(Twice())
+
+    assert [entry["added_total"] for entry in executor.revision_log] == [1, 0]
+    assert [entry["revisions_remaining_after"] for entry in executor.revision_log] == [1, 0]
+    assert [node.id for node in graph.nodes] == ["research", "draft", "judge", "notes"]
+
+
+def test_a_refused_revision_is_logged_with_the_graph_it_left_unchanged():
+    revision = Revision(drop_node_ids=("research",), reason="start over")
+    executor, tracer, _ = _supervised_run(ActsAfter("research", revision))
+
+    [(status, record)] = _revision_records(tracer)
+    assert status == "revision_rejected"
+    assert record["retained"] == ["research"] and record["invalidated"] == []
+    assert record["revisions_remaining_after"] == 2 and record["added_total"] == 0
+    [entry] = executor.revision_log
+    assert entry["applied"] is False and entry["dropped"] == ["research"]
+    assert entry["reason"] == "start over"
+    assert "only pending work may be revised" in entry["detail"]
+    assert executor.revisions_used == 0
+
+
+def test_a_supervisor_error_is_logged_as_a_refused_review():
+    supervisor = ActsAfter("draft", raises=RuntimeError("supervisor exploded"))
+    executor, _, _ = _supervised_run(supervisor)
+
+    [entry] = executor.revision_log
+    assert (entry["after_node"], entry["applied"], entry["change"]) == ("draft", False, "unknown")
+    assert entry["added"] == entry["dropped"] == entry["rewired"] == []
+    assert entry["retained"] == ["research", "draft"] and entry["preserved_gates"] == ["judge"]
+    assert entry["reason"] is None
+    assert entry["detail"] == "supervisor raised: supervisor exploded"
+
+
+def test_a_strict_obligation_refusal_is_logged_with_the_obligations_it_would_break():
+    from smythe.acceptance import AcceptancePolicy
+
+    graph = ExecutionGraph(topology=[Topology.SERIAL], nodes=[
+        Node(id="draft", label="draft", metadata={"model": "test-model"}),
+        Node(id="judge", label="judge", depends_on=["draft"], verifies="draft",
+             metadata={"model": "test-model"}),
+    ])
+    revision = Revision(add_nodes=(Node(id="final", label="final", depends_on=["draft"]),),
+                        reason="add a final step")
+    executor, _, graph = _supervised_run(ActsAfter("draft", revision), max_revisions=1,
+                                         acceptance=AcceptancePolicy(mode="strict"), graph=graph)
+
+    [entry] = executor.revision_log
+    assert entry["applied"] is False and entry["added"] == ["final"]
+    assert entry["detail"].startswith("a strict acceptance policy refuses this revision")
+    assert entry["preserved_gates"] == ["judge"] and entry["invalidated"] == []
+    assert entry["revisions_remaining_after"] == 1 and entry["added_total"] == 0
+    assert [node.id for node in graph.nodes] == ["draft", "judge"]
+
+
+def test_the_log_keeps_supervisor_text_short_and_redacted():
+    """A supervisor's reason is model text: the log keeps it as data, cut short."""
+    identifier = "org-" + "A1b2C3d4" * 3
+    revision = Revision(drop_node_ids=("research",), reason=f"see {identifier} " + "x" * 5_000)
+    executor, tracer, _ = _supervised_run(ActsAfter("research", revision))
+
+    [entry] = executor.revision_log
+    assert len(entry["reason"]) == 200 and entry["reason"].startswith("see org-[redacted] x")
+    assert identifier not in json.dumps(executor.revision_log)
+    # The trace span still carries the full reason, as before.
+    [span] = [span for span in tracer.summary() if "revision" in span]
+    assert span["label"] == revision.reason
+
+
+def test_a_log_entry_lists_a_bounded_number_of_ids():
+    nodes = [Node(id=f"step-{index:02d}", label=f"step {index}", metadata={"model": "test-model"})
+             for index in range(40)]
+    graph = ExecutionGraph(topology=[Topology.FORK_JOIN], nodes=nodes)
+    revision = Revision(drop_node_ids=("step-00",), reason="cannot drop finished work")
+    executor, tracer, _ = _supervised_run(ActsAfter("step-39", revision), graph=graph)
+
+    [(_, record)] = _revision_records(tracer)
+    assert len(record["retained"]) == 40  # the trace keeps every id
+    [entry] = executor.revision_log
+    assert entry["retained"] == [f"step-{index:02d}" for index in range(16)]
+    assert entry["omitted_ids"] == 24
+
+
+def test_a_revision_record_without_context_keeps_its_earlier_keys():
+    tracer = Tracer()
+    node = Node(id="n0", label="n0")
+    tracer.on_revision(node, Revision(drop_node_ids=("n1",), reason="r"), applied=False)
+    [span] = tracer.summary()
+    assert span["revision"] == {"after_node": "n0", "change": "-1", "added": [],
+                                "dropped": ["n1"], "rewired": []}
+    assert set(span) == {"node_id", "label", "agent_id", "status", "duration_ms", "error",
+                         "revision"}

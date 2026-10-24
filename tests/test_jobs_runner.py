@@ -1351,3 +1351,563 @@ def test_slow_artifact_finalizer_does_not_starve_lease_heartbeat(
                 store.close()
 
     asyncio.run(scenario())
+
+
+# ---------------------------------------------------------------------------
+# Integrity repair of corrupted accepted artifacts
+# ---------------------------------------------------------------------------
+
+
+def _damage(path, change):
+    if change == "flip":
+        data = bytearray(path.read_bytes())
+        data[-1] ^= 0xFF
+        path.write_bytes(bytes(data))
+    elif change == "truncate":
+        path.write_bytes(path.read_bytes()[:-1])
+    else:
+        path.unlink()
+
+
+def _artifact_dump(store):
+    return [line for line in store._connection.iterdump() if line.startswith('INSERT INTO "artifacts"')]
+
+
+def _accepted_file(tmp_path, result, artifact):
+    return tmp_path / "outputs" / result["artifact_directory"] / artifact["relative_path"]
+
+
+def _owner(result, artifact):
+    return next(item for item in result["operations"]
+                if item["accepted_attempt_id"] == artifact["attempt_id"])
+
+
+@pytest.mark.parametrize("change,status", [("flip", "changed"), ("truncate", "changed"),
+                                           ("delete", "missing")])
+def test_integrity_repair_regenerates_a_corrupted_accepted_png(tmp_path, store_factory, change, status):
+    from smythe.jobs.inspection import inspect_job
+
+    plan = preflight_job(_manifest(count=2, attempts=2), manifest_root=tmp_path)
+    store = store_factory(tmp_path / "jobs.db")
+    runner = JobRunner(store)
+    first = asyncio.run(runner.start(plan, make_approval(plan), manifest_root=tmp_path, run_id="repair"))
+    corrupted, intact = first["artifacts"]
+    key = _owner(first, corrupted)["operation_key"]
+    _damage(_accepted_file(tmp_path, first, corrupted), change)
+
+    with SQLiteRunStore(tmp_path / "jobs.db", read_only=True) as reader:
+        inspected = {item["operation_key"]: item for item in inspect_job(reader, "repair")["operations"]}
+    assert inspected[key]["delivery_eligibility"] == {"eligible": False, "reasons": [f"artifact_{status}"]}
+    assert inspected[_owner(first, intact)["operation_key"]]["delivery_eligibility"]["eligible"]
+    dump = _artifact_dump(store)
+
+    repaired = asyncio.run(runner.reroll("repair", [key], reason="accepted PNG damaged",
+                                         repair_integrity=True))
+
+    assert repaired["status"] == RunStatus.COMPLETED.value
+    assert repaired["counts"] == {OperationStatus.SUCCEEDED.value: 2}
+    assert repaired["execution_metrics"]["operations_started"] == 1
+    operation = next(item for item in repaired["operations"] if item["operation_key"] == key)
+    attempts = [item for item in repaired["attempts"] if item["operation_id"] == operation["operation_id"]]
+    # The new attempt alone records the reason, linked to the attempt it replaces.
+    assert [(item["attempt_number"], item["reason"]) for item in attempts] == [
+        (1, None), (2, "accepted PNG damaged")]
+    assert attempts[1]["parent_attempt_id"] == corrupted["attempt_id"]
+    assert operation["accepted_attempt_id"] == attempts[1]["attempt_id"]
+    assert operation["attempt_count"] == 2
+    assert operation["delivery_eligibility"] == {"eligible": True, "reasons": []}
+    assert [item["reason"] for item in repaired["attempts"]
+            if item["operation_id"] != operation["operation_id"]] == [None]
+    # New artifact rows are added; the earlier rows stay byte-identical.
+    after = _artifact_dump(store)
+    assert set(dump) < set(after) and len(after) == len(dump) + 1
+    [new] = [item for item in repaired["artifacts"] if item["attempt_id"] == attempts[1]["attempt_id"]]
+    assert new["accepted"] == 1 and "/attempt-0002/" in new["relative_path"]
+    assert hashlib.sha256(_accepted_file(tmp_path, repaired, new).read_bytes()).hexdigest() == new["sha256"]
+    # Totals stay consistent: one more settled call and nothing reserved or exposed.
+    calls = store._call_rows("repair")
+    assert len(calls) == 3 and {call["status"] for call in calls} == {"succeeded"}
+    assert repaired["cost"]["confirmed_microusd"] == sum(call["confirmed_microusd"] for call in calls)
+    assert (repaired["cost"]["reserved_microusd"], repaired["cost"]["exposure_microusd"]) == (0, 0)
+    # The returned recheck covers each operation's accepted attempt.
+    assert repaired["artifact_integrity"]["counts"] == {"verified": 2}
+    [event] = _events(store, "repair", "integrity_repair_queued")
+    [finding] = event["payload"]["findings"]
+    assert (event["payload"]["version"], event["payload"]["reason"]) == (1, "accepted PNG damaged")
+    assert {name: finding[name] for name in ("artifact_id", "relative_path", "sha256", "status")} == {
+        "artifact_id": corrupted["artifact_id"], "relative_path": corrupted["relative_path"],
+        "sha256": corrupted["sha256"], "status": status}
+    with SQLiteRunStore(tmp_path / "jobs.db", read_only=True) as reader:
+        report = inspect_job(reader, "repair")
+    assert all(item["delivery_eligibility"]["eligible"] for item in report["operations"])
+
+
+def test_integrity_repair_uses_the_original_approval_and_attempt_allowance(tmp_path, store_factory):
+    data = _priced_manifest().to_dict()
+    data["execution"].update(max_attempts=2, max_budget_usd="0.20")
+    plan = preflight_job(JobManifestV1.from_dict(data), manifest_root=tmp_path)
+    store = store_factory(tmp_path / "jobs.db")
+    provider = _PricedArtifactProvider([Artifact(PNG_1X1, "image/png")])
+    runner = JobRunner(store, provider_pool=_FixedPool(provider))
+    first = asyncio.run(runner.start(plan, make_approval(plan), manifest_root=tmp_path))
+    [artifact] = first["artifacts"]
+    key = first["operations"][0]["operation_key"]
+    _accepted_file(tmp_path, first, artifact).unlink()
+
+    repaired = asyncio.run(runner.reroll(first["run_id"], [key], reason="file deleted",
+                                         repair_integrity=True))
+
+    assert provider.calls == 2
+    assert repaired["cost"]["approved_microusd"] == first["cost"]["approved_microusd"] == 200_000
+    assert repaired["cost"]["confirmed_microusd"] == 80_000
+    assert sum(call["confirmed_microusd"] for call in store._call_rows(first["run_id"])) == 80_000
+    # A second repair needs an attempt the plan no longer allows.
+    [_old, new] = repaired["artifacts"]
+    _accepted_file(tmp_path, repaired, new).unlink()
+    with pytest.raises(InvalidTransitionError, match="exhausted"):
+        asyncio.run(runner.reroll(first["run_id"], [key], reason="deleted again",
+                                  repair_integrity=True))
+    assert provider.calls == 2
+    assert store.snapshot(first["run_id"])["counts"] == {OperationStatus.SUCCEEDED.value: 1}
+
+
+def test_integrity_repair_refuses_verified_or_unsafe_bytes_and_other_owners(tmp_path, store_factory):
+    plan = preflight_job(_manifest(count=1, attempts=2), manifest_root=tmp_path)
+    store = store_factory(tmp_path / "jobs.db")
+    runner = JobRunner(store)
+    first = asyncio.run(runner.start(plan, make_approval(plan), manifest_root=tmp_path, run_id="kept"))
+    [artifact] = first["artifacts"]
+    key = first["operations"][0]["operation_key"]
+    before = store.snapshot("kept")
+
+    def unchanged():
+        after = store.snapshot("kept", include_events=True)
+        assert [after[name] for name in ("operations", "attempts", "artifacts")] == [
+            before[name] for name in ("operations", "attempts", "artifacts")]
+        assert not _events(store, "kept", "integrity_repair_queued")
+
+    with pytest.raises(InvalidTransitionError, match="no missing or changed accepted file"):
+        asyncio.run(runner.reroll("kept", [key], reason="looks off", repair_integrity=True))
+    # A casual reroll of a verified success stays refused.
+    with pytest.raises(InvalidTransitionError, match="cannot be rerolled"):
+        asyncio.run(runner.reroll("kept", [key], reason="looks off"))
+    with pytest.raises(ValueError, match="unknown outcome"):
+        asyncio.run(runner.reroll("kept", [key], reason="r", repair_integrity=True,
+                                  acknowledge_unknown=True))
+    with pytest.raises(TypeError, match="repair_integrity"):
+        asyncio.run(runner.reroll("kept", [key], reason="r", repair_integrity=1))
+    unchanged()
+
+    path = _accepted_file(tmp_path, first, artifact)
+    path.unlink()
+    path.mkdir()  # Not a regular file: the bytes cannot be known.
+    with pytest.raises(InvalidTransitionError, match="is unsafe"):
+        asyncio.run(runner.reroll("kept", [key], reason="replaced", repair_integrity=True))
+    unchanged()
+
+    path.rmdir()
+    lease = store.acquire_run_lease("kept", "other-worker", ttl_s=30)
+    with pytest.raises(RunLeaseError, match="other-worker"):
+        asyncio.run(runner.reroll("kept", [key], reason="file deleted", repair_integrity=True))
+    store.release_run_lease("kept", "other-worker", lease=lease)
+    unchanged()
+
+
+def test_integrity_repair_refuses_a_lease_lost_while_hashing(tmp_path, monkeypatch):
+    from fakes import ManualClock
+
+    clock = ManualClock.after(0)
+    plan = preflight_job(_manifest(count=1, attempts=2), manifest_root=tmp_path)
+    with SQLiteRunStore(tmp_path / "jobs.db", clock_ns=clock) as store, \
+            SQLiteRunStore(tmp_path / "jobs.db", clock_ns=clock) as intruder:
+        runner = JobRunner(store)
+        first = asyncio.run(runner.start(plan, make_approval(plan), manifest_root=tmp_path, run_id="lost"))
+        _accepted_file(tmp_path, first, first["artifacts"][0]).unlink()
+        check = runner_module.check_artifact_integrity
+
+        def expire_during_check(*args, **kwargs):
+            # The files are hashed while this runner holds the run's lease.
+            assert store.get_run_lease("lost").owner_id.startswith("runner-")
+            summary = check(*args, **kwargs)
+            clock.expire_lease(runner.lease_ttl_s)
+            intruder.acquire_run_lease("lost", "intruder")
+            return summary
+
+        monkeypatch.setattr(runner_module, "check_artifact_integrity", expire_during_check)
+        with pytest.raises(RunLeaseError, match="intruder"):
+            asyncio.run(runner.reroll("lost", [first["operations"][0]["operation_key"]],
+                                      reason="file deleted", repair_integrity=True))
+        assert store.snapshot("lost")["counts"] == {OperationStatus.SUCCEEDED.value: 1}
+        assert not _events(store, "lost", "integrity_repair_queued")
+
+
+def test_resume_reports_a_corrupted_file_a_rejected_repair_left_accepted(tmp_path, store_factory):
+    plan = preflight_job(_manifest(count=1, attempts=3), manifest_root=tmp_path)
+    store = store_factory(tmp_path / "jobs.db")
+    provider = _PricedArtifactProvider([Artifact(PNG_1X1, "image/png")], [], cost_usd=None)
+    runner = JobRunner(store, provider_pool=_FixedPool(provider))
+    first = asyncio.run(runner.start(plan, make_approval(plan), manifest_root=tmp_path, run_id="kept"))
+    [artifact] = first["artifacts"]
+    key = first["operations"][0]["operation_key"]
+    _damage(_accepted_file(tmp_path, first, artifact), "flip")
+
+    rejected = asyncio.run(runner.reroll("kept", [key], reason="flipped byte", repair_integrity=True))
+
+    assert rejected["status"] == RunStatus.FAILED.value
+    [operation] = rejected["operations"]
+    assert operation["status"] == OperationStatus.REJECTED.value
+    # The accepted attempt stays named until a new attempt is accepted.
+    assert operation["accepted_attempt_id"] == artifact["attempt_id"]
+    assert operation["delivery_eligibility"] == {"eligible": False, "reasons": ["artifact_changed"]}
+    before = store.snapshot("kept", include_events=True)
+
+    resumed = asyncio.run(runner.resume("kept"))
+
+    assert resumed["status"] == RunStatus.FAILED.value
+    assert resumed["execution_metrics"]["operations_started"] == 0
+    assert resumed["artifact_integrity"]["counts"] == {"changed": 1}
+    assert resumed["operations"][0]["delivery_eligibility"]["reasons"] == ["artifact_changed"]
+    after = store.snapshot("kept", include_events=True)
+    assert after["operations"] == before["operations"] and after["artifacts"] == before["artifacts"]
+    assert provider.calls == 2
+
+
+# ---------------------------------------------------------------------------
+# Rechecks of accepted outputs under changed validators
+# ---------------------------------------------------------------------------
+
+
+def _off_palette(validator, subject):
+    from smythe.validation import ValidationReport, hard_finding
+
+    return ValidationReport("tile", (hard_finding("off_palette", "uses #00ff00"),),
+                            validator=validator.identity)
+
+
+def _eligibility(database, run_id, validators=None):
+    from smythe.jobs.inspection import inspect_job
+
+    with SQLiteRunStore(database, read_only=True) as reader:
+        return {item["operation_key"]: item["delivery_eligibility"]
+                for item in inspect_job(reader, run_id, validators=validators)["operations"]}
+
+
+def test_a_validator_version_bump_needs_a_recheck_which_records_a_new_decision(
+    tmp_path, store_factory,
+):
+    store = store_factory(tmp_path / "jobs.db")
+    original = _PaletteValidator()
+    _, first, record = _validated_run(tmp_path, store, original)
+    run_id, [operation] = first["run_id"], first["operations"]
+    key = operation["operation_key"]
+    bumped = _PaletteValidator(version="2")
+    provider = _PricedArtifactProvider([Artifact(PNG_1X1, "image/png")], cost_usd=None)
+    rechecker = JobRunner(store, provider_pool=_FixedPool(provider), validators=[bumped])
+
+    # The call's decision used version 1, so version 2 requires a recheck.
+    assert _eligibility(tmp_path / "jobs.db", run_id, [bumped]) == {
+        key: {"eligible": False, "reasons": ["validator_changed"]}}
+    assert _eligibility(tmp_path / "jobs.db", run_id) == _eligibility(
+        tmp_path / "jobs.db", run_id, [original]) == {key: {"eligible": True, "reasons": []}}
+    # Resuming under the changed validator is still refused.
+    with pytest.raises(PreflightError, match="version '1'"):
+        asyncio.run(rechecker.resume(run_id))
+
+    rechecked = asyncio.run(rechecker.recheck(run_id, [key], reason="palette version 2"))
+
+    assert provider.calls == 0 and rechecked["execution_metrics"]["operations_started"] == 0
+    assert [subject.data for subject in bumped.subjects] == [PNG_1X1]
+    [item] = rechecked["operations"]
+    assert item["status"] == OperationStatus.SUCCEEDED.value
+    assert item["accepted_attempt_id"] == operation["accepted_attempt_id"]
+    assert item["delivery_eligibility"] == {"eligible": True, "reasons": []}
+    acceptance = item["delivery_acceptance"]
+    assert (acceptance["source"], acceptance["decision"], acceptance["accepted"]) == (
+        "reevaluated", "accepted", True)
+    assert [result["validator"]["version"] for result in acceptance["validators"]] == ["1", "2"]
+    assert rechecked["status"] == RunStatus.COMPLETED.value
+    assert _eligibility(tmp_path / "jobs.db", run_id, [bumped]) == {
+        key: {"eligible": True, "reasons": []}}
+    [event] = _events(store, run_id, "delivery_acceptance_reevaluated")
+    [artifact] = first["artifacts"]
+    assert event["payload"]["version"] == 1 and event["payload"]["reason"] == "palette version 2"
+    assert event["payload"]["attempt_id"] == operation["accepted_attempt_id"]
+    assert event["payload"]["outcome"] == "accepted" and event["payload"]["findings"] == []
+    assert event["payload"]["artifacts"] == [
+        {"relative_path": artifact["relative_path"], "sha256": artifact["sha256"]}]
+    assert event["payload"]["validators"][1]["validator"] == bumped.identity.to_dict()
+    # The call's own decision is kept, and the run's lease was released.
+    [completed] = _events(store, run_id, "call_completed")
+    assert completed["payload"]["delivery_acceptance"] == record
+    assert store.get_run_lease(run_id) is None
+
+
+def test_a_newer_built_in_check_needs_a_recheck(tmp_path, store_factory, monkeypatch):
+    import smythe.jobs.delivery as delivery
+
+    plan = preflight_job(_manifest(count=2), manifest_root=tmp_path)
+    store = store_factory(tmp_path / "jobs.db")
+    runner = JobRunner(store)
+    first = asyncio.run(runner.start(plan, make_approval(plan), manifest_root=tmp_path,
+                                     run_id="built-in"))
+    rechecked_key, other_key = (item["operation_key"] for item in first["operations"])
+    monkeypatch.setattr(delivery, "ARTIFACT_SPEC_VALIDATOR_VERSION", "2")
+
+    resumed = asyncio.run(runner.resume("built-in"))
+    assert {item["operation_key"]: item["delivery_eligibility"]["reasons"]
+            for item in resumed["operations"]} == {
+        rechecked_key: ["validator_changed"], other_key: ["validator_changed"]}
+
+    rechecked = asyncio.run(runner.recheck("built-in", [rechecked_key], reason="check version 2"))
+
+    assert {item["operation_key"]: item["delivery_eligibility"]["reasons"]
+            for item in rechecked["operations"]} == {rechecked_key: [], other_key: ["validator_changed"]}
+    [event] = _events(store, "built-in", "delivery_acceptance_reevaluated")
+    [builtin] = event["payload"]["validators"]
+    assert builtin["validator"]["name"] == "smythe.jobs.artifact-spec"
+    assert builtin["validator"]["version"] == "2" and builtin["outcome"] == "passed"
+
+
+def test_a_recheck_that_rejects_leaves_the_operation_succeeded_but_not_eligible(
+    tmp_path, store_factory,
+):
+    store = store_factory(tmp_path / "jobs.db")
+    runner, first, _ = _validated_run(tmp_path, store, _PaletteValidator())
+    run_id, [operation] = first["run_id"], first["operations"]
+    key = operation["operation_key"]
+    before = store.snapshot(run_id)
+    stricter = _PaletteValidator(_off_palette, version="2")
+
+    rechecked = asyncio.run(JobRunner(store, validators=[stricter]).recheck(
+        run_id, [operation["operation_id"]], reason="stricter palette"))
+
+    [item] = rechecked["operations"]
+    assert rechecked["status"] == RunStatus.COMPLETED.value
+    assert item["status"] == OperationStatus.SUCCEEDED.value
+    assert item["accepted_attempt_id"] == operation["accepted_attempt_id"]
+    assert item["delivery_eligibility"] == {"eligible": False, "reasons": ["not_accepted"]}
+    assert item["delivery_acceptance"]["decision"] == "rejected"
+    assert item["delivery_acceptance"]["reasons"] == ["artifact-01.png: brand-palette: uses #00ff00"]
+    after = store.snapshot(run_id)
+    for name in ("operations", "attempts", "artifacts", "cost", "counts"):
+        assert after[name] == before[name]
+    assert [artifact["accepted"] for artifact in after["artifacts"]] == [1]
+    assert _eligibility(tmp_path / "jobs.db", run_id, [stricter]) == {
+        key: {"eligible": False, "reasons": ["not_accepted"]}}
+    # Under the validators its plan names, the call's own decision still holds.
+    assert _eligibility(tmp_path / "jobs.db", run_id) == {key: {"eligible": True, "reasons": []}}
+    # The accepted bytes verify, so an integrity repair cannot regenerate them.
+    with pytest.raises(InvalidTransitionError, match="no missing or changed"):
+        asyncio.run(runner.reroll(run_id, [key], reason="rejected by palette 2",
+                                  repair_integrity=True))
+
+
+def test_a_recheck_is_refused_before_any_validator_decides(tmp_path, store_factory):
+    store = store_factory(tmp_path / "jobs.db")
+    validator = _PaletteValidator()
+    plan = preflight_job(_validated_manifest(count=2), manifest_root=tmp_path, validators=[validator])
+    runner = JobRunner(store, provider_pool=_FixedPool(_ImmediateArtifactProvider()),
+                       validators=[validator])
+    first = asyncio.run(runner.start(plan, make_approval(plan), manifest_root=tmp_path,
+                                     run_id="refused"))
+    keys = [item["operation_key"] for item in first["operations"]]
+    damaged, intact = first["artifacts"]
+    decided = len(validator.subjects)
+
+    def unchanged():
+        assert not _events(store, "refused", "delivery_acceptance_reevaluated")
+        assert len(validator.subjects) == decided
+        assert store.get_run_lease("refused") is None
+
+    _damage(_accepted_file(tmp_path, first, damaged), "flip")
+    with pytest.raises(InvalidTransitionError, match=f"{damaged['relative_path']} is changed"):
+        asyncio.run(runner.recheck("refused", keys, reason="palette check"))
+    unchanged()
+    _accepted_file(tmp_path, first, damaged).unlink()
+    with pytest.raises(InvalidTransitionError, match="is missing"):
+        asyncio.run(runner.recheck("refused", keys, reason="palette check"))
+    unchanged()
+
+    intact_key = _owner(first, intact)["operation_key"]
+    with pytest.raises(PreflightError, match="'brand-palette'.*not registered"):
+        asyncio.run(JobRunner(store).recheck("refused", [intact_key], reason="palette check"))
+    with pytest.raises(JobNotFoundError):
+        asyncio.run(runner.recheck("refused", ["missing[0]"], reason="palette check"))
+    for keys_value, error in (([], ValueError), ("glyph[0]", TypeError)):
+        with pytest.raises(error, match="operation key"):
+            asyncio.run(runner.recheck("refused", keys_value, reason="palette check"))
+    for reason in ("", " ", None, "x" * 2049):
+        with pytest.raises(ValueError, match="reason"):
+            asyncio.run(runner.recheck("refused", [intact_key], reason=reason))
+    lease = store.acquire_run_lease("refused", "other-worker", ttl_s=30)
+    with pytest.raises(RunLeaseError, match="other-worker"):
+        asyncio.run(runner.recheck("refused", [intact_key], reason="palette check"))
+    store.release_run_lease("refused", "other-worker", lease=lease)
+    unchanged()
+
+    # Only a succeeded operation has accepted output to recheck.
+    rejected_plan = preflight_job(_manifest(count=1, attempts=2), manifest_root=tmp_path)
+    rejected = asyncio.run(JobRunner(store, provider_pool=_FixedPool(_SequenceProvider())).start(
+        rejected_plan, make_approval(rejected_plan), manifest_root=tmp_path, run_id="rejected"))
+    with pytest.raises(InvalidTransitionError, match="state rejected has no accepted output"):
+        asyncio.run(JobRunner(store).recheck(
+            "rejected", [rejected["operations"][0]["operation_key"]], reason="check"))
+    assert not _events(store, "rejected", "delivery_acceptance_reevaluated")
+
+
+# ---------------------------------------------------------------------------
+# Repair previews
+# ---------------------------------------------------------------------------
+
+
+def _previewed(runner, run_id, keys=None):
+    return {item["operation_key"]: (item["status"], item["action"], item["reasons"],
+                                    item["attempts_remaining"], item["new_plan_required"])
+            for item in runner.repair_preview(run_id, keys)["operations"]}
+
+
+def test_a_repair_preview_matches_integrity_repair_eligibility(tmp_path, store_factory):
+    store = store_factory(tmp_path / "jobs.db")
+    runner = JobRunner(store)
+    plan = preflight_job(_manifest(count=5, attempts=2), manifest_root=tmp_path)
+    first = asyncio.run(runner.start(plan, make_approval(plan), manifest_root=tmp_path,
+                                     run_id="preview"))
+    last = preflight_job(_manifest(count=1, attempts=1), manifest_root=tmp_path)
+    spent = asyncio.run(runner.start(last, make_approval(last), manifest_root=tmp_path,
+                                     run_id="spent"))
+    damage = dict(zip(("intact", "flip", "truncate", "delete", "directory"), first["artifacts"]))
+    keys = {change: _owner(first, artifact)["operation_key"] for change, artifact in damage.items()}
+    for change, artifact in damage.items():
+        path = _accepted_file(tmp_path, first, artifact)
+        if change == "directory":
+            path.unlink()
+            path.mkdir()  # Not a regular file: the bytes cannot be known.
+        elif change != "intact":
+            _damage(path, change)
+    _accepted_file(tmp_path, spent, spent["artifacts"][0]).unlink()
+
+    previews = {run_id: _previewed(runner, run_id) for run_id in ("preview", "spent")}
+
+    assert {change: previews["preview"][key] for change, key in keys.items()} == {
+        "intact": ("succeeded", "reuse", [], 1, False),
+        "flip": ("succeeded", "regenerate", ["artifact_changed"], 1, False),
+        "truncate": ("succeeded", "regenerate", ["artifact_changed"], 1, False),
+        "delete": ("succeeded", "regenerate", ["artifact_missing"], 1, False),
+        "directory": ("succeeded", "review", ["artifact_unsafe"], 1, False),
+    }
+    # No attempt is left, so regenerating it takes a new plan and approval.
+    assert list(previews["spent"].values()) == [
+        ("succeeded", "regenerate", ["artifact_missing"], 0, True)]
+
+    # An integrity repair accepts exactly the operations the preview regenerates in their run.
+    for run_id, items in previews.items():
+        for key, (_status, action, _reasons, _left, new_plan) in items.items():
+            try:
+                asyncio.run(runner.reroll(run_id, [key], reason="preview check",
+                                          repair_integrity=True))
+            except InvalidTransitionError:
+                repaired = False
+            else:
+                repaired = True
+            assert repaired == (action == "regenerate" and not new_plan), key
+
+
+def test_a_repair_preview_reports_states_attempts_and_budget_and_changes_nothing(
+    tmp_path, store_factory,
+):
+    data = _priced_manifest(count=5).to_dict()
+    data["execution"].update(max_attempts=2, max_budget_usd="1.00")
+    plan = preflight_job(JobManifestV1.from_dict(data), manifest_root=tmp_path)
+    store = store_factory(tmp_path / "jobs.db")
+    run_id = store.create_run(plan, make_approval(plan), manifest_root=tmp_path, run_id="states")
+    unknown, rejected, _pending, running, succeeded = store.pending_operations(run_id)
+    lease = store.acquire_run_lease(run_id, "worker-a")
+
+    def dispatched(operation):
+        attempt = store.begin_attempt(run_id, operation["operation_id"], lease=lease)
+        permit = store.prepare_call(attempt["attempt_id"], 100_000, lease=lease)
+        store.mark_call_dispatched(permit.call_id, lease=lease)
+        return permit.call_id
+
+    def settle(call_id, artifacts, accepted):
+        store.complete_call(call_id, cost_microusd=80_000, cost_is_complete=True,
+                            cost_is_estimate=False, artifacts=artifacts, result_text="done",
+                            accepted=accepted, lease=lease)
+
+    store.mark_unknown_outcome(dispatched(unknown), "connection lost", lease=lease)
+    settle(dispatched(rejected), [], False)
+    store.begin_attempt(run_id, running["operation_id"], lease=lease)
+    settle(dispatched(succeeded), [{
+        "relative_path": "artifacts/glyph_4_/attempt-0001/artifact-01.png", "mime_type": "image/png",
+        "sha256": "a" * 64, "size_bytes": 68, "width": 1, "height": 1}], True)
+    before = list(store._connection.iterdump())
+
+    # The worker still holds the run's lease: a preview takes none and writes nothing.
+    preview = JobRunner(store).repair_preview(run_id)
+
+    assert list(store._connection.iterdump()) == before
+    assert store.get_run_lease(run_id).owner_id == "worker-a"
+    assert (preview["version"], preview["run_id"]) == (1, "states")
+    assert preview["status"] == store.get_run(run_id)["status"]
+    assert {item["operation_key"]: (item["status"], item["action"], item["reasons"],
+                                    item["attempts_remaining"], item["new_plan_required"])
+            for item in preview["operations"]} == {
+        "glyph[0]": ("unknown_outcome", "review", ["outcome_unknown"], 1, False),
+        "glyph[1]": ("rejected", "regenerate", ["node_incomplete"], 1, False),
+        "glyph[2]": ("pending", "regenerate", ["node_incomplete"], 2, False),
+        "glyph[3]": ("running", "review", ["run_in_progress"], 1, False),
+        # A legacy decision has no recorded validator, and its file is gone.
+        "glyph[4]": ("succeeded", "regenerate", ["artifact_missing", "validator_set_changed"], 1,
+                     False),
+    }
+    assert preview["counts"] == {"reuse": 0, "recheck": 0, "regenerate": 3, "review": 2}
+    assert preview["budget"] == {
+        "approved_microusd": 1_000_000, "confirmed_microusd": 160_000,
+        "exposure_microusd": 100_000, "reserved_microusd": 0, "remaining_microusd": 740_000,
+        "overrun": False, "unit": "microUSD"}
+    assert preview["attachments"] == []
+
+    assert list(_previewed(JobRunner(store), run_id, ["glyph[1]", rejected["operation_id"]])) == [
+        "glyph[1]"]
+    with pytest.raises(JobNotFoundError):
+        JobRunner(store).repair_preview(run_id, ["missing[0]"])
+    with pytest.raises(JobNotFoundError):
+        JobRunner(store).repair_preview("absent")
+    with pytest.raises(TypeError, match="operation key"):
+        JobRunner(store).repair_preview(run_id, "glyph[1]")
+
+    # After a budget overrun, nothing more is admitted under the run's approval.
+    data["operations"][0]["count"] = 2
+    data["execution"]["max_budget_usd"] = "0.40"
+    overrun_plan = preflight_job(JobManifestV1.from_dict(data), manifest_root=tmp_path)
+    overrun = store.create_run(overrun_plan, make_approval(overrun_plan), manifest_root=tmp_path)
+    first_operation = store.pending_operations(overrun)[0]
+    attempt = store.begin_attempt(overrun, first_operation["operation_id"])
+    permit = store.prepare_call(attempt["attempt_id"], 100_000)
+    store.mark_call_dispatched(permit.call_id)
+    store.complete_call(permit.call_id, cost_microusd=150_000, cost_is_complete=True,
+                        cost_is_estimate=False, artifacts=[], result_text="none", accepted=False)
+    latched = JobRunner(store).repair_preview(overrun)
+    assert latched["budget"]["overrun"] is True and latched["status"] == RunStatus.BUDGET_OVERRUN.value
+    assert [(item["action"], item["new_plan_required"]) for item in latched["operations"]] == [
+        ("regenerate", True), ("regenerate", True)]
+
+
+def test_a_repair_preview_offers_a_recheck_for_a_changed_validator(tmp_path, store_factory):
+    store = store_factory(tmp_path / "jobs.db")
+    _, first, _ = _validated_run(tmp_path, store, _PaletteValidator())
+    run_id = first["run_id"]
+    bumped = JobRunner(store, validators=[_PaletteValidator(version="2")])
+
+    assert list(_previewed(bumped, run_id).values()) == [
+        ("succeeded", "recheck", ["validator_set_changed"], 1, False)]
+    assert list(_previewed(JobRunner(store, validators=[_PaletteValidator()]), run_id).values()) == [
+        ("succeeded", "reuse", [], 1, False)]
+
+    asyncio.run(bumped.recheck(run_id, [first["operations"][0]["operation_key"]], reason="v2"))
+    assert list(_previewed(bumped, run_id).values()) == [("succeeded", "reuse", [], 1, False)]
+    stricter = JobRunner(store, validators=[_PaletteValidator(_off_palette, version="3")])
+    asyncio.run(stricter.recheck(run_id, [first["operations"][0]["operation_key"]], reason="v3"))
+    # A rejection of verified bytes is for a person: no repair in the run can replace them.
+    assert list(_previewed(stricter, run_id).values()) == [
+        ("succeeded", "review", ["decision_not_accepted"], 1, False)]

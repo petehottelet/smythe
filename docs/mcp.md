@@ -43,6 +43,7 @@ The value is read from the process environment when the session opens; a missing
 - The budget cap is enforced between iterations. A parallel run reserves each turn's estimate before calling the model; a serial run checks the cap after each billed turn, so the turn that crosses the cap is still paid for.
 - `Node.timeout_s` covers the *whole* loop, and session teardown survives the cancellation (stdio subprocesses are reaped before the node fails).
 - `tool_timeout_s` bounds each individual tool call; a slow or failing tool returns to the model as an error result it can adapt to — it does not fail the node.
+- A node counts the tool calls of its latest attempt that returned an error in `metadata["tool_errors"]`, which an [evidence trigger](supervisor.md#evidence-triggered-review) can act on.
 
 ## Sessions and performance
 

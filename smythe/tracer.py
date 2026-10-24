@@ -5,16 +5,29 @@ from __future__ import annotations
 import logging
 import math
 import time
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Iterable, Iterator, Mapping
 from contextlib import contextmanager
+from copy import deepcopy
 from dataclasses import dataclass, field
 from typing import Any
 
 from smythe._failures import classify_failure
 from smythe._redact import error_text
-from smythe.graph import Node, NodeStatus
+from smythe.graph import REVISION_ADDED_KEY, ExecutionGraph, Node, NodeStatus, _deliverable_ids
 
 logger = logging.getLogger("smythe.tracer")
+
+# What prompted a supervisor review: each review follows a completed node. A
+# supervisor with evidence triggers names the triggers that fired instead.
+REVIEW_TRIGGER = "node_completed"
+# The revision log an ordinary checkpoint keeps (see revision_log_entry): its
+# latest entries, at most this many ids in each of an entry's id lists, and at
+# most this many characters of a supervisor's reason or a refusal's detail.
+REVISION_LOG_LIMIT = 32
+REVISION_LOG_MAX_IDS = 16
+REVISION_LOG_TEXT_CHARS = 200
+_REVISION_ID_LISTS = ("added", "dropped", "rewired", "retained", "invalidated", "preserved_gates")
+
 
 # Phases reported by Tracer.timing(). Routing, planning, recovery and
 # synthesis are stages a call may not run; the rest accumulate during it.
@@ -23,7 +36,7 @@ PHASES = (
     "synthesis", "supervision", "checkpoint", "waiting",
 )
 _STAGES = frozenset({"routing", "planning", "recovery", "synthesis"})
-WAIT_REASONS = ("retry_backoff", "admission", "supervision")
+WAIT_REASONS = ("retry_backoff", "admission", "supervision", "capacity", "drain")
 _OUTCOMES = {
     NodeStatus.COMPLETED: "completed", NodeStatus.FAILED: "failed",
     NodeStatus.SKIPPED: "skipped", NodeStatus.PENDING: "cancelled",
@@ -158,6 +171,24 @@ class Tracer:
         self._active[node.id] = span
         logger.debug("Node started: %s (%s)", node.id, node.label)
 
+    def on_node_profile(
+        self, node: Node, profile: str, *, fallback_from: str | None = None,
+    ) -> None:
+        """Record the model profile that *node*'s active attempt calls.
+
+        The span's ``metadata["profile"]`` names it, and after a fallback
+        ``metadata["fallback_from"]`` names the profile whose failed attempt
+        this one replaces; ``summary()`` leaves both out, so it keeps its keys.
+        """
+        span = self._active.get(node.id)
+        if span:
+            span.metadata["profile"] = profile
+            if fallback_from is not None:
+                span.metadata["fallback_from"] = fallback_from
+        if fallback_from is not None:
+            logger.info("Node %s falls back from model profile %s to %s",
+                        node.id, fallback_from, profile)
+
     def on_node_end(self, node: Node) -> None:
         span = self._active.pop(node.id, None)
         if span:
@@ -199,12 +230,15 @@ class Tracer:
         *,
         applied: bool,
         detail: str = "",
+        context: Mapping[str, Any] | None = None,
     ) -> None:
         """Record a supervisor revision, whether it was applied or refused.
 
         Refusals are recorded too: a supervisor that keeps proposing
         invalid changes is a finding, and silently dropping those
-        attempts would hide it.
+        attempts would hide it. The span's ``revision`` record
+        (:func:`revision_record`) adds *context*, the decision's effect
+        from :func:`revision_context`, when given.
         """
         now = self._wall_clock()
         span = Span(
@@ -217,18 +251,33 @@ class Tracer:
         )
         if detail:
             span.error = detail
-        span.metadata["revision"] = {
-            "after_node": node.id,
-            "change": getattr(revision, "summary", lambda: "unknown")(),
-            "added": [n.id for n in getattr(revision, "add_nodes", ())],
-            "dropped": list(getattr(revision, "drop_node_ids", ())),
-            "rewired": sorted(getattr(revision, "rewire", {})),
-        }
+        span.metadata["revision"] = revision_record(node, revision, context)
         self.spans.append(span)
         logger.info(
             "Plan revision %s after node %s: %s",
             "applied" if applied else "rejected", node.id, span.label,
         )
+
+    def on_review_trigger(self, node: Node, triggers: Iterable[Any]) -> None:
+        """Record the evidence triggers that called for a supervisor review after *node*.
+
+        The span's status is ``review_triggered``, and its ``review_trigger``
+        record names the node and each trigger; their evidence, which may
+        quote output, goes to the supervisor, not the trace.
+        """
+        names = [str(getattr(trigger, "name", trigger)) for trigger in triggers]
+        now = self._wall_clock()
+        span = Span(
+            node_id=f"supervisor:{node.id}",
+            label=", ".join(names),
+            agent_id=None,
+            start_time=now,
+            end_time=now,
+            status="review_triggered",
+        )
+        span.metadata["review_trigger"] = {"after_node": node.id, "triggers": names}
+        self.spans.append(span)
+        logger.info("Review triggered after node %s: %s", node.id, span.label)
 
     def on_regeneration(
         self,
@@ -355,9 +404,131 @@ class Tracer:
                 entry["tool_calls"] = s.metadata["tool_calls"]
             if "revision" in s.metadata:
                 entry["revision"] = s.metadata["revision"]
+            if "review_trigger" in s.metadata:
+                entry["review_trigger"] = s.metadata["review_trigger"]
             if "regeneration" in s.metadata:
                 entry["regeneration"] = s.metadata["regeneration"]
             if "native_receipts" in s.metadata:
                 entry["native_receipts"] = s.metadata["native_receipts"]
             out.append(entry)
         return out
+
+
+def revision_record(
+    node: Node, revision: Any, context: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    """What a supervisor decision after *node* proposed and, with *context*, what it left.
+
+    ``change`` and the ``added``, ``dropped`` and ``rewired`` ids describe
+    *revision*, which is None when the review raised; *context*, from
+    :func:`revision_context`, adds the decision's effect on the graph.
+    """
+    return {
+        "after_node": node.id,
+        "change": getattr(revision, "summary", lambda: "unknown")(),
+        "added": [n.id for n in getattr(revision, "add_nodes", ())],
+        "dropped": list(getattr(revision, "drop_node_ids", ())),
+        "rewired": sorted(getattr(revision, "rewire", {})),
+        **(context or {}),
+    }
+
+
+def revision_context(
+    graph: ExecutionGraph, *, revisions_remaining_after: int | None,
+    delivered_before: Iterable[str] | None = None, added: Iterable[str] = (),
+    trigger: str = REVIEW_TRIGGER,
+) -> dict[str, Any]:
+    """The effect of a supervisor decision, read from *graph* after it.
+
+    ``retained`` lists the completed nodes: a revision never changes finished
+    work, so the decision keeps every result. ``invalidated`` lists those
+    whose result the run delivered before the decision (*delivered_before*,
+    the graph's deliverable nodes then; by default now) and no longer does,
+    because a step the revision added or rewired depends on them: ``DELIVERABLE``
+    synthesis returns that step's output in their place. ``preserved_gates``
+    lists the gates the graph kept, every verifier but those in *added*, the
+    ids an applied revision added. ``revisions_remaining_after`` is the run's
+    remaining revision allowance, ``added_total`` counts the revision-added
+    nodes the graph holds, and ``trigger`` names what prompted the review.
+    """
+    delivered = _deliverable_ids(graph.nodes)
+    before = delivered if delivered_before is None else set(delivered_before)
+    added = set(added)
+    completed = [n for n in graph.nodes if n.status is NodeStatus.COMPLETED]
+    return {
+        "retained": [n.id for n in completed],
+        "invalidated": [n.id for n in completed if n.id in before and n.id not in delivered],
+        "preserved_gates": [n.id for n in graph.nodes if n.verifies and n.id not in added],
+        "revisions_remaining_after": revisions_remaining_after,
+        "added_total": sum(1 for n in graph.nodes if n.metadata.get(REVISION_ADDED_KEY)),
+        "trigger": trigger,
+    }
+
+
+def _log_text(value: Any) -> str | None:
+    """Model or error text as the log keeps it: redacted, then cut short; None when empty."""
+    if not value:
+        return None
+    return error_text(value)[:REVISION_LOG_TEXT_CHARS]
+
+
+def revision_log_entry(
+    record: Mapping[str, Any], *, applied: bool | None, reason: Any = None, detail: Any = None,
+) -> dict[str, Any]:
+    """A bounded copy of a revision *record* (see :func:`revision_record`) for the revision log.
+
+    The entry adds whether the decision was ``applied`` (None when that is not
+    known), the supervisor's ``reason`` and, for a refusal, its ``detail``.
+    Both may be model text, which the log keeps only as data: account
+    identifiers are redacted and at most ``REVISION_LOG_TEXT_CHARS``
+    characters are kept. Each id list keeps its first ``REVISION_LOG_MAX_IDS``
+    ids, and ``omitted_ids``, present only then, counts the ids left out.
+    """
+    entry: dict[str, Any] = {
+        "after_node": str(record["after_node"]), "applied": applied, "change": record["change"],
+    }
+    omitted = 0
+    for key in _REVISION_ID_LISTS:
+        ids = [str(item) for item in record.get(key, ())]
+        omitted += max(0, len(ids) - REVISION_LOG_MAX_IDS)
+        entry[key] = ids[:REVISION_LOG_MAX_IDS]
+    for key in ("revisions_remaining_after", "added_total", "trigger"):
+        entry[key] = record.get(key)
+    entry["reason"], entry["detail"] = _log_text(reason), _log_text(detail)
+    if omitted:
+        entry["omitted_ids"] = omitted
+    return entry
+
+
+_REVISION_LOG_KEYS = frozenset({
+    "after_node", "applied", "change", *_REVISION_ID_LISTS, "revisions_remaining_after",
+    "added_total", "trigger", "reason", "detail",
+})
+
+
+def _readable_entry(entry: Any) -> bool:
+    """Whether *entry* has every key of a revision log entry, each of its type."""
+    def either(kind: type, value: Any) -> bool:
+        return value is None or type(value) is kind
+
+    return (
+        isinstance(entry, dict) and _REVISION_LOG_KEYS <= entry.keys()
+        and all(type(entry[key]) is str for key in ("after_node", "change", "trigger"))
+        and all(type(entry[key]) is list and all(type(item) is str for item in entry[key])
+                for key in _REVISION_ID_LISTS)
+        and either(bool, entry["applied"]) and either(int, entry.get("omitted_ids"))
+        and either(int, entry["revisions_remaining_after"]) and either(int, entry["added_total"])
+        and either(str, entry["reason"]) and either(str, entry["detail"])
+    )
+
+
+def read_revision_log(value: Any) -> list[dict[str, Any]]:
+    """The latest ``REVISION_LOG_LIMIT`` entries of a saved revision log, detached.
+
+    The log is informational, so one that is missing or malformed, such as a
+    hand-edited entry without a key, reads as empty instead of stopping a
+    resume or an inspection. Keys an entry holds beyond these are kept.
+    """
+    if not isinstance(value, list) or not all(_readable_entry(entry) for entry in value):
+        return []
+    return deepcopy(value[-REVISION_LOG_LIMIT:])

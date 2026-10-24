@@ -591,6 +591,25 @@ result = swarm.reevaluate(execution_id, acceptance=fixed)
   [`smythe runs inspect`](runs.md#decision-history) lists the decisions and
   exits by the current one.
 
+### Re-evaluation and republication
+
+A durable run with a [renderer](workflow-accounting.md#published-documents)
+delivers a published document, and two different repairs apply to it:
+
+| What changed | Repair | What is decided |
+|---|---|---|
+| A validator or the acceptance policy | `swarm.reevaluate(run_id, acceptance=policy)` | The same saved bytes, again, under the given policy. The document must still be intact. |
+| The published file: missing or changed | `swarm.republish(run_id)` | Without [lineage](lineage.md), nothing: the saved bytes go to a new file and the decision, which binds them, stands. With lineage, the bytes [rendered again](lineage.md#repair-a-run-in-place) from the saved synthesis, under the `Swarm`'s policy. |
+| A source, the renderer or the synthesizer | Neither: a new run | |
+
+A lineage run's republication never copies a decision: the new decision
+binds the new publication, so even identical bytes get a decision of their
+own, and the earlier ones stay in the decision history. On a lineage run,
+every new decision also supersedes the run's lineage record. A re-evaluation
+refuses a damaged document, so republish first and then re-evaluate when
+both changed; on a lineage run, republishing under the new policy does both
+in one decision.
+
 ### Operator decisions
 
 A policy that selects `needs_review`, or a decision left `indeterminate`,
@@ -835,9 +854,15 @@ policy, and records the decision in its journal:
   `smythe runs inspect` read the decision there. Resuming under a changed
   policy is still refused with `WorkflowConflictError`. A run with a renderer
   is re-evaluated only while its published document is intact; when the
-  file is missing or changed, `republish()` publishes it again first. An
+  file is missing or changed, `republish()` publishes it again first
+  ([re-evaluation and republication](#re-evaluation-and-republication)). An
   [operator's decision](#operator-decisions) is journaled and applied the
-  same way, by a `Swarm` with or without a policy.
+  same way, by a `Swarm` with or without a policy. On a run with a
+  [lineage policy](lineage.md#repair-a-run-in-place), each new decision also
+  journals a lineage record that supersedes the run's earlier one, in the
+  same checkpoint.
+  A lineage run whose source was [restricted](lineage.md#a-restricted-run)
+  is never decided again, by a policy or an operator.
 - **Synthesis keys.** Such a run journals its synthesis under `synthesis`
   while every node is at generation 0, and otherwise under
   `synthesis/<digest>`, the first 16 hex digits of the SHA-256 of every node

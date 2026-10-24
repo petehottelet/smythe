@@ -116,7 +116,7 @@ _ELIGIBILITY_REASONS = {
     "no_decision": "No completed attempt has a decision",
     "not_accepted": "The decision did not accept the output",
     "validator_unrecorded": _LEGACY_DECISION,
-    "validator_changed": "Recorded validators differ from the operation's current validators",
+    "validator_changed": "Recheck required: no decision used the operation's current validators",
     "record_invalid": "The recorded decision is malformed",
     "record_mismatch": "An accepted artifact differs from the recorded decision",
     "artifact_changed": "Accepted artifact changed on disk",
@@ -239,6 +239,8 @@ def _decision(acceptance: Any) -> str:
         return escape(_LEGACY_DECISION)
     if acceptance.get("decision") is None:
         return "Not recorded"
+    if acceptance.get("source") == "reevaluated":
+        return f"{_state(acceptance.get('decision'))} after a recheck"
     return _state(acceptance.get("decision"))
 
 
@@ -374,6 +376,9 @@ def render_job_report(payload: dict) -> str:
         if type(record) is dict:
             detail += _definitions([("Delivery decision", _state(record.get("decision")))])
             detail += _details("Validator results", record.get("validators"), structured=True)
+        rechecks = attempt.get("delivery_reevaluations")
+        if type(rechecks) is list and rechecks:
+            detail += _details("Rechecked decisions", rechecks, structured=True)
         rows.append([
             f'Attempt {_number(attempt.get("attempt_number"))}',
             _code(operation_keys.get(attempt.get("operation_id"), attempt.get("operation_id"))),

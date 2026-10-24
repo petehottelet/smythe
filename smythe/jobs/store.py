@@ -49,11 +49,21 @@ _FENCING_COLUMNS = {"runs": {"lease_epoch"}, "attempts": {"lease_owner_id", "lea
                     "run_leases": {"epoch"}}
 _ARTIFACT_COLUMNS = {"artifact_namespace", "artifact_owner_id"}
 # Events whose text ``reason`` explains the next attempt of their operation.
-_QUEUED_REASON_EVENTS = ("reroll_queued",)
+_QUEUED_REASON_EVENTS = ("reroll_queued", "integrity_repair_queued")
+# Integrity statuses of an accepted file. A repair needs a missing or changed
+# file; any status but these and ``verified`` leaves the bytes unknown.
+_REPAIRABLE_INTEGRITY = frozenset({"missing", "changed"})
+_INTEGRITY_STATUSES = _REPAIRABLE_INTEGRITY | {"verified", "unreadable", "unsafe", "not_checked"}
+_FINDING_KEYS = frozenset({"artifact_id", "relative_path", "sha256", "status", "detail"})
 # Events that carry a call's delivery decision when one was recorded: its
 # completion, or the adoption of bytes its unknown-outcome attempt published.
 _COMPLETION_EVENTS = ("call_completed", "artifact_rejected", "unknown_outcome_adopted")
 _DELIVERY_DECISIONS = frozenset({"accepted", "rejected", "indeterminate"})
+# A recheck's later decision about an operation's accepted bytes.
+_REEVALUATION_EVENT = "delivery_acceptance_reevaluated"
+_REEVALUATION_KEYS = frozenset({"operation_id", "attempt_id", "outcome", "validators", "findings",
+                                "artifacts"})
+_VALIDATOR_OUTCOMES = frozenset({"passed", "rejected", "error"})
 _IDENTITY_RE = re.compile(r"[0-9a-f]{32}\Z")
 _CONTROL_TABLE_SQL = """CREATE TABLE IF NOT EXISTS run_controls (
     run_id TEXT PRIMARY KEY REFERENCES runs(run_id) ON DELETE CASCADE,
@@ -253,6 +263,59 @@ def _delivery_decision(record: object, accepted: bool,
            for artifact in artifacts):
         raise ValueError("delivery_acceptance needs a published subject for every artifact")
     return decision
+
+
+def _repair_findings(findings: object) -> dict[str, dict[str, Any]]:
+    """Index a repair's integrity observations by artifact ID, refusing malformed ones."""
+    if not isinstance(findings, (list, tuple)):
+        raise ValueError("integrity findings must be a list of observations")
+    indexed: dict[str, dict[str, Any]] = {}
+    for item in findings:
+        if type(item) is not dict or set(item) != _FINDING_KEYS:
+            raise ValueError("each integrity finding needs exactly the keys "
+                             + ", ".join(sorted(_FINDING_KEYS)))
+        if any(type(item[key]) is not str for key in ("artifact_id", "relative_path", "sha256")):
+            raise ValueError("integrity finding artifact identities must be text")
+        if type(item["status"]) is not str or item["status"] not in _INTEGRITY_STATUSES:
+            raise ValueError("integrity finding status must be one of "
+                             + ", ".join(sorted(_INTEGRITY_STATUSES)))
+        if type(item["detail"]) is not str or len(item["detail"]) > 1024:
+            raise ValueError("integrity finding detail must be text of at most 1024 characters")
+        if item["artifact_id"] in indexed:
+            raise ValueError("an integrity finding names an artifact more than once")
+        indexed[item["artifact_id"]] = dict(item)
+    return indexed
+
+
+def _reevaluation(decision: object) -> dict[str, Any]:
+    """A detached JSON copy of one recheck's decision, refusing a malformed one."""
+    try:
+        item = json.loads(json.dumps(decision, allow_nan=False))
+    except (TypeError, ValueError, RecursionError) as exc:
+        raise ValueError("a recheck decision must be JSON data") from exc
+    if type(item) is not dict or set(item) != _REEVALUATION_KEYS:
+        raise ValueError("a recheck decision needs exactly the keys "
+                         + ", ".join(sorted(_REEVALUATION_KEYS)))
+    if type(item["operation_id"]) is not str or type(item["attempt_id"]) is not str:
+        raise ValueError("a recheck decision names its operation and attempt as text")
+    results = item["validators"]
+    if type(results) is not list or not results or any(
+            type(result) is not dict or type(result.get("validator")) is not dict
+            or result.get("outcome") not in _VALIDATOR_OUTCOMES for result in results):
+        raise ValueError("a recheck decision needs each validator's identity and outcome")
+    outcomes = {result["outcome"] for result in results}
+    expected = ("rejected" if "rejected" in outcomes
+                else "indeterminate" if "error" in outcomes else "accepted")
+    if item["outcome"] != expected:
+        raise ValueError("a recheck decision's outcome does not follow from its validators")
+    if type(item["findings"]) is not list or any(type(text) is not str for text in item["findings"]):
+        raise ValueError("recheck findings must be a list of text")
+    if type(item["artifacts"]) is not list or not item["artifacts"] or any(
+            type(artifact) is not dict or set(artifact) != {"relative_path", "sha256"}
+            or any(type(value) is not str for value in artifact.values())
+            for artifact in item["artifacts"]):
+        raise ValueError("a recheck decision names each artifact's relative_path and sha256")
+    return item
 
 
 def _check_artifacts(artifacts: Sequence[dict[str, Any]]) -> None:
@@ -1427,8 +1490,11 @@ class SQLiteRunStore:
                    completed_at_ns = ? WHERE attempt_id = ?""",
                 (operation_status.value, result_text, error, now, attempt["attempt_id"]),
             )
+            # Only an accepted attempt moves the pointer. A rejected attempt
+            # queued by an integrity repair leaves it on the attempt it replaces.
             cursor.execute(
-                """UPDATE operations SET status = ?, accepted_attempt_id = ?,
+                """UPDATE operations SET status = ?,
+                   accepted_attempt_id = COALESCE(?, accepted_attempt_id),
                    result_text = ?, error = ?, updated_at_ns = ?
                    WHERE run_id = ? AND operation_id = ?""",
                 (
@@ -1631,6 +1697,102 @@ class SQLiteRunStore:
             )
         return queued
 
+    def queue_integrity_repair(
+        self,
+        run_id: str,
+        operation_keys: Iterable[str],
+        *,
+        reason: str,
+        findings: Sequence[dict[str, Any]],
+        lease: RunLease | None = None,
+    ) -> list[str]:
+        """Queue succeeded operations whose accepted files are missing or changed.
+
+        ``findings`` are the caller's observations, made under the current
+        lease, of every accepted artifact of each operation's accepted
+        attempt: its ``artifact_id``, ``relative_path`` and ``sha256`` as
+        recorded, and the ``status`` and ``detail`` of the shared integrity
+        check. An operation is queued only when it is ``succeeded``, has an
+        attempt left, and at least one of those files is ``missing`` or
+        ``changed`` while the rest are ``verified``; otherwise nothing is
+        queued and ``InvalidTransitionError`` is raised. Each operation's
+        ``integrity_repair_queued`` event records the reason and its
+        findings, and its next attempt records the reason. A repair uses the
+        run's original approval and attempt allowance. The accepted attempt,
+        its artifact rows and their accepted flags stay as they are until a
+        new attempt is accepted.
+        """
+        keys = list(dict.fromkeys(operation_keys))
+        if not keys:
+            raise ValueError("at least one operation key is required")
+        if not isinstance(reason, str) or not reason.strip() or len(reason) > 2048:
+            raise ValueError("repair reason must be nonempty text of at most 2048 characters")
+        observed = _repair_findings(findings)
+        queued: list[str] = []
+        with self._transaction() as cursor:
+            now = self._clock_ns()
+            self._assert_write_owner(cursor, run_id, lease, now)
+            self._assert_budget_open(cursor, run_id, now)
+            for key in keys:
+                operation = cursor.execute(
+                    """SELECT * FROM operations WHERE run_id = ?
+                       AND (operation_key = ? OR operation_id = ?)""",
+                    (run_id, key, key),
+                ).fetchone()
+                if operation is None:
+                    raise JobNotFoundError(f"{run_id}:{key}")
+                name = operation["operation_key"]
+                if operation["status"] != OperationStatus.SUCCEEDED.value:
+                    raise InvalidTransitionError(
+                        f"operation {name} in state {operation['status']} cannot be repaired"
+                    )
+                if operation["attempt_count"] >= operation["max_attempts"]:
+                    raise InvalidTransitionError(f"operation {name} exhausted attempts")
+                rows = cursor.execute(
+                    """SELECT artifact_id, relative_path, sha256 FROM artifacts
+                       WHERE run_id = ? AND attempt_id = ? AND accepted = 1
+                       ORDER BY relative_path, artifact_id""",
+                    (run_id, operation["accepted_attempt_id"]),
+                ).fetchall()
+                found = [observed.pop(row["artifact_id"], None) for row in rows]
+                if any(item is None or (item["relative_path"], item["sha256"])
+                       != (row["relative_path"], row["sha256"]) for item, row in zip(found, rows)):
+                    raise ValueError(
+                        f"integrity findings must observe every accepted artifact of "
+                        f"operation {name} as recorded"
+                    )
+                statuses = sorted({item["status"] for item in found})
+                unknown = [status for status in statuses
+                           if status not in _REPAIRABLE_INTEGRITY and status != "verified"]
+                if unknown:
+                    raise InvalidTransitionError(
+                        f"operation {name} cannot be repaired while an accepted file is {unknown[0]}"
+                    )
+                if not _REPAIRABLE_INTEGRITY.intersection(statuses):
+                    raise InvalidTransitionError(
+                        f"operation {name} has no missing or changed accepted file to repair; "
+                        "a succeeded operation cannot be rerolled"
+                    )
+                cursor.execute(
+                    """UPDATE operations SET status = ?, error = NULL,
+                       updated_at_ns = ? WHERE run_id = ? AND operation_id = ?""",
+                    (OperationStatus.PENDING.value, now, run_id, operation["operation_id"]),
+                )
+                self._event(cursor, run_id, operation["operation_id"], "integrity_repair_queued",
+                            {"version": 1, "reason": reason, "findings": found}, now)
+                queued.append(name)
+            if observed:
+                raise ValueError(
+                    "an integrity finding names a file that is not an accepted artifact "
+                    "of a selected operation"
+                )
+            cursor.execute(
+                """UPDATE runs SET status = ?, updated_at_ns = ?
+                   WHERE run_id = ? AND status != ?""",
+                (RunStatus.APPROVED.value, now, run_id, RunStatus.BUDGET_OVERRUN.value),
+            )
+        return queued
+
     def adopt_published_attempt(
         self,
         run_id: str,
@@ -1710,6 +1872,69 @@ class SQLiteRunStore:
             self._event(cursor, run_id, operation["operation_id"], "unknown_outcome_adopted",
                         payload, now)
         return payload
+
+    def record_reevaluation(
+        self,
+        run_id: str,
+        decisions: Sequence[dict[str, Any]],
+        *,
+        reason: str,
+        lease: RunLease | None = None,
+    ) -> list[dict[str, Any]]:
+        """Record later delivery decisions about succeeded operations' accepted bytes.
+
+        Each decision names a succeeded operation's ``operation_id``, its
+        accepted ``attempt_id``, the ``outcome``, each validator's result
+        (``validators``), the ``findings`` and every accepted artifact's
+        ``relative_path`` and ``sha256`` as recorded (``artifacts``);
+        ``JobRunner.recheck`` produces them. In one transaction under the
+        run's lease, each operation's ``delivery_acceptance_reevaluated``
+        event records version 1, the attempt, the reason and the decision.
+        Statuses, accepted attempts, artifact rows and their ``accepted``
+        flags stay as they are; delivery eligibility reads the events. Any
+        decision that does not fit refuses them all. Returns the payloads.
+        """
+        if not isinstance(reason, str) or not reason.strip() or len(reason) > 2048:
+            raise ValueError("recheck reason must be nonempty text of at most 2048 characters")
+        if not isinstance(decisions, (list, tuple)) or not decisions:
+            raise ValueError("at least one recheck decision is required")
+        items = [_reevaluation(decision) for decision in decisions]
+        if len({item["operation_id"] for item in items}) != len(items):
+            raise ValueError("a recheck decides each operation once")
+        payloads: list[dict[str, Any]] = []
+        with self._transaction() as cursor:
+            now = self._clock_ns()
+            self._assert_write_owner(cursor, run_id, lease, now)
+            for item in items:
+                operation = cursor.execute(
+                    "SELECT * FROM operations WHERE run_id = ? AND operation_id = ?",
+                    (run_id, item["operation_id"]),
+                ).fetchone()
+                if operation is None:
+                    raise JobNotFoundError(f"{run_id}:{item['operation_id']}")
+                name = operation["operation_key"]
+                if (operation["status"] != OperationStatus.SUCCEEDED.value
+                        or operation["accepted_attempt_id"] != item["attempt_id"]):
+                    raise InvalidTransitionError(
+                        f"operation {name} in state {operation['status']} has no accepted "
+                        f"attempt {item['attempt_id']} to recheck"
+                    )
+                recorded = sorted((row["relative_path"], row["sha256"]) for row in cursor.execute(
+                    """SELECT relative_path, sha256 FROM artifacts
+                       WHERE run_id = ? AND attempt_id = ? AND accepted = 1""",
+                    (run_id, item["attempt_id"]),
+                ))
+                if recorded != sorted((artifact["relative_path"], artifact["sha256"])
+                                      for artifact in item["artifacts"]):
+                    raise ValueError(f"a recheck of operation {name} must decide every accepted "
+                                     "artifact as recorded")
+                payload = {"version": 1, "attempt_id": item["attempt_id"], "reason": reason,
+                           **{key: item[key] for key in ("outcome", "validators", "findings",
+                                                         "artifacts")}}
+                self._event(cursor, run_id, operation["operation_id"], _REEVALUATION_EVENT,
+                            payload, now)
+                payloads.append(payload)
+        return payloads
 
     def finalize_run(self, run_id: str, *, lease: RunLease | None = None) -> str:
         with self._transaction() as cursor:
@@ -1889,7 +2114,9 @@ class SQLiteRunStore:
         events contain the latest N for the run or exact operation filter,
         returned in chronological order. Each operation's ``adoption`` is its
         ``unknown_outcome_adopted`` record without the decision, plus
-        ``adopted_at_ns``, or None. This does not read artifact files.
+        ``adopted_at_ns``, or None. Each attempt carries its recorded
+        ``delivery_acceptance`` and its rechecks, oldest first, as
+        ``delivery_reevaluations``. This does not read artifact files.
         """
         if type(limit) is not int or not 1 <= limit <= MAX_LIST_RUNS:
             raise ValueError(f"limit must be an integer between 1 and {MAX_LIST_RUNS}")
@@ -1979,8 +2206,10 @@ class SQLiteRunStore:
                 for call in calls:
                     _validate_read_row(call, "calls")
                 records = self._delivery_records(cursor, run_id, ids)
+                rechecks = self._reevaluations(cursor, run_id, ids)
                 for attempt in result["attempts"]:
                     attempt["delivery_acceptance"] = records.get(attempt["attempt_id"])
+                    attempt["delivery_reevaluations"] = rechecks.get(attempt["attempt_id"], [])
                 for item in result["operations"]:
                     item["adoption"] = adoptions.get(item["operation_id"])
                 result.update(counts=counts, calls=[dict(row) for row in calls], lease=lease,
@@ -2026,6 +2255,37 @@ class SQLiteRunStore:
             if attempt_id is not None and "delivery_acceptance" in payload:
                 records[attempt_id] = payload["delivery_acceptance"]
         return records
+
+    def delivery_reevaluations(self, run_id: str) -> dict[str, list[dict[str, Any]]]:
+        """Return each attempt's recorded rechecks, oldest first, keyed by attempt ID.
+
+        Each is a ``delivery_acceptance_reevaluated`` event's payload with its
+        ``reevaluated_at_ns`` time.
+        """
+        with self._read_transaction() as cursor:
+            if cursor.execute("SELECT 1 FROM runs WHERE run_id = ?", (run_id,)).fetchone() is None:
+                raise JobNotFoundError(run_id)
+            return self._reevaluations(cursor, run_id)
+
+    @staticmethod
+    def _reevaluations(cursor: sqlite3.Cursor, run_id: str,
+                       operation_ids: Sequence[str] | None = None) -> dict[str, list[dict[str, Any]]]:
+        where, parameters = "run_id = ? AND event_type = ?", [run_id, _REEVALUATION_EVENT]
+        if operation_ids is not None:
+            if not operation_ids:
+                return {}
+            where += f" AND operation_id IN ({','.join('?' for _ in operation_ids)})"
+            parameters.extend(operation_ids)
+        rechecks: dict[str, list[dict[str, Any]]] = {}
+        for row in cursor.execute(
+            f"SELECT payload_json, created_at_ns FROM events WHERE {where} ORDER BY sequence",
+            parameters,
+        ):
+            payload = _read_json_object(row["payload_json"], "events.payload_json")
+            if type(payload.get("attempt_id")) is str:
+                rechecks.setdefault(payload["attempt_id"], []).append(
+                    payload | {"reevaluated_at_ns": row["created_at_ns"]})
+        return rechecks
 
     def manifest_record(self, run_id: str) -> dict[str, Any]:
         run = self.get_run(run_id)

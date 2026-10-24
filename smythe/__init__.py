@@ -1,5 +1,6 @@
 """Smythe: task-based personalized agent swarms with dynamic execution topology."""
 
+from smythe._failures import RunControl, SecurityStop
 from smythe.acceptance import (
     AcceptanceDecision,
     AcceptancePolicy,
@@ -25,7 +26,9 @@ from smythe.lineage import ArtifactLineage, LineagePolicy
 from smythe.loader import load_graph
 from smythe.mcp import MCPConfigError, MCPServerSpec, MCPSkillProvider, MCPToolRuntime
 from smythe.memory import PlannerMemory
-from smythe.planner import ArchitectError, DeterministicArchitect, LLMArchitect, SimpleArchitect
+from smythe.planner import (
+    ArchitectError, DeterministicArchitect, LLMArchitect, SimpleArchitect, lint_contributions,
+)
 from smythe.provider import (
     AnthropicProvider,
     Artifact,
@@ -47,14 +50,21 @@ from smythe.provider import (
 from smythe.provider_responses import OpenAIResponsesProvider
 from smythe.provider_messages import AnthropicMessagesProvider
 from smythe.pricing import NativeReceipt
+from smythe.reuse import (
+    CurrentState, ItemDecision, RepairPlan, RepairResult, SourceCatalog, SourceStatus,
+    archive_heads,
+)
 from smythe.workflow_artifact import MarkdownRenderer, PublishedArtifact
 from smythe.workflow_binding import LocalOnly, WorkflowBindingError
 from smythe.workflow_provider import ProviderRequestRejectedError
 from smythe.workflow_policy import WorkflowGraphPolicy
 from smythe.workflow_store import SQLiteWorkflowStore, WorkflowError
 from smythe.workflow_tools import ReadProfile, ReadToolError
-from smythe.router import RoutingDecision, WhiteRabbit
-from smythe.scheduling import RetryDeadlineError, RetryPolicy
+from smythe.router import RoutingDecision, RoutingRule, WhiteRabbit
+from smythe.scheduling import (
+    CapacityLimit, CapacityPolicy, ModelProfile, NoAllowedProfileError, RetryDeadlineError,
+    RetryPolicy, TerminationPolicy, UncertainDispatchError,
+)
 from smythe.skills import (
     CapabilityHydrationMode,
     CapabilityMapper,
@@ -62,7 +72,9 @@ from smythe.skills import (
     SkillProvider,
     SkillRef,
 )
-from smythe.supervisor import LLMSupervisor, Supervisor
+from smythe.supervisor import (
+    EvidenceTriggeredSupervisor, FiredTrigger, LLMSupervisor, ReviewTriggers, Supervisor,
+)
 from smythe.swarm import Swarm, SwarmResult
 from smythe.synthesizer import Synthesizer, SynthesisStrategy
 from smythe.task import Task
@@ -105,6 +117,8 @@ __all__ = [
     "CallableVerifier",
     "CapabilityHydrationMode",
     "CapabilityMapper",
+    "CapacityLimit",
+    "CapacityPolicy",
     "ChatMessage",
     "CheckpointStore",
     "ClaimPassage",
@@ -113,12 +127,15 @@ __all__ = [
     "ConstrainedArchitect",
     "ContextSnapshot",
     "ContextSource",
+    "CurrentState",
     "DefaultCapabilityMapper",
     "DeliveryAcceptance",
     "DesignSystem",
     "DeterministicArchitect",
     "DistillationError",
+    "EvidenceTriggeredSupervisor",
     "FailurePolicy",
+    "FiredTrigger",
     "FileCheckpointStore",
     "Finding",
     "FindingSeverity",
@@ -131,11 +148,14 @@ __all__ = [
     "MCPSkillProvider",
     "MCPToolRuntime",
     "MarkdownRenderer",
+    "ModelProfile",
+    "NoAllowedProfileError",
     "OfflineProvider",
     "OpenAIImageProvider",
     "OpenAIProvider",
     "OpenAIResponsesProvider",
     "IncompleteOutputError",
+    "ItemDecision",
     "JSONValidator",
     "OutputRefusedError",
     "OutputTruncatedError",
@@ -143,6 +163,7 @@ __all__ = [
     "NativeReceipt",
     "LocalOnly",
     "SQLiteWorkflowStore",
+    "SecurityStop",
     "WorkflowBindingError",
     "WorkflowGraphPolicy",
     "WorkflowError",
@@ -158,17 +179,24 @@ __all__ = [
     "ReadToolError",
     "RetryDeadlineError",
     "RetryPolicy",
+    "ReviewTriggers",
     "Revision",
     "RevisionError",
+    "RepairPlan",
+    "RepairResult",
     "RoutingDecision",
+    "RoutingRule",
+    "RunControl",
     "Sentinel",
     "SentinelAlert",
     "SimpleArchitect",
     "SkillProvider",
     "SkillRef",
+    "SourceCatalog",
     "SourceEvidence",
     "SourceEvidenceValidator",
     "SourceRecord",
+    "SourceStatus",
     "SubGraphTemplate",
     "Supervisor",
     "Swarm",
@@ -176,6 +204,7 @@ __all__ = [
     "Synthesizer",
     "SynthesisStrategy",
     "Task",
+    "TerminationPolicy",
     "ToolCall",
     "ToolLoopLimitError",
     "ToolResult",
@@ -184,6 +213,7 @@ __all__ = [
     "TextValidator",
     "TokenVerifier",
     "ToolSpec",
+    "UncertainDispatchError",
     "ValidationFinding",
     "ValidationOutcome",
     "ValidationReport",
@@ -194,9 +224,11 @@ __all__ = [
     "Verifier",
     "VerificationRecoveryError",
     "WhiteRabbit",
+    "archive_heads",
     "design_verifier",
     "distill_template",
     "inspect_asset",
+    "lint_contributions",
     "load_graph",
 ]
 __version__ = "0.9.1"

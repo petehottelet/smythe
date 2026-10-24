@@ -1,35 +1,53 @@
-"""Workflow journal version upgrades: read-only access, migration and refusal.
+"""Workflow journal version upgrades and the external action tables.
 
-Each fixture is built through the public API and then marked as version 1.
-Version 2 changes no table, so a version 1 journal differs from a new one only
-in its recorded version.
+Each fixture is built through the public API and then made a version 1
+journal: version 2's external action tables are dropped and the recorded
+version set to 1. Version 1 has every other table of version 2, so a version 1
+journal differs from a new one only in those tables and its recorded version.
+Action rows are written with SQL in the shape the action tables define, since
+nothing in the library writes them yet.
 """
 
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import closing
 import json
+import os
+import re
 import sqlite3
+import stat
+import subprocess
 from threading import Barrier
 
 import pytest
 
-from fakes import ManualClock, kill_and_reap, launch_child, wait_for_barrier
-from smythe import workflow_store
+from fakes import (
+    Crash, ManualClock, child_executable, crash_when, kill_and_reap, launch_child, offline_env,
+    wait_for_barrier,
+)
+from smythe import (
+    AcceptanceDecision, AcceptancePolicy, OfflineProvider, SimpleArchitect, Swarm, Task, TextValidator,
+    workflow_store,
+)
+from smythe.actions import ActionIntent, ActionTarget, ConnectorProfile, ContentRef, action_key
 from smythe.pricing import PRICE_VERSION
+from smythe.workflow import current_decision
 from smythe.workflow_binding import CallScope, WorkflowBindingError
 from smythe.workflow_store import (
     STORE_VERSION, CallKey, SQLiteWorkflowStore, WorkflowCorruptionError, WorkflowLeaseError,
-    WorkflowStateError, WorkflowValidationError,
+    WorkflowStateError, WorkflowValidationError, _canonical, _sha,
 )
 
 CONNECT = sqlite3.connect
 LEASE_TTL_S = 30
 PROVIDER = {"kind": "openai_responses", "adapter_version": "test-v1", "decoder_version": "test-v1"}
+# The fixture's runs by id, besides the strict run whose delivery was accepted.
 STATES = {
     "completed": ("completed", None), "accepted": ("running", None), "rejected": ("running", None),
     "overrun": ("blocked", "budget_overrun"), "unknown": ("blocked", "unknown_exposure"),
     "interrupted": ("running", None),
 }
+ACTION_TABLES = ("workflow_actions", "workflow_action_attempts", "workflow_action_approvals",
+                 "workflow_action_records")
 
 
 def canonical(value):
@@ -123,6 +141,16 @@ def build_journal(path, clock):
     clock.advance(LEASE_TTL_S + 1)
 
 
+def add_delivered_run(path, clock):
+    """Add a completed run whose strict delivery decision accepted its output."""
+    with SQLiteWorkflowStore(path, clock_ns=clock) as store:
+        Swarm(model="offline", provider=OfflineProvider(), architect=SimpleArchitect(), run_store=store,
+              max_budget_usd=1, artifact_dir=None,
+              acceptance=AcceptancePolicy(mode="strict", final_validators=[TextValidator()]),
+              ).execute(Task("Write the brief"))
+    clock.advance(LEASE_TTL_S + 1)
+
+
 def copy(source, target):
     with closing(CONNECT(source)) as db, closing(CONNECT(target)) as copied:
         db.backup(copied)
@@ -130,7 +158,10 @@ def copy(source, target):
 
 
 def mark_version_1(path):
+    """Give a journal version 1's schema: no action tables, and version 1 recorded."""
     with closing(CONNECT(path)) as db, db:
+        for table in ACTION_TABLES:
+            db.execute(f"DROP TABLE {table}")
         db.execute("UPDATE workflow_meta SET version=1")
 
 
@@ -139,6 +170,7 @@ def templates(tmp_path_factory):
     """Version 1 journals, built once: every lease expired, or one still live."""
     folder, clock = tmp_path_factory.mktemp("journals"), ManualClock()
     build_journal(folder / "built.db", clock)
+    add_delivered_run(folder / "built.db", clock)
     expired, live = copy(folder / "built.db", folder / "expired.db"), copy(folder / "built.db", folder / "live.db")
     with SQLiteWorkflowStore(live, clock_ns=clock) as store:
         # A worker from an earlier release holds a run.
@@ -159,9 +191,48 @@ def dump(path):
 
 
 def migrated(lines):
-    """The dump of a migrated journal: only the recorded version changes."""
+    """A version 1 dump as its upgrade keeps it: only the recorded version changes."""
     return [line.replace("'smythe.workflow',1,", f"'smythe.workflow',{STORE_VERSION},")
             if line.startswith('INSERT INTO "workflow_meta"') else line for line in lines]
+
+
+def without_actions(lines):
+    """A dump without the action tables' schema and rows: version 1's tables."""
+    return [line for line in lines
+            if not re.match(r'(CREATE (TABLE|INDEX|TRIGGER) |INSERT INTO ")workflow_action', line)]
+
+
+def schema(path):
+    with closing(CONNECT(path)) as db:
+        return sorted(db.execute("SELECT type, name, tbl_name, sql FROM sqlite_master").fetchall(),
+                      key=lambda row: (row[0], row[1]))
+
+
+def add_foreign_table(path):
+    """Add a table and a row, as a backup or replication tool does."""
+    with closing(CONNECT(path)) as db, db:
+        db.execute("CREATE TABLE _litestream_seq(id INTEGER PRIMARY KEY, seq INTEGER)")
+        db.execute("INSERT INTO _litestream_seq VALUES (1, 7)")
+
+
+FOREIGN_ROW = 'INSERT INTO "_litestream_seq" VALUES(1,7);'
+
+
+def assert_upgraded(path, before_dump, *, foreign=False):
+    """Every version 1 row is kept, and the empty action tables match a new journal's.
+
+    With ``foreign``, the journal also keeps the table ``add_foreign_table`` adds.
+    """
+    after = dump(path)
+    assert without_actions(after) == migrated(before_dump)
+    assert [line for line in after if line.startswith('INSERT INTO "workflow_action')] == []
+    fresh = path.parent / "fresh-schema.db"
+    SQLiteWorkflowStore(fresh).close()
+    if foreign:
+        add_foreign_table(fresh)
+    assert schema(path) == schema(fresh)
+    assert recorded_version(path) == [(STORE_VERSION,)]
+    assert_integrity(path)
 
 
 def recorded_version(path):
@@ -186,16 +257,30 @@ def snapshot(store):
             "run": store.load_run(run_id), "inspect": inspected, "checkpoint": store.get_checkpoint(run_id),
             "sessions": store.lease_sessions(run_id), "operation": store.load_operation(run_id, "plan"),
             "replays": [store.load_replay(call["call_id"]) for call in inspected["calls"]],
+            "decision": current_decision(store, run_id),
+            # Exactly what inspection returns, in its key order.
+            "inspected_bytes": json.dumps(inspected).encode(),
         }
     return {"store_id": store.store_id, "runs": runs, "detail": detail}
 
 
+def delivered_run(state):
+    """The id of the fixture's run with a delivery decision."""
+    decided = [run_id for run_id, detail in state["detail"].items() if detail["decision"]]
+    assert len(decided) == 1
+    return decided[0]
+
+
 def assert_fixture_states(state):
     runs = {run["run_id"]: run for run in state["runs"]}
-    assert {run_id: (run["status"], run["blocked_reason"]) for run_id, run in runs.items()} == STATES
+    delivered = delivered_run(state)
+    assert state["detail"][delivered]["decision"]["record"].decision is AcceptanceDecision.ACCEPTED
+    assert (runs[delivered]["status"], runs[delivered]["blocked_reason"]) == ("completed", None)
+    assert {run_id: (run["status"], run["blocked_reason"])
+            for run_id, run in runs.items() if run_id != delivered} == STATES
     calls = {run_id: [(call["state"], call["billing_state"], call["result_state"])
                       for call in detail["inspect"]["calls"]]
-             for run_id, detail in state["detail"].items()}
+             for run_id, detail in state["detail"].items() if run_id != delivered}
     assert calls == {
         "completed": [("settled", "known", "applied")],
         "accepted": [("settled", "known", "accepted")],
@@ -219,6 +304,8 @@ def assert_fixture_states(state):
 
 def test_writable_open_migrates_and_keeps_every_record_identity_and_balance(templates, tmp_path):
     path, clock = v1_journal(templates, tmp_path)
+    os.chmod(path, 0o600)
+    mode = stat.S_IMODE(path.stat().st_mode)
     before_dump = dump(path)
     with SQLiteWorkflowStore(path, read_only=True, clock_ns=clock) as reader:
         assert reader.store_version == 1
@@ -226,11 +313,14 @@ def test_writable_open_migrates_and_keeps_every_record_identity_and_balance(temp
     assert_fixture_states(before)
     with SQLiteWorkflowStore(path, clock_ns=clock) as store:
         assert store.store_version == STORE_VERSION == 2
+        # Inspection of runs without actions returns the same bytes as before.
         assert snapshot(store) == before
-    assert recorded_version(path) == [(2,)]
-    # Every table except the version marker is unchanged, row for row.
-    assert dump(path) == migrated(before_dump)
-    assert_integrity(path)
+    for detail in before["detail"].values():
+        assert "actions" not in detail["inspect"]
+    # Every version 1 table is unchanged, row for row, apart from the version
+    # marker, and the action tables are created empty.
+    assert_upgraded(path, before_dump)
+    assert stat.S_IMODE(path.stat().st_mode) == mode
     with SQLiteWorkflowStore(path, clock_ns=clock) as store:
         assert snapshot(store) == before
         # Saved runs continue on the migrated journal.
@@ -265,7 +355,7 @@ def test_read_only_open_reads_a_v1_journal_without_migrating(templates, tmp_path
         with pytest.raises(WorkflowStateError):
             reader.create_run(None, {}, None, run_id="new")
     monkeypatch.setattr(sqlite3, "connect", CONNECT)
-    assert {run["run_id"] for run in state["runs"]} == set(STATES)
+    assert {run["run_id"] for run in state["runs"]} == set(STATES) | {delivered_run(state)}
     compact = ["".join(sql.upper().split()) for sql in statements]
     assert "BEGINIMMEDIATE" not in compact
     assert not any(sql.startswith(("PRAGMAJOURNAL_MODE=", "CREATE", "INSERT", "UPDATE", "ALTER"))
@@ -288,7 +378,7 @@ def test_live_lease_from_an_earlier_release_refuses_migration(templates, tmp_pat
     clock.advance(LEASE_TTL_S + 1)
     with SQLiteWorkflowStore(path, clock_ns=clock) as store:
         assert store.store_version == 2
-    assert dump(path) == migrated(before)
+    assert_upgraded(path, before)
 
 
 @pytest.mark.parametrize("failure", ["interrupt", "sql-error"])
@@ -341,7 +431,7 @@ def test_interrupted_migration_leaves_a_usable_v1_journal(templates, tmp_path, m
     with SQLiteWorkflowStore(path, clock_ns=clock) as store:
         assert store.store_version == 2
         assert snapshot(store) == before
-    assert dump(path) == migrated(before_dump)
+    assert_upgraded(path, before_dump)
 
 
 def test_concurrent_writable_openers_migrate_once_and_share_one_identity(templates, tmp_path, monkeypatch):
@@ -387,7 +477,7 @@ def test_concurrent_writable_openers_migrate_once_and_share_one_identity(templat
     assert len(migrations) == 1
     assert results == [(2, before["store_id"])] * 2
     assert recorded_version(path) == [(2,)]
-    assert dump(path) == migrated(before_dump)
+    assert_upgraded(path, before_dump)
     with SQLiteWorkflowStore(path, read_only=True, clock_ns=clock) as reader:
         assert snapshot(reader) == before
     assert_integrity(path)
@@ -445,7 +535,36 @@ def test_process_killed_during_migration_leaves_the_v1_journal_intact(templates,
     with SQLiteWorkflowStore(path, clock_ns=clock) as store:
         assert store.store_version == 2
         assert snapshot(store) == before
-    assert dump(path) == migrated(before_dump)
+    assert_upgraded(path, before_dump)
+
+
+def test_a_crash_after_the_action_tables_are_created_rolls_the_upgrade_back(templates, tmp_path, monkeypatch):
+    path, clock = v1_journal(templates, tmp_path)
+    before_dump = dump(path)
+    with SQLiteWorkflowStore(path, read_only=True, clock_ns=clock) as reader:
+        before = snapshot(reader)
+    created = []
+
+    def final_check(self, db, *, allow_empty):
+        # The upgrade's last step, inside its transaction, once its tables exist.
+        if allow_empty:
+            return False
+        created.extend(row[0] for row in db.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name LIKE 'workflow_action%'"))
+        return True
+
+    point = crash_when(monkeypatch, SQLiteWorkflowStore, "_validate_schema_db", final_check)
+    with pytest.raises(Crash):
+        SQLiteWorkflowStore(path, clock_ns=clock)
+    point.restore()
+    assert point.fired and sorted(created) == sorted(ACTION_TABLES)
+    assert dump(path) == before_dump
+    assert recorded_version(path) == [(1,)]
+    assert_integrity(path)
+    with SQLiteWorkflowStore(path, clock_ns=clock) as store:
+        assert store.store_version == 2
+        assert snapshot(store) == before
+    assert_upgraded(path, before_dump)
 
 
 @pytest.mark.parametrize("read_only", [False, True], ids=["writable", "read-only"])
@@ -459,6 +578,62 @@ def test_unsupported_journal_versions_are_refused_without_changes(templates, tmp
     with pytest.raises(WorkflowCorruptionError, match="Unsupported workflow journal version"):
         SQLiteWorkflowStore(path, read_only=read_only, clock_ns=clock)
     assert path.read_bytes() == before
+
+
+@pytest.mark.parametrize("read_only", [False, True], ids=["writable", "read-only"])
+@pytest.mark.parametrize("change", ["version-2-missing-a-table", "version-1-with-an-action-table"])
+def test_journal_tables_that_contradict_its_version_are_refused(tmp_path, read_only, change):
+    path = tmp_path / "workflow.db"
+    with SQLiteWorkflowStore(path) as store:
+        store.create_run(None, {}, None, run_id="saved")
+    if change == "version-1-with-an-action-table":
+        mark_version_1(path)
+    with closing(CONNECT(path)) as db, db:
+        db.execute("PRAGMA journal_mode=DELETE")
+        if change == "version-2-missing-a-table":
+            db.execute("DROP TABLE workflow_action_records")
+        else:
+            # An upgrade must not adopt a table of unknown shape as its own.
+            db.execute("CREATE TABLE workflow_actions(action_id TEXT)")
+    before = path.read_bytes()
+    with pytest.raises(WorkflowCorruptionError, match="tables do not match its version"):
+        SQLiteWorkflowStore(path, read_only=read_only)
+    assert path.read_bytes() == before
+
+
+def test_a_v1_journal_keeps_tables_other_tools_added_through_its_upgrade(templates, tmp_path):
+    path, clock = v1_journal(templates, tmp_path)
+    add_foreign_table(path)
+    before_dump = dump(path)
+    assert FOREIGN_ROW in before_dump
+    with SQLiteWorkflowStore(path, read_only=True, clock_ns=clock) as reader:
+        assert reader.store_version == 1
+        before = snapshot(reader)
+    assert_fixture_states(before)
+    with SQLiteWorkflowStore(path, clock_ns=clock) as store:
+        assert store.store_version == STORE_VERSION
+        assert snapshot(store) == before
+    # The other tool's table and row are kept, like every version 1 table.
+    assert_upgraded(path, before_dump, foreign=True)
+    with SQLiteWorkflowStore(path, read_only=True, clock_ns=clock) as reader:
+        assert reader.store_version == STORE_VERSION
+        assert snapshot(reader) == before
+
+
+@pytest.mark.parametrize("read_only", [False, True], ids=["writable", "read-only"])
+def test_a_v2_journal_with_tables_other_tools_added_opens(tmp_path, read_only):
+    path = tmp_path / "workflow.db"
+    with SQLiteWorkflowStore(path) as store:
+        store.create_run(None, {}, None, run_id="saved")
+        inspected = store.inspect_run("saved")
+    add_foreign_table(path)
+    before = dump(path)
+    assert FOREIGN_ROW in before
+    with SQLiteWorkflowStore(path, read_only=read_only) as store:
+        assert store.store_version == STORE_VERSION
+        assert store.inspect_run("saved") == inspected
+    assert dump(path) == before
+    assert_integrity(path)
 
 
 @pytest.mark.parametrize("version", [1, STORE_VERSION + 1])
@@ -495,3 +670,254 @@ def test_tool_phase_is_shared_by_call_keys_and_call_scopes():
         else:
             scope = True
         assert key == scope == (phase in phases), phase
+
+
+# ---------------------------------------------------------------------------
+# External action tables
+# ---------------------------------------------------------------------------
+
+NOW = ManualClock().now_ns
+HOUR_NS = 3600 * 10**9
+PROFILE = ConnectorProfile("fixture-posts", "1", ["publish", "delete"], write_ceiling_nanousd=2_000_000,
+                           read_ceiling_nanousd=10_000, max_attempts=2, readback_reads=2)
+PRINCIPAL = {"issuer": "host", "subject": "editor", "tenant": "acme"}
+RECEIPT = {"key": "receipt-key", "object_version": 1, "cost_nanousd": 2_000_000, "body": "SECRET-RECEIPT"}
+READBACK = {"content_sha256": "0" * 64, "body": "SECRET-PAYLOAD"}
+NOTICE = {"notice": "SECRET-NOTICE"}
+
+
+def intent(operation="publish", title="SECRET-PARAMETER"):
+    return ActionIntent(operation, ActionTarget("acme", "posts"), parameters={"title": title},
+                        content=ContentRef.for_bytes(b"accepted document", "text/markdown"),
+                        connector=PROFILE.name, connector_version=PROFILE.version)
+
+
+def insert(db, table, **row):
+    db.execute(f"INSERT INTO {table}({','.join(row)}) VALUES ({','.join('?' * len(row))})",
+               tuple(row.values()))
+
+
+def add_action(db, store_id, action_id, slot, value, state, balances, compensates=None):
+    insert(db, "workflow_actions", action_id=action_id, run_id="acting", slot=slot, sequence=0,
+           action_key=action_key(store_id, "acting", slot, 0), intent_json=_canonical(value.to_dict()),
+           intent_sha=value.digest(), profile_json=_canonical(PROFILE.to_dict()), state=state,
+           ceiling="4020000", confirmed=balances[0], reserved=balances[1], unknown=balances[2],
+           compensates_action_id=compensates, created=NOW, updated=NOW)
+
+
+def add_approval(db, action_id, approval_id, value, **row):
+    assertion = "SECRET-ASSERTION-" + approval_id
+    insert(db, "workflow_action_approvals", approval_id=approval_id, action_id=action_id,
+           intent_sha=value.digest(), verdict="approved", principal_json=_canonical(PRINCIPAL),
+           verifier_json=_canonical({"identity": "fixture-hmac v1"}), assertion=assertion,
+           assertion_sha=_sha(assertion), ceiling="4020000", expires_at_ns=NOW + HOUR_NS, created=NOW, **row)
+
+
+def add_attempt(db, action_id, attempt_id, number, approval_id, state, *, epoch=None, receipt=None,
+                cost=None, reserved="0", unknown="0"):
+    receipt_json = None if receipt is None else _canonical(receipt)
+    insert(db, "workflow_action_attempts", attempt_id=attempt_id, action_id=action_id, number=number,
+           approval_id=approval_id, state=state,
+           dispatch_token_sha=None if epoch is None else _sha("token-" + attempt_id), dispatch_epoch=epoch,
+           receipt_json=receipt_json, receipt_sha=None if receipt is None else _sha(receipt_json),
+           cost=cost, reserved=reserved, unknown=unknown, error="SECRET-ERROR from the service",
+           created=NOW, dispatched=None if epoch is None else NOW, updated=NOW)
+
+
+def add_record(db, action_id, record_id, kind, payload, *, trusted, cost=None):
+    insert(db, "workflow_action_records", record_id=record_id, action_id=action_id, kind=kind,
+           payload_json=_canonical(payload), payload_sha=_sha(_canonical(payload)), trusted=int(trusted),
+           cost=cost, created=NOW)
+
+
+@pytest.fixture(scope="module")
+def action_template(tmp_path_factory):
+    """A version 2 journal whose run ``acting`` has three external actions; ``quiet`` has none.
+
+    ``published`` was refused once, then acknowledged and read back;
+    ``pending`` has an outcome that may have taken effect; and ``undo``,
+    which compensates ``published``, holds a reservation for its first attempt.
+    """
+    path, clock, before = tmp_path_factory.mktemp("actions") / "workflow.db", ManualClock(), {}
+    with SQLiteWorkflowStore(path, clock_ns=clock) as store:
+        for run_id in ("acting", "quiet"):
+            lease = start(store, run_id)
+            call = settle(store, lease, prepare(store, lease, "execution", "node/a"))
+            store.accept_result(lease, call["call_id"], {"text": "accepted output"}, "test-v1")
+            store.release_lease(lease)
+            before[run_id] = json.dumps(store.inspect_run(run_id)).encode()
+        audit, store_id = store.audit("acting"), store.store_id
+    published, pending, undo = intent(), intent(title="announcement"), intent("delete")
+    with closing(CONNECT(path)) as db, db:
+        db.execute("PRAGMA foreign_keys=ON")
+        add_action(db, store_id, "published", "publish", published, "observed", ("2010000", "0", "0"))
+        add_approval(db, "published", "approval-1", published)
+        add_attempt(db, "published", "attempt-1", 1, "approval-1", "refused", epoch=1, cost="0")
+        add_attempt(db, "published", "attempt-2", 2, "approval-1", "acknowledged", epoch=1, receipt=RECEIPT,
+                    cost="2000000")
+        db.execute("UPDATE workflow_action_approvals SET consumed_by_attempt='attempt-2' "
+                   "WHERE approval_id='approval-1'")
+        add_record(db, "published", "readback-1", "readback", READBACK, trusted=True, cost="10000")
+        add_record(db, "published", "notice-1", "notice", NOTICE, trusted=False)
+        add_action(db, store_id, "pending", "announce", pending, "outcome_unknown", ("0", "0", "2000000"))
+        add_approval(db, "pending", "approval-2", pending)
+        add_approval(db, "pending", "approval-2b", pending, revoked_at_ns=NOW, revoked_reason="SECRET-REASON")
+        add_attempt(db, "pending", "pending-1", 1, "approval-2", "outcome_unknown", epoch=2, unknown="2000000")
+        add_action(db, store_id, "undo", "undo", undo, "not_dispatched", ("0", "2000000", "0"), "published")
+        add_approval(db, "undo", "approval-3", undo)
+        add_attempt(db, "undo", "undo-1", 1, "approval-3", "prepared", reserved="2000000")
+    return path, store_id, before, audit
+
+
+def action_journal(action_template, tmp_path):
+    path, *rest = action_template
+    return copy(path, tmp_path / "workflow.db"), *rest
+
+
+def test_inspection_adds_a_safe_actions_block_only_for_runs_with_actions(action_template, tmp_path):
+    path, store_id, before, audit = action_journal(action_template, tmp_path)
+    with SQLiteWorkflowStore(path, read_only=True) as reader:
+        # Action money never enters a run's balances, which equal its call ledger.
+        assert reader.audit("acting") == audit
+        inspected, quiet = reader.inspect_run("acting"), reader.inspect_run("quiet")
+        assert reader.list_runs()[0]["confirmed_nanousd"] == audit["confirmed_nanousd"]
+    assert json.dumps(quiet).encode() == before["quiet"]
+    actions = inspected.pop("actions")
+    # The block is added last; everything else is what the run inspected to before.
+    assert json.dumps(inspected).encode() == before["acting"]
+    assert "SECRET" not in json.dumps(actions)
+    totals = {key: actions[key] for key in actions if key != "items"}
+    assert totals == {"accounting_scope": "external_actions", "unit": "nanoUSD",
+                      "confirmed_nanousd": 2_010_000, "reserved_nanousd": 2_000_000, "unknown_nanousd": 2_000_000}
+    items = {item["action_id"]: item for item in actions["items"]}
+    assert list(items) == ["pending", "published", "undo"]  # by slot, then sequence
+    value = intent()
+    assert items["published"] == {
+        "action_id": "published", "slot": "publish", "sequence": 0,
+        "action_key": action_key(store_id, "acting", "publish", 0), "intent_sha256": value.digest(),
+        "operation": "publish", "target": {"tenant": "acme", "collection": "posts", "object_id": None},
+        "connector": "fixture-posts", "connector_version": "1", "state": "observed",
+        "compensates_action_id": None, "ceiling_nanousd": 4_020_000,
+        "confirmed_nanousd": 2_010_000, "reserved_nanousd": 0, "unknown_nanousd": 0,
+        "attempts": [
+            {"attempt_id": "attempt-1", "number": 1, "approval_id": "approval-1", "state": "refused",
+             "dispatch_epoch": 1, "receipt_sha256": None, "cost_nanousd": 0, "reserved_nanousd": 0,
+             "unknown_nanousd": 0},
+            {"attempt_id": "attempt-2", "number": 2, "approval_id": "approval-1", "state": "acknowledged",
+             "dispatch_epoch": 1, "receipt_sha256": _sha(_canonical(RECEIPT)), "cost_nanousd": 2_000_000,
+             "reserved_nanousd": 0, "unknown_nanousd": 0},
+        ],
+        "approvals": [
+            {"approval_id": "approval-1", "verdict": "approved", "intent_sha256": value.digest(),
+             "principal": PRINCIPAL, "verifier": {"identity": "fixture-hmac v1"},
+             "ceiling_nanousd": 4_020_000, "expires_at_ns": NOW + HOUR_NS, "consumed_by_attempt": "attempt-2",
+             "revoked_at_ns": None, "duplicate_risk": False},
+        ],
+        "records": [
+            {"record_id": "readback-1", "kind": "readback", "payload_sha256": _sha(_canonical(READBACK)),
+             "trusted": True, "cost_nanousd": 10_000},
+            {"record_id": "notice-1", "kind": "notice", "payload_sha256": _sha(_canonical(NOTICE)),
+             "trusted": False, "cost_nanousd": None},
+        ],
+    }
+    pending, undo = items["pending"], items["undo"]
+    assert (pending["state"], pending["unknown_nanousd"], pending["attempts"][0]["state"]) == (
+        "outcome_unknown", 2_000_000, "outcome_unknown")
+    assert [(approval["approval_id"], approval["revoked_at_ns"]) for approval in pending["approvals"]] == [
+        ("approval-2", None), ("approval-2b", NOW)]
+    assert (undo["compensates_action_id"], undo["operation"], undo["reserved_nanousd"]) == (
+        "published", "delete", 2_000_000)
+    assert undo["attempts"][0]["dispatch_epoch"] is None
+
+
+def test_runs_without_actions_never_load_the_action_modules(tmp_path):
+    code = (
+        "import sys\n"
+        "from smythe import SQLiteWorkflowStore\n"
+        "with SQLiteWorkflowStore(sys.argv[1]) as store:\n"
+        "    store.create_run(None, {}, None, run_id='run')\n"
+        "    assert 'actions' not in store.inspect_run('run') and store.audit('run')['ok']\n"
+        "assert not {'smythe.actions', 'smythe.workflow_actions'} & set(sys.modules)\n"
+        "print('ok')\n"
+    )
+    completed = subprocess.run([child_executable(), "-c", code, str(tmp_path / "workflow.db")],
+                               env=offline_env(), capture_output=True, text=True, timeout=120)
+    assert completed.returncode == 0, completed.stderr
+    assert completed.stdout.strip() == "ok"
+
+
+def test_action_records_are_append_only(action_template, tmp_path):
+    path = action_journal(action_template, tmp_path)[0]
+    before = dump(path)
+    for statement in ("UPDATE workflow_action_records SET trusted=1", "DELETE FROM workflow_action_records"):
+        with closing(CONNECT(path)) as db:
+            with pytest.raises(sqlite3.IntegrityError, match="append-only"):
+                db.execute(statement)
+    assert dump(path) == before
+
+
+def test_the_audit_detects_a_tampered_action_balance(action_template, tmp_path):
+    path = action_journal(action_template, tmp_path)[0]
+    with closing(CONNECT(path)) as db, db:
+        db.execute("UPDATE workflow_actions SET confirmed='2000000' WHERE action_id='published'")
+    with SQLiteWorkflowStore(path) as store:
+        message = "External action balances disagree with its attempts and records"
+        with pytest.raises(WorkflowCorruptionError, match=message):
+            store.audit("acting")
+        with pytest.raises(WorkflowCorruptionError, match=message):
+            store.inspect_run("acting")
+        with pytest.raises(WorkflowCorruptionError, match=message):
+            store.recover(store.acquire_lease("acting", "owner"))
+        # The audit covers one run's actions; another run is unaffected.
+        assert store.audit("quiet")["ok"] is True
+        with closing(CONNECT(path)) as db, db:
+            db.execute("UPDATE workflow_actions SET confirmed='2010000' WHERE action_id='published'")
+        assert store.audit("acting")["ok"] is True
+
+
+ALLOW_RECORD_UPDATES = "DROP TRIGGER workflow_action_records_no_update"
+TAMPERING = {
+    "attempt-cost": (["UPDATE workflow_action_attempts SET cost='1999999' WHERE attempt_id='attempt-2'"],
+                     "balances disagree"),
+    "read-cost": ([ALLOW_RECORD_UPDATES, "UPDATE workflow_action_records SET cost='0' WHERE record_id='readback-1'"],
+                  "balances disagree"),
+    "reservation": (["UPDATE workflow_actions SET reserved='0' WHERE action_id='undo'"], "balances disagree"),
+    "exposure": (["UPDATE workflow_action_attempts SET unknown='0' WHERE attempt_id='pending-1'"],
+                 "balances disagree"),
+    "amount-form": (["UPDATE workflow_actions SET confirmed='02010000' WHERE action_id='published'"],
+                    "canonical nanoUSD"),
+    "action-state": (["UPDATE workflow_actions SET state='published' WHERE action_id='published'"],
+                     "identity or state"),
+    "intent": ([("UPDATE workflow_actions SET intent_json=? WHERE action_id='published'",
+                 (_canonical(intent(title="edited").to_dict()),))], "identity or state"),
+    "action-key": (["UPDATE workflow_actions SET slot='republish' WHERE action_id='published'"],
+                   "identity or state"),
+    "attempt-state": (["UPDATE workflow_action_attempts SET state='sent' WHERE attempt_id='attempt-2'"],
+                      "attempt is inconsistent"),
+    "unclaimed-dispatch": (["UPDATE workflow_action_attempts SET dispatch_token_sha=NULL "
+                            "WHERE attempt_id='attempt-2'"], "attempt is inconsistent"),
+    "rejected-approval": (["UPDATE workflow_action_approvals SET verdict='rejected' WHERE approval_id='approval-3'"],
+                          "attempt is inconsistent"),
+    "approval-intent": ([("UPDATE workflow_action_approvals SET intent_sha=? WHERE approval_id='approval-3'",
+                          (intent().digest(),))], "approval is inconsistent"),
+    "assertion": (["UPDATE workflow_action_approvals SET assertion='forged' WHERE approval_id='approval-1'"],
+                  "approval is inconsistent"),
+    "record-payload": ([ALLOW_RECORD_UPDATES, "UPDATE workflow_action_records SET payload_json='{\"notice\":1}' "
+                        "WHERE record_id='notice-1'"], "record is inconsistent"),
+}
+
+
+@pytest.mark.parametrize("case", sorted(TAMPERING))
+def test_the_audit_detects_tampered_action_rows(action_template, tmp_path, case):
+    path = action_journal(action_template, tmp_path)[0]
+    statements, message = TAMPERING[case]
+    with closing(CONNECT(path)) as db, db:
+        for statement in statements:
+            sql, *parameters = (statement,) if isinstance(statement, str) else statement
+            db.execute(sql, *parameters)
+    with SQLiteWorkflowStore(path, read_only=True) as reader:
+        with pytest.raises(WorkflowCorruptionError, match=message):
+            reader.audit("acting")
+        with pytest.raises(WorkflowCorruptionError, match=message):
+            reader.inspect_run("acting")
+        assert reader.audit("quiet")["ok"] is True

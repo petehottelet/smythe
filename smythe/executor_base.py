@@ -11,11 +11,13 @@ import random
 import re
 import tempfile
 import time
+from contextlib import nullcontext
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Awaitable, Callable
 
 from smythe._errors import PicklableError
-from smythe._failures import QUALITY_DEFECT, classify_failure
+from smythe._failures import QUALITY_DEFECT, RunControl, SecurityStop, classify_failure
 from smythe._http_rejection import _http_rejection_receipt
 from smythe._publish import publish_unique
 from smythe.acceptance import AcceptanceMode, AcceptancePolicy, _unmet_obligations, task_sha256
@@ -30,6 +32,7 @@ from smythe.budget import (
 from smythe.context import (
     CONTEXT_SNAPSHOT_KEY, UNTRUSTED_DATA_NOTE, ContextSnapshot, text_sha256, untrusted_block,
 )
+from smythe.evidence import claim_exchange
 from smythe.graph import (
     REVISION_ADDED_KEY, ExecutionGraph, Node, NodeStatus, Revision, RevisionError, _deliverable_ids,
 )
@@ -41,16 +44,24 @@ from smythe.provider import (
 )
 from smythe.provider_responses import RawResponseEnvelope
 from smythe.registry import Registry
-from smythe.scheduling import RetryDeadlineError, RetryPolicy, _attempt_records, _retry_after_s
+from smythe.scheduling import (
+    FALLBACK_CLASSES, PROFILE_KEY, ModelProfile, NoAllowedProfileError, RetryDeadlineError,
+    RetryPolicy, UncertainDispatchError, _attempt_records, _retry_after_s, fallback_chain,
+    node_profile, profile_map,
+)
+from smythe.scheduling import CapacityPolicy, _CapacityLimiter
 from smythe.task import _prompt_json, render_task, snapshot_task
-from smythe.tools import ChatMessage, ToolLoopLimitError, ToolResult, ToolRuntime
-from smythe.tracer import Tracer
+from smythe.tools import TOOL_ERRORS_KEY, ChatMessage, ToolLoopLimitError, ToolResult, ToolRuntime
+from smythe.tracer import (
+    REVIEW_TRIGGER, REVISION_LOG_LIMIT, Tracer, read_revision_log, revision_context,
+    revision_log_entry, revision_record,
+)
 from smythe.verifier import (
     ADVISORY_VERDICT_KEY, TokenVerifier, Verifier, VerificationRecoveryError, node_generation,
     read_verdict, rejection_reason, verification_integer, validate_verification_receipt,
 )
 from smythe.workflow_provider import ProviderRequestRejectedError
-from smythe.workflow_store import WorkflowError, WorkflowStateError
+from smythe.workflow_store import _PRICED_KINDS, WorkflowError, WorkflowStateError, _price_table
 from smythe.workflow_tools import READ_STEP_KEY
 
 if TYPE_CHECKING:
@@ -70,6 +81,18 @@ def _raise_workflow_error(error: BaseException) -> None:
                 _raise_workflow_error(child)
             except WorkflowError as found:
                 raise found from error
+
+
+def _security_stop_in(error: BaseException) -> SecurityStop | None:
+    """The first ``SecurityStop`` in *error*, or in the groups that wrap it; None without one."""
+    if isinstance(error, SecurityStop):
+        return error
+    if isinstance(error, BaseExceptionGroup):
+        for child in error.exceptions:
+            found = _security_stop_in(child)
+            if found is not None:
+                return found
+    return None
 
 
 def validate_retry_backoff_s(value: float) -> float:
@@ -149,17 +172,107 @@ def check_provider_support(
 
 def check_pending_nodes(
     provider: Provider, graph: ExecutionGraph, *, max_budget_usd: float | None, tools: bool,
-    retry_owner: bool = False,
+    retry_owner: bool = False, profiles: dict[str, ModelProfile] | None = None,
 ) -> None:
-    """Check every node that has not completed or been skipped, before any of them runs."""
+    """Check every node that has not completed or been skipped, before any of them runs.
+
+    A node that names one of *profiles* is checked against its profile's
+    provider and model, and those of each profile it falls back to, with
+    each profile's ceiling standing in for an estimate of its own; one that
+    names any other profile raises ``NoAllowedProfileError``.
+    """
     for node in graph.nodes:
         if node.status in (NodeStatus.COMPLETED, NodeStatus.SKIPPED):
             continue
-        check_provider_support(
-            provider, str(node.metadata.get("model", "")), node_id=node.id,
-            max_budget_usd=max_budget_usd, estimate=node.metadata.get("estimated_cost_usd"),
-            tools=tools, attachments=node.attach_dep_artifacts, retry_owner=retry_owner,
+        _exchanges_claims(node)
+        profile = node_profile(node, profiles or {})
+        estimate = node.metadata.get("estimated_cost_usd")
+        routes = [(provider, str(node.metadata.get("model", "")), estimate)]
+        if profile is not None:
+            routes = [(item.provider, item.model,
+                       item.max_cost_per_call_usd if estimate is None else estimate)
+                      for item in fallback_chain(profile, profiles)]
+        for routed, model, ceiling in routes:
+            check_provider_support(
+                routed, model, node_id=node.id, max_budget_usd=max_budget_usd, estimate=ceiling,
+                tools=tools, attachments=node.attach_dep_artifacts, retry_owner=retry_owner,
+            )
+
+
+def _retired(provider: Provider, model: str) -> bool:
+    """Whether *provider* prices *model* with a versioned table that retires it by today (UTC).
+
+    The table is the current one of the durable provider kind its
+    ``workflow_descriptor()`` names; a provider without one prices nothing.
+    """
+    describe = getattr(provider, "workflow_descriptor", None)
+    try:
+        kind = describe().get("kind") if callable(describe) else None
+    except (AttributeError, TypeError, ValueError):  # Such as a scripted OfflineProvider.
+        return False
+    if type(kind) is not str or kind not in _PRICED_KINDS:
+        return False
+    table = _price_table(kind)
+    return table.prices(model) and not table.admits(model, datetime.now(timezone.utc).date())
+
+
+def check_profile_support(profile: ModelProfile, *, tools: bool = False) -> None:
+    """Raise ``NoAllowedProfileError``, before any call, for a profile that cannot serve its nodes.
+
+    Its provider must not declare its model unsupported, must declare
+    ``True`` every feature the profile requires, and must not price the model
+    with a table that retires it. With *tools*, a run offers tools to every
+    node, so a provider that declares it cannot call them is refused too.
+    """
+    provider, model, name = profile.provider, profile.model, type(profile.provider).__name__
+    features = _declared_features(provider, model)
+    if features.model_supported is False:
+        raise NoAllowedProfileError(
+            f"Model profile {profile.name!r}: {name} does not support model {model!r}"
         )
+    missing = sorted(feature for feature in profile.requires
+                     if getattr(features, feature) is not True)
+    if missing:
+        raise NoAllowedProfileError(
+            f"Model profile {profile.name!r} requires {missing}, which {name} does not "
+            f"declare for model {model!r}"
+        )
+    if tools and features.tools is False:
+        raise NoAllowedProfileError(
+            f"Model profile {profile.name!r} cannot serve a run with tool_runtime: {name} "
+            f"cannot call tools with model {model!r}"
+        )
+    if _retired(provider, model):
+        raise NoAllowedProfileError(
+            f"Model profile {profile.name!r} names {model!r}, which is retired and admits no "
+            "new calls"
+        )
+
+
+def check_supervisor_profiles(
+    supervisor: Supervisor | None, profiles: dict[str, ModelProfile],
+) -> None:
+    """Raise ``NoAllowedProfileError``, before any call, for a review sent to the wrong provider.
+
+    Without a model of its own, an ``LLMSupervisor`` reviews a node with that
+    node's model on its own provider, and a profiled node's model is its
+    profile's. Each of *profiles* must therefore call the supervisor's
+    provider. Callers check only while the supervisor may still review.
+    So does one inside an ``EvidenceTriggeredSupervisor``.
+    """
+    from smythe.supervisor import _model_reviewer
+
+    supervisor = _model_reviewer(supervisor)
+    if supervisor is None or supervisor._model:
+        return
+    for profile in profiles.values():
+        if profile.provider is not supervisor._provider:
+            raise NoAllowedProfileError(
+                f"LLMSupervisor reviews a node with that node's model, but model profile "
+                f"{profile.name!r} calls {profile.model!r} on {type(profile.provider).__name__}, "
+                "not on the supervisor's provider; give the supervisor its own model with "
+                "LLMSupervisor(provider, model=...)"
+            )
 
 
 class NodeFinalizationError(PicklableError, RuntimeError):
@@ -247,6 +360,22 @@ SUPPORTED_PROMPT_ASSEMBLY_VERSIONS = (1, 2)
 # deliverable.
 SKIPPED_DEPENDENCY_RESULT = "[skipped: this step did not complete]"
 
+# A node whose metadata sets this key to "claims" is given, for each dependency
+# whose output carries source evidence with claims, the compact record
+# smythe.evidence.claim_exchange makes in place of that output.
+EXCHANGE_KEY = "exchange"
+
+
+def _exchanges_claims(node: Node) -> bool:
+    """Whether *node* exchanges claims; another ``exchange`` value raises ValueError."""
+    if EXCHANGE_KEY not in node.metadata:
+        return False
+    if node.metadata[EXCHANGE_KEY] != "claims":
+        raise ValueError(f"Node {node.id!r} metadata {EXCHANGE_KEY!r} must be 'claims', not "
+                         f"{node.metadata[EXCHANGE_KEY]!r}")
+    return True
+
+
 # Under a strict acceptance policy, a regeneration moves each discarded
 # generation's result and artifact records into a list under this node
 # metadata key instead of dropping them.
@@ -310,8 +439,8 @@ class ExecutorBase:
     classified retries with ``Retry-After``, a backoff cap and a deadline
     shared by each node's attempts and waits; a run under one refuses,
     before any node call, a provider that does not declare
-    ``sdk_retries=0``, its own or, while revisions remain, an
-    ``LLMSupervisor``'s. ``sleep(seconds)`` replaces the wait before a retry
+    ``sdk_retries=0``, its own, any model profile's or, while revisions
+    remain, an ``LLMSupervisor``'s. ``sleep(seconds)`` replaces the wait before a retry
     (``time.sleep`` in the serial executor, ``asyncio.sleep`` in the async
     one) and is awaited when it returns an awaitable; ``rng`` replaces the
     ``random`` module that draws backoff jitter. Under a policy with
@@ -320,7 +449,51 @@ class ExecutorBase:
     ``attempts_used``, as a checkpoint saved it, seeds the attempts each node
     has already used in its current ``execution_generation``. The seed applies
     to the executor's first run only: a later run is a new run, with a fresh
-    allowance for every node.
+    allowance for every node. Under a policy with
+    ``retain_uncertain_dispatch``, a node call that is sent and never
+    answered, because the node's timeout, a cancellation or an interruption
+    ended it, keeps its reservation as the node's unknown, estimated cost
+    (``Sentinel.retain_unknown``) instead of releasing it.
+    A durable journal records each attempt as its
+    call, so journal-managed calls take a policy only with
+    ``attempts_spent(node)``, which returns the attempts the node's current
+    generation has already used each time the node starts; nothing is saved
+    through the control hook for an attempt.
+
+    ``profiles``, a sequence of :class:`~smythe.scheduling.ModelProfile`,
+    routes each node that names one in ``metadata["profile"]`` to that
+    profile's provider and model, and reserves the profile's ceiling for it
+    unless the node sets ``estimated_cost_usd``. A node that names any other
+    profile, or sets another model than its profile's, raises
+    ``NoAllowedProfileError`` before its call, and a revision that adds such
+    a node is refused before it applies. Every other node calls *provider*
+    with its own model, and a node a supervisor adds without a profile takes
+    the model of the first such node that has one, or else ``default_model``.
+    While revisions remain, a run refuses with ``NoAllowedProfileError``,
+    before any call, an ``LLMSupervisor`` without a model of its own and a
+    profile that calls another provider than the supervisor's. A retry after
+    a failure in ``FALLBACK_CLASSES`` calls the failed profile's
+    ``fallback``, when it has one, as a new attempt of the node's allowance
+    that reserves and takes capacity for its own profile; each attempt's
+    trace span records its profile (see :meth:`_route_attempt`).
+
+    ``capacity_policy``, a :class:`~smythe.scheduling.CapacityPolicy`, makes
+    every provider call of a node, including tool turns and retries, wait
+    for its provider type and model's turn: ``min_interval_s`` after the
+    previous call's start and after any ``Retry-After`` cooldown, on the
+    tracer's clock, with ``sleep`` replacing the wait. The async executor
+    also admits at most ``max_in_flight`` nodes of a model at once. Each run
+    starts with fresh limits, and every provider hint the run's pending nodes
+    need is read before any node call.
+
+    ``run_control``, a :class:`~smythe._failures.RunControl`, is checked
+    before each node is admitted and before each provider or read call, tool
+    turns and supervisor reviews included: once it is revoked, the run raises
+    ``SecurityStop``. A ``SecurityStop`` that a tool runtime raises stops the
+    run the same way, never as a tool result for the model. Either way, a
+    call that was sent and not answered keeps its reservation as unknown
+    cost, as under ``retain_uncertain_dispatch``, and :attr:`security_stop`
+    records the stop.
     """
 
     def __init__(
@@ -352,10 +525,26 @@ class ExecutorBase:
         sleep: Callable[[float], Any] | None = None,
         rng: Any = None,
         attempts_used: dict[str, dict[str, int]] | None = None,
+        attempts_spent: Callable[[Node], int] | None = None,
+        profiles: tuple[ModelProfile, ...] | list[ModelProfile] = (),
+        default_model: str | None = None,
+        capacity_policy: CapacityPolicy | None = None,
+        run_control: RunControl | None = None,
         acceptance: AcceptancePolicy | None = None,
     ) -> None:
         if context_assembler is not None and not callable(context_assembler):
             raise TypeError("context_assembler must be callable or None")
+        if run_control is not None and not isinstance(run_control, RunControl):
+            raise TypeError(
+                f"run_control must be a RunControl or None, not {type(run_control).__name__}"
+            )
+        self._run_control = run_control
+        # The stop that ended the current run: its reason code and wall time.
+        self._security_stop: dict[str, Any] | None = None
+        self._profiles = profile_map(profiles)
+        # The profile that each node's running attempt fell back to.
+        self._fallbacks: dict[str, ModelProfile] = {}
+        self._default_model = default_model
         self._context_assembler = context_assembler
         if retry_policy is not None and not isinstance(retry_policy, RetryPolicy):
             raise TypeError(
@@ -368,7 +557,12 @@ class ExecutorBase:
         self._retry_policy, self._sleep, self._rng = retry_policy, sleep, rng
         # When each node's retry deadline passes, on the tracer's clock.
         self._deadlines: dict[str, float] = {}
-        self._persist_attempts = retry_policy is not None and retry_policy.persist_attempts
+        if attempts_spent is not None and (not callable(attempts_spent) or retry_policy is None):
+            raise TypeError("attempts_spent must be callable, and needs a retry_policy")
+        # A journal's count of each node's attempts, which no checkpoint duplicates.
+        self._journal_attempts = attempts_spent
+        self._persist_attempts = (retry_policy is not None and retry_policy.persist_attempts
+                                  and attempts_spent is None)
         if attempts_used is not None and not self._persist_attempts:
             raise ValueError("attempts_used needs a retry_policy with persist_attempts")
         # Like revisions_used, a per-run allowance: each node's generation and
@@ -376,6 +570,10 @@ class ExecutorBase:
         # only the first run; a reused executor's next run starts empty.
         self._attempts_used = _attempt_records(attempts_used or {})
         self._attempts_seed = dict(self._attempts_used)
+        self._retain_dispatch = retry_policy is not None and retry_policy.retain_uncertain_dispatch
+        # The nodes whose call was sent and has not answered: in flight, or
+        # ended by a timeout or cancellation.
+        self._dispatched: set[str] = set()
         if acceptance is not None and not isinstance(acceptance, AcceptancePolicy):
             raise TypeError(
                 f"acceptance must be an AcceptancePolicy or None, not {type(acceptance).__name__}"
@@ -394,8 +592,23 @@ class ExecutorBase:
         self._workflow_managed = (
             provider_call_factory is not None or getattr(provider, "workflow_managed", False) is True
         )
-        if retry_policy is not None and self._workflow_managed:
-            raise ValueError("retry_policy is not supported with journal-managed provider calls")
+        if retry_policy is not None and self._workflow_managed and attempts_spent is None:
+            raise ValueError(
+                "retry_policy with journal-managed provider calls needs attempts_spent, "
+                "the attempts the journal records"
+            )
+        if self._profiles and self._workflow_managed:
+            raise ValueError("profiles are not supported with journal-managed provider calls")
+        if capacity_policy is not None and not isinstance(capacity_policy, CapacityPolicy):
+            raise TypeError(
+                f"capacity_policy must be a CapacityPolicy or None, "
+                f"not {type(capacity_policy).__name__}"
+            )
+        if capacity_policy is not None and self._workflow_managed:
+            raise ValueError("capacity_policy is not supported with journal-managed provider calls")
+        # Each run's limiter, made when the run starts; None without a policy.
+        self._capacity_policy = capacity_policy
+        self._capacity: _CapacityLimiter | None = None
         self._call_attempts: dict[str, int] = {}
         self._reserved_node_ids: set[str] = set()
         self._settled_response_errors: list[tuple[str, Exception]] = []
@@ -422,6 +635,9 @@ class ExecutorBase:
         # Restored from the checkpoint on resume: the revision cap is a
         # per-run guarantee, so a crash must not refill the allowance.
         self._revisions_used = revisions_used
+        self._revision_log: list[dict[str, Any]] = []
+        # What prompted the current review, for its trace span and log entry.
+        self._review_trigger = REVIEW_TRIGGER
         self._verifier = verifier or TokenVerifier()
 
     @property
@@ -430,10 +646,47 @@ class ExecutorBase:
         return self._revisions_used
 
     @property
+    def revision_log(self) -> list[dict[str, Any]]:
+        """The run's latest supervisor decisions, applied or refused, oldest first.
+
+        Each entry is a :func:`~smythe.tracer.revision_log_entry`, and at most
+        ``REVISION_LOG_LIMIT`` are kept. Resume sets the log a checkpoint
+        saved, which later decisions extend.
+        """
+        return read_revision_log(self._revision_log)
+
+    @revision_log.setter
+    def revision_log(self, entries: list[dict[str, Any]]) -> None:
+        self._revision_log = read_revision_log(entries)
+
+    @property
     def attempts_used(self) -> dict[str, dict[str, int]]:
         """Under a policy with ``persist_attempts``, each node's attempts in its generation."""
         return {node_id: {"execution_generation": generation, "attempts": used}
                 for node_id, (generation, used) in self._attempts_used.items()}
+
+    @property
+    def security_stop(self) -> dict[str, Any] | None:
+        """The security stop that ended the last run, or None.
+
+        ``reason_code`` is the stop's code and ``at`` the tracer's wall time,
+        in seconds since the epoch, when the executor met it. A Swarm's
+        checkpoints save it as ``control["security_stop"]``.
+        """
+        return None if self._security_stop is None else dict(self._security_stop)
+
+    def check_run_control(self) -> None:
+        """Raise ``SecurityStop``, and record it, once the run control is revoked."""
+        if self._run_control is not None and self._run_control.revoked:
+            stop = SecurityStop(self._run_control.reason_code)
+            self._record_security_stop(stop)
+            raise stop
+
+    def _record_security_stop(self, stop: SecurityStop) -> None:
+        """Record the run's first security stop, before any call in flight is cancelled."""
+        if self._security_stop is None:
+            self._security_stop = {"reason_code": stop.reason_code,
+                                   "at": self._tracer.wall_time()}
 
     async def maybe_revise(self, node: Node, graph: ExecutionGraph) -> bool:
         """Let the supervisor revise the plan after *node* completed.
@@ -445,14 +698,25 @@ class ExecutorBase:
         more while the supervisor's charge remains unresolved. Under a
         strict acceptance policy, a revision that breaks a delivery
         acceptance obligation is an invalid change too.
+
+        Each decision that the trace records, applied or refused, also
+        joins :attr:`revision_log` with its effect on the graph (see
+        :func:`~smythe.tracer.revision_context`). For a supervisor with
+        evidence triggers, the triggers that fire are traced before its
+        review and named as the decision's ``trigger``.
         """
         if self._supervisor is None or node.status is not NodeStatus.COMPLETED:
             return False
         remaining = self._max_revisions - self._revisions_used
         if remaining <= 0:
             return False
+        self.check_run_control()
 
         started = self._tracer.now()
+        fired = self._fired_triggers(graph, node)
+        self._review_trigger = ",".join(trigger.name for trigger in fired) or REVIEW_TRIGGER
+        if fired:
+            self._tracer.on_review_trigger(node, fired)
         try:
             revision = await self._supervisor.review(
                 graph, node, task=snapshot_task(self._task) if self._task is not None else None,
@@ -464,7 +728,7 @@ class ExecutorBase:
                     exc, lambda error: self._record_response_error(node, error, phase="supervision"),
                 )
             _raise_workflow_error(exc)
-            self._tracer.on_revision(node, None, applied=False, detail=str(exc))
+            self._trace_revision(node, graph, None, applied=False, detail=str(exc))
             self.notify_supervision_update(node, False)
             return False
         except WorkflowError:
@@ -475,14 +739,14 @@ class ExecutorBase:
             raise
         except BudgetValidationError as exc:
             self.mark_accounting_invalid(node, exc)
-            self._tracer.on_revision(
-                node, None, applied=False, detail=f"supervisor accounting invalid: {exc}",
+            self._trace_revision(
+                node, graph, None, applied=False, detail=f"supervisor accounting invalid: {exc}",
             )
             self.notify_update(node)
             raise
         except Exception as exc:
-            self._tracer.on_revision(
-                node, None, applied=False, detail=f"supervisor raised: {exc}",
+            self._trace_revision(
+                node, graph, None, applied=False, detail=f"supervisor raised: {exc}",
             )
             self.notify_supervision_update(node, False)
             return False
@@ -492,19 +756,58 @@ class ExecutorBase:
             self.notify_supervision_update(node, False)
             return False
 
+        delivered = _deliverable_ids(graph.nodes)
         try:
+            for added in revision.add_nodes:
+                # An added node is routed like any other: refuse one no profile can serve.
+                node_profile(added, self._profiles)
             self._apply_revision(graph, revision)
-        except RevisionError as exc:
-            self._tracer.on_revision(node, revision, applied=False, detail=str(exc))
+        except (RevisionError, NoAllowedProfileError) as exc:
+            self._trace_revision(node, graph, revision, applied=False, detail=str(exc))
             self.notify_supervision_update(node, False)
             return False
 
         self._revisions_used += 1
         self._inherit_execution_context(revision.add_nodes, graph)
         self.prepare_graph(graph)
-        self._tracer.on_revision(node, revision, applied=True)
+        self._trace_revision(node, graph, revision, applied=True, delivered=delivered)
         self.notify_supervision_update(node, True)
         return True
+
+    def _fired_triggers(self, graph: ExecutionGraph, node: Node) -> tuple:
+        """The evidence triggers that call for a review after *node*; none without any.
+
+        Read from the graph before the review, as the supervisor reads them.
+        """
+        from smythe.supervisor import ReviewTriggers
+
+        triggers = getattr(self._supervisor, "triggers", None)
+        if not isinstance(triggers, ReviewTriggers):
+            return ()
+        try:
+            return triggers.fired(graph, node)
+        except Exception:  # The review reads them again and its error is contained.
+            return ()
+
+    def _trace_revision(
+        self, node: Node, graph: ExecutionGraph, revision: Revision | None, *, applied: bool,
+        detail: str = "", delivered: set[str] | None = None,
+    ) -> None:
+        """Trace a supervisor decision on *graph*, as it stands after it, and log it.
+
+        *delivered* holds the graph's deliverable nodes before an applied
+        *revision*; a refused one left the graph unchanged.
+        """
+        context = revision_context(
+            graph, revisions_remaining_after=self._max_revisions - self._revisions_used,
+            delivered_before=delivered,
+            added=[added.id for added in revision.add_nodes] if applied and revision else (),
+            trigger=self._review_trigger,
+        )
+        self._tracer.on_revision(node, revision, applied=applied, detail=detail, context=context)
+        entry = revision_log_entry(revision_record(node, revision, context), applied=applied,
+                                   reason=getattr(revision, "reason", None), detail=detail)
+        self._revision_log = [*self._revision_log, entry][-REVISION_LOG_LIMIT:]
 
     def _apply_revision(self, graph: ExecutionGraph, revision: Revision) -> None:
         """Apply *revision*; under a strict policy, refuse one that breaks an obligation.
@@ -902,12 +1205,18 @@ class ExecutorBase:
         Nodes minted mid-run never passed through ``Swarm.plan``, so
         they carry none of the metadata the executor depends on; without
         this a revision would produce nodes that call the provider with
-        an empty model name.
+        an empty model name. A node that names no profile calls the run's
+        provider, so a profiled node's model, which belongs to its profile's
+        provider, is not taken; one that names a profile takes that
+        profile's model, which it calls. A profile it cannot be routed to
+        raises ``NoAllowedProfileError`` before any node is changed.
         """
         if not new_nodes:
             return
         model = next(
-            (n.metadata["model"] for n in graph.nodes if n.metadata.get("model")), None,
+            (n.metadata["model"] for n in graph.nodes
+             if n.metadata.get("model") and PROFILE_KEY not in n.metadata),
+            self._default_model,
         )
         context = next(
             (
@@ -917,8 +1226,11 @@ class ExecutorBase:
             ),
             None,
         )
-        for node in new_nodes:
-            if model is not None:
+        profiles = [node_profile(node, self._profiles) for node in new_nodes]
+        for node, profile in zip(new_nodes, profiles):
+            if profile is not None:
+                node.metadata.setdefault("model", profile.model)
+            elif model is not None:
                 node.metadata.setdefault("model", model)
             if self._task is None and context is not None:
                 node.metadata.setdefault("task_context", context)
@@ -1004,7 +1316,12 @@ class ExecutorBase:
         )
 
     def _attempts_spent(self, node: Node) -> int:
-        """The attempts *node* already used in its current generation, under ``persist_attempts``."""
+        """The attempts *node* already used in its current generation, under ``persist_attempts``.
+
+        With ``attempts_spent``, the journal's count, read each time the node starts.
+        """
+        if self._journal_attempts is not None:
+            return self._journal_attempts(node)
         generation, used = self._attempts_used.get(node.id, (None, 0))
         return used if self._persist_attempts and generation == node_generation(node) else 0
 
@@ -1075,15 +1392,63 @@ class ExecutorBase:
         """Reserve this executor's pre-call estimate for one node."""
         self.reserve_node_budget(node)
 
+    def _node_route(self, node: Node) -> tuple[Provider, Any, ModelProfile | None]:
+        """The provider and model *node* calls, and the profile that chose them, if any.
+
+        While an attempt that fell back runs, that is its fallback profile
+        (see :meth:`_route_attempt`). Raises ``NoAllowedProfileError`` for a
+        profile this executor was not given, or for a node that sets another
+        model than its profile's.
+        """
+        profile = node_profile(node, self._profiles)
+        if profile is None:
+            return self._provider, node.metadata.get("model", ""), None
+        if node.status is NodeStatus.RUNNING:
+            profile = self._fallbacks.get(node.id, profile)
+        return profile.provider, profile.model, profile
+
+    def _route_attempt(self, node: Node, error: Exception | None) -> None:
+        """Choose the profile of *node*'s attempt that has just started, and trace it.
+
+        *error* ended the node's previous attempt in this process. Without
+        one, the attempt calls the profile the node names, as a resumed or
+        requeued node does again. After a failure whose class is in
+        ``FALLBACK_CLASSES`` it calls the failed profile's fallback, when it
+        has one, and the reservation that profile's attempt left is released
+        so that the attempt reserves for its own profile before its call;
+        otherwise it calls the same profile. The attempt's span records the
+        profile and, after a fallback, the profile it fell back from.
+        """
+        if error is None:
+            self._fallbacks.pop(node.id, None)
+        current = self._node_route(node)[2]
+        if current is None:
+            return
+        profile = current
+        if (error is not None and current.fallback is not None
+                and classify_failure(error) in FALLBACK_CLASSES):
+            profile = self._fallbacks[node.id] = self._profiles[current.fallback]
+            if node.id in self._reserved_node_ids:
+                self._budget.release(node.id)
+                self._reserved_node_ids.discard(node.id)
+        self._tracer.on_node_profile(
+            node, profile.name, fallback_from=None if profile is current else current.name,
+        )
+
     def _node_estimate(
         self, node: Node, default_estimated_tokens: int | None,
     ) -> tuple[float | None, bool]:
-        """The node's pre-call estimate, and whether its provider requires an explicit one."""
+        """The node's pre-call estimate, and whether its provider requires an explicit one.
+
+        A profiled node's estimate is its profile's ceiling unless it sets its own.
+        """
         estimate = node.metadata.get("estimated_cost_usd")
-        model = str(node.metadata.get("model", ""))
-        requires_explicit = self._provider.requires_explicit_budget_estimate(model)
+        provider, model, profile = self._node_route(node)
+        model = str(model)
+        requires_explicit = provider.requires_explicit_budget_estimate(model)
         if estimate is None:
-            estimate = self._provider.budget_estimate_usd(model)
+            estimate = (provider.budget_estimate_usd(model) if profile is None
+                        else profile.max_cost_per_call_usd)
         if estimate is None and not requires_explicit and default_estimated_tokens is not None:
             tokens = validate_token_count(default_estimated_tokens, "default_estimated_tokens")
             try:
@@ -1225,23 +1590,44 @@ class ExecutorBase:
                 if ("workflow_accounting_invalid" in node.metadata
                         or node.metadata.get("accounting_invalid") and "response_error" not in node.metadata):
                     raise BudgetValidationError("Unjournaled accounting requires reconciliation")
+        if self._max_revisions > self._revisions_used:
+            check_supervisor_profiles(self._supervisor, self._profiles)
+        self._fallbacks.clear()
         if self._retry_policy is not None:
+            pending = [node for node in graph.nodes
+                       if node.status not in (NodeStatus.COMPLETED, NodeStatus.SKIPPED)]
+            routes = [self._node_route(node) for node in pending]
             calls = [(self._provider, model) for model in sorted(
-                {str(node.metadata.get("model", "")) for node in graph.nodes
-                 if node.status not in (NodeStatus.COMPLETED, NodeStatus.SKIPPED)})]
-            from smythe.supervisor import LLMSupervisor
+                {str(model) for _, model, profile in routes if profile is None})]
+            # Every profile, not only those pending nodes name: a supervisor may add one.
+            calls += [(profile.provider, profile.model) for profile in self._profiles.values()]
+            from smythe.supervisor import _model_reviewer
 
             # A supervisor that may still revise reviews with its own model or
             # else the reviewed node's, which can be any node of the graph.
-            supervisor = self._supervisor
-            if isinstance(supervisor, LLMSupervisor) and self._max_revisions > self._revisions_used:
+            supervisor = _model_reviewer(self._supervisor)
+            if supervisor is not None and self._max_revisions > self._revisions_used:
                 models = {supervisor._model} if supervisor._model else {
                     str(node.metadata.get("model", "")) for node in graph.nodes}
                 calls += [(supervisor._provider, model) for model in sorted(models)]
             for provider, model in calls:
                 check_provider_support(provider, model, node_id=None, check_model=False,
                                        retry_owner=True)
+        if self._capacity_policy is not None:
+            self._capacity = _CapacityLimiter(
+                self._capacity_policy, self._tracer, self._sleep or asyncio.sleep,
+            )
+            # Read every hint the pending nodes need, so a bad one stops the run before any call.
+            # A profiled node's limits are its profile's provider and model and its fallbacks'.
+            for node in graph.nodes:
+                if node.status not in (NodeStatus.COMPLETED, NodeStatus.SKIPPED):
+                    provider, model, profile = self._node_route(node)
+                    self._capacity.bucket(provider, str(model))
+                    for fallback in fallback_chain(profile, self._profiles)[1:] if profile else ():
+                        self._capacity.bucket(fallback.provider, fallback.model)
         self._reserved_node_ids.clear()
+        self._dispatched.clear()
+        self._security_stop = None
         self._call_attempts.clear()
         self._deadlines.clear()
         self._attempts_used, self._attempts_seed = self._attempts_seed, {}
@@ -1351,7 +1737,12 @@ class ExecutorBase:
         a retry deadline the timeout is at most the time left, and reaching
         it raises ``RetryDeadlineError``. A ``TimeoutError`` the conversation
         raises itself, such as an HTTP client's own timeout, is an ordinary
-        timeout even then.
+        timeout even then. Under ``retain_uncertain_dispatch``, a timeout
+        while a provider call is unanswered raises ``UncertainDispatchError``
+        (the deadline's still raises ``RetryDeadlineError``), and however the
+        attempt ends, such a call keeps its reservation as unknown cost. A
+        ``SecurityStop``, plain or in a group, is recorded and raised, with the
+        node's reservation released.
         """
         timeout, by_deadline = self._attempt_timeout(node)
         coro = self._run_node_conversation(node, graph)
@@ -1366,7 +1757,14 @@ class ExecutorBase:
             async with asyncio.timeout(timeout) as deadline_timer:
                 return await coro
         except BaseExceptionGroup as exc:
+            stop = _security_stop_in(exc)
+            if stop is not None:
+                # Grouped native failures still settle first; the stop holds either way.
+                self._record_security_stop(stop)
             if not _native_response_errors(exc):
+                if stop is not None:
+                    self.release_node_budget(node)
+                    raise stop from exc
                 _raise_workflow_error(exc)
                 self._raise_unresolved_response(node)
             _settle_response_group(
@@ -1387,12 +1785,23 @@ class ExecutorBase:
                 raise exc.__cause__
             if deadline_timer is not None and deadline_timer.expired():
                 raise self._deadline_error(node) from None
+            if self._retain_dispatch and node.id in self._dispatched:
+                raise UncertainDispatchError(
+                    f"Node {node.id!r} timed out after {node.timeout_s}s with its provider call "
+                    "unanswered; the call's outcome and charge are unknown"
+                ) from None
             raise TimeoutError(
                 f"Node {node.id!r} timed out after {node.timeout_s}s"
             ) from None
+        except SecurityStop as stop:
+            self._record_security_stop(stop)
+            self.release_node_budget(node)
+            raise
         except Exception:
             self._raise_unresolved_response(node)
             raise
+        finally:
+            self._retain_uncertain_dispatch(node)
 
     async def _run_node_conversation(
         self, node: Node, graph: ExecutionGraph,
@@ -1411,7 +1820,7 @@ class ExecutorBase:
             prompt = self.build_context_prompt(
                 snapshot, self._task, dep_results, is_terminal=self._is_terminal(node, graph),
             )
-        model = node.metadata.get("model", "")
+        model = self._node_route(node)[1]
         attachments = (
             self.load_dep_image_artifacts(node, graph)
             if node.attach_dep_artifacts
@@ -1429,6 +1838,9 @@ class ExecutorBase:
             return result
 
         collected_artifacts: list = []
+        # Counted per attempt, for supervisor triggers that read the node.
+        tool_errors = 0
+        node.metadata.pop(TOOL_ERRORS_KEY, None)
         async with self._tool_runtime.open(agent) as session:
             tools = list(session.tools) or None
             limit = node.max_tool_iterations or self._max_tool_iterations
@@ -1469,8 +1881,8 @@ class ExecutorBase:
                     try:
                         outcome = await session.call(tc)
                     except BaseExceptionGroup as exc:
-                        if _native_response_errors(exc):
-                            raise  # acall_node settles grouped accounting.
+                        if _native_response_errors(exc) or _security_stop_in(exc):
+                            raise  # acall_node settles grouped accounting and stops.
                         _raise_workflow_error(exc)
                         outcome = ToolResult(tool_call_id=tc.id, content=str(exc), is_error=True)
                     except ProviderResponseError as exc:
@@ -1483,6 +1895,9 @@ class ExecutorBase:
                         raise
                     except WorkflowError:
                         raise
+                    except SecurityStop:
+                        # The developer's tool stopped the run; the model never sees it.
+                        raise
                     except Exception as exc:
                         # Tool failures go back to the model, not up the stack —
                         # it can adapt or try another tool.
@@ -1491,6 +1906,9 @@ class ExecutorBase:
                         )
                     duration_ms = (time.monotonic() - started) * 1000
                     self._tracer.on_tool_call(node, tc.name, duration_ms, outcome.is_error)
+                    if outcome.is_error:
+                        tool_errors += 1
+                        node.metadata[TOOL_ERRORS_KEY] = tool_errors
                     if self._context_assembler is not None:
                         # What a tool returns is material, like a source.
                         outcome = ToolResult(
@@ -1517,6 +1935,7 @@ class ExecutorBase:
                 f"Node {node.id!r} declares a read step, which runs only in a durable "
                 "workflow: pass run_store and read_tools to Swarm"
             )
+        self.check_run_control()
         step = node.metadata[READ_STEP_KEY]
         name = step.get("profile") if isinstance(step, dict) else None
         read = self._read_call_factory(node, self._call_attempts.get(node.id, 0))
@@ -1541,17 +1960,23 @@ class ExecutorBase:
             self._reserve_node(node)
 
     async def _provider_chat(self, node, system, messages, model, tools=None, *, turn=0):
+        self.check_run_control()
         self._raise_unresolved_response(node)
         phase = "verification" if node.verifies else "execution"
-        provider = self._provider
+        provider = self._node_route(node)[0]
         if self._provider_call_factory is not None:
             provider = self._provider_call_factory(node, phase, self._call_attempts.get(node.id, 0), turn)
             if getattr(provider, "workflow_managed", False) is not True:
                 raise WorkflowError("The provider call factory must return a journal-managed provider")
         try:
-            if tools is None:
-                return await provider.chat(system, messages, model)
-            return await provider.chat(system, messages, model, tools=tools)
+            async with self._capacity_call(node, provider, model):
+                if self._capacity is not None:
+                    # A revocation during the capacity wait sends nothing.
+                    self.check_run_control()
+                if tools is None:
+                    return await self._send(node, provider.chat(system, messages, model))
+                return await self._send(
+                    node, provider.chat(system, messages, model, tools=tools))
         except BaseExceptionGroup as exc:
             if not _native_response_errors(exc):
                 _raise_workflow_error(exc)
@@ -1569,6 +1994,53 @@ class ExecutorBase:
             if defect is not None:
                 raise defect from None
             raise
+
+    async def _send(self, node, call):
+        """Await a provider *call*, marking *node* dispatched until the provider answers.
+
+        A result or an exception the provider raises, such as its own error
+        or its client's timeout, answers the call. A cancellation, from the
+        node's timeout or otherwise, or an interruption leaves the node
+        marked, and the attempt then keeps its reservation under
+        ``retain_uncertain_dispatch`` or a security stop
+        (:meth:`_retain_uncertain_dispatch`).
+        """
+        self._dispatched.add(node.id)
+        try:
+            result = await call
+        except Exception:
+            self._dispatched.discard(node.id)
+            raise
+        self._dispatched.discard(node.id)
+        return result
+
+    def _retain_uncertain_dispatch(self, node: Node) -> None:
+        """Keep the reservation of *node*'s sent and unanswered call as unknown cost.
+
+        Under ``retain_uncertain_dispatch``, or once a security stop ended
+        the run, the reservation becomes the node's recorded cost, flagged
+        ``cost_usd_unknown`` and, with an amount, ``cost_usd_is_estimate``, so
+        a checkpoint keeps it and resume restores it; the next call reserves
+        again. Does nothing unless such a call is marked (see :meth:`_send`),
+        and leaves journal-managed calls to their journal.
+        """
+        if node.id not in self._dispatched:
+            return
+        self._dispatched.discard(node.id)
+        if (self._budget is None or self._workflow_managed
+                or not (self._retain_dispatch or self._security_stop is not None)):
+            return
+        kept = self._budget.retain_unknown(node.id)
+        self._reserved_node_ids.discard(node.id)
+        node.metadata["cost_usd_unknown"] = True
+        if kept is not None:
+            node.metadata["cost_usd_is_estimate"] = True
+        node.metadata["cost_usd"] = self._budget.breakdown()[node.id]
+    def _capacity_call(self, node: Node, provider: Any, model: Any):
+        """Wait for one of *node*'s calls to take its turn; nothing without a capacity policy."""
+        if self._capacity is None:
+            return nullcontext()
+        return self._capacity.call(provider, str(model), node)
 
     def _settle_rejection(self, node, error, phase):
         """Under a retry policy, settle a native plain HTTP rejection at zero cost.
@@ -1654,6 +2126,8 @@ class ExecutorBase:
         return None
 
     def release_node_budget(self, node: Node) -> None:
+        """Release the node's reservation, except a sent, unanswered call's, which is kept."""
+        self._retain_uncertain_dispatch(node)
         if self._budget is not None and not self._workflow_managed:
             self._budget.release(node.id)
 
@@ -1854,8 +2328,11 @@ class ExecutorBase:
         JSON results stay parseable); they are appended here so
         downstream nodes can reference the files.  A SKIPPED dependency
         contributes only ``SKIPPED_DEPENDENCY_RESULT``: its recorded
-        result is an error message, not output.
+        result is an error message, not output.  A node that exchanges
+        claims (``EXCHANGE_KEY``) is given a dependency's compact claim
+        record, when its output carries one, in place of the output.
         """
+        claims = _exchanges_claims(node)
         dep_results: dict[str, Any] = {}
         for dep_id in node.depends_on:
             dep_node = self._cached_node_by_id(dep_id, graph)
@@ -1865,6 +2342,8 @@ class ExecutorBase:
                 dep_results[dep_id] = SKIPPED_DEPENDENCY_RESULT
                 continue
             value = dep_node.result
+            if claims:
+                value = claim_exchange(value) or value
             records = dep_node.metadata.get("artifacts") or []
             if records and isinstance(value, str) and records[0]["path"] not in value:
                 listing = "\n".join(

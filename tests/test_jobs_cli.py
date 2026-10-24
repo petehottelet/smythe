@@ -399,3 +399,242 @@ def test_export_rejects_invalid_recorded_directory_without_legacy_fallback(direc
     with pytest.raises(ValueError, match="artifact directory"):
         _portable_export({"manifest_root": "/source", "output_directory": "outputs",
                           "run_id": "legacy", "artifact_directory": directory})
+
+
+# ---------------------------------------------------------------------------
+# Integrity repair
+# ---------------------------------------------------------------------------
+
+
+def test_reroll_repair_integrity_regenerates_a_deleted_accepted_file(tmp_path, capsys):
+    manifest = _manifest(tmp_path, attempts=2)
+    store = tmp_path / "jobs.sqlite3"
+    assert main(["jobs", "plan", str(manifest), "--json"]) == EXIT_OK
+    token = _json_output(capsys)["plan"]["approval"]["token"]
+    assert main(["jobs", "run", str(manifest), "--approve", token, "--store", str(store),
+                 "--json"]) == EXIT_OK
+    run = _json_output(capsys)["run"]
+    [artifact] = run["artifacts"]
+    command = ["jobs", "reroll", run["run_id"], "glyph[0]", "--reason", "accepted file deleted",
+               "--store", str(store), "--json"]
+
+    for arguments, code, error in (
+        ([], EXIT_JOB_STATE, "cannot be rerolled"),
+        (["--repair-integrity"], EXIT_JOB_STATE, "no missing or changed accepted file"),
+        (["--repair-integrity", "--acknowledge-unknown"], EXIT_INVALID_INPUT, "unknown outcome"),
+    ):
+        assert main([*command, *arguments]) == code
+        refused = _json_output(capsys)
+        assert refused["ok"] is False and refused["command"] == "reroll"
+        assert error in refused["error"]["message"]
+
+    (tmp_path / "outputs" / run["artifact_directory"] / artifact["relative_path"]).unlink()
+    assert main([*command, "--repair-integrity"]) == EXIT_OK
+    repaired = _json_output(capsys)["reroll"]
+    assert repaired["status"] == "completed" and repaired["counts"] == {"succeeded": 1}
+    [operation] = repaired["operations"]
+    assert [attempt["reason"] for attempt in repaired["attempts"]] == [None, "accepted file deleted"]
+    assert operation["accepted_attempt_id"] == repaired["attempts"][1]["attempt_id"]
+    assert operation["delivery_eligibility"] == {"eligible": True, "reasons": []}
+    assert main(["jobs", "status", run["run_id"], "--events", "--store", str(store), "--json"]) == EXIT_OK
+    [queued] = [event for event in _json_output(capsys)["status"]["events"]
+                if event["event_type"] == "integrity_repair_queued"]
+    assert queued["payload"]["reason"] == "accepted file deleted"
+    assert [finding["status"] for finding in queued["payload"]["findings"]] == ["missing"]
+
+    with pytest.raises(SystemExit):
+        main(["jobs", "reroll", "--help"])
+    help_text = " ".join(capsys.readouterr().out.split())
+    assert "--repair-integrity rerun succeeded operations whose accepted files are missing or changed" in help_text
+
+
+# ---------------------------------------------------------------------------
+# Rechecks of accepted outputs
+# ---------------------------------------------------------------------------
+
+
+def _completed_run(tmp_path, capsys, manifest=None):
+    manifest = manifest or _manifest(tmp_path)
+    store = tmp_path / "jobs.sqlite3"
+    assert main(["jobs", "plan", str(manifest), "--json"]) == EXIT_OK
+    token = _json_output(capsys)["plan"]["approval"]["token"]
+    assert main(["jobs", "run", str(manifest), "--approve", token, "--store", str(store),
+                 "--json"]) == EXIT_OK
+    return store, _json_output(capsys)["run"]
+
+
+def test_recheck_decides_accepted_files_again_under_a_newer_built_in_check(
+    tmp_path, capsys, monkeypatch,
+):
+    import smythe.jobs.delivery as delivery
+
+    store, run = _completed_run(tmp_path, capsys)
+    inspect = ["jobs", "inspect", run["run_id"], "--store", str(store), "--json"]
+    monkeypatch.setattr(delivery, "ARTIFACT_SPEC_VALIDATOR_VERSION", "2")
+    assert main(inspect) == EXIT_OK
+    [operation] = _json_output(capsys)["inspect"]["operations"]
+    assert operation["delivery_eligibility"] == {"eligible": False, "reasons": ["validator_changed"]}
+
+    command = ["jobs", "recheck", run["run_id"], "glyph[0]", "--reason", "artifact check version 2",
+               "--store", str(store)]
+    assert main([*command, "--json"]) == EXIT_OK
+    rechecked = _json_output(capsys)
+    assert rechecked["ok"] is True and rechecked["command"] == "recheck"
+    assert rechecked["recheck"]["status"] == "completed"
+    [operation] = rechecked["recheck"]["operations"]
+    assert operation["status"] == "succeeded"
+    assert operation["delivery_eligibility"] == {"eligible": True, "reasons": []}
+    assert main(inspect) == EXIT_OK
+    inspected = _json_output(capsys)["inspect"]
+    assert inspected["operations"][0]["delivery_eligibility"] == {"eligible": True, "reasons": []}
+    [attempt] = inspected["attempts"]
+    [recorded] = attempt["delivery_reevaluations"]
+    assert recorded["reason"] == "artifact check version 2" and recorded["outcome"] == "accepted"
+    assert recorded["validators"][0]["validator"]["version"] == "2"
+    assert main(command) == EXIT_OK
+    assert "Status: completed" in capsys.readouterr().out
+
+    [artifact] = run["artifacts"]
+    (tmp_path / "outputs" / run["artifact_directory"] / artifact["relative_path"]).unlink()
+    for arguments, error in (([run["run_id"], "glyph[0]"], "is missing"),
+                             ([run["run_id"], "missing[0]"], "missing[0]"),
+                             (["missing-run", "glyph[0]"], "missing-run")):
+        assert main(["jobs", "recheck", *arguments, "--reason", "check", "--store", str(store),
+                     "--json"]) == EXIT_JOB_STATE
+        refused = _json_output(capsys)
+        assert refused["ok"] is False and refused["command"] == "recheck"
+        assert error in refused["error"]["message"]
+    with pytest.raises(SystemExit) as missing_reason:
+        main(["jobs", "recheck", run["run_id"], "glyph[0]", "--store", str(store)])
+    assert missing_reason.value.code == EXIT_INVALID_INPUT
+    with pytest.raises(SystemExit):
+        main(["jobs", "--help"])
+    assert "recheck" in capsys.readouterr().out
+
+
+# ---------------------------------------------------------------------------
+# Repair previews
+# ---------------------------------------------------------------------------
+
+
+def test_reroll_dry_run_names_the_operations_a_changed_attachment_needs_a_new_plan_for(
+    tmp_path, capsys,
+):
+    import sqlite3
+    from contextlib import closing
+
+    (tmp_path / "brand").mkdir()
+    logo, mark = tmp_path / "brand" / "logo.png", tmp_path / "brand" / "mark.png"
+    logo.write_bytes(b"logo-bytes")
+    mark.write_bytes(b"mark-bytes")
+    manifest = _manifest(tmp_path, attempts=2)
+    data = json.loads(manifest.read_text(encoding="utf-8"))
+    glyph = data["operations"][0]
+    data["operations"] = [glyph | {"key": "hero", "count": 2, "attachments": ["brand/logo.png"]},
+                          glyph | {"key": "badge", "attachments": ["brand/mark.png"]},
+                          glyph | {"key": "plain"}]
+    manifest.write_text(json.dumps(data), encoding="utf-8")
+    store, run = _completed_run(tmp_path, capsys, manifest)
+    assert run["counts"] == {"succeeded": 4}
+    logo.write_bytes(b"a different logo")
+    mark.unlink()
+
+    def leases():
+        with closing(sqlite3.connect(f"{store.as_uri()}?mode=ro", uri=True)) as db:
+            return db.execute("SELECT * FROM run_leases").fetchall()
+
+    before, held = store.read_bytes(), leases()
+    command = ["jobs", "reroll", run["run_id"], "--dry-run", "--store", str(store)]
+
+    assert main([*command, "--json"]) == EXIT_OK
+
+    payload = _json_output(capsys)
+    assert payload["ok"] is True and payload["command"] == "reroll"
+    preview = payload["reroll"]
+    assert set(preview) == {"version", "run_id", "status", "budget", "attachments", "counts",
+                            "operations"}
+    assert (preview["version"], preview["run_id"], preview["status"]) == (1, run["run_id"],
+                                                                          "completed")
+    assert preview["attachments"] == [
+        {"relative_path": "brand/logo.png", "sha256": hashlib.sha256(b"logo-bytes").hexdigest(),
+         "status": "changed"},
+        {"relative_path": "brand/mark.png", "sha256": hashlib.sha256(b"mark-bytes").hexdigest(),
+         "status": "missing"}]
+    items = {item["operation_key"]: item for item in preview["operations"]}
+    assert all(set(item) == {"operation_key", "operation_id", "status", "action", "reasons",
+                             "attempts_remaining", "new_plan_required"} for item in items.values())
+    assert {key for key, item in items.items() if item["new_plan_required"]} == {"hero[0]", "hero[1]"}
+    assert {key: (item["action"], item["reasons"]) for key, item in items.items()} == {
+        "badge[0]": ("review", ["source_unavailable"]),
+        "hero[0]": ("regenerate", ["source_changed"]),
+        "hero[1]": ("regenerate", ["source_changed"]),
+        "plain[0]": ("reuse", []),
+    }
+    assert preview["counts"] == {"reuse": 1, "recheck": 0, "regenerate": 2, "review": 1}
+    assert preview["budget"]["overrun"] is False and preview["budget"]["unit"] == "microUSD"
+    assert store.read_bytes() == before and leases() == held
+
+    assert main([*command[:3], "hero[0]", *command[3:]]) == EXIT_OK
+    text = capsys.readouterr().out
+    assert "hero[0]: regenerate (source_changed); 1 attempt left; new plan and approval required" in text
+    assert "Attachment brand/logo.png: changed" in text and "plain[0]" not in text
+    assert main(["jobs", "reroll", "missing-run", "--dry-run", "--store", str(store),
+                 "--json"]) == EXIT_JOB_STATE
+    assert _json_output(capsys)["error"]["type"] == "JobNotFoundError"
+    assert store.read_bytes() == before and leases() == held
+
+    # Without --dry-run, a reroll still needs operations and a reason.
+    for arguments in ([run["run_id"]], [run["run_id"], "hero[0]"], [run["run_id"], "--reason", "r"]):
+        with pytest.raises(SystemExit) as refused:
+            main(["jobs", "reroll", *arguments, "--store", str(store)])
+        assert refused.value.code == EXIT_INVALID_INPUT
+    with pytest.raises(SystemExit):
+        main(["jobs", "reroll", "--help"])
+    help_text = " ".join(capsys.readouterr().out.split())
+    assert "--dry-run" in help_text and "changes nothing" in help_text
+
+
+def test_reroll_reads_operation_keys_before_between_and_after_its_options(tmp_path, capsys):
+    manifest = _manifest(tmp_path, attempts=2)
+    data = json.loads(manifest.read_text(encoding="utf-8"))
+    data["operations"][0]["count"] = 2
+    manifest.write_text(json.dumps(data), encoding="utf-8")
+    store, run = _completed_run(tmp_path, capsys, manifest)
+    reroll = ["jobs", "reroll", run["run_id"]]
+
+    def previewed(*arguments):
+        assert main([*reroll, *arguments]) == EXIT_OK
+        return [item["operation_key"] for item in _json_output(capsys)["reroll"]["operations"]]
+
+    assert previewed("--dry-run", "glyph[1]", "--store", str(store), "--json") == ["glyph[1]"]
+    assert previewed("--store", str(store), "--json", "--dry-run", "glyph[1]") == ["glyph[1]"]
+    assert previewed("glyph[1]", "--dry-run", "glyph[0]", "--store", str(store),
+                     "--json") == ["glyph[1]", "glyph[0]"]
+    assert previewed("--dry-run", "--store", str(store), "--json", "--", "glyph[1]") == ["glyph[1]"]
+
+    # Every order reaches the run, which refuses a succeeded operation.
+    for arguments in (["--reason", "r", "glyph[1]", "--store", str(store)],
+                      ["--store", str(store), "glyph[1]", "--reason", "r"],
+                      ["--acknowledge-unknown", "glyph[1]", "--reason", "r", "--store", str(store)],
+                      ["--reason", "r", "--store", str(store), "--", "glyph[1]"]):
+        assert main([*reroll, "--json", *arguments]) == EXIT_JOB_STATE
+        refused = _json_output(capsys)
+        assert refused["command"] == "reroll"
+        assert "glyph[1] in state succeeded cannot be rerolled" in refused["error"]["message"]
+
+    [operation] = [item for item in run["operations"] if item["operation_key"] == "glyph[1]"]
+    [artifact] = [item for item in run["artifacts"] if item["operation_id"] == operation["operation_id"]]
+    (tmp_path / "outputs" / run["artifact_directory"] / artifact["relative_path"]).unlink()
+    assert main([*reroll, "--store", str(store), "--repair-integrity", "glyph[1]", "--reason",
+                 "accepted file deleted", "--json"]) == EXIT_OK
+    repaired = _json_output(capsys)["reroll"]
+    assert repaired["status"] == "completed" and repaired["counts"] == {"succeeded": 2}
+    assert [attempt["reason"] for attempt in repaired["attempts"]
+            if attempt["operation_id"] == operation["operation_id"]] == [None, "accepted file deleted"]
+
+    # A leftover option is still refused, whatever surrounds it.
+    for arguments in (["--dry-run", "glyph[1]", "--bogus"], ["--bogus", "glyph[1]", "--reason", "r"]):
+        with pytest.raises(SystemExit) as refused:
+            main([*reroll, *arguments, "--store", str(store)])
+        assert refused.value.code == EXIT_INVALID_INPUT
+        assert "unrecognized arguments: --bogus\n" in capsys.readouterr().err

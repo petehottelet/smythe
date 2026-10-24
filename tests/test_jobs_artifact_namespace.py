@@ -235,3 +235,76 @@ def test_incomplete_owner_marker_is_retained_and_rejected(tmp_path):
     with pytest.raises(ValueError, match="incomplete owner marker"):
         claim_artifact_root(root, b"expected", legacy=True, legacy_artifacts=[])
     assert marker.read_bytes() == b"incomplete"
+
+
+# ---------------------------------------------------------------------------
+# Integrity repair claims the artifact directory before queueing
+# ---------------------------------------------------------------------------
+
+
+def _ledger(store, run_id):
+    snapshot = store.snapshot(run_id, include_events=True)
+    records = [snapshot[name] for name in ("status", "operations", "attempts", "artifacts")]
+    return records, [event["event_type"] for event in snapshot["events"]]
+
+
+@pytest.mark.parametrize("change,error", [("overwrite", ValueError), ("delete", FileNotFoundError)])
+def test_integrity_repair_of_an_unclaimed_legacy_directory_queues_nothing(tmp_path, change, error):
+    path = tmp_path / "legacy.db"
+    key = legacy_run(path, tmp_path).operations[0].operation_key
+    prior = tmp_path / "outputs/LegacyRun/artifacts/prior.png"
+    if change == "overwrite":
+        prior.write_bytes(b"changed accepted bytes")
+    else:
+        prior.unlink()
+    with SQLiteRunStore(path) as store:
+        before, _ = _ledger(store, "LegacyRun")
+        provider = PixelProvider()
+        runner = JobRunner(store, provider_pool=FixedPool(provider))
+        # The first claim verifies the accepted bytes, so it refuses the repair.
+        with pytest.raises(error):
+            asyncio.run(runner.reroll("LegacyRun", [key], reason="prior.png damaged",
+                                      repair_integrity=True))
+        after, events = _ledger(store, "LegacyRun")
+        assert after == before and "integrity_repair_queued" not in events
+        assert provider.calls == 0
+        assert not (prior.parents[1] / ".smythe-run-owner.json").exists()
+
+        # With the bytes restored, resume runs only the pending operation.
+        prior.write_bytes(PNG)
+        result = asyncio.run(runner.resume("LegacyRun"))
+        assert result["status"] == "completed" and provider.calls == 1
+        operation = next(item for item in result["operations"] if item["operation_key"] == key)
+        assert [attempt["attempt_number"] for attempt in result["attempts"]
+                if attempt["operation_id"] == operation["operation_id"]] == [1]
+        assert operation["accepted_attempt_id"] == before[1][0]["accepted_attempt_id"]
+
+        # Once the directory is claimed, a damaged accepted file is repairable.
+        prior.write_bytes(b"changed accepted bytes")
+        repaired = asyncio.run(runner.reroll("LegacyRun", [key], reason="prior.png damaged",
+                                             repair_integrity=True))
+        assert repaired["status"] == "completed" and provider.calls == 2
+        assert repaired["artifact_integrity"]["counts"] == {"verified": 2}
+
+
+@pytest.mark.parametrize("marker", [None, b"another run\n"])
+def test_integrity_repair_with_a_lost_owner_marker_queues_nothing(tmp_path, marker):
+    plan = plan_for(tmp_path, count=1)
+    with SQLiteRunStore(tmp_path / "jobs.db") as store:
+        provider = PixelProvider()
+        runner = JobRunner(store, provider_pool=FixedPool(provider))
+        first = asyncio.run(runner.start(plan, make_approval(plan), manifest_root=tmp_path, run_id="run"))
+        key = first["operations"][0]["operation_key"]
+        artifact_path(tmp_path, first).unlink()
+        owner = tmp_path / first["output_directory"] / first["artifact_directory"] / ".smythe-run-owner.json"
+        if marker is None:
+            owner.unlink()
+        else:
+            owner.write_bytes(marker)
+        before, _ = _ledger(store, "run")
+        with pytest.raises(ValueError, match="unowned files|another run"):
+            asyncio.run(runner.reroll("run", [key], reason="file deleted", repair_integrity=True))
+        after, events = _ledger(store, "run")
+        assert after == before and "integrity_repair_queued" not in events
+        assert provider.calls == 1
+        assert owner.exists() == (marker is not None)

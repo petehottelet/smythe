@@ -773,3 +773,39 @@ def test_messages_transport_lost_response_keeps_unknown_exposure(journal, messag
     assert messages.log[-1].outcome == "lost_response" and messages.log[-1].response_id
     store, lease = journal
     assert store.inspect_run(lease.run_id)["blocked_reason"] == "unknown_exposure"
+
+
+# Revoked and deleted sources
+
+
+def test_revoked_and_deleted_sources_can_no_longer_be_read():
+    service = FixtureService()
+    first = service.add_source("brief", "Version one")
+    second = service.change_source("brief", "Version two")
+    service.add_source("notes", "Kept")
+    assert service.revoke_source("brief", version=1) == first
+    with pytest.raises(NotFound):
+        service.read_source("brief", version=1)
+    assert service.read_source("brief") == second
+    # Revoking the latest version leaves no readable latest version.
+    assert service.revoke_source("brief") == second
+    with pytest.raises(NotFound):
+        service.read_source("brief")
+    state = service.snapshot()["sources"]
+    assert state["brief"]["revoked"] == [1, 2] and len(state["brief"]["history"]) == 2
+    assert "revoked" not in state["notes"]
+    with pytest.raises(NotFound):
+        service.revoke_source("brief", version=3)
+    service.delete_source("notes")
+    assert "notes" not in service.snapshot()["sources"]
+    with pytest.raises(NotFound):
+        service.read_source("notes")
+    with pytest.raises(NotFound):
+        service.delete_source("notes")
+    # A source added again under a deleted id starts a new, readable history.
+    service.delete_source("brief")
+    assert service.add_source("brief", "Version one again").version == 1
+    assert service.read_source("brief").content == "Version one again"
+    with serve_http(service) as endpoint:
+        service.revoke_source("brief")
+        assert call_http(endpoint.port, "GET", "/sources/brief")[0] == 404

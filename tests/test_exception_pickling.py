@@ -127,3 +127,12 @@ def test_exception_survives_pickle_and_copy(cls, how):
             assert (type(other), str(other)) == (type(value), str(value))
         else:
             assert other == value
+
+
+# ---------------------------------------------------------------------------
+# Security stops
+# ---------------------------------------------------------------------------
+
+from smythe import SecurityStop  # noqa: E402
+
+CUSTOM_CONSTRUCTED[SecurityStop] = lambda: SecurityStop("key_revoked")

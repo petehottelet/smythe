@@ -9,7 +9,9 @@ in-memory bytes. The decision is recorded in the call's completion event under
 ``delivery_acceptance``, in the same transaction that settles the call's cost,
 so the Jobs schema is unchanged. Inspection and resume derive each operation's
 delivery eligibility from that record, the current bytes on disk and the
-validators its plan requires, and never write it back.
+validators its plan requires, and never write it back. A recheck
+(``JobRunner.recheck``) records a later decision about the same accepted bytes,
+and eligibility uses the latest decision made under the current validators.
 """
 
 from __future__ import annotations
@@ -25,6 +27,8 @@ from smythe.validation import ValidationOutcome, ValidationReport, ValidatorIden
 ARTIFACT_SPEC_VALIDATOR = "smythe.jobs.artifact-spec"
 ARTIFACT_SPEC_VALIDATOR_VERSION = "1"
 DELIVERY_RECORD_VERSION = 1
+# The version of a recheck's ``delivery_acceptance_reevaluated`` event.
+REEVALUATION_VERSION = 1
 # A report keeps at most this many findings, hard findings first.
 MAX_RECORDED_FINDINGS = 32
 # The report path for findings about the whole response rather than one artifact.
@@ -186,15 +190,41 @@ def _valid_record(record: Any, attempt_id: str) -> bool:
     )
 
 
-def _required_validators(operation: Mapping[str, Any]) -> list[Any] | None:
-    """The identities an operation's current plan requires, or None if unreadable."""
+def _required_validators(
+    operation: Mapping[str, Any], registered: Mapping[str, ValidatorIdentity] | None = None,
+) -> list[Any] | None:
+    """The identities an operation requires now, or None if unreadable.
+
+    The built-in check is this release's. Each validator the plan names is
+    the one *registered* holds under that name, if any, else the plan's.
+    """
     try:
         spec = operation["spec"]
-        required = [artifact_spec_identity(spec["artifact"]).to_dict(),
-                    *spec.get("validators", [])]
+        required = [artifact_spec_identity(spec["artifact"]).to_dict()]
+        for identity in spec.get("validators", []):
+            current = (registered or {}).get(identity["name"])
+            required.append(identity if current is None else current.to_dict())
         return sorted(required, key=lambda identity: identity["name"])
     except (AttributeError, KeyError, TypeError, ValueError):
         return None
+
+
+def _reevaluated(item: Any, attempt_id: str) -> dict[str, Any] | None:
+    """A recorded recheck of *attempt_id* in the shape of a decision, or None if malformed."""
+    if (type(item) is not dict or item.get("version") != REEVALUATION_VERSION
+            or type(item.get("artifacts")) is not list
+            or any(type(artifact) is not dict for artifact in item["artifacts"])):
+        return None
+    record = {"attempt_id": item.get("attempt_id"), "decision": item.get("outcome"),
+              "reasons": item.get("findings"), "validators": item.get("validators"),
+              "subjects": [{"path": artifact.get("relative_path"), "sha256": artifact.get("sha256"),
+                            "published": True} for artifact in item["artifacts"]]}
+    return record if _valid_record(record, attempt_id) else None
+
+
+def _recorded_validators(record: Mapping[str, Any]) -> list[Any]:
+    return sorted((result["validator"] for result in record["validators"]),
+                  key=lambda identity: str(identity.get("name")))
 
 
 def operation_delivery(
@@ -202,6 +232,8 @@ def operation_delivery(
     attempts: Sequence[Mapping[str, Any]],
     artifacts: Mapping[str, Sequence[Mapping[str, Any]]],
     records: Mapping[str, Any],
+    reevaluations: Mapping[str, Sequence[Any]] | None = None,
+    registered: Mapping[str, ValidatorIdentity] | None = None,
 ) -> tuple[dict[str, Any] | None, dict[str, Any]]:
     """Project one operation's delivery decision and derive its eligibility.
 
@@ -212,11 +244,19 @@ def operation_delivery(
     legacy built-in decision whose validator is unrecorded; it is never
     reported as accepted or as not evaluated.
 
-    The operation is eligible for delivery only with a recorded ``accepted``
-    decision, validators identical to the ones its plan requires now, and
-    every accepted artifact verified on disk with the recorded SHA-256.
-    *artifacts* maps attempt IDs to artifact rows carrying an ``integrity``
-    observation. Eligibility is derived on every read and never stored.
+    *reevaluations* maps attempt IDs to their recorded rechecks, oldest
+    first. Of the attempt's recorded decision and its rechecks, the latest
+    whose validators are the ones the operation requires now is projected,
+    with ``source`` ``reevaluated`` for a recheck; without one, the latest
+    of them is, and ``validator_changed`` says a recheck is required. The
+    validators required now are this release's built-in check and those the
+    plan names, each replaced by the identity *registered* maps its name to.
+
+    The operation is eligible for delivery only with such a decision that is
+    ``accepted``, and every accepted artifact verified on disk with the
+    SHA-256 the decision names. *artifacts* maps attempt IDs to artifact rows
+    carrying an ``integrity`` observation. Eligibility is derived on every
+    read and never stored.
     """
     accepted_id = operation.get("accepted_attempt_id")
     completed = [attempt for attempt in attempts
@@ -234,25 +274,31 @@ def operation_delivery(
                                   "validators": None, "reasons": []}
     reasons = [] if accepted else ["not_accepted"]
     subjects = None
-    if record is None:
+    decisions = [("recorded", record)] if _valid_record(record, attempt_id) else []
+    for item in (reevaluations or {}).get(attempt_id, ()):
+        rechecked = _reevaluated(item, attempt_id)
+        if rechecked is not None:
+            decisions.append(("reevaluated", rechecked))
+    required = _required_validators(operation, registered)
+    current = [item for item in decisions if _recorded_validators(item[1]) == required]
+    if not decisions and record is None:
         projection["source"] = "legacy_built_in"
         reasons.append("validator_unrecorded")
-    elif not _valid_record(record, attempt_id):
+    elif not decisions:
         reasons.append("record_invalid")
     else:
+        source, decided = (current or decisions)[-1]
         projection.update(
-            decision=record["decision"], reasons=list(record["reasons"]),
+            source=source, decision=decided["decision"], reasons=list(decided["reasons"]),
             validators=[{"validator": result["validator"], "outcome": result["outcome"]}
-                        for result in record["validators"]],
+                        for result in decided["validators"]],
         )
-        if record["decision"] != "accepted" and accepted:
+        if decided["decision"] != "accepted" and accepted:
             reasons.append("not_accepted")
-        recorded = sorted((result["validator"] for result in record["validators"]),
-                          key=lambda identity: str(identity.get("name")))
-        if recorded != _required_validators(operation):
+        if not current:
             reasons.append("validator_changed")
         subjects = {(subject.get("path"), subject.get("sha256"))
-                    for subject in record["subjects"] if subject.get("published") is True}
+                    for subject in decided["subjects"] if subject.get("published") is True}
     if accepted:
         delivered = [item for item in artifacts.get(attempt_id, ()) if item.get("accepted") == 1]
         if not delivered:
@@ -268,11 +314,19 @@ def operation_delivery(
     return projection, {"eligible": not reasons, "reasons": reasons}
 
 
-def annotate_delivery(snapshot: dict[str, Any], records: Mapping[str, Any]) -> dict[str, Any]:
+def annotate_delivery(
+    snapshot: dict[str, Any],
+    records: Mapping[str, Any],
+    reevaluations: Mapping[str, Sequence[Any]] | None = None,
+    registered: Mapping[str, ValidatorIdentity] | None = None,
+) -> dict[str, Any]:
     """Add ``delivery_acceptance`` and ``delivery_eligibility`` to each operation.
 
-    *records* maps attempt IDs to recorded decisions. Artifact rows should
-    already carry an ``integrity`` observation; one without it is unchecked.
+    *records* maps attempt IDs to recorded decisions, and *reevaluations* to
+    their recorded rechecks, oldest first. *registered* maps validator names
+    to the identities registered now (see :func:`operation_delivery`).
+    Artifact rows should already carry an ``integrity`` observation; one
+    without it is unchecked.
     """
     attempts: dict[Any, list[Mapping[str, Any]]] = {}
     for attempt in snapshot.get("attempts", ()):
@@ -283,6 +337,7 @@ def annotate_delivery(snapshot: dict[str, Any], records: Mapping[str, Any]) -> d
     for operation in snapshot.get("operations", ()):
         acceptance, eligibility = operation_delivery(
             operation, attempts.get(operation.get("operation_id"), ()), artifacts, records,
+            reevaluations, registered,
         )
         operation["delivery_acceptance"] = acceptance
         operation["delivery_eligibility"] = eligibility
@@ -294,6 +349,7 @@ __all__ = [
     "ARTIFACT_SPEC_VALIDATOR_VERSION",
     "DELIVERY_RECORD_VERSION",
     "MAX_RECORDED_FINDINGS",
+    "REEVALUATION_VERSION",
     "RESPONSE_PATH",
     "annotate_delivery",
     "artifact_spec_identity",

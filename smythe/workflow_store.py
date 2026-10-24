@@ -25,6 +25,7 @@ from typing import Any
 from uuid import uuid4
 
 from smythe import pricing, pricing_anthropic
+from smythe._failures import security_reason_code
 # Recognizing a free HTTP rejection is shared with ordinary runs.
 from smythe._http_rejection import (  # noqa: F401
     _ERROR_BODY_FIELDS, _ERROR_OBJECT_FIELDS, _HTTP_REJECTION_SCOPE, _REJECTION_STATUS_ERRORS,
@@ -41,6 +42,12 @@ OFFLINE_PRICE_VERSION = "offline-zero-v1"
 READ_PRICE_VERSION = "declared-read-v1"
 # Version 1 journals open read-only as they are; a writable open migrates them.
 _READABLE_VERSIONS = (1, STORE_VERSION)
+_V1_TABLES = frozenset({"workflow_meta", "workflow_runs", "workflow_calls", "workflow_evidence",
+                        "workflow_checkpoints", "workflow_operations", "workflow_invocations",
+                        "workflow_events"})
+# Version 2 adds the external action tables; see smythe.workflow_actions.
+_ACTION_TABLES = frozenset({"workflow_actions", "workflow_action_attempts",
+                            "workflow_action_approvals", "workflow_action_records"})
 _MONEY = re.compile(r"0|[1-9][0-9]*")
 # Keep in step with CallScope in workflow_binding. Version 2 adds "tool".
 _PHASES = {"routing", "planning", "execution", "verification", "supervision", "synthesis", "tool"}
@@ -314,6 +321,39 @@ class DispatchPermit:
     lease_epoch: int
 
 
+# Version 2's external action tables. Action money is its own accounting scope,
+# kept on these rows and never added to a run's balances.
+_ACTION_SCHEMA = (
+    """CREATE TABLE IF NOT EXISTS workflow_actions(
+  action_id TEXT PRIMARY KEY,run_id TEXT NOT NULL REFERENCES workflow_runs(run_id),slot TEXT NOT NULL,
+  sequence INTEGER NOT NULL,action_key TEXT NOT NULL UNIQUE,intent_json TEXT NOT NULL,intent_sha TEXT NOT NULL,
+  profile_json TEXT NOT NULL,state TEXT NOT NULL,ceiling TEXT NOT NULL,confirmed TEXT NOT NULL,
+  reserved TEXT NOT NULL,unknown TEXT NOT NULL,compensates_action_id TEXT REFERENCES workflow_actions(action_id),
+  created INTEGER NOT NULL,updated INTEGER NOT NULL,UNIQUE(run_id,slot,sequence))""",
+    """CREATE TABLE IF NOT EXISTS workflow_action_approvals(
+  approval_id TEXT PRIMARY KEY,action_id TEXT NOT NULL REFERENCES workflow_actions(action_id),
+  intent_sha TEXT NOT NULL,verdict TEXT NOT NULL,principal_json TEXT NOT NULL,verifier_json TEXT NOT NULL,
+  assertion TEXT NOT NULL,assertion_sha TEXT NOT NULL,ceiling TEXT,expires_at_ns INTEGER,
+  consumed_by_attempt TEXT REFERENCES workflow_action_attempts(attempt_id),revoked_at_ns INTEGER,
+  revoked_reason TEXT,duplicate_risk INTEGER NOT NULL DEFAULT 0,created INTEGER NOT NULL)""",
+    """CREATE TABLE IF NOT EXISTS workflow_action_attempts(
+  attempt_id TEXT PRIMARY KEY,action_id TEXT NOT NULL REFERENCES workflow_actions(action_id),
+  number INTEGER NOT NULL,approval_id TEXT NOT NULL REFERENCES workflow_action_approvals(approval_id),
+  state TEXT NOT NULL,dispatch_token_sha TEXT,dispatch_epoch INTEGER,receipt_json TEXT,receipt_sha TEXT,
+  cost TEXT,reserved TEXT NOT NULL,unknown TEXT NOT NULL,error TEXT,created INTEGER NOT NULL,
+  dispatched INTEGER,updated INTEGER NOT NULL,UNIQUE(action_id,number))""",
+    """CREATE TABLE IF NOT EXISTS workflow_action_records(
+  record_id TEXT PRIMARY KEY,action_id TEXT NOT NULL REFERENCES workflow_actions(action_id),
+  kind TEXT NOT NULL,payload_json TEXT NOT NULL,payload_sha TEXT NOT NULL,trusted INTEGER NOT NULL,
+  cost TEXT,created INTEGER NOT NULL)""",
+    """CREATE INDEX IF NOT EXISTS workflow_action_approvals_by_action ON workflow_action_approvals(action_id)""",
+    """CREATE INDEX IF NOT EXISTS workflow_action_records_by_action ON workflow_action_records(action_id)""",
+    *(f"""CREATE TRIGGER IF NOT EXISTS workflow_action_records_no_{verb.lower()} BEFORE {verb}
+  ON workflow_action_records BEGIN SELECT RAISE(ABORT,'workflow action records are append-only'); END"""
+      for verb in ("UPDATE", "DELETE")),
+)
+
+
 class SQLiteWorkflowStore:
     """A fenced, exact local workflow journal with explicit raw evidence access."""
 
@@ -365,15 +405,18 @@ class SQLiteWorkflowStore:
             if allow_empty:
                 return None
             raise WorkflowCorruptionError("Database has no workflow schema")
-        required = {"workflow_meta", "workflow_runs", "workflow_calls", "workflow_evidence",
-                    "workflow_checkpoints", "workflow_operations", "workflow_invocations", "workflow_events"}
-        if not required <= tables:
+        if not _V1_TABLES <= tables:
             raise WorkflowCorruptionError("Database is not a Smythe workflow journal")
         meta = db.execute("SELECT kind, version, store_id FROM workflow_meta").fetchall()
         version = meta[0]["version"] if len(meta) == 1 else None
         if (len(meta) != 1 or meta[0]["kind"] != STORE_KIND
                 or type(version) is not int or version not in _READABLE_VERSIONS):
             raise WorkflowCorruptionError("Unsupported workflow journal version")
+        # Each version requires its own tables, and tables other tools add are
+        # kept. A version 1 journal has no action tables, so that its upgrade
+        # never adopts one of unknown shape.
+        if tables & _ACTION_TABLES != (_ACTION_TABLES if version > 1 else frozenset()):
+            raise WorkflowCorruptionError("Workflow journal tables do not match its version")
         store_id = meta[0]["store_id"]
         if type(store_id) is not str or re.fullmatch("[0-9a-f]{32}", store_id) is None:
             raise WorkflowCorruptionError("Invalid persistent workflow store identity")
@@ -394,8 +437,10 @@ class SQLiteWorkflowStore:
                       (self._clock_ns(),)).fetchone():
             raise WorkflowLeaseError("Stop workflow workers from earlier releases before upgrading "
                                      "a journal with a live lease")
-        # Version 2 adds the "tool" call phase. Its tables are those of
-        # version 1, and every version 1 row is a valid version 2 row.
+        # Version 2 adds the "tool" call phase and the external action tables,
+        # created empty. Every version 1 row is a valid version 2 row.
+        for statement in _ACTION_SCHEMA:
+            db.execute(statement)
         db.execute("UPDATE workflow_meta SET version=?", (STORE_VERSION,))
 
     def __enter__(self):
@@ -456,6 +501,7 @@ class SQLiteWorkflowStore:
           sequence INTEGER PRIMARY KEY AUTOINCREMENT,run_id TEXT NOT NULL REFERENCES workflow_runs(run_id),
           call_id TEXT,event_type TEXT NOT NULL,payload_json TEXT NOT NULL,created INTEGER NOT NULL)""",
             """CREATE INDEX IF NOT EXISTS workflow_calls_by_run ON workflow_calls(run_id,state)""",
+            *_ACTION_SCHEMA,
         )
         for statement in statements:
             db.execute(statement)
@@ -859,6 +905,32 @@ class SQLiteWorkflowStore:
                 ORDER BY created,call_id""", (run_id,))
                 if self._superseded(self._stored_key(row["key_json"]), generations)]
 
+    def node_generation_calls(self, run_id, node_id, generation):
+        """The settled calls a graph node made at one generation, with their results.
+
+        Lists the execution, verification and read (``tool``) calls scoped
+        ``node/<node_id>`` at *generation* whose billing is known, each as
+        ``{"key": {...}, "result_state": ...}``, ordered by phase,
+        invocation, attempt and turn. Only that scope's keys are parsed, so
+        the cost barely grows with other nodes' calls. A durable retry policy
+        counts a node's rejected calls here, on every invocation, as the
+        attempts its generation used.
+        """
+        scope = CallKey("execution", f"node/{node_id}", _integer(generation, "generation"))
+        with self._transaction(write=False) as db:
+            self._run(db, run_id)
+            try:
+                rows = db.execute(
+                    """SELECT key_json,result_state FROM workflow_calls WHERE run_id=? AND
+                    billing_state='known' AND json_extract(key_json,'$.scope_id')=?""",
+                    (run_id, scope.scope_id)).fetchall()
+            except sqlite3.DatabaseError as exc:  # A key that is not JSON.
+                raise WorkflowCorruptionError("Call key is invalid") from exc
+            calls = [(self._stored_key(row["key_json"]), row["result_state"]) for row in rows]
+        return [{"key": asdict(key), "result_state": state} for key, state in sorted(
+            calls, key=lambda call: (call[0].phase, call[0].invocation, call[0].attempt, call[0].turn))
+            if key.generation == generation and key.phase in ("execution", "verification", "tool")]
+
     @staticmethod
     def _call_record(row):
         request = _loads(row["request_json"], stored=True)
@@ -1098,7 +1170,9 @@ class SQLiteWorkflowStore:
             evidence_id = self._insert_evidence(db, call, values)
             if call["evidence_id"] not in (None, evidence_id):
                 conflict = True
-                db.execute("UPDATE workflow_runs SET status='blocked',blocked_reason='evidence_conflict' WHERE run_id=?", (permit.run_id,))
+                # A security stop keeps its reason; the event records the conflict.
+                db.execute("UPDATE workflow_runs SET status='blocked',blocked_reason='evidence_conflict' "
+                           "WHERE run_id=? AND blocked_reason IS NOT 'security_stop'", (permit.run_id,))
                 self._event(db, permit.run_id, "evidence_conflict", call_id=permit.call_id)
             elif call["evidence_id"] is None:
                 db.execute("UPDATE workflow_calls SET evidence_id=?,state=CASE WHEN state='dispatched' THEN 'response_saved' ELSE state END,updated=? WHERE call_id=?",
@@ -1106,6 +1180,45 @@ class SQLiteWorkflowStore:
         if conflict:
             raise WorkflowConflictError("Conflicting raw responses retained; workflow admission is closed")
         return evidence_id
+
+    def security_stop(self, run_id, reason_code):
+        """Close a run's admission for good because of a security stop; return the stop.
+
+        The run becomes ``blocked`` with ``blocked_reason`` ``security_stop``,
+        whatever its status or reason was, and a ``security_stop`` event
+        records *reason_code*, a short developer code (see
+        ``smythe._failures.security_reason_code``). No call is admitted or
+        dispatched after it; calls already dispatched still settle, and keep
+        unknown exposure without evidence. The admission latches never replace
+        the reason and no method clears it. No lease is needed. The first stop
+        stands: stopping a stopped run again records nothing and returns it.
+        Returns ``{"reason_code", "at_ns"}``, ``at_ns`` on the journal's clock.
+        """
+        try:
+            security_reason_code(reason_code)
+        except (TypeError, ValueError) as error:
+            raise WorkflowValidationError(str(error)) from None
+        with self._transaction() as db:
+            if self._run(db, run_id)["blocked_reason"] != "security_stop":
+                db.execute("UPDATE workflow_runs SET status='blocked',blocked_reason='security_stop',"
+                           "updated=? WHERE run_id=?", (self._clock_ns(), run_id))
+                self._event(db, run_id, "security_stop", payload={"reason_code": reason_code})
+            return self._security_stop(db, run_id)
+
+    def load_security_stop(self, run_id):
+        """The security stop that holds a run, ``{"reason_code", "at_ns"}``, or None."""
+        with self._transaction(write=False) as db:
+            if self._run(db, run_id)["blocked_reason"] != "security_stop":
+                return None
+            return self._security_stop(db, run_id)
+
+    def _security_stop(self, db, run_id):
+        row = db.execute("SELECT payload_json,created FROM workflow_events WHERE run_id=? AND "
+                         "event_type='security_stop' ORDER BY sequence LIMIT 1", (run_id,)).fetchone()
+        payload = None if row is None else _loads(row["payload_json"], stored=True)
+        if type(payload) is not dict or type(payload.get("reason_code")) is not str:
+            raise WorkflowCorruptionError("A security stop has no readable event")
+        return {"reason_code": payload["reason_code"], "at_ns": row["created"]}
 
     def _update_latch(self, db, run_id):
         run = self._run(db, run_id)
@@ -1621,15 +1734,32 @@ class SQLiteWorkflowStore:
         for operation in db.execute("SELECT * FROM workflow_operations WHERE run_id=?", (run_id,)):
             value = self._operation_record(operation)
             self._consumable_calls(db, run_id, value["consumed_call_ids"])
+        self._actions(db, run_id)
         return {"ok": True, "call_count": len(calls), "confirmed_nanousd": totals[0],
                 "reserved_nanousd": totals[1], "unknown_nanousd": totals[2], "unknown_calls": unknown_calls,
                 "revision": run["revision"]}
+
+    def _actions(self, db, run_id):
+        """Audit a run's external actions; return their safe projection, or None without any.
+
+        Version 1 journals have no action tables.
+        """
+        if self._version < 2 or db.execute("SELECT 1 FROM workflow_actions WHERE run_id=? LIMIT 1",
+                                           (run_id,)).fetchone() is None:
+            return None
+        from smythe.workflow_actions import audit_actions
+        return audit_actions(self, db, run_id)
 
     def audit(self, run_id):
         with self._transaction(write=False) as db:
             return self._audit(db, run_id)
 
     def inspect_run(self, run_id):
+        """Safe summaries of a run's calls, balances and events.
+
+        A run with external actions also has an ``actions`` block; see
+        ``smythe.workflow_actions.audit_actions``.
+        """
         with self._transaction(write=False) as db:
             audit = self._audit(db, run_id)
             run = self._run(db, run_id)
@@ -1639,12 +1769,14 @@ class SQLiteWorkflowStore:
                 calls.append({key: record[key] for key in (
                     "call_id", "key", "binding_sha256", "request_sha256", "state", "billing_state", "result_state",
                     "quote_id", "evidence_id", "ceiling_nanousd", "cost_nanousd", "reserved_nanousd", "unknown_nanousd")})
+            actions = self._actions(db, run_id)
             return {**audit, "store_id": self.store_id, "run_id": run_id, "status": run["status"],
                     "blocked_reason": run["blocked_reason"], "budget_nanousd": None if run["budget"] is None else _amount(run["budget"]),
                     "config_sha256": _sha(run["config_json"]), "task_sha256": _sha(run["task_json"]), "calls": calls,
                     "events": [{"sequence": row["sequence"], "call_id": row["call_id"], "type": row["event_type"],
                                 "data": _loads(row["payload_json"], stored=True)}
-                               for row in db.execute("SELECT * FROM workflow_events WHERE run_id=? ORDER BY sequence", (run_id,))]}
+                               for row in db.execute("SELECT * FROM workflow_events WHERE run_id=? ORDER BY sequence", (run_id,))],
+                    **({} if actions is None else {"actions": actions})}
 
     def lease_sessions(self, run_id):
         """Wall-clock bounds of each lease session on a run, oldest first.
