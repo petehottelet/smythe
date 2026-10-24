@@ -35,9 +35,19 @@ from smythe.optimize.ledger import (
     TrialRecord,
     TrialStatus,
 )
+from smythe.optimize.registry import (
+    ActivationEvent,
+    ActiveVersion,
+    PolicyRegistry,
+    PolicyReview,
+    RegistryConflictError,
+    RegistryError,
+)
 from smythe.optimize.statistics import PromotionAssessment, assess_promotion
 
 __all__ = [
+    "ActivationEvent",
+    "ActiveVersion",
     "CampaignLease",
     "CampaignLeaseError",
     "CampaignLeaseConflict",
@@ -58,8 +68,12 @@ __all__ = [
     "OptimizationNeedsAttention",
     "OptimizationResult",
     "OptimizationRunner",
+    "PolicyRegistry",
+    "PolicyReview",
     "PromotionAssessment",
     "PromotionDecision",
+    "RegistryConflictError",
+    "RegistryError",
     "TrialContext",
     "TrialOutcome",
     "TrialRecord",

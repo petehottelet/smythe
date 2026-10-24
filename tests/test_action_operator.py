@@ -310,12 +310,12 @@ def test_not_executed_needs_a_new_approval_that_accepts_the_duplicate_risk(
     assert "does not accept the duplicate risk" in refused.refusal
     assert connector.made("submit") == 1
 
-    # An approval for the intent alone, or one that names the risk without accepting it, is refused.
+    # An approval of the action alone, or one that names the risk without accepting it, is refused.
     expiry = clock.now_ns + HOUR_NS
     with pytest.raises(ActionStateError, match="duplicate_risk=True"):
         approve(store, action.action_id, sign(host, action), host, ceiling_nanousd=action.ceiling_nanousd,
                 expires_at_ns=expiry)
-    with pytest.raises(ApprovalRejected, match="another intent"):
+    with pytest.raises(ApprovalRejected, match="approves another digest"):
         approve(store, action.action_id, sign(host, action), host, ceiling_nanousd=action.ceiling_nanousd,
                 expires_at_ns=expiry, duplicate_risk=True)
     assert rows(store.path, "workflow_action_approvals") == untouched["workflow_action_approvals"]
@@ -454,11 +454,12 @@ def test_a_decision_needs_a_principal_the_verifier_vouches_for_exactly_this_deci
     forged = Host().issue(decision_sha256(store, action.action_id, "not_executed", attached), subject="operator-1",
                           tenant="acme", expires_at_ns=FAR)
     refused(ApprovalRejected, "signature is not this host's", forged)
-    # The action's approval assertion binds its intent, never a decision.
-    refused(ApprovalRejected, "another intent", sign(host, action))
+    # The action's approval assertion binds its approval subject, never a decision.
+    refused(ApprovalRejected, "approves another digest", sign(host, action))
     # An assertion for another decision, or other evidence, decides nothing else.
-    refused(ApprovalRejected, "another intent", assertion_for(store, host, action, "abandon"))
-    refused(ApprovalRejected, "another intent", assertion_for(store, host, action, "not_executed", evidence("other")))
+    refused(ApprovalRejected, "approves another digest", assertion_for(store, host, action, "abandon"))
+    refused(ApprovalRejected, "approves another digest",
+            assertion_for(store, host, action, "not_executed", evidence("other")))
     refused(ApprovalRejected, "tenant 'globex'",
             assertion_for(store, host, action, "not_executed", attached, tenant="globex"))
     host.authorized = False
@@ -590,7 +591,8 @@ def test_inspection_shows_states_approvals_records_balances_and_next_actions(
                      "notify": ("not_dispatched", False, "approve"),
                      "publish": ("outcome_unknown", False, "operator_review")}
     published = next(entry for entry in view["items"] if entry["action_id"] == action.action_id)
-    assert published == {**item(store, action), "duplicate_risk": False, "next_action": "operator_review"}
+    assert published == {**item(store, action), "duplicate_risk": False, "contradiction": None,
+                         "next_action": "operator_review"}
     (shown,) = published["approvals"]
     assert (shown["approval_id"], shown["principal"]["subject"], shown["expires_at_ns"]) == (
         approval.approval_id, "editor-1", approval.expires_at_ns)

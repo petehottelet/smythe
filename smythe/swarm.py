@@ -750,6 +750,38 @@ class Swarm:
             self._memory.record(task, graph, result)
         return result
 
+    def _record_failure(
+        self,
+        execution_id: str,
+        graph: ExecutionGraph,
+        budget: Sentinel,
+        task: Task | None,
+        timing: _RunTiming,
+        exc: BaseException,
+    ) -> None:
+        """Record a failed run in a planner memory whose ``record_failures`` is True.
+
+        Interrupts, exits and cancellation are not recorded. A memory that
+        cannot record is logged and never replaces the run's own exception.
+        """
+        if (task is None or not isinstance(exc, Exception)
+                or isinstance(exc, asyncio.CancelledError)):
+            return
+        try:
+            if getattr(self._memory, "record_failures", False) is not True:
+                return
+            record_failure = getattr(self._memory, "record_failure", None)
+            if callable(record_failure):
+                record_failure(
+                    task, graph, exc, execution_id=execution_id, timing=timing.result(),
+                    trace=timing.tracer.summary(), budget=budget,
+                )
+        except Exception:
+            logger.warning(
+                "Could not record failed execution %r in planner memory", execution_id,
+                exc_info=True,
+            )
+
     def _reverified(
         self, record: DeliveryAcceptance, output: Any, graph: ExecutionGraph, task: Task | None,
     ) -> DeliveryAcceptance:
@@ -1248,6 +1280,7 @@ class Swarm:
                 accounting_error=str(exc) if isinstance(exc, BudgetValidationError) else None,
                 response_error=_response_error_marker(exc),
             )
+            self._record_failure(execution_id, graph, budget, task, timing, exc)
             raise
         finally:
             self._release_holds(budget)
@@ -1321,6 +1354,7 @@ class Swarm:
                 accounting_error=str(exc) if isinstance(exc, BudgetValidationError) else None,
                 response_error=_response_error_marker(exc),
             )
+            self._record_failure(execution_id, graph, budget, task, timing, exc)
             raise
         finally:
             self._release_holds(budget)
@@ -1519,9 +1553,9 @@ class Swarm:
         Each run in this Swarm's lineage access scope, by default each head
         of the archive (:func:`~smythe.reuse.archive_heads`), is evaluated
         (:func:`~smythe.reuse.evaluate`) against what a new run of this
-        Swarm would use: its strict policy's validators, its read profiles,
-        synthesizer, context assembly and agents, and the sources that
-        *sources*, a zero-cost :class:`~smythe.reuse.SourceCatalog`,
+        Swarm would use: its strict policy's validators, its gate verifier,
+        read profiles, synthesizer, renderer, context assembly and agents, and the
+        sources that *sources*, a zero-cost :class:`~smythe.reuse.SourceCatalog`,
         describes. The journal is opened again read-only, so no lease is
         taken, nothing is written, no provider is called and no source is
         read. Returns a :class:`~smythe.reuse.RepairPlan`; its
@@ -1770,10 +1804,10 @@ class Swarm:
 
         A durable ``run_store`` run journals the decision as a new
         ``acceptance`` operation and checkpoint; its recipe may differ from
-        this Swarm's only in its acceptance policy and gate verifier. A run
-        with a lineage policy also journals the new decision's lineage record,
-        which supersedes the earlier one. See
-        ``smythe.workflow.WorkflowRuntime.reevaluate``.
+        this Swarm's only in its acceptance policy, its gate verifier and its
+        lineage policy's ``reuse``. A run with a lineage policy also journals
+        the new decision's lineage record, which supersedes the earlier one.
+        See ``smythe.workflow.WorkflowRuntime.reevaluate``.
 
         *operator*, an :class:`~smythe.acceptance.OperatorDecision`, records an
         operator's decision instead of a policy's, and takes no *acceptance*.
@@ -2011,6 +2045,7 @@ class Swarm:
                 accounting_error=str(exc) if isinstance(exc, BudgetValidationError) else None,
                 response_error=_response_error_marker(exc),
             )
+            self._record_failure(execution_id, graph, budget, task, timing, exc)
             raise
         finally:
             self._release_holds(budget)

@@ -92,8 +92,9 @@ class AsyncExecutor(ExecutorBase):
     ``sleep``, when given, also times the drain's deadline.
 
     A security stop never drains: a revoked ``run_control``, even while the
-    run waits on its nodes or drains, or a ``SecurityStop`` a node raises,
-    cancels the nodes in flight at once, and each call that was sent and not
+    run waits on its nodes, on a supervisor review or on a drain, or a
+    ``SecurityStop`` a node raises, cancels the nodes in flight at once, and
+    a pending review with them, and each call that was sent and not
     answered keeps its reservation as unknown cost. A revocation that ends a
     drain raises ``SecurityStop`` with the run's original error as its cause.
     """
@@ -181,6 +182,8 @@ class AsyncExecutor(ExecutorBase):
         self._backing_off: set[str] = set()
         # During a run under a run control, the task that ends once it is revoked.
         self._revocation: asyncio.Task[None] | None = None
+        # The current run's node tasks in flight.
+        self._active: dict[asyncio.Task[None], Node] = {}
 
     @property
     def drain_record(self) -> dict[str, Any] | None:
@@ -244,6 +247,7 @@ class AsyncExecutor(ExecutorBase):
         with self._tracer.phase("verification"):
             self.recover_verification(graph)
         active: dict[asyncio.Task[None], Node] = {}
+        self._active = active
         pending, resolved, dependents, unresolved, ready, order = self._schedule_state(
             graph, active,
         )
@@ -432,6 +436,11 @@ class AsyncExecutor(ExecutorBase):
             for waiting in held:
                 held_s[waiting.id] = held_s.get(waiting.id, 0.0) + stalled
         return revised
+
+    def _cancel_in_flight(self) -> None:
+        """Cancel the node tasks in flight at once; the run settles them as it stops."""
+        for task in self._active:
+            task.cancel()
 
     def _reserve_node(self, node: Node) -> None:
         """Reserve the best available per-call estimate before admission."""

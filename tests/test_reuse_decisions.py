@@ -17,15 +17,16 @@ import smythe.reuse
 from fakes import release_price_version
 from fixture_service import FixtureService
 from smythe import (
-    ArtifactLineage, CurrentState, ItemDecision, LineagePolicy, SourceStatus, ValidatorIdentity,
-    WorkflowBindingError,
+    ArtifactLineage, CurrentState, ItemDecision, LineagePolicy, LocalOnly, MarkdownRenderer,
+    SourceStatus, ValidatorIdentity, WorkflowBindingError,
 )
 from smythe._canonical import sha256_hex
 from smythe.context import CONTEXT_ASSEMBLY_VERSION
 from smythe.executor_base import ExecutorBase
 from smythe.graph import ExecutionGraph, Node
-from smythe.lineage import validator_set_sha256
+from smythe.lineage import renderer_identity, validator_set_sha256
 from smythe.reuse import ACTIONS, REASONS, NodeDecision, evaluate
+from smythe.verifier import TOKEN_VERIFIER_IDENTITY
 from smythe.workflow_artifact import PublishedArtifact, artifact_integrity
 
 
@@ -42,6 +43,7 @@ SOURCES = {"a": {"source_id": "a", "version": "v1", "sha256": digest("a v1")},
            "b": {"source_id": "b", "version": "v1", "sha256": digest("b v1")}}
 NODES = ["read_a", "extract_a", "read_b", "extract_b", "write"]
 AGENTS = frozenset(digest("agent " + node_id) for node_id in ("extract_a", "extract_b", "write"))
+RENDERER = {"name": "markdown_renderer", "version": "1", "spec_sha256": digest("renderer")}
 
 
 def node(node_id, *, depends_on=(), kind="model", sources=(), context=True, tool=None,
@@ -81,9 +83,7 @@ def record_data(*, gate=False, **changes) -> dict:
         "access_scope": "local",
         "artifact": {
             "relative_path": "run-1/document.md", "sha256": digest("document"), "size_bytes": 120,
-            "media_type": "text/markdown; charset=utf-8",
-            "renderer": {"name": "markdown_renderer", "version": "1",
-                         "spec_sha256": digest("renderer")},
+            "media_type": "text/markdown; charset=utf-8", "renderer": dict(RENDERER),
         },
         "acceptance": {
             "operation_key": "acceptance/" + digest("inputs"), "record_sha256": digest("record"),
@@ -122,7 +122,7 @@ def state(catalog=None, **changes) -> CurrentState:
         "policy_sha256": POLICY,
         "tools": {"catalog": {"version": "1", "decoder_version": "text-utf8-v1"}},
         "components": {"brief-writer": "2", "fact-check": "1"}, "agents": AGENTS,
-        "integrity": {"run-1": "verified"},
+        "integrity": {"run-1": "verified"}, "renderer": RENDERER,
     }
     options.update(changes)
     return CurrentState(**options)
@@ -358,7 +358,69 @@ def test_an_artifact_that_cannot_be_checked_needs_review(integrity, code):
 
 
 def test_a_run_without_a_document_needs_no_integrity_finding():
-    assert evaluate(lineage(artifact=None), state(integrity={})).action == "reuse"
+    assert evaluate(lineage(artifact=None), state(integrity={}, renderer=None)).action == "reuse"
+
+
+@pytest.mark.parametrize("renderer", [
+    {"name": "plain-brief", "version": "1", "spec_sha256": digest("plain brief")},
+    {**RENDERER, "version": "2"}, {**RENDERER, "spec_sha256": digest("another description")},
+    None,
+], ids=["another", "version", "description", "none"])
+def test_a_changed_renderer_regenerates_the_publication(renderer):
+    decision = evaluate(lineage(), state(renderer=renderer))
+
+    # The document is made again from the synthesis, the node nothing depends on.
+    assert (decision.action, decision.reasons) == ("regenerate", ("renderer_changed",))
+    assert actions(decision) == {**dict.fromkeys(NODES[:-1], "reuse"), "write": "regenerate"}
+    assert reasons(decision)["write"] == ("renderer_changed",)
+    assert decision.to_dict()["authority"]["sources"] == [SOURCES["a"], SOURCES["b"]]
+    # Another renderer never renders the old synthesis again, damaged document or not.
+    damaged = evaluate(lineage(), state(renderer=renderer, integrity={"run-1": "missing"}))
+    assert damaged.action == "regenerate" and "rerender" not in actions(damaged).values()
+    # A gate is never kept in an item that computes something again.
+    gated = evaluate(lineage(gate=True), state(renderer=renderer))
+    assert actions(gated)["check"] == actions(gated)["extract_b"] == "regenerate"
+
+
+@pytest.mark.parametrize("renderer", [
+    RENDERER, {"name": "plain-brief", "version": "1", "spec_sha256": digest("plain brief")},
+], ids=["markdown", "another"])
+def test_a_renderer_added_since_a_run_without_a_document_regenerates_the_publication(renderer):
+    # A run that published no document was made without a renderer.
+    decision = evaluate(lineage(artifact=None), state(renderer=renderer, integrity={}))
+
+    # A renderer configured since publishes a document the run never had, from a new synthesis.
+    assert (decision.action, decision.reasons) == ("regenerate", ("renderer_changed",))
+    assert actions(decision) == {**dict.fromkeys(NODES[:-1], "reuse"), "write": "regenerate"}
+    # Without a renderer now, there is still nothing to publish.
+    assert evaluate(lineage(artifact=None), state(renderer=None, integrity={})).action == "reuse"
+
+
+class PlainBrief:
+    """A LocalOnly renderer."""
+
+    filename = "brief.txt"
+
+    def render(self, output, task):
+        return output
+
+
+def test_a_renderer_identity_names_a_configured_renderer_as_a_record_does():
+    markdown = renderer_identity(MarkdownRenderer())
+    assert markdown == {"name": "markdown_renderer", "version": "1",
+                        "spec_sha256": sha256_hex({"type": "markdown_renderer", "version": 1})}
+    local = renderer_identity(LocalOnly(PlainBrief, "plain-brief", "2", role="renderer"))
+    assert (local["name"], local["version"]) == ("plain-brief", "2")
+    assert renderer_identity(LocalOnly(PlainBrief, "plain-brief", "3", role="renderer")) != local
+    assert renderer_identity(None) is None
+    # It is what a state compares a record's renderer with.
+    record = lineage(artifact={**record_data()["artifact"], "renderer": markdown})
+    assert evaluate(record, state(renderer=renderer_identity(MarkdownRenderer()))).action == "reuse"
+    assert evaluate(record, state(renderer=local)).reasons == ("renderer_changed",)
+    for value in (object(), "markdown_renderer", MarkdownRenderer,
+                  LocalOnly(PlainBrief, "plain-brief", "1", role="synthesizer")):
+        with pytest.raises(WorkflowBindingError):
+            renderer_identity(value)
 
 
 @pytest.mark.parametrize("status", ["missing", "changed"])
@@ -445,7 +507,7 @@ def test_regeneration_reaches_exactly_the_nodes_a_run_resets(changed_id):
         node(node_id, depends_on=depends_on, result=node_id != changed_id)
         for node_id, depends_on in DIAMOND.items()])
     decision = evaluate(ArtifactLineage.from_dict(data), state(
-        agents={digest("agent " + node_id) for node_id in DIAMOND}))
+        agents={digest("agent " + node_id) for node_id in DIAMOND}, renderer=None))
     graph = ExecutionGraph(topology=[], nodes=[
         Node(label=node_id, id=node_id, depends_on=list(depends_on))
         for node_id, depends_on in DIAMOND.items()])
@@ -474,6 +536,61 @@ def test_a_gate_pair_in_an_item_under_review_is_never_reused():
     decision = evaluate(lineage(gate=True), state(catalog))
     assert decision.action == "review"
     assert actions(decision)["extract_b"] == actions(decision)["check"] == "regenerate"
+    assert actions(decision)["read_b"] == "reuse"
+
+
+GATE_VALIDATOR = ValidatorIdentity.for_config("contains", "1", {"needle": "needle"})
+
+
+def judged(verifier="validator-v1", validators=(GATE_VALIDATOR,)) -> ArtifactLineage:
+    """A record whose gate names the gate verifier that judged it."""
+    data = record_data(gate=True)
+    data["nodes"][-1]["inputs"]["verifier"] = {
+        "name": verifier, "validators": [item.to_dict() for item in validators]}
+    return ArtifactLineage.from_dict(data)
+
+
+@pytest.mark.parametrize("changes", [
+    {"gate_validators": [ValidatorIdentity.for_config("contains", "2", {"needle": "absent"})]},
+    {"gate_validators": [ValidatorIdentity.for_config("contains", "1", {"needle": "absent"})]},
+    {"gate_verifier": TOKEN_VERIFIER_IDENTITY, "gate_validators": []},
+    {"gate_validators": [GATE_VALIDATOR, ValidatorIdentity.for_config("other", "1")]},
+], ids=["version", "configuration", "token-verifier", "added"])
+def test_a_changed_gate_validator_is_never_reused(changes):
+    current = {"gate_verifier": "validator-v1", "gate_validators": [GATE_VALIDATOR]}
+    assert evaluate(judged(), state(**current)).action == "reuse"
+
+    decision = evaluate(judged(), state(**{**current, **changes}))
+
+    # The gate and the node it judged regenerate, and so does what depends on them.
+    assert decision.action == "regenerate"
+    assert actions(decision) == {"read_a": "reuse", "extract_a": "reuse", "read_b": "reuse",
+                                 "extract_b": "regenerate", "write": "regenerate",
+                                 "check": "regenerate"}
+    assert reasons(decision)["extract_b"] == ("gate_validator_changed",)
+    assert reasons(decision)["check"] == ("dependency_changed", "gate_validator_changed")
+    assert reasons(decision)["write"] == ("dependency_changed",)
+    assert decision.reasons == ("dependency_changed", "gate_validator_changed")
+    # A gate judged by TokenVerifier is compared the same way.
+    token = judged(TOKEN_VERIFIER_IDENTITY, ())
+    assert evaluate(token, state()).action == "reuse"
+    assert "gate_validator_changed" in evaluate(token, state(**current)).reasons
+
+
+@pytest.mark.parametrize("coverage", ["review", "regenerate"])
+def test_a_gate_recorded_without_its_verifier_is_unknown_under_a_gate_validator(coverage):
+    # A record written before records named their gates' verifier.
+    record, policy = lineage(gate=True), LineagePolicy(undeclared_coverage=coverage)
+    assert "verifier" not in record.nodes[-1]["inputs"]
+    assert evaluate(record, state(lineage=policy)).action == "reuse"
+
+    decision = evaluate(record, state(gate_verifier="validator-v1",
+                                      gate_validators=[GATE_VALIDATOR], lineage=policy))
+
+    assert decision.action == coverage
+    assert reasons(decision)["extract_b"] == ("gate_validator_unknown",)
+    assert "gate_validator_unknown" in reasons(decision)["check"]
+    assert actions(decision)["check"] == actions(decision)["extract_b"] == coverage
     assert actions(decision)["read_b"] == "reuse"
 
 
@@ -686,6 +803,13 @@ def test_source_statuses_are_frozen_and_keyword_only():
     ({"tasks": {"task": digest("task")}}, ValueError),
     ({"integrity": {"run-1": "fine"}}, ValueError),
     ({"integrity": ["verified"]}, TypeError),
+    ({"gate_verifier": ""}, ValueError),
+    ({"gate_verifier": None}, ValueError),
+    ({"gate_validators": ["contains"]}, TypeError),
+    ({"gate_validators": GATE_VALIDATOR}, TypeError),
+    ({"renderer": {"name": "markdown_renderer", "version": "1"}}, ValueError),
+    ({"renderer": {**RENDERER, "spec_sha256": "renderer"}}, ValueError),
+    ({"renderer": "markdown_renderer"}, ValueError),
 ], ids=lambda value: re.sub(r"\W+", "-", str(value))[:40])
 def test_the_current_state_is_validated(changes, error):
     with pytest.raises(error):
@@ -708,6 +832,19 @@ def test_the_current_state_is_detached_and_read_only():
     assert defaults.lineage == LineagePolicy()
     assert (dict(defaults.tools), dict(defaults.components), defaults.agents,
             dict(defaults.tasks), dict(defaults.integrity)) == ({}, {}, frozenset(), {}, {})
+    # Gates are judged by TokenVerifier unless the state names a gate validator.
+    assert (defaults.gate_verifier, defaults.gate_validators) == (TOKEN_VERIFIER_IDENTITY, ())
+    # No renderer unless one is named; a named one is detached and read-only.
+    assert defaults.renderer is None
+    renderer = dict(RENDERER)
+    named = state(renderer=renderer)
+    renderer["version"] = "2"
+    assert named.renderer == RENDERER
+    with pytest.raises(TypeError):
+        named.renderer["version"] = "2"
+    validators = [ValidatorIdentity.for_config("b", "1"), GATE_VALIDATOR, GATE_VALIDATOR]
+    assert state(gate_validators=validators).gate_validators == tuple(sorted(
+        set(validators), key=lambda item: item.name))
 
 
 def test_evaluate_refuses_anything_but_a_record_and_a_state():

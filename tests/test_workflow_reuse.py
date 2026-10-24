@@ -27,6 +27,7 @@ from smythe import (
 from smythe._canonical import sha256_hex
 from smythe._run_inspection import inspect_journal
 from smythe.agent import Agent, AgentProfile
+from smythe.evidence import SOURCE_TOMBSTONE_OPERATION
 from smythe.graph import ExecutionGraph, Node, Topology
 from smythe.lineage import LINEAGE_REUSE_KEY, load_lineage
 from smythe.provider import CompletionResult
@@ -162,7 +163,9 @@ def decide(store, run_id, service):
         components={"brief-writer": "1"},
         agents=[node["inputs"]["agent_sha256"] for node in lineage.nodes
                 if "agent_sha256" in node["inputs"]],
-        integrity={run_id: "verified"}, lineage=LineagePolicy(access_scope=SCOPE))
+        integrity={run_id: "verified"}, lineage=LineagePolicy(access_scope=SCOPE),
+        renderer={"name": "markdown_renderer", "version": "1",
+                  "spec_sha256": sha256_hex({"type": "markdown_renderer", "version": 1})})
     return evaluate(lineage, state)
 
 
@@ -309,6 +312,27 @@ def test_reuse_operations_carry_no_calls_and_are_consumed_once(changed):
             operation["applied_revision"]]
         node = next(item for item in changed.second.graph.nodes if item.id == node_id)
         assert node.metadata[LINEAGE_REUSE_KEY] == operation["inputs"]
+
+
+def test_each_reuse_operation_names_its_reason_codes_and_plan_digest(store, replies):
+    graph = ExecutionGraph([Topology.SERIAL], [
+        Node(id="collect", label="Collect the facts"),
+        Node(id="write", label="Write the answer", depends_on=["collect"])])
+    swarm = Swarm(model="offline", provider=OfflineProvider(), architect=SimpleArchitect(),
+                  run_store=store, max_budget_usd=1, context_sources=[], acceptance=strict(),
+                  lineage=LineagePolicy())
+    first = swarm.execute(graph).execution_id
+    plan = sha256_hex("another repair plan")
+
+    second = successor(swarm, first, {"collect": ["source_version_changed", "source_changed",
+                                                  "source_changed"]}, plan_sha256=plan)
+
+    # The codes the reuse was decided with, sorted and once each, and the plan's digest.
+    (operation,) = store.list_operations(second.execution_id, "reuse")
+    assert (operation["inputs"]["reasons"], operation["inputs"]["plan_sha256"]) == (
+        ["source_changed", "source_version_changed"], plan)
+    collect = next(node for node in second.graph.nodes if node.id == "collect")
+    assert collect.metadata[LINEAGE_REUSE_KEY] == operation["inputs"]
 
 
 def test_inspection_never_returns_reused_text(changed):
@@ -498,8 +522,10 @@ def test_a_resumed_successor_replays_its_reuse_without_reading_the_predecessor(
     for name in ("get_checkpoint", "load_operation", "list_operations", "load_run"):
         original = getattr(store, name)
 
-        def guarded(target, *args, _original=original, **kwargs):
-            if target == first.execution_id:
+        def guarded(target, *args, _original=original, _name=name, **kwargs):
+            # Only the predecessor's tombstones are read again, never its results.
+            if target == first.execution_id and (
+                    _name, args) != ("list_operations", (SOURCE_TOMBSTONE_OPERATION,)):
                 pytest.fail("A resumed successor read its predecessor's records")
             return _original(target, *args, **kwargs)
 

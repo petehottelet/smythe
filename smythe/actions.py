@@ -51,6 +51,8 @@ from smythe.workflow_store import (
 
 ACTION_CONTRACT_VERSION = "smythe.action.v1"
 _CONTRACT_VERSIONS = (ACTION_CONTRACT_VERSION,)
+# The type tag of the digest an approval's assertion approves: see PreparedAction.approval_sha256.
+APPROVAL_SUBJECT_VERSION = "smythe.action-approval.v1"
 
 # ``canceled`` closes an action that was rejected, expired or revoked before
 # any dispatch, and ``unresolved`` one an operator abandoned with its effect
@@ -81,6 +83,8 @@ _COMPENSATION = ("new_action", "unsupported")
 READBACK_VALIDATOR = ValidatorIdentity.for_config("smythe.action-readback", "1")
 # The largest notice, as canonical JSON, that record_notice keeps.
 _NOTICE_BYTES = 65_536
+# The most notices one action keeps; record_notice counts any further ones by digest only.
+_NOTICES = 64
 
 
 class ConnectorRefused(Exception):
@@ -521,15 +525,18 @@ class ApprovalVerifier(Protocol):
     """Trusted host code that authenticates approvals; Smythe ships none.
 
     ``verify`` returns the principal that issued ``assertion`` for exactly
-    ``intent_sha256`` or raises :class:`ApprovalRejected`;
-    ``still_authorized`` says whether it may still approve ``intent``.
-    ``identity`` names the verifier and its version.
+    ``subject_sha256`` or raises :class:`ApprovalRejected`. For an approval
+    or a rejection it is the action's :attr:`PreparedAction.approval_sha256`,
+    which binds the action's key and intent digest; for an operator's
+    decision or a duplicate-risk approval, the digest that function names.
+    ``still_authorized`` says whether the principal may still approve
+    ``intent``. ``identity`` names the verifier and its version.
     """
 
     @property
     def identity(self) -> str: ...
 
-    def verify(self, assertion: str, intent_sha256: str, now_ns: int) -> Principal: ...
+    def verify(self, assertion: str, subject_sha256: str, now_ns: int) -> Principal: ...
 
     def still_authorized(self, principal: Principal, intent: ActionIntent, now_ns: int) -> bool: ...
 
@@ -616,7 +623,7 @@ class PreparedAction:
     take the action's confirmed, reserved and unknown nanoUSD past the
     approval's ceiling, so lookups share the budget of the reads.
     ``compensates_action_id`` names the action a compensation undoes, or is
-    None.
+    None. :attr:`approval_sha256` is what an approval's assertion approves.
     """
 
     action_id: str
@@ -629,6 +636,20 @@ class PreparedAction:
     state: str
     ceiling_nanousd: int
     compensates_action_id: str | None = None
+
+    @property
+    def approval_sha256(self) -> str:
+        """The digest an assertion must approve to approve or reject this action, as plain hex.
+
+        It is the SHA-256 of the canonical JSON object ``{"type":
+        "smythe.action-approval.v1", "action_key": ..., "intent_sha256": ...}``
+        (:data:`APPROVAL_SUBJECT_VERSION`), with the action's key and intent
+        digest. The key names the journal, run, slot and sequence, so an
+        assertion approves this one action and never an identical intent of
+        another action, in this journal or any other.
+        """
+        return sha256_hex({"type": APPROVAL_SUBJECT_VERSION, "action_key": self.action_key,
+                           "intent_sha256": self.intent.digest()})
 
 
 @dataclass(frozen=True)
@@ -691,13 +712,9 @@ def _assertion(assertion: Any) -> str:
     return assertion
 
 
-def _verified(verifier: Any, assertion: str, intent: ActionIntent, now_ns: int,
-              digest: str | None = None) -> Principal:
-    """The principal *verifier* says issued *assertion* for *intent*, who may still approve it.
-
-    The assertion must approve *digest*, by default the intent's digest.
-    """
-    principal = verifier.verify(assertion, digest or intent.digest(), now_ns)
+def _verified(verifier: Any, assertion: str, intent: ActionIntent, now_ns: int, digest: str) -> Principal:
+    """The principal *verifier* says issued *assertion* for *digest*, who may still approve *intent*."""
+    principal = verifier.verify(assertion, digest, now_ns)
     if not isinstance(principal, Principal):
         raise ApprovalRejected("The approval verifier did not return a Principal")
     if principal.tenant != intent.target.tenant:
@@ -762,7 +779,7 @@ def prepare_compensation(store: Any, action_id: str, *, operation: str,
     action's receipt named and its readback read, through the same profile.
     Its slot is ``<slot>/<sequence>/compensation`` and its
     ``compensates_action_id`` names the action. It needs its own approval,
-    since no approval of the action binds its intent digest, and makes its own
+    since no approval of the action binds its key or intent, and makes its own
     attempts with its own receipt; the action's records never change. The
     same operation and parameters again return it. A run that a security stop
     holds is refused with ``ActionNotAuthorized``. No lease is needed.
@@ -792,21 +809,24 @@ def approve(store: Any, action_id: str, assertion: str, verifier: Any, *, ceilin
             expires_at_ns: int, duplicate_risk: bool = False) -> ActionApproval:
     """Record the verified approval of one action, up to a ceiling and until an expiry.
 
-    *verifier* must verify *assertion* for exactly the action's intent
+    *verifier* must verify *assertion* for exactly the action's
+    :attr:`PreparedAction.approval_sha256`, which binds its key and intent
     digest, return a principal of the intent's tenant, and still authorize
-    that principal. *ceiling_nanousd* must cover the action's
-    ``ceiling_nanousd`` and *expires_at_ns* must be later than the journal's
-    clock. The run's content must still be deliverable. An assertion is
-    recorded once in a journal: the same approval again returns it, and an
-    assertion recorded for anything else raises ``ApprovalRejected``. The
-    newest approval supersedes earlier ones. The verifier is called outside
-    any journal transaction, and no lease is needed.
+    that principal, so an assertion for one action never approves another,
+    even one with an identical intent in another journal. *ceiling_nanousd*
+    must cover the action's ``ceiling_nanousd`` and *expires_at_ns* must be
+    later than the journal's clock. The run's content must still be
+    deliverable. An assertion is recorded once in a journal: the same
+    approval again returns it, and an assertion recorded for anything else
+    raises ``ApprovalRejected``. The newest approval supersedes earlier ones.
+    The verifier is called outside any journal transaction, and no lease is
+    needed.
 
     After an operator decided that the action was ``not_executed`` (see
     :func:`resolve`), another dispatch may repeat an effect, so only an
     approval with *duplicate_risk* authorizes one: its assertion approves
     :func:`duplicate_risk_sha256` of the action, bound to the number of
-    attempts that decision found, instead of the intent digest. Otherwise
+    attempts that decision found, instead of its approval subject. Otherwise
     *duplicate_risk* is refused; either refusal raises ``ActionStateError``.
     """
     from smythe.workflow_actions import load, record_verdict
@@ -833,7 +853,7 @@ def approve(store: Any, action_id: str, assertion: str, verifier: Any, *, ceilin
     if expires_at_ns <= now:
         raise WorkflowValidationError("expires_at_ns must be later than the journal's clock")
     principal = _verified(verifier, assertion, action.intent, now,
-                          None if risk is None else _risk_sha256(action, risk))
+                          action.approval_sha256 if risk is None else _risk_sha256(action, risk))
     problem = _undeliverable(store, action.run_id, action.intent.content)
     if problem:
         raise ActionNotAuthorized(f"Action {action_id!r} cannot be approved: {problem}")
@@ -845,7 +865,8 @@ def approve(store: Any, action_id: str, assertion: str, verifier: Any, *, ceilin
 def reject(store: Any, action_id: str, assertion: str, verifier: Any) -> PreparedAction:
     """Cancel an action that was never dispatched, by a verified principal of its tenant.
 
-    The assertion is verified as for :func:`approve`. The rejection is
+    The assertion is verified as for :func:`approve`, for the action's
+    :attr:`PreparedAction.approval_sha256`. The rejection is
     recorded with the principal and the action is ``canceled`` for good:
     preparing the same intent in its slot returns it. An attempt begun but
     not yet claimed is released with its reservation, since nothing was sent.
@@ -861,7 +882,7 @@ def reject(store: Any, action_id: str, assertion: str, verifier: Any) -> Prepare
         return action
     if action.state != "not_dispatched":
         raise ActionStateError(f"Action {action_id!r} is {action.state} and cannot be rejected")
-    principal = _verified(verifier, assertion, action.intent, store._clock_ns())
+    principal = _verified(verifier, assertion, action.intent, store._clock_ns(), action.approval_sha256)
     record_verdict(store, action, "rejected", principal, identity, assertion, None, None)
     return load(store, action_id)[0]
 
@@ -907,10 +928,11 @@ def check_authority(store: Any, action_id: str, verifier: Any) -> ActionApproval
     approval must be unrevoked, unconsumed and unexpired on the journal's
     clock, bind the action's intent digest, cover its ceiling, accept any
     duplicate risk (see :func:`approve`) and have been recorded by this
-    verifier. *verifier* must verify the stored assertion again for the same
-    principal and still authorize it, and the run's content must still be
-    deliverable (see :func:`prepare_action`). Only reads are made; the
-    verifier is called outside any journal transaction.
+    verifier. *verifier* must verify the stored assertion again, for the
+    action's :attr:`PreparedAction.approval_sha256` or its duplicate-risk
+    digest, for the same principal and still authorize it, and the run's
+    content must still be deliverable (see :func:`prepare_action`). Only
+    reads are made; the verifier is called outside any journal transaction.
     """
     from smythe.workflow_actions import _authorizing, load
 
@@ -927,7 +949,7 @@ def check_authority(store: Any, action_id: str, verifier: Any) -> ActionApproval
         raise refused("another approval verifier recorded its approval")
     try:
         principal = _verified(verifier, approval["assertion"], action.intent, now,
-                              None if risk is None else _risk_sha256(action, risk))
+                              action.approval_sha256 if risk is None else _risk_sha256(action, risk))
     except ApprovalRejected as error:
         raise refused(f"the approval verifier refuses it: {error}") from error
     if principal.to_dict() != json.loads(approval["principal_json"]):
@@ -1012,10 +1034,12 @@ def resolve(store: Any, action_id: str, decision: str, *, assertion: str, verifi
     Each applies to an ``outcome_unknown`` action. ``adopt_observed`` and
     ``abandon`` also apply to a ``dispatched`` action whose latest attempt
     was acknowledged, and ``abandon`` to ``compensation_required``; anything
-    else raises ``ActionStateError``. *verifier* must verify *assertion* for
-    exactly :func:`decision_sha256` of the decision and *evidence*, return a
-    principal of the intent's tenant and still authorize it. A security stop
-    on the run refuses every decision with ``ActionNotAuthorized``.
+    else, and ``not_executed`` for an action with an attempt whose commit a
+    late receipt shows, raises ``ActionStateError``. *verifier* must verify
+    *assertion* for exactly :func:`decision_sha256` of the decision and
+    *evidence*, return a principal of the intent's tenant and still authorize
+    it. A security stop on the run refuses every decision with
+    ``ActionNotAuthorized``.
 
     The decision is appended as a ``decision`` record with the principal, the
     verifier's identity, the records it rests on and *note*, kept redacted and
@@ -1058,15 +1082,19 @@ def inspect_actions(store: Any, run_id: str) -> dict[str, Any]:
     the ``external_actions`` scope and, for each action, its state, attempts,
     approvals by principal, verifier, ceiling, expiry, consumption and
     revocation, and records by kind and digest. Each action adds
-    ``duplicate_risk`` and ``next_action``: as :class:`ActionProgress` names
-    it, except that a ``not_dispatched`` action that no approval authorizes
-    needs ``approve``, or ``approve_duplicate_risk`` while it carries
-    duplicate risk. ``unresolved`` lists the actions whose effect is unknown,
-    unverified, wrong or abandoned: ``outcome_unknown``,
-    ``compensation_required`` and ``unresolved`` ones, and ``dispatched``
-    ones with no read left to confirm them. Assertions, parameters, receipts
-    and record payloads are never included. A journal without action tables
-    shows none.
+    ``duplicate_risk``, ``contradiction`` and ``next_action``: as
+    :class:`ActionProgress` names it, except that a ``not_dispatched`` action
+    that no approval authorizes needs ``approve``, or
+    ``approve_duplicate_risk`` while it carries duplicate risk.
+    ``contradiction`` is None until a late receipt shows that an attempt found
+    not executed took effect: ``second_effect`` when the receipts show
+    another commit too, and ``contradicted_absence`` otherwise. ``unresolved``
+    lists the actions whose effect is unknown, unverified, wrong, abandoned
+    or repeated: ``outcome_unknown``, ``compensation_required`` and
+    ``unresolved`` ones, ``dispatched`` ones with no read left to confirm
+    them, and contradicted ones with a second effect or not yet observed or
+    reconciled. Assertions, parameters, receipts and record payloads are
+    never included. A journal without action tables shows none.
     """
     from smythe.workflow_actions import inspect
 
@@ -1080,7 +1108,10 @@ def record_notice(store: Any, payload: Any) -> PreparedAction | None:
     the action key it reports as ``key`` and the action's target as
     ``target``, an object with ``tenant`` and ``collection``; other fields are
     kept as they are. A notice whose key names an action of the journal is
-    kept with that action, marked untrusted; any other is not kept. The action
+    kept with that action, marked untrusted; any other is not kept. A notice
+    whose canonical JSON has the SHA-256 of one the action keeps is not kept
+    again, and an action keeps at most 64 notices: an ``action_notice_dropped``
+    event records the digest of each further one, never its body. The action
     is returned, so that the host can call :meth:`ActionRunner.readback`, only
     when it is ``dispatched`` and the notice names its tenant and collection;
     otherwise None is. A notice never changes an action: only a read the
@@ -1176,8 +1207,9 @@ class ActionProgress:
     that fit its approval's ceiling, ``reconcile`` for an outcome the reads
     have not settled,
     ``operator_review`` once reconciliation has found it can do no more,
-    ``compensate`` for ``compensation_required``, and None when the runner
-    can do nothing more. ``refusal`` is None, or says why
+    ``compensate`` for ``compensation_required``, or for an observed or
+    reconciled action that a late receipt shows took effect twice, and None
+    when the runner can do nothing more. ``refusal`` is None, or says why
     :meth:`ActionRunner.dispatch_pending` sent nothing for the action; its
     ``next_action`` is then None.
     """
@@ -1406,7 +1438,11 @@ class ActionRunner:
         empty lookup never causes a submission. It proves the write was not
         made (``not_executed``; the action is ``not_dispatched`` again) only
         once a declared ``visibility_bound_s`` plus ``timeout_s`` has passed
-        since the latest dispatch claim while the key's window is open. With
+        since the latest dispatch claim while the key's window is open, and
+        no late receipt shows a commit of any of the action's attempts. That
+        proof assumes each request leaves within ``timeout_s`` of its claim;
+        a late receipt that contradicts it is recorded (see
+        :func:`inspect_actions`) and keeps the action from dispatch. With
         ``deduplicates`` alone, one same-key retry is made within
         ``max_attempts`` while the window is open and :func:`check_authority`
         passes, and its receipt is read back; with neither, nothing is sent.
@@ -1472,8 +1508,10 @@ class ActionRunner:
             if receipt is not None:
                 found = receipt
                 break
+            # A late receipt that shows any attempt's commit under the key outweighs every empty lookup.
             reason = ("no lookup answered" if error is not None
-                      else _absence_unproven(profile, first, last, now))
+                      else "a late receipt shows that the write took effect, so an empty lookup proves nothing"
+                      if status["committed"] else _absence_unproven(profile, first, last, now))
             if reason is None:
                 journal.record_finding(self.store, lease, attempt_id, "not_executed",
                                        "an empty lookup after the visibility bound, inside the key's window, "
@@ -1561,11 +1599,13 @@ def _next_action(status: dict[str, Any]) -> str | None:
                 and status["reads"].get(latest["attempt_id"], 0) < profile.readback_reads
                 and status["ceilings"][latest["approval_id"]] - status["spent"] >= profile.read_ceiling_nanousd
                 else review)
+    if action.state in ("observed", "reconciled") and status["contradiction"] == "second_effect":
+        return "compensate"
     return {"outcome_unknown": review, "compensation_required": "compensate"}.get(action.state)
 
 
 __all__ = [
-    "ACTION_CONTRACT_VERSION", "ACTION_DECISIONS", "ACTION_STATES", "READBACK_VALIDATOR",
+    "ACTION_CONTRACT_VERSION", "ACTION_DECISIONS", "ACTION_STATES", "APPROVAL_SUBJECT_VERSION", "READBACK_VALIDATOR",
     "ActionApproval", "ActionEvidence", "ActionIntent", "ActionNotAuthorized", "ActionProgress",
     "ActionRunner", "ActionStateError", "ActionTarget", "ApprovalRejected", "ApprovalVerifier",
     "ConnectorAmbiguous", "ConnectorProfile", "ConnectorReceipt", "ConnectorRefused", "ContentRef",

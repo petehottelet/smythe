@@ -1,7 +1,8 @@
 # Inspect saved runs
 
 `smythe runs` reports what a saved run did and whether its output may be
-used, without resuming or changing it; its one control,
+used, and [reviews](#review-what-needs-a-decision) what in the newest runs
+needs a decision, without resuming or changing them; its one control,
 [`revoke-action`](#revoke-an-actions-approvals), revokes an external
 action's approvals. It reads ordinary `Swarm` checkpoints
 from a [`FileCheckpointStore`](checkpoint-format.md) directory, or durable
@@ -14,6 +15,7 @@ complete with its cost fully known and still have output that its
 smythe runs list                                   # ~/.smythe/checkpoints
 smythe runs --checkpoints ./checkpoints inspect 3f9c2d0e8b4a
 smythe runs --journal smythe-runs.db --json inspect 3f9c2d0e8b4a
+smythe runs --journal smythe-runs.db review
 smythe runs --journal smythe-runs.db revoke-action 7c1e40aa --reason "approver left"
 ```
 
@@ -22,14 +24,17 @@ smythe runs --journal smythe-runs.db revoke-action 7c1e40aa --reason "approver l
 compact JSON document, `{"ok": true, "command": "inspect", "inspect": {...}}`,
 with structured errors in the same shape. Options may follow the subcommand.
 `list` takes `--limit` (1-500, default 50) and `--offset`, and lists each
-run's id, execution state, decision and next action; a run it cannot read,
-such as a checkpoint entry it cannot open or JSON nested too deeply to parse,
-is listed with its error and the listing continues.
+run's id, execution state, decision, next action and `unresolved_actions`,
+the number of its [external actions](#external-actions) that `inspect`
+lists as unresolved; the text table adds `N unresolved action(s)` to a run
+that has any. A run it cannot read, such as a checkpoint entry it cannot
+open or JSON nested too deeply to parse, is listed with its error and null
+fields, and the listing continues.
 
 ## Read-only
 
-Inspection constructs no provider, connector or action runner and needs no
-API key. Only [`revoke-action`](#revoke-an-actions-approvals) writes, and
+Inspection and review construct no provider, connector or action runner and
+need no API key. Only [`revoke-action`](#revoke-an-actions-approvals) writes, and
 only revocations. A missing directory
 or journal is reported and never created. A journal is opened read-only, so a
 version 1 journal is [never upgraded](workflow-accounting.md#journal-upgrades)
@@ -52,6 +57,7 @@ its runs and its recorded version do not change.
 | `delivery` | The current delivery acceptance decision; see below |
 | `decisions` | The [decision history](#decision-history): the current decision's sequence and the decisions before it |
 | `revision_log` | The run's latest [supervisor decisions](#revision-log), applied or refused; empty without any |
+| `routing` | The [routing decision](#routing-decisions) that chose the tier that planned the run; null for a run that no router planned |
 | `artifact` | A durable run's [published document](#published-documents); null for a run that publishes none and for ordinary runs |
 | `lineage` | A summary of a durable run's [lineage](#lineage): coverage, source references, predecessor and successors, document integrity and derived status; null without a lineage policy and for ordinary runs |
 | `context` | A durable run's [context assembly](#research-runs): versions, current sources, snapshots and tombstones; null without context assembly and for ordinary runs |
@@ -59,7 +65,7 @@ its runs and its recorded version do not change.
 | `evidence` | The [source evidence](#research-runs) a completed durable run delivered, summarized; null without any and for ordinary runs |
 | `issues` | What the run leaves open: unresolved questions, unavailable sources, failed reads and final validators that did not pass |
 | `actions` | A durable run's [external actions](#external-actions): balances, each action's state, attempts, approvals, records by kind and digest and next action, and the unresolved ones; null for a run without actions and for ordinary runs |
-| `accounting` | `cost_scope`, `total_cost_usd`, `max_budget_usd`, `cost_is_complete`, `cost_contains_estimates`, `unknown_cost_nodes`, the durable `workflow_accounting` balances, `unknown_exposure` and `unresolved` accounting that stops resume |
+| `accounting` | `cost_scope`, `total_cost_usd`, `max_budget_usd`, `cost_is_complete`, `cost_contains_estimates`, `unknown_cost_nodes`, a durable run's `unknown_cost_calls` (each call whose charge is unknown, by `call_id`, `phase`, `scope_id` and `unknown_nanousd`; null for ordinary runs), the durable `workflow_accounting` balances, `unknown_exposure` and `unresolved` accounting that stops resume |
 | `timing` | `elapsed_ms`, `phases_ms` and `waiting_ms` added over the saved [timing segments](checkpoint-format.md#timing-segments), with the segment count, first start and last end; null when none were saved. Durable runs report lease sessions on the journal's wall clock and no phase totals |
 | `next_action` | The first thing the run needs, as an `action` code and a `detail` sentence |
 
@@ -96,10 +102,11 @@ one the run's recipe writes, and the record must be undecided until the run
 completes and belong to the policy the recipe records, or to a policy a
 re-evaluation decided under, or the run is reported as unreadable. A decided
 record is checked as resuming the completed run checks it: against the saved
-output, the task and the source generations, and against the journal's
-current decision, so a record changed to match other output also gives
-`indeterminate`. Durable runs without a strict policy, including runs with
-only a gate validator, have no record.
+output, the task and the source generations, against the journal's current
+decision, and its gates' saved receipts against the digest the run's
+decisions bound, so a record changed to match other output, or a gate verdict
+changed after the decision, also gives `indeterminate`. Durable runs without
+a strict policy, including runs with only a gate validator, have no record.
 
 ### Decision history
 
@@ -152,6 +159,31 @@ Revision after final: refused (-1); dropped draft; 1 revisions left, 1 added nod
   Detail: cannot drop node 'draft' with status completed; only pending work may be revised
 ```
 
+### Routing decisions
+
+A run that a `WhiteRabbit` router planned reports its
+[routing decision](architecture.md#routing-decisions) under `routing`, read
+from the planned graph its checkpoint saved; for a durable run planned before
+its first checkpoint, from its planning operation:
+
+| Field | Meaning |
+|---|---|
+| `readable` | False for a decision this build cannot read, whose other fields are then null; inspection goes on |
+| `tier` | The tier that planned the run: `single`, `deterministic:<key>`, `constrained` or `autonomous` |
+| `method` | `rule`, `classifier`, `fallback_no_classifier` or `fallback_unmatched` |
+| `rule` | The name of the [routing rule](architecture.md#routing-rules) that chose the tier; null for any other method |
+| `reasons`, `alternatives`, `policy_version`, `matched_token` | As the decision records them |
+| `classifier` | The classifier call's `usage`, which an ordinary run records, and the journal `call_ids` that hold a durable run's charge; null when no classifier was called |
+
+The decision holds no task text, prompt or classifier reply, so none is
+shown. The text report gives it one line:
+
+```text
+Routing: tier single, chosen by rule stable-transform
+Routing: tier constrained, chosen by the classifier; classifier call: 120 prompt and 2 completion tokens, $0.000124
+Routing: tier autonomous, chosen by fallback unmatched; classifier charge in 1 journal call
+```
+
 ### Published documents
 
 A durable run with a [renderer](workflow-accounting.md#published-documents)
@@ -199,7 +231,8 @@ source the record names was [restricted](lineage.md#restrict-a-source) or
 decision is not `accepted`) or null, never `current` or `stale`; plan a
 repair with [`Swarm.plan_repair`](lineage.md#plan-a-repair) to see those.
 The summary reads every run in the run's access scope to find its
-successors; `list` leaves it out. It adds no exit code. A restricted run's
+successors; `list` leaves it out, and `review` reads it without the
+successors. It adds no exit code. A restricted run's
 next action is never `republish`, which it refuses.
 
 ```text
@@ -282,16 +315,20 @@ A durable run that [prepared external actions](actions.md#prepared-actions)
 reports them under `actions`, as
 [`inspect_actions()`](actions.md#inspecting-actions) returns them: the
 `external_actions` scope's nanoUSD balances; `unresolved`, the IDs of the
-actions whose effect is unknown, unverified, wrong or abandoned; and each
-action's identity, state, balances, attempts, approvals by principal,
-verifier, ceiling, expiry, consumption and revocation, records by kind and
-digest, `duplicate_risk` and `next_action`. Assertions, parameters, receipts,
-error text and record payloads are never shown. The text report prints one
-line per action, its approvals and its record kinds:
+actions whose effect is unknown, unverified, wrong, abandoned or repeated;
+and each action's identity, state, balances, attempts, approvals by
+principal, verifier, ceiling, expiry, consumption and revocation, records by
+kind and digest, `duplicate_risk`, `contradiction` and `next_action`. A
+`contradiction` of `second_effect` or `contradicted_absence` means that a
+[late receipt](actions.md#leases-and-late-receipts) showed a write that
+reconciliation or an operator had found not made. Assertions, parameters,
+receipts, error text and record payloads are never shown. The text report
+prints one line per action, with any duplicate risk or contradiction, its
+approvals and its record kinds:
 
 ```text
 External actions: 1; 0 confirmed, 0 reserved, 2000000 unknown nanoUSD; 1 unresolved
-  Action publish/1 (5b2d9e70c4a1): outcome_unknown; 1 attempts; 0 confirmed, 2000000 unknown nanoUSD; next operator_review
+  Action publish/1 (5b2d9e70c4a1): outcome_unknown; 1 attempt; 0 confirmed, 2000000 unknown nanoUSD; next operator_review
     Approval 0e7f13c2d98b: editor-1 of acme (identity-host); approved; expires at 1791820800000000000 ns
     Records: finding 1
 ```
@@ -301,7 +338,8 @@ decision is `accepted` and an action is unresolved, `inspect` exits with 12.
 An [operator decision](actions.md#operator-decisions), made in Python
 because only the host can construct the approval verifier, settles an
 action: `adopt_observed` or `not_executed` leaves nothing unresolved, while
-an `abandon`ed action stays unresolved.
+an `abandon`ed action stays unresolved, as does one with a `second_effect`,
+whose next action is `compensate`.
 
 ### Next actions
 
@@ -314,6 +352,105 @@ an `abandon`ed action stays unresolved.
 | `rerun` | A [security stop](execution.md#security-stops) ended the run, ordinary or durable, or a durable run passed its budget: it admits no more calls |
 | `review_output` | The output was `rejected` or `needs_review` and is withheld |
 | `resolve_indeterminate` | No valid decision covers the output, which is withheld |
+
+## Review what needs a decision
+
+`review` lists only what in a run, or in the newest runs, needs a decision,
+and how each decision is carried out:
+
+```bash
+smythe runs review                                   # the newest 50 checkpoints
+smythe runs --journal smythe-runs.db review --limit 20 --offset 20
+smythe runs --journal smythe-runs.db --json review 3f9c2d0e8b4a
+```
+
+Without a run id, `review` reads a page of runs, newest first: a journal's
+runs by creation, and checkpoints by when each file was last written.
+`--limit` (1-500, default 50) and `--offset` page the runs, and a run it
+cannot read is an `unreadable` item; the packet's `page` gives the `limit`,
+`offset`, `total`, `returned` and `has_more`. With a run id, it reviews that
+run, `page` is null, and a run that cannot be read fails as `inspect` does.
+Each run is read once, as `inspect` reads it, except that a lineage run's
+successors are not looked up, and every item comes from that projection:
+
+| Kind | Holds back | When | Resolve with |
+|---|---|---|---|
+| `security_stop` | admission | A [security stop](execution.md#security-stops) ended the run; it is then the run's only item | Nothing in this run: a new run |
+| `budget_overrun`, `unknown_exposure`, `evidence_conflict` | admission | That `blocked_reason` closed a durable run's admission; `observed` gives the `unknown_nanousd` and each call in `unknown_cost_calls` | Nothing in this run: a new run, once the charges are checked |
+| `unreadable` | completion | A run that a page of runs cannot read, with its error | Restore it, or read it with the release that wrote it |
+| `run_failed` | completion | The run stopped before it completed; `observed` gives its node counts and any `unresolved` accounting | The resume or reconciliation that `inspect`'s next action names |
+| `decision_uncommitted` | completion | A strict run's nodes all completed, but no decision was committed: it stopped, or is still finishing, between synthesis and its decision | Resume, which decides on the output again and never accepts it unchecked |
+| `read_unanswered` | completion | A [journaled read](workflow-accounting.md#interrupted-reads) was sent and no response was saved | Resume: a free, repeat-safe read is read again; any other blocks the run with unknown exposure |
+| `source_restricted` | delivery | A [restriction](lineage.md#restrict-a-source) withdrew a source text the run's lineage names; no other source, document or decision item is given | Nothing in this run: a new run, or a [repair plan](lineage.md#plan-a-repair) |
+| `source_unavailable` | delivery | The run does not hold a source's text: [removed](tasks.md#remove-a-source), tombstoned or not retained | `Swarm.reevaluate`, or a new run with the source |
+| `artifact_integrity` | delivery | A completed run's [published document](#published-documents) no longer holds the decided bytes; no decision item is given until it does | `Swarm(run_store=...).republish(run_id)` |
+| `rejected`, `needs_review`, `indeterminate` | delivery | The current decision withholds the output; `observed` gives its reasons, `integrity` and each validator's identity and outcome | [`Swarm.reevaluate`](verifier.md#re-evaluation) under a policy, or with an [operator's decision](verifier.md#operator-decisions) for `needs_review` and `indeterminate` |
+| `policy_changed` | delivery | Only from Python, given a policy: a completed run's current decision was made under another policy | `Swarm.reevaluate(run_id, acceptance=policy)` |
+| `action_approval`, `action_duplicate_risk` | delivery | An [external action](#external-actions) waits for an approval, or for one that [accepts its duplicate risk](actions.md#duplicate-risk) | [`approve()`](actions.md#approvals) in Python |
+| `action_outcome_unknown` | delivery | An action's outcome is open, with `reconcile` or `operator_review` next | [`ActionRunner.reconcile`](actions.md#reconciliation) or an [operator decision](actions.md#operator-decisions); while an approval is in force, `revoke-action` stops further writes first |
+| `action_compensation` | delivery | A read showed that the target does not hold the intended result | A [compensation](actions.md#compensation), or `abandon` |
+
+A run without a delivery acceptance record, such as a checkpoint before
+version 5, a durable version 1 checkpoint or any run without a strict
+policy, has no decision item: no record is not a decision.
+
+With `--json` the command prints one compact document,
+`{"ok": true, "command": "review", "review": {...}}`:
+
+```text
+{
+  "review_version": 1, "store": "journal", "run_id": null,
+  "page": {"limit": 50, "offset": 0, "total": 3, "returned": 3, "has_more": false},
+  "totals": {"security_stop": 0, "...": 0, "unknown_exposure": 1},
+  "items": [{
+    "item_id": "<64 hex characters>",
+    "kind": "unknown_exposure",
+    "blocks": "admission",
+    "subject": {"run_id": "3f9c2d0e8b4a"},
+    "observed": {"status": "blocked", "error_class": null, "excerpt": null,
+                 "unknown_nanousd": 6250000,
+                 "unknown_calls": [{"call_id": "...", "phase": "execution",
+                                    "scope_id": "node/draft", "unknown_nanousd": 6250000}]},
+    "reasons": [],
+    "decision_needed": "Calls were sent without a saved response, ...",
+    "resolve_with": []
+  }]
+}
+```
+
+- **Items.** Items have the [Jobs review](jobs.md#review-what-needs-attention)'s
+  schema. `subject` names the run, and the source, action, published
+  document or read the item is about. `observed` holds the run's
+  `status`, an `error_class` and an `excerpt` of stored text of at most 300
+  characters, with account identifiers redacted and the store's directory
+  and the home directory written as `<store directory>` and `~`; each kind
+  adds the fields named above. Source, document and decision items give
+  `reasons` from the [reuse decisions' vocabulary](lineage.md#reason-codes).
+  Saved output, source text, read bodies and record payloads are never
+  shown.
+- **Commands.** Most decisions are made through the Python entry point that
+  `decision_needed` names, and `resolve_with` is empty. An action whose
+  reconciliation may still write under an approval in force has the
+  `smythe runs revoke-action` arguments that stop it, without `--journal`
+  and with `REASON` for your own reason; the printed output reminds you to
+  add `--journal`.
+- **Stable identity.** `item_id` is the SHA-256 of the item's kind, run,
+  subject and the recorded state it depends on, so it stays the same across
+  reviews until that state changes, for example after reconnecting to a
+  durable run that a worker holds.
+- **Order.** Items that hold back admission come first, then completion,
+  then delivery; within each, the newest run first.
+- **Ownership.** An ordinary run holds no lease, so no item says whether a
+  process is still running it; a run still in progress is reviewed as it
+  was last saved.
+
+`review` exits 0 whether or not anything needs a decision, 2 for an invalid
+option or run id, 6 for an unknown run, 7 for a store or named run it cannot
+read, and 130 when interrupted, printing no part of its packet. In Python,
+`smythe.review_run(store, run_id=None, *, limit=50, offset=0,
+acceptance=None)` returns the same document; given `acceptance`, a strict
+`AcceptancePolicy`, it adds the `policy_changed` items, since only your code
+can construct the validators a policy names.
 
 ## Revoke an action's approvals
 
@@ -332,22 +469,25 @@ decisions stay in the [Python API](actions.md#operator-decisions).
 
 | Code | Meaning |
 |---:|---|
-| 0 | Inspected; the run has no decision that withholds its output and no unresolved external action. It may still be unfinished: read `execution.state`. `revoke-action` succeeded |
-| 2 | Invalid argument, such as both `--checkpoints` and `--journal`, an invalid run id, a `list` page out of range, or `revoke-action` without `--journal` or with an empty reason |
+| 0 | Inspected; the run has no decision that withholds its output and no unresolved external action. It may still be unfinished: read `execution.state`. `revoke-action` succeeded. `review` succeeded, whether or not anything needs a decision |
+| 2 | Invalid argument, such as both `--checkpoints` and `--journal`, an invalid run id, a `list` or `review` page out of range, or `revoke-action` without `--journal` or with an empty reason |
 | 6 | The store has no run with that id; for `revoke-action`, no action or approval with that id, or a journal without external actions |
 | 7 | The store or the run cannot be read: missing, foreign, corrupt, written by a newer release, or a durable checkpoint that resume would refuse |
 | 10 | The run completed and its output was `rejected` or `needs_review` |
 | 11 | The decision is `indeterminate` |
 | 12 | The decision is `accepted`, but an [external action](#external-actions) is unresolved |
+| 130 | `review` was interrupted; it printed no part of its packet |
 
 Codes 10, 11 and 12 follow the run's current decision, after any
 [re-evaluation](#decision-history), and 10 and 11 take precedence over 12.
-`list` returns 0 whatever the runs' decisions. Codes 10 to 12 are used only
-by `runs inspect`; the [Jobs codes](jobs.md#cli-exit-codes) are unchanged.
+`list` and `review` return 0 whatever the runs' decisions and unresolved
+actions. Codes 10 to 12 are used only by `runs inspect`; the
+[Jobs codes](jobs.md#cli-exit-codes) are unchanged.
 
 ## From Python
 
 `SwarmResult.to_dict()` includes the `execution`, `delivery`,
 `unknown_exposure` and `next_action` blocks for a finished result, built the
 same way. Its withheld output's `field` is `rejected_output`, where the result
-keeps the text.
+keeps the text. [`smythe.review_run()`](#review-what-needs-a-decision)
+returns a review packet.

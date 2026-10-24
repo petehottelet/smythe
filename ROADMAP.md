@@ -371,7 +371,18 @@ connector or paid run.
    checked again before dispatch. One connector gets a stable action identity
    across retries, a receipt per action and independent readback: a write
    whose acknowledgment is lost is reconciled or reported as unresolved, never
-   blindly repeated
+   blindly repeated. In progress: a completed durable run whose strict
+   delivery acceptance is `accepted` can [deliver that output](docs/actions.md)
+   through a host connector. An approval binds a principal your host verifies
+   to one action and its exact intent, with a ceiling and an expiry; it is checked again
+   before every dispatch, and rejection, revocation and a run's action stop
+   are kept in the journal across restarts. Each action sends one key on
+   every attempt and records each receipt, and only a read of the target
+   settles its result. A write whose answer is lost is reconciled from
+   lookups or a deduplicated retry where the connector declares them, or left
+   for an operator's verified decision. The offline
+   [governed-publication example](examples/19_governed_publication.py) runs
+   the path end to end. Approval gates inside a run's graph are not covered
 3. **Evidence-triggered control** — replace routine model supervision calls
    with deterministic stage and anomaly triggers; reserve LLM review for a
    result that supplies evidence the pending plan should change. A replan
@@ -388,22 +399,43 @@ connector or paid run.
    retry owner and a shared deadline per operation; an opt-in drain policy
    that stops new paid work while in-flight results settle; and admission that
    respects provider rate limits and reserves allowance for verification and
-   synthesis. Security events and revoked authority stop work immediately
+   synthesis. Security events and revoked authority stop work immediately.
+   In progress, each experimental and off by default: an opt-in
+   [retry policy](docs/execution.md#retry-policy) classifies failures, with
+   one retry owner, a shared deadline and attempt caps that resume cannot
+   refill; [capacity limits](docs/execution.md#provider-capacity) admit work
+   per provider type and model; a
+   [drain policy](docs/execution.md#draining-in-flight-work) lets in-flight
+   calls settle after a failure; a
+   [held allowance](docs/budgets.md#held-allowance-for-checks) keeps budget for
+   verification and synthesis; a
+   [security stop](docs/execution.md#security-stops) ends a run at once and for
+   good; and [model profiles](docs/execution.md#model-profiles) route nodes to
+   approved models and [fall back](docs/execution.md#profile-fallback) on a
+   retry. [Evidence-triggered supervision](docs/supervisor.md#evidence-triggered-review),
+   [claim exchange](docs/architecture.md#claim-exchange) and
+   [routing rules](docs/architecture.md#routing-rules) are opt-in as well, and
+   the [contribution lint](docs/architecture.md#contribution-lint) only
+   records. No default changes without a held-out evaluation
 5. **Artifact lineage and selective repair** — accepted artifacts record the
    sources, validators and tools they depend on. A changed source or validator
    invalidates its dependents, and a repair plan shows what will be reused,
    rechecked or regenerated before dispatch. In progress: strict durable runs
-   opt into [lineage records](docs/lineage.md) of ids, versions and digests;
-   a pure evaluator says what each record calls for under the current
-   sources, tools and validators; a read-only
-   [repair plan](docs/lineage.md#plan-a-repair) lists each run's decision,
-   derived status and predicted work, which `smythe runs inspect`
-   summarizes without a source catalog; `Swarm.repair`
-   [applies a reviewed plan](docs/lineage.md#apply-a-repair-plan) under an
-   explicit allowance, regenerating affected work in successor runs; and a
-   [source restriction](docs/lineage.md#restrict-a-source) withdraws a
-   source's text from every run that used it, optionally deleting their
-   published documents
+   opt into [lineage records](docs/lineage.md) of ids, versions and digests.
+   A read-only [repair plan](docs/lineage.md#plan-a-repair) shows each run's
+   decision, derived status and predicted work before anything runs, and
+   `Swarm.repair` [applies a reviewed plan](docs/lineage.md#apply-a-repair-plan)
+   under an explicit allowance: it decides a run again under a changed
+   validator, publishes a damaged document again, or starts a successor run
+   that keeps the unaffected results, and `reuse=False` computes affected
+   work again in full. A [source restriction](docs/lineage.md#restrict-a-source)
+   withdraws a source's text from every run that used it, optionally
+   deleting their published documents. Jobs repair a damaged accepted
+   output, recheck accepted outputs under changed validators and preview
+   repairs, each within one run. The offline
+   [archive-maintenance example](examples/18_archive_maintenance.py) repairs
+   an archive and compares it with a full recomputation. Reuse across Jobs
+   runs and automatic repair are not covered
 6. **Integrate asset policy with Jobs v1** — manifest-native production brand
    masters, OCR and perceptual brand validators, select-from-N curation, and
    deterministic export bundles built from accepted attempt pointers
@@ -412,11 +444,21 @@ connector or paid run.
    versioned supplemental state with diffs and rollback, extending
    `PlannerMemory` and `distill_template` without mutating the base planner.
    A candidate becomes active only after it beats its predecessor and a
-   simpler alternative on held-out tasks
-8. **Native Agent Skills support** — discover the Agent Skills standard
-   directly, add Python-backed executable skills, and keep the existing
-   OpenClaw and MCP skill providers as inventory sources alongside it.
-   Skills never grant tools or change acceptance criteria
+   simpler alternative on held-out tasks. In progress: distilled templates
+   are [versioned records](docs/learning.md#template-records) in an
+   append-only catalog, and a durable run pins an exact template version;
+   evaluation, activation and rollback are not built yet
+8. **Native Agent Skills support** — built for the next release.
+   [Agent Skills directories](docs/skills.md#agent-skills-directories) are
+   discovered directly, beside the OpenClaw and MCP skill providers, and lend
+   agents capability tags only: declared `allowed-tools` are recorded and
+   never granted, instructions never enter a prompt, and durable runs pin a
+   static snapshot of the tags.
+   [Python-backed skills](docs/skills.md#python-backed-skills) are developer
+   tools that a local tool runtime offers only to the agent ids you list, on
+   ordinary runs. Skills never grant tools or change acceptance criteria.
+   Running a skill's bundled scripts, putting its instructions into prompts
+   and tools in durable text workflows are not covered
 9. **Autotune generalization** — add calibrated sample-size and
    repeated-comparison guidance, cross-campaign reports, process-
    supervised evaluator isolation, and conservative live-evaluator adapters
@@ -460,8 +502,12 @@ The original-glyph generation benchmark stays in Smythe.
   the local path should not grow into. Both must pass the same acceptance,
   authority and accounting tests as local runs
 - Coordination of external coding harnesses: bounded tasks in separate
-  workspaces, review packets that name the exact decision needed, and launch
-  limits set by review capacity, with no automatic merge rights
+  workspaces, review packets that name the exact decision needed, as
+  [`smythe jobs review`](docs/jobs.md#review-what-needs-attention) already
+  does for Jobs runs and
+  [`smythe runs review`](docs/runs.md#review-what-needs-a-decision) for saved
+  checkpoints and durable journals, and launch limits set by review
+  capacity, with no automatic merge rights
 - Autonomous Autotune proposal strategies after the bounded runner and
   evidence protocol are calibrated on more than the concurrency workload
 - Recursive subgraph decomposition, with depth limits and shared

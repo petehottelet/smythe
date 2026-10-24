@@ -8,7 +8,8 @@ ids, versions and SHA-256 digests (:mod:`smythe._canonical`) and never text.
 A run with a policy writes its record once, when it completes, as a
 ``lineage`` journal operation (:func:`build_lineage`, :func:`load_lineage`).
 :func:`restrict_source` withdraws a source's text from every completed run
-whose record names it, which restricts what those runs derived.
+whose record names it, and from every successor in progress that reuses a
+result derived from it, which restricts what those runs derived.
 """
 
 from __future__ import annotations
@@ -34,15 +35,15 @@ from smythe.graph import ExecutionGraph, Node, NodeStatus
 from smythe.validation import ValidatorIdentity, _require_keys, _require_sha256
 from smythe.verifier import node_generation
 from smythe.workflow_artifact import PublishedArtifact, publications, read_publication
-from smythe.workflow_binding import WorkflowBindingError
+from smythe.workflow_binding import WorkflowBindingError, describe_component
 from smythe.workflow_store import WorkflowStateError
 from smythe.workflow_tools import READ_STEP_KEY
 
 __all__ = [
     "LINEAGE_OPERATION", "LINEAGE_POLICY_VERSION", "LINEAGE_RECORD_VERSION", "LINEAGE_REUSE_KEY",
     "PURGE_OPERATION", "ArtifactLineage", "LineagePolicy", "build_lineage", "lineage_key",
-    "load_lineage", "purged_artifacts", "restrict_source", "restricted_sources",
-    "validator_set_sha256",
+    "load_lineage", "purged_artifacts", "renderer_identity", "restrict_source",
+    "restricted_sources", "validator_set_sha256",
 ]
 
 LINEAGE_POLICY_VERSION = 1
@@ -51,6 +52,8 @@ LINEAGE_RECORD_VERSION = 1
 LINEAGE_OPERATION = "lineage"
 # Node metadata marking a result reused from an earlier run; a new graph cannot carry it.
 LINEAGE_REUSE_KEY = "lineage_reuse"
+# The journal operation kind, and key prefix, of a result a successor run reuses.
+_REUSE_OPERATION = "reuse"
 _SCOPE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:-]{0,63}")
 _KIND = re.compile(r"[a-z][a-z0-9_-]{0,31}")
 
@@ -228,22 +231,25 @@ def _object(fields: dict[str, _Check], optional: dict[str, _Check] | None = None
 
 _RUN = _object({"store_id": _id, "run_id": _id, "recipe_sha256": _sha,
                 "task_sha256": _nullable(_sha)})
+_RENDERER = _object({"name": _text, "version": _text, "spec_sha256": _sha})
 _ARTIFACT = _nullable(_object({
     "relative_path": _path, "sha256": _sha, "size_bytes": _count, "media_type": _text,
-    "renderer": _object({"name": _text, "version": _text, "spec_sha256": _sha})}))
+    "renderer": _RENDERER}))
+_VALIDATORS = _list(lambda value, what: ValidatorIdentity.from_dict(value))
 _ACCEPTANCE = _object({
     "operation_key": _long, "record_sha256": _sha, "policy_sha256": _sha,
     "decision": _choice(*(item.value for item in AcceptanceDecision
                           if item is not AcceptanceDecision.NOT_EVALUATED)),
-    "validator_set_sha256": _sha,
-    "validators": _list(lambda value, what: ValidatorIdentity.from_dict(value))})
+    "validator_set_sha256": _sha, "validators": _VALIDATORS})
 _INPUTS = _object({"sources": _list(_object({"source_id": _id, "version": _nullable(_text),
                                              "sha256": _sha}))}, {
     "context": _object({"snapshot_key": _long,
                         "assembly_version": lambda value, what: _count(value, what, 1)}),
     "tool": _object({"name": _text, "version": _text, "decoder_version": _text}),
     "component": _object({"name": _text, "version": _text}),
-    "agent_sha256": _sha})
+    "agent_sha256": _sha,
+    # The gate verifier that judged a gate: the recipe's verifier and gate validators.
+    "verifier": _object({"name": _text, "validators": _VALIDATORS})})
 _NODE = _object({
     "id": _id, "generation": _count, "kind": _pattern(_KIND), "depends_on": _list(_id),
     "result_sha256": _nullable(_sha), "inputs": _INPUTS,
@@ -264,6 +270,8 @@ def _node_problem(node: dict[str, Any]) -> str | None:
         return "lists a source more than once"
     if node["coverage"] == "declared" and not inputs.keys() & {"context", "tool", "component"}:
         return "is declared without a recorded context, tool or component"
+    if "verifier" in inputs and node["kind"] != "gate":
+        return "names a gate verifier but is not a gate"
     if "reused_from" in node and node["result_sha256"] is None:
         return "is reused without a result"
     return None
@@ -279,8 +287,9 @@ class ArtifactLineage:
     none. ``acceptance`` binds the delivery decision, its policy and its
     validator set (:func:`validator_set_sha256`). ``nodes`` each follow the
     nodes they depend on, each with the inputs it was given; a ``declared`` node
-    names a context snapshot, read tool or component, and ``coverage`` is
-    ``complete`` only when every node is declared, else ``partial``. A run
+    names a context snapshot, read tool or component, a gate may name the gate
+    ``verifier`` that judged it, and ``coverage`` is ``complete`` only when
+    every node is declared, else ``partial``. A run
     that reused results names its ``predecessor`` in the same store, the
     ``repair`` that made it, and, on each reused node, ``reused_from``.
 
@@ -318,6 +327,11 @@ class ArtifactLineage:
         acceptance["validators"] = [item.to_dict() for item in validators]
         if acceptance["validator_set_sha256"] != validator_set_sha256(validators):
             raise ValueError("lineage acceptance validator_set_sha256 does not match its validators")
+        for node in nodes:
+            if "verifier" in node["inputs"]:
+                verifier = node["inputs"]["verifier"]
+                verifier["validators"] = [item.to_dict()
+                                          for item in _validator_set(verifier["validators"])]
         ids = [node["id"] for node in nodes]
         if not ids or len(set(ids)) != len(ids):
             raise ValueError("lineage nodes must be a non-empty list of distinct nodes")
@@ -504,6 +518,55 @@ def _synthesizer(description: Mapping[str, Any]) -> dict[str, str] | None:
     return identity if all(_fits(value) for value in identity.values()) else None
 
 
+def _gate_verifier(recipe: Mapping[str, Any]) -> dict[str, Any] | None:
+    """The gate verifier a run with *recipe* judges its gates with, as a record names it.
+
+    It is the recipe's ``verifier`` with the identities of its gate
+    ``validators``, sorted, or None for a recipe that names no verifier.
+    """
+    if "verifier" not in recipe:
+        return None
+    validators = _validator_set(
+        ValidatorIdentity(item["identity"], item["version"], item["config_sha256"])
+        for item in recipe.get("validators", ()))
+    return {"name": _label(recipe["verifier"]),
+            "validators": [item.to_dict() for item in validators]}
+
+
+def _renderer(description: Mapping[str, Any]) -> dict[str, str]:
+    """The identity a record gives the renderer its recipe *description* describes."""
+    return {"name": _label(description.get("identity", description.get("type"))),
+            "version": _label(str(description.get("version"))),
+            "spec_sha256": sha256_hex(description)}
+
+
+def renderer_identity(renderer: Any) -> dict[str, str] | None:
+    """The identity a lineage record gives *renderer*'s documents, or None for no renderer.
+
+    *renderer* is a :class:`~smythe.workflow_artifact.MarkdownRenderer` or a
+    renderer declared with ``LocalOnly(..., role="renderer")``, as a durable
+    run takes it. The identity is the ``name``, ``version`` and
+    ``spec_sha256`` that a record's ``artifact.renderer`` holds and
+    :class:`~smythe.reuse.CurrentState` compares with it. Nothing is
+    rendered or called. Raises ``WorkflowBindingError`` for anything else.
+    """
+    if renderer is None:
+        return None
+    return _renderer(describe_component(renderer, role="renderer"))
+
+
+def _matching_digests(record: ArtifactLineage) -> set[str]:
+    """The digests a run's saved record may have when its journal assembles *record* again.
+
+    A record written before records named their gates' verifier has the
+    digest of *record* without them.
+    """
+    data = record.to_dict()
+    for node in data["nodes"]:
+        node["inputs"].pop("verifier", None)
+    return {record.sha256, sha256_hex(data)}
+
+
 def build_lineage(graph: ExecutionGraph, recipe: Mapping[str, Any],
                   snapshots: Mapping[str, ContextSnapshot], read_calls: Mapping[str, Any],
                   publication: PublishedArtifact | None,
@@ -538,11 +601,12 @@ def build_lineage(graph: ExecutionGraph, recipe: Mapping[str, Any],
     claims, their compact claim records); a read step whose accepted read
     names its source; or a synthesis by local code or a built-in strategy
     that calls no model. Any other node is ``undeclared``, which makes the
-    coverage ``partial``.
+    coverage ``partial``. Each gate names the recipe's gate ``verifier``.
     """
     run, sources = graph.run_ref, tuple(sources)
     agents = {entry["id"]: sha256_hex({key: value for key, value in entry.items() if key != "id"})
               for entry in registry_description["agents"]}
+    verifier = _gate_verifier(recipe)
     entries: list[dict[str, Any]] = []
     results: dict[str, tuple] = {}
     for node in _dependency_order(graph.nodes):
@@ -574,6 +638,8 @@ def build_lineage(graph: ExecutionGraph, recipe: Mapping[str, Any],
                 declared = _given(snapshot, node, results)
             if node.agent_id in agents:
                 inputs["agent_sha256"] = agents[node.agent_id]
+            if kind == "gate" and verifier is not None:
+                inputs["verifier"] = _plain(verifier)
         results[node.id] = (node.status, generation, result, node.result)
         entries.append({"id": node.id, "generation": generation, "kind": kind,
                         "depends_on": list(dict.fromkeys(node.depends_on)), "result_sha256": result,
@@ -593,13 +659,10 @@ def build_lineage(graph: ExecutionGraph, recipe: Mapping[str, Any],
                     "coverage": "declared" if component else "undeclared"})
     artifact = None
     if publication is not None:
-        renderer = publication.renderer
         artifact = {"relative_path": f"{run['run_id']}/{publication.name}",
                     "sha256": publication.sha256, "size_bytes": publication.size_bytes,
                     "media_type": publication.media_type,
-                    "renderer": {"name": _label(renderer.get("identity", renderer.get("type"))),
-                                 "version": _label(str(renderer.get("version"))),
-                                 "spec_sha256": sha256_hex(renderer)}}
+                    "renderer": _renderer(publication.renderer)}
     operation_key, record = acceptance
     validators = list(validators) if validators is not None else [
         ValidatorIdentity.from_dict(item) for item in recipe["acceptance"]["final_validators"]]
@@ -699,9 +762,34 @@ def _purge(store: Any, lease: Any, publication: PublishedArtifact, reason: str,
     return operation
 
 
+def _reused_entries(store: Any, run_id: str) -> list[Mapping[str, Any]]:
+    """The predecessor's record entry of each result an unfinished successor reuses.
+
+    A successor's saved graph names its predecessor in its ``repair``
+    planning record, and each node it reuses in its ``lineage_reuse``
+    metadata. A committed ``reuse`` operation holds the entry it reused; a
+    node without one has its entry in the predecessor's record. Any other
+    run has none. Only reads are made; malformed records raise ValueError,
+    TypeError, KeyError or AttributeError.
+    """
+    saved = store.get_checkpoint(run_id)
+    graph = (None if saved is None else saved["checkpoint"].get("graph")) or {}
+    repair = (graph.get("planning") or {}).get("repair")
+    if repair is None:
+        return []
+    entries = {item["inputs"]["node_id"]: item["result"]["lineage"]
+               for item in store.list_operations(run_id, _REUSE_OPERATION)
+               if item["state"] != "started"}
+    planned = {node["id"] for node in graph["nodes"]
+               if LINEAGE_REUSE_KEY in (node.get("metadata") or {})} - entries.keys()
+    record = load_lineage(store, repair["predecessor"]["run_id"]) if planned else None
+    return [*entries.values(),
+            *(node for node in (record.nodes if record else ()) if node["id"] in planned)]
+
+
 def _restrict(store: Any, run_id: str, texts: Mapping[str, str | None], source_id: str,
               reason: str, stamp: str, purge: bool) -> dict[str, Any]:
-    """Tombstone *texts* (SHA-256 to version) in one completed run, and purge its files."""
+    """Tombstone *texts* (SHA-256 to version) in one run, and purge its files."""
     lease = store.acquire_lease(run_id, uuid4().hex, ttl_s=60)
     try:
         operations = [_journal_tombstone(store, lease, SourceRecord(
@@ -713,11 +801,11 @@ def _restrict(store: Any, run_id: str, texts: Mapping[str, str | None], source_i
                            if operation["state"] != "started"]
         pending = [item["operation_id"] for item in operations if item["state"] != "applied"]
         if pending:
-            # A copy of the completed checkpoint applies them; nothing else changes.
+            # A copy of the latest checkpoint applies them; nothing else changes.
             saved = store.get_checkpoint(run_id)
             store.save_checkpoint(lease, saved["revision"], saved["checkpoint"],
                                   consumed_operation_ids=sorted(pending),
-                                  transition_kind="completed")
+                                  transition_kind=saved["checkpoint"]["status"])
     finally:
         store.release_lease(lease)
     return {"run_id": run_id,
@@ -729,7 +817,7 @@ def _restrict(store: Any, run_id: str, texts: Mapping[str, str | None], source_i
 def restrict_source(store: Any, source_id: str, *, version: str | None = None,
                     scope: str | None = None, reason: str,
                     purge: bool = False) -> list[dict[str, Any]]:
-    """Withdraw a source's text from every completed lineage run whose record names it.
+    """Withdraw a source's text from every lineage run that derived from it.
 
     *version*, when given, withdraws only the references recorded with that
     version. *scope*, when given, limits the runs to that access scope,
@@ -743,7 +831,13 @@ def restrict_source(store: Any, source_id: str, *, version: str | None = None,
     source's id, version and SHA-256, *reason* (1-500 characters) and
     ``removed_at`` from the journal's clock, and none of its text. A copy of
     the run's completed checkpoint applies it, and nothing is called. The
-    run is then restricted (:func:`restricted_sources`).
+    run is then restricted (:func:`restricted_sources`). So does each
+    successor in progress whose saved graph or ``reuse`` operations name a
+    result of its predecessor whose recorded inputs name the text, with a
+    copy of its latest checkpoint: resuming it refuses that result before
+    any node runs, whether or not a checkpoint saved it. Completed runs are
+    restricted first, so a predecessor holds its tombstones before its
+    successors are reached.
 
     With *purge*, every file the run published is deleted, never through a
     symbolic link, and an ``artifact_purge`` operation records its path
@@ -757,15 +851,15 @@ def restrict_source(store: Any, source_id: str, *, version: str | None = None,
     ``purged`` files (:func:`purged_artifacts`). A text a run already holds
     a tombstone of keeps its first one, so calling this again, for example
     after another process released a run, finishes a restriction without
-    changing what it recorded. A run that has not completed has no record
-    and is not changed.
+    changing what it recorded. Any other run that has not completed has no
+    record and is not changed.
 
     Raises ``WorkflowBindingError`` for a blank or overlong source id,
     version or reason, a scope that is not an access scope label, or a
     *purge* that is not True or False; ``WorkflowStateError``, before
-    anything is written, for a run in scope whose record cannot be read,
-    and for a store opened read-only; and ``WorkflowLeaseError`` for a run
-    another process holds.
+    anything is written, for a run in scope whose record, or a successor
+    whose reuse records, cannot be read, and for a store opened read-only;
+    and ``WorkflowLeaseError`` for a run another process holds.
     """
     try:
         _id(source_id, "source_id")
@@ -783,26 +877,31 @@ def restrict_source(store: Any, source_id: str, *, version: str | None = None,
         raise WorkflowStateError("Workflow store is read-only")
     affected = []
     for run in store.list_runs():
-        run_id = run["run_id"]
-        policy = store.load_run(run_id)["config"].get("lineage") \
-            if run["status"] == "completed" else None
+        run_id, completed = run["run_id"], run["status"] == "completed"
+        policy = store.load_run(run_id)["config"].get("lineage")
         # The scope is compared before any record or digest is read.
         if not isinstance(policy, dict) or scope not in (None, policy.get("access_scope")):
             continue
         try:
-            record = load_lineage(store, run_id)
-        except ValueError as error:
+            if completed:
+                record = load_lineage(store, run_id)
+                entries = () if record is None else record.nodes
+            else:
+                entries = _reused_entries(store, run_id)
+        except (ValueError, TypeError, KeyError, AttributeError) as error:
+            held = "an invalid lineage record" if completed else "invalid reuse records"
             raise WorkflowStateError(
-                f"Run {run_id!r} holds an invalid lineage record, so the sources it used are "
-                "unknown") from error
+                f"Run {run_id!r} holds {held}, so the sources it used are unknown") from error
         texts: dict[str, str | None] = {}
-        for node in record.nodes if record is not None else ():
+        for node in entries:
             for ref in node["inputs"]["sources"]:
                 if ref["source_id"] == source_id and version in (None, ref["version"]):
                     # One tombstone per text; it keeps a version a reference recorded.
                     texts[ref["sha256"]] = texts.get(ref["sha256"]) or ref["version"]
         if texts:
-            affected.append((run_id, texts))
+            affected.append((run_id, texts, completed))
     stamp = _stamp(store)
-    return [_restrict(store, run_id, texts, source_id, reason, stamp, purge)
-            for run_id, texts in affected]
+    # Completed runs first, so a predecessor holds its tombstones before its successors.
+    restricted = {run_id: _restrict(store, run_id, texts, source_id, reason, stamp, purge)
+                  for run_id, texts, _ in sorted(affected, key=lambda item: not item[2])}
+    return [restricted[run_id] for run_id, _, _ in affected]

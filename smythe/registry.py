@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import copy
 import logging
 import time
+from dataclasses import replace
 
 from smythe.agent import Agent, AgentProfile
 from smythe.graph import ExecutionGraph
@@ -106,6 +108,21 @@ class Registry:
                 ), history=entry["history"],
             ))
         return bound
+
+    def static_snapshot(self) -> Registry:
+        """Return a new ``STATIC_ONLY`` registry of each agent's effective capabilities.
+
+        Each agent is copied with its profile's capabilities replaced by what
+        :meth:`effective_capabilities` returns now, so a durable run can take a
+        skill provider's capability tags without live hydration. Nothing else
+        a provider lists is kept, and the copy never calls it again.
+        """
+        snapshot = Registry(hydration_mode=CapabilityHydrationMode.STATIC_ONLY)
+        for agent in self._agents.values():
+            profile = replace(agent.profile, capabilities=self.effective_capabilities(agent),
+                              mcp_servers=list(agent.profile.mcp_servers))
+            snapshot.register(replace(agent, profile=profile, history=copy.deepcopy(agent.history)))
+        return snapshot
 
     def register(self, agent: Agent) -> None:
         self._agents[agent.id] = agent

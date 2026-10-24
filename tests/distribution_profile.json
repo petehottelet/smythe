@@ -10,6 +10,7 @@
   ],
   "excluded_modules": {
     "test_acquisition_demo.py": "Acquisition example and input documents",
+    "test_archive_maintenance.py": "Archive-maintenance example and its bundled sources",
     "test_astra_analysis.py": "Astra benchmark harness",
     "test_astra_campaign_plan.py": "Frozen Astra protocol and task pack",
     "test_astra_campaign_tasks.py": "Frozen Astra task pack",

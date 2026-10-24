@@ -8,6 +8,7 @@ import time
 from collections.abc import Callable
 from collections.abc import Mapping
 from dataclasses import replace
+from pathlib import Path
 
 import pytest
 
@@ -18,6 +19,7 @@ from smythe.optimize.contracts import (
     MetricObjective,
     MutableFieldRule,
     ObjectiveDirection,
+    canonical_json_bytes,
     sha256_prefixed,
 )
 from smythe.optimize.engine import (
@@ -32,6 +34,7 @@ from smythe.optimize.engine import (
     _task_indices,
 )
 from smythe.optimize.ledger import (
+    _ENGINE_HOLDOUT_CAPABILITY,
     CampaignLeaseConflict,
     ExperimentLedger,
     HoldoutAlreadyUsedError,
@@ -39,6 +42,7 @@ from smythe.optimize.ledger import (
     holdout_identity,
 )
 from smythe.optimize.statistics import PROMOTION_METHOD
+from smythe.validation import ValidatorIdentity
 
 
 EVALUATOR_HASH = "sha256:" + "e" * 64
@@ -221,6 +225,399 @@ async def test_runner_rejects_incomplete_executable_contract_before_mutation(
             await _runner(contract, ledger, evaluate).run(incumbent, (challenger,))
         count = ledger._connection.execute("SELECT COUNT(*) FROM campaigns").fetchone()[0]
         assert count == 0
+
+
+# How a candidate is judged, what it may spend and what it may do.
+RESERVED_ROOTS = (
+    "acceptance",
+    "validators",
+    "verifier",
+    "evaluator",
+    "harness",
+    "budget",
+    "spend",
+    "ceilings",
+    "capabilities",
+    "tools",
+    "permissions",
+    "authority",
+    "holdout",
+)
+
+
+def _policy_contract(*paths: str, **limits: int) -> ExperimentContract:
+    """The engine test contract with an integer rule for each mutable path."""
+
+    return replace(
+        _contract(**limits),
+        mutable_fields=paths,
+        mutable_field_rules={
+            path: MutableFieldRule("integer", minimum=1, maximum=8) for path in paths
+        },
+    )
+
+
+def _ledger_state(ledger: ExperimentLedger, path: Path) -> tuple[list[str], dict[str, bytes]]:
+    """Every row the ledger holds, and the bytes of its database files."""
+
+    files = sorted(path.parent.glob(path.name + "*"))
+    return list(ledger._connection.iterdump()), {item.name: item.read_bytes() for item in files}
+
+
+def _boundaries(
+    contract: ExperimentContract, manifest: EvaluatorManifest, *candidates: Candidate
+) -> bytes:
+    return canonical_json_bytes(
+        {
+            "contract": contract.to_dict(),
+            "contract_hash": contract.contract_hash,
+            "evaluator": manifest.to_dict(),
+            "evaluator_hash": manifest.evaluator_hash,
+            "candidates": [candidate.to_dict() for candidate in candidates],
+        }
+    )
+
+
+async def _never_called(_context: TrialContext) -> TrialOutcome:
+    raise AssertionError("a refused campaign must not invoke the evaluator")
+
+
+@pytest.mark.asyncio
+async def test_runner_refuses_a_mutable_reserved_path_before_any_ledger_write(tmp_path):
+    paths = (
+        *RESERVED_ROOTS,
+        *(f"{root}.limit" for root in RESERVED_ROOTS),
+        "acceptance.policy.mode",
+        "Budget.max_usd",
+        "TOOLS",
+    )
+    manifest = EvaluatorManifest(
+        code_digest=EVALUATOR_HASH,
+        validators=(ValidatorIdentity.for_config("safe", "1"),),
+    )
+    ledger_path = tmp_path / "reserved.sqlite3"
+
+    with ExperimentLedger(ledger_path, durability="normal") as ledger:
+        before = _ledger_state(ledger, ledger_path)
+        for path in paths:
+            contract = _policy_contract("strength", path)
+            incumbent = Candidate(
+                contract=contract, policy={"strength": 1, path: 1}, hypothesis="incumbent"
+            )
+            challenger = Candidate(
+                contract=contract,
+                policy={"strength": 1, path: 8},
+                hypothesis="relax the bound",
+                parent=incumbent,
+            )
+            boundaries = _boundaries(contract, manifest, incumbent, challenger)
+            runner = OptimizationRunner(
+                contract,
+                ledger,
+                _never_called,
+                evaluator_hash=manifest.evaluator_hash,
+                bootstrap_resamples=100,
+            )
+            with pytest.raises(OptimizationError, match="reserved") as refused:
+                await runner.run(incumbent, (challenger,))
+            assert path in str(refused.value)
+            assert _ledger_state(ledger, ledger_path) == before
+            # The contract, evaluator data and candidate inventory are untouched.
+            assert runner.evaluator_hash == manifest.evaluator_hash
+            assert _boundaries(contract, manifest, incumbent, challenger) == boundaries
+
+
+@pytest.mark.asyncio
+async def test_a_path_that_only_starts_like_a_reserved_name_stays_mutable(tmp_path):
+    contract = _policy_contract("strength", "toolbar.layout", "budgeted")
+    incumbent, challenger = _candidates(contract)
+
+    with ExperimentLedger(tmp_path / "lookalike.sqlite3", durability="normal") as ledger:
+        result = await _runner(contract, ledger, _challengers_win).run(incumbent, (challenger,))
+    assert result.promoted is True
+
+
+@pytest.mark.asyncio
+async def test_a_stored_campaign_with_a_reserved_path_loads_but_does_not_resume(tmp_path):
+    contract = _policy_contract("strength", "budget.max_usd")
+    incumbent, challenger = _candidates(contract)
+    identity = holdout_identity(contract, EVALUATOR_HASH)
+    # The plan an earlier release, which let any field be mutable, sealed for
+    # this campaign under its automatic campaign ID.
+    plan_hash = sha256_prefixed(
+        {
+            "runner_version": 4,
+            "statistics": {"method": PROMOTION_METHOD, "descriptive_bootstrap_resamples": 100},
+            "contract_hash": contract.contract_hash,
+            "incumbent_candidate_id": incumbent.candidate_id,
+            "ordered_candidate_ids": [challenger.candidate_id],
+            "ordered_policy_hashes": [challenger.policy_hash],
+            "evaluator_hash": EVALUATOR_HASH,
+            "ledger_durability": "normal",
+            "required_trials": 14,
+        }
+    )
+    campaign_id = "optimization_v4_" + plan_hash.removeprefix("sha256:")
+
+    ledger_path = tmp_path / "stored.sqlite3"
+    with ExperimentLedger(ledger_path, durability="normal") as ledger:
+        # That release wrote the campaign through the ledger, and its
+        # challenger's first sealed holdout trial claimed the policy's holdout.
+        ledger.create_campaign(
+            contract,
+            incumbent.candidate_id,
+            (incumbent, challenger),
+            plan_hash=plan_hash,
+            campaign_id=campaign_id,
+        )
+        material, _ = ledger._get_holdout_seed_binding(
+            campaign_id,
+            plan_hash=plan_hash,
+            candidates=(incumbent, challenger),
+            capability=_ENGINE_HOLDOUT_CAPABILITY,
+        )
+        lease = ledger.acquire_campaign_lease(campaign_id, "earlier-release")
+        trial_key = ledger.prepare_trial(
+            campaign_id,
+            challenger.candidate_id,
+            "holdout",
+            _bound_phase("challenger", plan_hash),
+            _split_seeds(contract, holdout_seed_material=material)[2][0],
+            lease=lease,
+            evaluator_hash=EVALUATOR_HASH,
+            ceiling_microusd=contract.per_trial_reservation_microusd,
+        )
+        ledger.mark_trial_dispatched(trial_key, lease=lease)
+        ledger.complete_trial(
+            trial_key,
+            lease=lease,
+            metrics={"quality": 10.0, "risk": 1.0},
+            gates={"safe": True},
+            actual_cost_microusd=1,
+            duration_ms=1.0,
+        )
+        ledger.release_campaign_lease(lease)
+        # This runner would resume exactly that campaign.
+        resumed = _runner(contract, ledger, _never_called)
+        assert resumed._build_plan(incumbent, (challenger,))["campaign_id"] == campaign_id
+
+        # The ledger still reads the stored contract back for inspection, and
+        # its holdout use still counts against a contract without the field.
+        stored = ledger.snapshot(campaign_id)["campaign"]["contract"]
+        assert ExperimentContract.from_dict(stored) == contract
+        assert ledger.holdout_uses(identity) == {challenger.policy_hash: (campaign_id,)}
+        allowed = _contract()
+        allowed_incumbent, allowed_challenger = _candidates(allowed)
+        assert holdout_identity(allowed, EVALUATOR_HASH) == identity
+        assert allowed_challenger.policy_hash == challenger.policy_hash
+        before = _ledger_state(ledger, ledger_path)
+        with pytest.raises(HoldoutAlreadyUsedError, match=campaign_id):
+            await _runner(allowed, ledger, _never_called).run(
+                allowed_incumbent, (allowed_challenger,)
+            )
+
+        # Resuming is refused before the runner reads or writes the ledger.
+        with pytest.raises(OptimizationError, match="budget.max_usd"):
+            await resumed.run(incumbent, (challenger,))
+        assert _ledger_state(ledger, ledger_path) == before
+
+
+# Two challengers, each with one development trial, and two paired splits of
+# three seeds; a reference adds five more.
+_TWO_FIELD_LIMITS = {"max_candidates": 3, "max_trials": 20, "max_budget_microusd": 200}
+
+
+def _two_field_contract() -> ExperimentContract:
+    return replace(
+        _contract(**_TWO_FIELD_LIMITS),
+        mutable_fields=("strength", "style"),
+        mutable_field_rules={
+            "strength": MutableFieldRule("integer", minimum=1, maximum=8),
+            "style": MutableFieldRule("string", choices=("plain", "bold")),
+        },
+    )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("incumbent_policy", "changed_policy"),
+    [
+        ({"strength": 1, "style": "plain"}, {"strength": 2, "style": "bold"}),
+        ({"strength": 1}, {"style": "bold"}),
+    ],
+    ids=["two-values", "different-path"],
+)
+async def test_single_change_refuses_a_challenger_that_changes_two_paths(
+    tmp_path, incumbent_policy, changed_policy
+):
+    contract = _two_field_contract()
+    incumbent = Candidate(contract=contract, policy=incumbent_policy, hypothesis="incumbent")
+    one = Candidate(
+        contract=contract,
+        policy={**incumbent_policy, "strength": 3},
+        hypothesis="one change",
+        parent=incumbent,
+    )
+    two = Candidate(
+        contract=contract, policy=changed_policy, hypothesis="two changes", parent=incumbent
+    )
+    ledger_path = tmp_path / "single.sqlite3"
+
+    with ExperimentLedger(ledger_path, durability="normal") as ledger:
+        before = _ledger_state(ledger, ledger_path)
+        with pytest.raises(OptimizationError, match="exactly one policy path") as refused:
+            await _runner(contract, ledger, _never_called, single_change=True).run(
+                incumbent, (one, two)
+            )
+        message = str(refused.value)
+        assert two.candidate_id in message
+        assert one.candidate_id not in message
+        assert "strength, style" in message
+        assert _ledger_state(ledger, ledger_path) == before
+
+        # The constraint is opt-in, and a reference is never promoted, so it
+        # may differ in more than one path.
+        assert _runner(contract, ledger, _never_called)._build_plan(incumbent, (one, two))
+        assert _runner(contract, ledger, _never_called, single_change=True)._build_plan(
+            incumbent, (one,), (two,)
+        )
+
+
+@pytest.mark.asyncio
+async def test_single_change_runs_one_path_challengers_and_binds_the_plan(tmp_path):
+    contract = _two_field_contract()
+    incumbent = Candidate(
+        contract=contract, policy={"strength": 1, "style": "plain"}, hypothesis="incumbent"
+    )
+    stronger = Candidate(
+        contract=contract,
+        policy={"strength": 2, "style": "plain"},
+        hypothesis="stronger",
+        parent=incumbent,
+    )
+    # Dropping a path the incumbent sets is also one change.
+    unstyled = Candidate(
+        contract=contract, policy={"strength": 1}, hypothesis="no style", parent=incumbent
+    )
+    challengers = (stronger, unstyled)
+    calls: list[TrialContext] = []
+
+    async def evaluate(context: TrialContext) -> TrialOutcome:
+        calls.append(context)
+        return await _challengers_win(context)
+
+    payload = {
+        "runner_version": 4,
+        "statistics": {"method": PROMOTION_METHOD, "descriptive_bootstrap_resamples": 100},
+        "contract_hash": contract.contract_hash,
+        "incumbent_candidate_id": incumbent.candidate_id,
+        "ordered_candidate_ids": [stronger.candidate_id, unstyled.candidate_id],
+        "ordered_policy_hashes": [stronger.policy_hash, unstyled.policy_hash],
+        "evaluator_hash": EVALUATOR_HASH,
+        "ledger_durability": "normal",
+        "required_trials": 15,
+    }
+
+    with ExperimentLedger(tmp_path / "single.sqlite3", durability="normal") as ledger:
+
+        def plan(**options: object) -> dict:
+            return _runner(contract, ledger, evaluate, **options)._build_plan(
+                incumbent, challengers
+            )
+
+        assert plan()["plan_hash"] == sha256_prefixed(payload)
+        assert plan(single_change=True)["plan_hash"] == sha256_prefixed(
+            {**payload, "single_change": True}
+        )
+        assert plan(single_change=True)["campaign_id"] != plan()["campaign_id"]
+
+        # A campaign sealed without the constraint does not reopen with it.
+        unconstrained = plan(campaign_id="unconstrained")
+        ledger.create_campaign(
+            contract,
+            incumbent.candidate_id,
+            unconstrained["all_candidates"],
+            plan_hash=unconstrained["plan_hash"],
+            campaign_id="unconstrained",
+        )
+        with pytest.raises(OptimizationError, match="campaign binding drift"):
+            await _runner(
+                contract, ledger, evaluate, campaign_id="unconstrained", single_change=True
+            ).run(incumbent, challengers)
+
+        runner = _runner(contract, ledger, evaluate, campaign_id="single", single_change=True)
+        result = await runner.run(incumbent, challengers)
+        assert result.promoted is True
+        assert result.selected_candidate_id == stronger.candidate_id
+        assert result.optimization_plan_hash == plan(single_change=True)["plan_hash"]
+        evaluated = len(calls)
+
+        # Nor does a constrained campaign reopen without it; it still replays.
+        with pytest.raises(OptimizationError, match="campaign binding drift"):
+            await _runner(contract, ledger, evaluate, campaign_id="single").run(
+                incumbent, challengers
+            )
+        replay = await runner.run(incumbent, challengers)
+        assert replay.decision_id == result.decision_id
+        assert len(calls) == evaluated
+
+
+def test_single_change_leaves_the_default_plan_hash_unchanged(tmp_path):
+    contract = _contract()
+    incumbent, challenger = _candidates(contract)
+    # Fixed bytes: a plan without the constraint keeps its earlier identity.
+    golden = "sha256:37830969bc68da4e8b6a5cd8df722bef53c5c03cec600e4f63bb8a99b1c34fbc"
+
+    with ExperimentLedger(tmp_path / "golden.sqlite3", durability="normal") as ledger:
+        for options in ({}, {"single_change": False}):
+            plan = _runner(contract, ledger, _challengers_win, **options)._build_plan(
+                incumbent, (challenger,)
+            )
+            assert plan["plan_hash"] == golden
+            assert plan["campaign_id"] == "optimization_v4_" + golden.removeprefix("sha256:")
+        constrained = _runner(contract, ledger, _challengers_win, single_change=True)
+        assert constrained._build_plan(incumbent, (challenger,))["plan_hash"] != golden
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("first", [False, True], ids=["then-constrained", "then-unconstrained"])
+async def test_changing_single_change_cannot_draw_a_second_holdout(tmp_path, first):
+    contract = _contract()
+    incumbent, challenger = _candidates(contract)
+    identity = holdout_identity(contract, EVALUATOR_HASH)
+    calls: list[TrialContext] = []
+
+    async def evaluate(context: TrialContext) -> TrialOutcome:
+        calls.append(context)
+        return await _challengers_win(context)
+
+    ledger_path = tmp_path / "single-holdout.sqlite3"
+    with ExperimentLedger(ledger_path, durability="normal") as ledger:
+        used = await _runner(contract, ledger, evaluate, single_change=first).run(
+            incumbent, (challenger,)
+        )
+        assert used.holdout_assessment is not None
+        assert ledger.holdout_uses(identity) == {challenger.policy_hash: (used.campaign_id,)}
+        evaluated = len(calls)
+
+        # The other setting changes the plan hash, and so the automatic
+        # campaign ID, but not the holdout identity.
+        other = _runner(contract, ledger, evaluate, single_change=not first)
+        assert other._build_plan(incumbent, (challenger,))["campaign_id"] != used.campaign_id
+        before = _ledger_state(ledger, ledger_path)
+        with pytest.raises(HoldoutAlreadyUsedError, match=used.campaign_id) as refused:
+            await other.run(incumbent, (challenger,))
+        assert challenger.policy_hash in str(refused.value)
+        assert identity in str(refused.value)
+        assert _ledger_state(ledger, ledger_path) == before
+        assert len(calls) == evaluated
+
+
+@pytest.mark.parametrize("value", [1, "yes", None])
+def test_runner_rejects_a_non_boolean_single_change(tmp_path, value):
+    with ExperimentLedger(tmp_path / "single-type.sqlite3", durability="normal") as ledger:
+        with pytest.raises(TypeError, match="single_change must be a boolean"):
+            _runner(_contract(), ledger, _challengers_win, single_change=value)
 
 
 @pytest.mark.asyncio

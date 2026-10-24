@@ -1,0 +1,4980 @@
+{
+  "benchmark": "policy-ablations",
+  "evidence_status": "offline-mechanics",
+  "claimable": false,
+  "api_calls": 0,
+  "paid_execution_allowed": false,
+  "mode": "offline",
+  "record_version": 1,
+  "scope": "Fixture runs establish mechanics, not a measured benefit. Deterministic fixture providers decide every call, manual-clock times are declared, and the failures are planted where each policy acts, so the differences between arms follow from the fixtures and the policy under test. Scheduler overhead is real local time on one machine. No policy becomes a default, and no number here is a product, README or roadmap claim.",
+  "default_change": false,
+  "promotion": {
+    "eligible": false,
+    "reasons": [
+      "fixture providers and planted failures establish mechanics, not a measured benefit",
+      "no held-out quality, cost or latency criteria are decided for any policy",
+      "live evaluation needs an approved budget and decided thresholds"
+    ]
+  },
+  "arms": [
+    "baseline",
+    "policy"
+  ],
+  "protocol": {
+    "one_change": "each case's baseline and policy arms come from one configuration and differ only in the varied policy; differs_in lists the keys on which they differ",
+    "attempts": "every call or attempt is recorded, failed, cancelled, refused and rejected ones included",
+    "correlated_errors": "failures one node caused (a cancelled or unknown sibling) form one group; other failures that share an outcome, error type, failure class and message form one group",
+    "seed": 0
+  },
+  "features": [
+    {
+      "feature": "TerminationPolicy",
+      "evidence": "drain_ordinary, drain_durable",
+      "applies_to": "AsyncExecutor, Swarm(parallel=True) and durable runs, which record it in their recipe",
+      "default": "off",
+      "status": "experimental",
+      "held_out_evaluation": "not run",
+      "promotion": "not eligible: offline fixtures establish mechanics only, and no held-out quality, cost or latency criteria are decided"
+    },
+    {
+      "feature": "CapacityPolicy",
+      "evidence": "capacity_admission",
+      "applies_to": "ordinary runs; durable runs refuse it",
+      "default": "off",
+      "status": "experimental",
+      "held_out_evaluation": "not run",
+      "promotion": "not eligible: offline fixtures establish mechanics only, and no held-out quality, cost or latency criteria are decided"
+    },
+    {
+      "feature": "Swarm(reserve_for_checks=True)",
+      "evidence": "budget_holds",
+      "applies_to": "ordinary runs under max_budget_usd; durable runs refuse it",
+      "default": "off",
+      "status": "experimental",
+      "held_out_evaluation": "not run",
+      "promotion": "not eligible: offline fixtures establish mechanics only, and no held-out quality, cost or latency criteria are decided"
+    },
+    {
+      "feature": "Synthesizer(retain_contradictions=True)",
+      "evidence": "contradiction_synthesis",
+      "applies_to": "DELIVERABLE and LLM_MERGE synthesis, ordinary and durable",
+      "default": "off",
+      "status": "experimental",
+      "held_out_evaluation": "not run",
+      "promotion": "not eligible: offline fixtures establish mechanics only, and no held-out quality, cost or latency criteria are decided"
+    },
+    {
+      "feature": "WhiteRabbit routing rules (adaptive selection)",
+      "evidence": "results/selector_comparison_offline.json",
+      "applies_to": "ordinary runs with a router",
+      "default": "off",
+      "status": "experimental",
+      "held_out_evaluation": "not run",
+      "promotion": "not eligible: offline fixtures establish mechanics only, and no held-out quality, cost or latency criteria are decided"
+    },
+    {
+      "feature": "EvidenceTriggeredSupervisor",
+      "evidence": "results/trigger_ablation_offline.json",
+      "applies_to": "ordinary runs with a supervisor",
+      "default": "off",
+      "status": "experimental",
+      "held_out_evaluation": "not run",
+      "promotion": "not eligible: offline fixtures establish mechanics only, and no held-out quality, cost or latency criteria are decided"
+    }
+  ],
+  "ablations": {
+    "drain_ordinary": {
+      "policy": "TerminationPolicy",
+      "varied": "termination",
+      "question": "When a failure stops an ordinary run, does draining keep the work already in flight that a cancellation would lose, without delaying a security stop?",
+      "clock": "manual: each fixture call and the drain deadline take declared virtual time",
+      "cases": [
+        {
+          "case": "answers_within_drain",
+          "fixture": "fail raises a planted failure at 1 s while sibling, in flight, answers at 3 s; queued waits for a slot",
+          "differs_in": [
+            "termination"
+          ],
+          "arms": {
+            "baseline": {
+              "executor": "AsyncExecutor",
+              "graph": "fork_join: fail, sibling, queued",
+              "max_concurrency": 2,
+              "max_budget_usd": 10.0,
+              "node_estimate_usd": 0.25,
+              "call_cost_usd": 0.125,
+              "failure_policy": "halt",
+              "clock": "manual",
+              "termination": null
+            },
+            "policy": {
+              "executor": "AsyncExecutor",
+              "graph": "fork_join: fail, sibling, queued",
+              "max_concurrency": 2,
+              "max_budget_usd": 10.0,
+              "node_estimate_usd": 0.25,
+              "call_cost_usd": 0.125,
+              "failure_policy": "halt",
+              "clock": "manual",
+              "termination": {
+                "drain_timeout_s": 30.0
+              }
+            }
+          },
+          "results": {
+            "baseline": {
+              "error": {
+                "type": "RuntimeError",
+                "message": "planted failure"
+              },
+              "elapsed_ms": 1000,
+              "calls": [
+                {
+                  "node": "fail",
+                  "start_ms": 0,
+                  "end_ms": 1000,
+                  "outcome": "failed",
+                  "error": {
+                    "type": "RuntimeError",
+                    "message": "planted failure"
+                  }
+                },
+                {
+                  "node": "sibling",
+                  "start_ms": 0,
+                  "end_ms": 1000,
+                  "outcome": "cancelled"
+                }
+              ],
+              "nodes": {
+                "fail": "failed",
+                "sibling": "pending",
+                "queued": "pending"
+              },
+              "drain": null,
+              "kept_cost_usd": {},
+              "reserved_usd": 0.0,
+              "cost_is_complete": true,
+              "waits_ms": {
+                "retry_backoff": 0.0,
+                "admission": 0.0,
+                "supervision": 0.0,
+                "capacity": 0.0,
+                "drain": 0.0
+              },
+              "failures": [
+                {
+                  "node": "fail",
+                  "attempt": 1,
+                  "outcome": "failed",
+                  "error": {
+                    "type": "RuntimeError",
+                    "message": "planted failure"
+                  },
+                  "failure_class": "transient",
+                  "caused_by": null
+                },
+                {
+                  "node": "sibling",
+                  "attempt": 1,
+                  "outcome": "cancelled",
+                  "error": null,
+                  "failure_class": null,
+                  "caused_by": "fail"
+                }
+              ],
+              "correlated_errors": [
+                {
+                  "kind": "consequence",
+                  "cause": "the failure of 'fail'",
+                  "failures": [
+                    {
+                      "node": "sibling",
+                      "attempt": 1
+                    }
+                  ],
+                  "count": 1
+                }
+              ],
+              "resume": {
+                "nodes_to_run": [
+                  "fail",
+                  "queued",
+                  "sibling"
+                ],
+                "sent_calls_repeated": 1
+              }
+            },
+            "policy": {
+              "error": {
+                "type": "RuntimeError",
+                "message": "planted failure"
+              },
+              "elapsed_ms": 3000,
+              "calls": [
+                {
+                  "node": "fail",
+                  "start_ms": 0,
+                  "end_ms": 1000,
+                  "outcome": "failed",
+                  "error": {
+                    "type": "RuntimeError",
+                    "message": "planted failure"
+                  }
+                },
+                {
+                  "node": "sibling",
+                  "start_ms": 0,
+                  "end_ms": 3000,
+                  "outcome": "answered"
+                }
+              ],
+              "nodes": {
+                "fail": "failed",
+                "sibling": "completed",
+                "queued": "pending"
+              },
+              "drain": {
+                "settled": [
+                  "sibling"
+                ],
+                "cancelled": [],
+                "deadline_hit": false
+              },
+              "kept_cost_usd": {
+                "sibling": 0.125
+              },
+              "reserved_usd": 0.0,
+              "cost_is_complete": true,
+              "waits_ms": {
+                "retry_backoff": 0.0,
+                "admission": 0.0,
+                "supervision": 0.0,
+                "capacity": 0.0,
+                "drain": 2000.0
+              },
+              "failures": [
+                {
+                  "node": "fail",
+                  "attempt": 1,
+                  "outcome": "failed",
+                  "error": {
+                    "type": "RuntimeError",
+                    "message": "planted failure"
+                  },
+                  "failure_class": "transient",
+                  "caused_by": null
+                }
+              ],
+              "correlated_errors": [],
+              "resume": {
+                "nodes_to_run": [
+                  "fail",
+                  "queued"
+                ],
+                "sent_calls_repeated": 0
+              }
+            }
+          },
+          "comparison": {
+            "completed": {
+              "baseline": [],
+              "policy": [
+                "sibling"
+              ]
+            },
+            "kept_cost_usd": {
+              "baseline": 0,
+              "policy": 0.125
+            },
+            "cost_is_complete": {
+              "baseline": true,
+              "policy": true
+            },
+            "sent_calls_repeated": {
+              "baseline": 1,
+              "policy": 0
+            },
+            "drain": {
+              "baseline": null,
+              "policy": {
+                "settled": [
+                  "sibling"
+                ],
+                "cancelled": [],
+                "deadline_hit": false
+              }
+            },
+            "drain_wait_ms": {
+              "baseline": 0.0,
+              "policy": 2000.0
+            },
+            "elapsed_ms": {
+              "baseline": 1000,
+              "policy": 3000
+            }
+          }
+        },
+        {
+          "case": "straggles_past_deadline",
+          "fixture": "fail raises a planted failure at 1 s; sibling would answer only at 60 s, after the 30 s drain deadline",
+          "differs_in": [
+            "termination"
+          ],
+          "arms": {
+            "baseline": {
+              "executor": "AsyncExecutor",
+              "graph": "fork_join: fail, sibling, queued",
+              "max_concurrency": 2,
+              "max_budget_usd": 10.0,
+              "node_estimate_usd": 0.25,
+              "call_cost_usd": 0.125,
+              "failure_policy": "halt",
+              "clock": "manual",
+              "termination": null
+            },
+            "policy": {
+              "executor": "AsyncExecutor",
+              "graph": "fork_join: fail, sibling, queued",
+              "max_concurrency": 2,
+              "max_budget_usd": 10.0,
+              "node_estimate_usd": 0.25,
+              "call_cost_usd": 0.125,
+              "failure_policy": "halt",
+              "clock": "manual",
+              "termination": {
+                "drain_timeout_s": 30.0
+              }
+            }
+          },
+          "results": {
+            "baseline": {
+              "error": {
+                "type": "RuntimeError",
+                "message": "planted failure"
+              },
+              "elapsed_ms": 1000,
+              "calls": [
+                {
+                  "node": "fail",
+                  "start_ms": 0,
+                  "end_ms": 1000,
+                  "outcome": "failed",
+                  "error": {
+                    "type": "RuntimeError",
+                    "message": "planted failure"
+                  }
+                },
+                {
+                  "node": "sibling",
+                  "start_ms": 0,
+                  "end_ms": 1000,
+                  "outcome": "cancelled"
+                }
+              ],
+              "nodes": {
+                "fail": "failed",
+                "sibling": "pending",
+                "queued": "pending"
+              },
+              "drain": null,
+              "kept_cost_usd": {},
+              "reserved_usd": 0.0,
+              "cost_is_complete": true,
+              "waits_ms": {
+                "retry_backoff": 0.0,
+                "admission": 0.0,
+                "supervision": 0.0,
+                "capacity": 0.0,
+                "drain": 0.0
+              },
+              "failures": [
+                {
+                  "node": "fail",
+                  "attempt": 1,
+                  "outcome": "failed",
+                  "error": {
+                    "type": "RuntimeError",
+                    "message": "planted failure"
+                  },
+                  "failure_class": "transient",
+                  "caused_by": null
+                },
+                {
+                  "node": "sibling",
+                  "attempt": 1,
+                  "outcome": "cancelled",
+                  "error": null,
+                  "failure_class": null,
+                  "caused_by": "fail"
+                }
+              ],
+              "correlated_errors": [
+                {
+                  "kind": "consequence",
+                  "cause": "the failure of 'fail'",
+                  "failures": [
+                    {
+                      "node": "sibling",
+                      "attempt": 1
+                    }
+                  ],
+                  "count": 1
+                }
+              ],
+              "resume": {
+                "nodes_to_run": [
+                  "fail",
+                  "queued",
+                  "sibling"
+                ],
+                "sent_calls_repeated": 1
+              }
+            },
+            "policy": {
+              "error": {
+                "type": "RuntimeError",
+                "message": "planted failure"
+              },
+              "elapsed_ms": 31000,
+              "calls": [
+                {
+                  "node": "fail",
+                  "start_ms": 0,
+                  "end_ms": 1000,
+                  "outcome": "failed",
+                  "error": {
+                    "type": "RuntimeError",
+                    "message": "planted failure"
+                  }
+                },
+                {
+                  "node": "sibling",
+                  "start_ms": 0,
+                  "end_ms": 31000,
+                  "outcome": "cancelled"
+                }
+              ],
+              "nodes": {
+                "fail": "failed",
+                "sibling": "pending",
+                "queued": "pending"
+              },
+              "drain": {
+                "settled": [],
+                "cancelled": [
+                  "sibling"
+                ],
+                "deadline_hit": true
+              },
+              "kept_cost_usd": {},
+              "reserved_usd": 0.0,
+              "cost_is_complete": true,
+              "waits_ms": {
+                "retry_backoff": 0.0,
+                "admission": 0.0,
+                "supervision": 0.0,
+                "capacity": 0.0,
+                "drain": 30000.0
+              },
+              "failures": [
+                {
+                  "node": "fail",
+                  "attempt": 1,
+                  "outcome": "failed",
+                  "error": {
+                    "type": "RuntimeError",
+                    "message": "planted failure"
+                  },
+                  "failure_class": "transient",
+                  "caused_by": null
+                },
+                {
+                  "node": "sibling",
+                  "attempt": 1,
+                  "outcome": "cancelled",
+                  "error": null,
+                  "failure_class": null,
+                  "caused_by": "fail"
+                }
+              ],
+              "correlated_errors": [
+                {
+                  "kind": "consequence",
+                  "cause": "the failure of 'fail'",
+                  "failures": [
+                    {
+                      "node": "sibling",
+                      "attempt": 1
+                    }
+                  ],
+                  "count": 1
+                }
+              ],
+              "resume": {
+                "nodes_to_run": [
+                  "fail",
+                  "queued",
+                  "sibling"
+                ],
+                "sent_calls_repeated": 1
+              }
+            }
+          },
+          "comparison": {
+            "completed": {
+              "baseline": [],
+              "policy": []
+            },
+            "kept_cost_usd": {
+              "baseline": 0,
+              "policy": 0
+            },
+            "cost_is_complete": {
+              "baseline": true,
+              "policy": true
+            },
+            "sent_calls_repeated": {
+              "baseline": 1,
+              "policy": 1
+            },
+            "drain": {
+              "baseline": null,
+              "policy": {
+                "settled": [],
+                "cancelled": [
+                  "sibling"
+                ],
+                "deadline_hit": true
+              }
+            },
+            "drain_wait_ms": {
+              "baseline": 0.0,
+              "policy": 30000.0
+            },
+            "elapsed_ms": {
+              "baseline": 1000,
+              "policy": 31000
+            }
+          }
+        },
+        {
+          "case": "security_stop",
+          "fixture": "fail raises SecurityStop at 1 s while sibling, in flight, would answer at 3 s",
+          "differs_in": [
+            "termination"
+          ],
+          "arms": {
+            "baseline": {
+              "executor": "AsyncExecutor",
+              "graph": "fork_join: fail, sibling, queued",
+              "max_concurrency": 2,
+              "max_budget_usd": 10.0,
+              "node_estimate_usd": 0.25,
+              "call_cost_usd": 0.125,
+              "failure_policy": "halt",
+              "clock": "manual",
+              "termination": null
+            },
+            "policy": {
+              "executor": "AsyncExecutor",
+              "graph": "fork_join: fail, sibling, queued",
+              "max_concurrency": 2,
+              "max_budget_usd": 10.0,
+              "node_estimate_usd": 0.25,
+              "call_cost_usd": 0.125,
+              "failure_policy": "halt",
+              "clock": "manual",
+              "termination": {
+                "drain_timeout_s": 30.0
+              }
+            }
+          },
+          "results": {
+            "baseline": {
+              "error": {
+                "type": "SecurityStop",
+                "message": "Run stopped for security (fixture-revoked); it admits no further work and cannot resume"
+              },
+              "elapsed_ms": 1000,
+              "calls": [
+                {
+                  "node": "fail",
+                  "start_ms": 0,
+                  "end_ms": 1000,
+                  "outcome": "failed",
+                  "error": {
+                    "type": "SecurityStop",
+                    "message": "Run stopped for security (fixture-revoked); it admits no further work and cannot resume"
+                  }
+                },
+                {
+                  "node": "sibling",
+                  "start_ms": 0,
+                  "end_ms": 1000,
+                  "outcome": "cancelled"
+                }
+              ],
+              "nodes": {
+                "fail": "failed",
+                "sibling": "pending",
+                "queued": "pending"
+              },
+              "drain": null,
+              "kept_cost_usd": {
+                "sibling": 0.25
+              },
+              "reserved_usd": 0.0,
+              "cost_is_complete": false,
+              "waits_ms": {
+                "retry_backoff": 0.0,
+                "admission": 0.0,
+                "supervision": 0.0,
+                "capacity": 0.0,
+                "drain": 0.0
+              },
+              "failures": [
+                {
+                  "node": "fail",
+                  "attempt": 1,
+                  "outcome": "failed",
+                  "error": {
+                    "type": "SecurityStop",
+                    "message": "Run stopped for security (fixture-revoked); it admits no further work and cannot resume"
+                  },
+                  "failure_class": "security_stop",
+                  "caused_by": null
+                },
+                {
+                  "node": "sibling",
+                  "attempt": 1,
+                  "outcome": "cancelled",
+                  "error": null,
+                  "failure_class": null,
+                  "caused_by": "fail"
+                }
+              ],
+              "correlated_errors": [
+                {
+                  "kind": "consequence",
+                  "cause": "the failure of 'fail'",
+                  "failures": [
+                    {
+                      "node": "sibling",
+                      "attempt": 1
+                    }
+                  ],
+                  "count": 1
+                }
+              ],
+              "resume": {
+                "nodes_to_run": [
+                  "fail",
+                  "queued",
+                  "sibling"
+                ],
+                "sent_calls_repeated": 1
+              }
+            },
+            "policy": {
+              "error": {
+                "type": "SecurityStop",
+                "message": "Run stopped for security (fixture-revoked); it admits no further work and cannot resume"
+              },
+              "elapsed_ms": 1000,
+              "calls": [
+                {
+                  "node": "fail",
+                  "start_ms": 0,
+                  "end_ms": 1000,
+                  "outcome": "failed",
+                  "error": {
+                    "type": "SecurityStop",
+                    "message": "Run stopped for security (fixture-revoked); it admits no further work and cannot resume"
+                  }
+                },
+                {
+                  "node": "sibling",
+                  "start_ms": 0,
+                  "end_ms": 1000,
+                  "outcome": "cancelled"
+                }
+              ],
+              "nodes": {
+                "fail": "failed",
+                "sibling": "pending",
+                "queued": "pending"
+              },
+              "drain": null,
+              "kept_cost_usd": {
+                "sibling": 0.25
+              },
+              "reserved_usd": 0.0,
+              "cost_is_complete": false,
+              "waits_ms": {
+                "retry_backoff": 0.0,
+                "admission": 0.0,
+                "supervision": 0.0,
+                "capacity": 0.0,
+                "drain": 0.0
+              },
+              "failures": [
+                {
+                  "node": "fail",
+                  "attempt": 1,
+                  "outcome": "failed",
+                  "error": {
+                    "type": "SecurityStop",
+                    "message": "Run stopped for security (fixture-revoked); it admits no further work and cannot resume"
+                  },
+                  "failure_class": "security_stop",
+                  "caused_by": null
+                },
+                {
+                  "node": "sibling",
+                  "attempt": 1,
+                  "outcome": "cancelled",
+                  "error": null,
+                  "failure_class": null,
+                  "caused_by": "fail"
+                }
+              ],
+              "correlated_errors": [
+                {
+                  "kind": "consequence",
+                  "cause": "the failure of 'fail'",
+                  "failures": [
+                    {
+                      "node": "sibling",
+                      "attempt": 1
+                    }
+                  ],
+                  "count": 1
+                }
+              ],
+              "resume": {
+                "nodes_to_run": [
+                  "fail",
+                  "queued",
+                  "sibling"
+                ],
+                "sent_calls_repeated": 1
+              }
+            }
+          },
+          "comparison": {
+            "completed": {
+              "baseline": [],
+              "policy": []
+            },
+            "kept_cost_usd": {
+              "baseline": 0.25,
+              "policy": 0.25
+            },
+            "cost_is_complete": {
+              "baseline": false,
+              "policy": false
+            },
+            "sent_calls_repeated": {
+              "baseline": 1,
+              "policy": 1
+            },
+            "drain": {
+              "baseline": null,
+              "policy": null
+            },
+            "drain_wait_ms": {
+              "baseline": 0.0,
+              "policy": 0.0
+            },
+            "elapsed_ms": {
+              "baseline": 1000,
+              "policy": 1000
+            }
+          }
+        }
+      ]
+    },
+    "drain_durable": {
+      "policy": "TerminationPolicy",
+      "varied": "termination",
+      "question": "When a failure stops a durable run, does draining settle a sibling's sent call instead of leaving permanent unknown exposure that blocks resume?",
+      "clock": "real; a fixture hook stands for the drain deadline, so the held sibling answers as soon as the run waits for it, or the deadline passes at once",
+      "cases": [
+        {
+          "case": "answered_within_drain",
+          "fixture": "Halt's request is refused with HTTP 401 once Sibling's request is sent and held; Sibling answers as soon as the run waits for it",
+          "differs_in": [
+            "termination"
+          ],
+          "arms": {
+            "baseline": {
+              "swarm": "durable",
+              "run_store": "SQLiteWorkflowStore",
+              "graph": "fork_join: halt, sibling",
+              "provider": "OpenAIResponsesProvider on the shared fake Responses transport",
+              "model": "gpt-6-astra",
+              "max_output_tokens": 100,
+              "max_concurrency": 2,
+              "max_budget_usd": 1.0,
+              "failure_policy": "halt",
+              "clock": "real",
+              "termination": null
+            },
+            "policy": {
+              "swarm": "durable",
+              "run_store": "SQLiteWorkflowStore",
+              "graph": "fork_join: halt, sibling",
+              "provider": "OpenAIResponsesProvider on the shared fake Responses transport",
+              "model": "gpt-6-astra",
+              "max_output_tokens": 100,
+              "max_concurrency": 2,
+              "max_budget_usd": 1.0,
+              "failure_policy": "halt",
+              "clock": "real",
+              "termination": {
+                "drain_timeout_s": 30.0
+              }
+            }
+          },
+          "results": {
+            "baseline": {
+              "error": {
+                "type": "ProviderRequestRejectedError",
+                "message": "Provider rejected the request with HTTP 401 (invalid_api_key); the journal settled it at zero cost"
+              },
+              "sent": {
+                "Halt": 1,
+                "Sibling": 1
+              },
+              "drain_waits_s": [],
+              "journal": {
+                "status": "blocked",
+                "blocked_reason": "unknown_exposure",
+                "ok": true,
+                "confirmed_nanousd": 0,
+                "reserved_nanousd": 0,
+                "unknown_nanousd": 6250000,
+                "unknown_calls": 1,
+                "calls": {
+                  "halt": [
+                    {
+                      "state": "settled",
+                      "billing_state": "known",
+                      "result_state": "rejected",
+                      "cost_nanousd": 0,
+                      "reserved_nanousd": 0,
+                      "unknown_nanousd": 0
+                    }
+                  ],
+                  "sibling": [
+                    {
+                      "state": "unknown",
+                      "billing_state": "unknown",
+                      "result_state": "pending",
+                      "cost_nanousd": null,
+                      "reserved_nanousd": 0,
+                      "unknown_nanousd": 6250000
+                    }
+                  ]
+                }
+              },
+              "failures": [
+                {
+                  "node": "halt",
+                  "attempt": 1,
+                  "outcome": "rejected",
+                  "error": {
+                    "type": "ProviderRequestRejectedError",
+                    "message": "Provider rejected the request with HTTP 401 (invalid_api_key); the journal settled it at zero cost"
+                  },
+                  "failure_class": "authority_denied",
+                  "caused_by": null
+                },
+                {
+                  "node": "sibling",
+                  "attempt": 1,
+                  "outcome": "unknown_exposure",
+                  "error": null,
+                  "failure_class": null,
+                  "caused_by": "halt"
+                }
+              ],
+              "correlated_errors": [
+                {
+                  "kind": "consequence",
+                  "cause": "the failure of 'halt'",
+                  "failures": [
+                    {
+                      "node": "sibling",
+                      "attempt": 1
+                    }
+                  ],
+                  "count": 1
+                }
+              ],
+              "resume": {
+                "outcome": "refused",
+                "error": {
+                  "type": "WorkflowStateError",
+                  "message": "Workflow admission is closed: unknown_exposure"
+                },
+                "cost_is_complete": null,
+                "sent": {
+                  "Halt": 0,
+                  "Sibling": 0
+                },
+                "journal": {
+                  "status": "blocked",
+                  "blocked_reason": "unknown_exposure",
+                  "ok": true,
+                  "confirmed_nanousd": 0,
+                  "reserved_nanousd": 0,
+                  "unknown_nanousd": 6250000,
+                  "unknown_calls": 1,
+                  "calls": {
+                    "halt": [
+                      {
+                        "state": "settled",
+                        "billing_state": "known",
+                        "result_state": "rejected",
+                        "cost_nanousd": 0,
+                        "reserved_nanousd": 0,
+                        "unknown_nanousd": 0
+                      }
+                    ],
+                    "sibling": [
+                      {
+                        "state": "unknown",
+                        "billing_state": "unknown",
+                        "result_state": "pending",
+                        "cost_nanousd": null,
+                        "reserved_nanousd": 0,
+                        "unknown_nanousd": 6250000
+                      }
+                    ]
+                  }
+                }
+              }
+            },
+            "policy": {
+              "error": {
+                "type": "ProviderRequestRejectedError",
+                "message": "Provider rejected the request with HTTP 401 (invalid_api_key); the journal settled it at zero cost"
+              },
+              "sent": {
+                "Halt": 1,
+                "Sibling": 1
+              },
+              "drain_waits_s": [
+                30.0
+              ],
+              "journal": {
+                "status": "running",
+                "blocked_reason": null,
+                "ok": true,
+                "confirmed_nanousd": 1500000,
+                "reserved_nanousd": 0,
+                "unknown_nanousd": 0,
+                "unknown_calls": 0,
+                "calls": {
+                  "halt": [
+                    {
+                      "state": "settled",
+                      "billing_state": "known",
+                      "result_state": "rejected",
+                      "cost_nanousd": 0,
+                      "reserved_nanousd": 0,
+                      "unknown_nanousd": 0
+                    }
+                  ],
+                  "sibling": [
+                    {
+                      "state": "settled",
+                      "billing_state": "known",
+                      "result_state": "applied",
+                      "cost_nanousd": 1500000,
+                      "reserved_nanousd": 0,
+                      "unknown_nanousd": 0
+                    }
+                  ]
+                }
+              },
+              "failures": [
+                {
+                  "node": "halt",
+                  "attempt": 1,
+                  "outcome": "rejected",
+                  "error": {
+                    "type": "ProviderRequestRejectedError",
+                    "message": "Provider rejected the request with HTTP 401 (invalid_api_key); the journal settled it at zero cost"
+                  },
+                  "failure_class": "authority_denied",
+                  "caused_by": null
+                }
+              ],
+              "correlated_errors": [],
+              "resume": {
+                "outcome": "completed",
+                "error": null,
+                "cost_is_complete": true,
+                "sent": {
+                  "Halt": 1,
+                  "Sibling": 0
+                },
+                "journal": {
+                  "status": "completed",
+                  "blocked_reason": null,
+                  "ok": true,
+                  "confirmed_nanousd": 3000000,
+                  "reserved_nanousd": 0,
+                  "unknown_nanousd": 0,
+                  "unknown_calls": 0,
+                  "calls": {
+                    "halt": [
+                      {
+                        "state": "settled",
+                        "billing_state": "known",
+                        "result_state": "rejected",
+                        "cost_nanousd": 0,
+                        "reserved_nanousd": 0,
+                        "unknown_nanousd": 0
+                      },
+                      {
+                        "state": "settled",
+                        "billing_state": "known",
+                        "result_state": "applied",
+                        "cost_nanousd": 1500000,
+                        "reserved_nanousd": 0,
+                        "unknown_nanousd": 0
+                      }
+                    ],
+                    "sibling": [
+                      {
+                        "state": "settled",
+                        "billing_state": "known",
+                        "result_state": "applied",
+                        "cost_nanousd": 1500000,
+                        "reserved_nanousd": 0,
+                        "unknown_nanousd": 0
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "comparison": {
+            "sibling_calls": {
+              "baseline": [
+                {
+                  "state": "unknown",
+                  "billing_state": "unknown",
+                  "result_state": "pending",
+                  "cost_nanousd": null,
+                  "reserved_nanousd": 0,
+                  "unknown_nanousd": 6250000
+                }
+              ],
+              "policy": [
+                {
+                  "state": "settled",
+                  "billing_state": "known",
+                  "result_state": "applied",
+                  "cost_nanousd": 1500000,
+                  "reserved_nanousd": 0,
+                  "unknown_nanousd": 0
+                }
+              ]
+            },
+            "unknown_nanousd": {
+              "baseline": 6250000,
+              "policy": 0
+            },
+            "blocked_reason": {
+              "baseline": "unknown_exposure",
+              "policy": null
+            },
+            "resume": {
+              "baseline": "refused",
+              "policy": "completed"
+            },
+            "sent_on_resume": {
+              "baseline": {
+                "Halt": 0,
+                "Sibling": 0
+              },
+              "policy": {
+                "Halt": 1,
+                "Sibling": 0
+              }
+            },
+            "drain_waits_s": {
+              "baseline": [],
+              "policy": [
+                30.0
+              ]
+            }
+          }
+        },
+        {
+          "case": "deadline_passes",
+          "fixture": "Halt's request is refused with HTTP 401 once Sibling's request is sent and held; the drain deadline passes before Sibling answers",
+          "differs_in": [
+            "termination"
+          ],
+          "arms": {
+            "baseline": {
+              "swarm": "durable",
+              "run_store": "SQLiteWorkflowStore",
+              "graph": "fork_join: halt, sibling",
+              "provider": "OpenAIResponsesProvider on the shared fake Responses transport",
+              "model": "gpt-6-astra",
+              "max_output_tokens": 100,
+              "max_concurrency": 2,
+              "max_budget_usd": 1.0,
+              "failure_policy": "halt",
+              "clock": "real",
+              "termination": null
+            },
+            "policy": {
+              "swarm": "durable",
+              "run_store": "SQLiteWorkflowStore",
+              "graph": "fork_join: halt, sibling",
+              "provider": "OpenAIResponsesProvider on the shared fake Responses transport",
+              "model": "gpt-6-astra",
+              "max_output_tokens": 100,
+              "max_concurrency": 2,
+              "max_budget_usd": 1.0,
+              "failure_policy": "halt",
+              "clock": "real",
+              "termination": {
+                "drain_timeout_s": 30.0
+              }
+            }
+          },
+          "results": {
+            "baseline": {
+              "error": {
+                "type": "ProviderRequestRejectedError",
+                "message": "Provider rejected the request with HTTP 401 (invalid_api_key); the journal settled it at zero cost"
+              },
+              "sent": {
+                "Halt": 1,
+                "Sibling": 1
+              },
+              "drain_waits_s": [],
+              "journal": {
+                "status": "blocked",
+                "blocked_reason": "unknown_exposure",
+                "ok": true,
+                "confirmed_nanousd": 0,
+                "reserved_nanousd": 0,
+                "unknown_nanousd": 6250000,
+                "unknown_calls": 1,
+                "calls": {
+                  "halt": [
+                    {
+                      "state": "settled",
+                      "billing_state": "known",
+                      "result_state": "rejected",
+                      "cost_nanousd": 0,
+                      "reserved_nanousd": 0,
+                      "unknown_nanousd": 0
+                    }
+                  ],
+                  "sibling": [
+                    {
+                      "state": "unknown",
+                      "billing_state": "unknown",
+                      "result_state": "pending",
+                      "cost_nanousd": null,
+                      "reserved_nanousd": 0,
+                      "unknown_nanousd": 6250000
+                    }
+                  ]
+                }
+              },
+              "failures": [
+                {
+                  "node": "halt",
+                  "attempt": 1,
+                  "outcome": "rejected",
+                  "error": {
+                    "type": "ProviderRequestRejectedError",
+                    "message": "Provider rejected the request with HTTP 401 (invalid_api_key); the journal settled it at zero cost"
+                  },
+                  "failure_class": "authority_denied",
+                  "caused_by": null
+                },
+                {
+                  "node": "sibling",
+                  "attempt": 1,
+                  "outcome": "unknown_exposure",
+                  "error": null,
+                  "failure_class": null,
+                  "caused_by": "halt"
+                }
+              ],
+              "correlated_errors": [
+                {
+                  "kind": "consequence",
+                  "cause": "the failure of 'halt'",
+                  "failures": [
+                    {
+                      "node": "sibling",
+                      "attempt": 1
+                    }
+                  ],
+                  "count": 1
+                }
+              ],
+              "resume": {
+                "outcome": "refused",
+                "error": {
+                  "type": "WorkflowStateError",
+                  "message": "Workflow admission is closed: unknown_exposure"
+                },
+                "cost_is_complete": null,
+                "sent": {
+                  "Halt": 0,
+                  "Sibling": 0
+                },
+                "journal": {
+                  "status": "blocked",
+                  "blocked_reason": "unknown_exposure",
+                  "ok": true,
+                  "confirmed_nanousd": 0,
+                  "reserved_nanousd": 0,
+                  "unknown_nanousd": 6250000,
+                  "unknown_calls": 1,
+                  "calls": {
+                    "halt": [
+                      {
+                        "state": "settled",
+                        "billing_state": "known",
+                        "result_state": "rejected",
+                        "cost_nanousd": 0,
+                        "reserved_nanousd": 0,
+                        "unknown_nanousd": 0
+                      }
+                    ],
+                    "sibling": [
+                      {
+                        "state": "unknown",
+                        "billing_state": "unknown",
+                        "result_state": "pending",
+                        "cost_nanousd": null,
+                        "reserved_nanousd": 0,
+                        "unknown_nanousd": 6250000
+                      }
+                    ]
+                  }
+                }
+              }
+            },
+            "policy": {
+              "error": {
+                "type": "ProviderRequestRejectedError",
+                "message": "Provider rejected the request with HTTP 401 (invalid_api_key); the journal settled it at zero cost"
+              },
+              "sent": {
+                "Halt": 1,
+                "Sibling": 1
+              },
+              "drain_waits_s": [
+                30.0
+              ],
+              "journal": {
+                "status": "blocked",
+                "blocked_reason": "unknown_exposure",
+                "ok": true,
+                "confirmed_nanousd": 0,
+                "reserved_nanousd": 0,
+                "unknown_nanousd": 6250000,
+                "unknown_calls": 1,
+                "calls": {
+                  "halt": [
+                    {
+                      "state": "settled",
+                      "billing_state": "known",
+                      "result_state": "rejected",
+                      "cost_nanousd": 0,
+                      "reserved_nanousd": 0,
+                      "unknown_nanousd": 0
+                    }
+                  ],
+                  "sibling": [
+                    {
+                      "state": "unknown",
+                      "billing_state": "unknown",
+                      "result_state": "pending",
+                      "cost_nanousd": null,
+                      "reserved_nanousd": 0,
+                      "unknown_nanousd": 6250000
+                    }
+                  ]
+                }
+              },
+              "failures": [
+                {
+                  "node": "halt",
+                  "attempt": 1,
+                  "outcome": "rejected",
+                  "error": {
+                    "type": "ProviderRequestRejectedError",
+                    "message": "Provider rejected the request with HTTP 401 (invalid_api_key); the journal settled it at zero cost"
+                  },
+                  "failure_class": "authority_denied",
+                  "caused_by": null
+                },
+                {
+                  "node": "sibling",
+                  "attempt": 1,
+                  "outcome": "unknown_exposure",
+                  "error": null,
+                  "failure_class": null,
+                  "caused_by": "halt"
+                }
+              ],
+              "correlated_errors": [
+                {
+                  "kind": "consequence",
+                  "cause": "the failure of 'halt'",
+                  "failures": [
+                    {
+                      "node": "sibling",
+                      "attempt": 1
+                    }
+                  ],
+                  "count": 1
+                }
+              ],
+              "resume": {
+                "outcome": "refused",
+                "error": {
+                  "type": "WorkflowStateError",
+                  "message": "Workflow admission is closed: unknown_exposure"
+                },
+                "cost_is_complete": null,
+                "sent": {
+                  "Halt": 0,
+                  "Sibling": 0
+                },
+                "journal": {
+                  "status": "blocked",
+                  "blocked_reason": "unknown_exposure",
+                  "ok": true,
+                  "confirmed_nanousd": 0,
+                  "reserved_nanousd": 0,
+                  "unknown_nanousd": 6250000,
+                  "unknown_calls": 1,
+                  "calls": {
+                    "halt": [
+                      {
+                        "state": "settled",
+                        "billing_state": "known",
+                        "result_state": "rejected",
+                        "cost_nanousd": 0,
+                        "reserved_nanousd": 0,
+                        "unknown_nanousd": 0
+                      }
+                    ],
+                    "sibling": [
+                      {
+                        "state": "unknown",
+                        "billing_state": "unknown",
+                        "result_state": "pending",
+                        "cost_nanousd": null,
+                        "reserved_nanousd": 0,
+                        "unknown_nanousd": 6250000
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "comparison": {
+            "sibling_calls": {
+              "baseline": [
+                {
+                  "state": "unknown",
+                  "billing_state": "unknown",
+                  "result_state": "pending",
+                  "cost_nanousd": null,
+                  "reserved_nanousd": 0,
+                  "unknown_nanousd": 6250000
+                }
+              ],
+              "policy": [
+                {
+                  "state": "unknown",
+                  "billing_state": "unknown",
+                  "result_state": "pending",
+                  "cost_nanousd": null,
+                  "reserved_nanousd": 0,
+                  "unknown_nanousd": 6250000
+                }
+              ]
+            },
+            "unknown_nanousd": {
+              "baseline": 6250000,
+              "policy": 6250000
+            },
+            "blocked_reason": {
+              "baseline": "unknown_exposure",
+              "policy": "unknown_exposure"
+            },
+            "resume": {
+              "baseline": "refused",
+              "policy": "refused"
+            },
+            "sent_on_resume": {
+              "baseline": {
+                "Halt": 0,
+                "Sibling": 0
+              },
+              "policy": {
+                "Halt": 0,
+                "Sibling": 0
+              }
+            },
+            "drain_waits_s": {
+              "baseline": [],
+              "policy": [
+                30.0
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "capacity_admission": {
+      "policy": "CapacityPolicy",
+      "varied": "capacity_policy",
+      "question": "Does limiting a model's calls in flight to the provider's quota replace rejected calls and retry backoff with deferred admission?",
+      "clock": "manual for the executor cases; the simulator's milliseconds are simulated",
+      "cases": [
+        {
+          "case": "retries_cover_overload",
+          "fixture": "eight ready nodes, eight free slots and a provider that serves two calls at once; each node may retry four times",
+          "differs_in": [
+            "capacity_policy"
+          ],
+          "arms": {
+            "baseline": {
+              "executor": "AsyncExecutor",
+              "graph": "fork_join: 8 nodes on model 'm'",
+              "nodes": 8,
+              "max_concurrency": 8,
+              "provider_quota_in_flight": 2,
+              "call_s": 1.0,
+              "rejection_s": 0.25,
+              "failure_policy": "retry",
+              "max_retries": 4,
+              "retry_policy": {
+                "backoff_max_s": 8.0
+              },
+              "retry_backoff_s": 1.0,
+              "jitter": "top of each range",
+              "max_budget_usd": 10.0,
+              "clock": "manual",
+              "capacity_policy": null
+            },
+            "policy": {
+              "executor": "AsyncExecutor",
+              "graph": "fork_join: 8 nodes on model 'm'",
+              "nodes": 8,
+              "max_concurrency": 8,
+              "provider_quota_in_flight": 2,
+              "call_s": 1.0,
+              "rejection_s": 0.25,
+              "failure_policy": "retry",
+              "max_retries": 4,
+              "retry_policy": {
+                "backoff_max_s": 8.0
+              },
+              "retry_backoff_s": 1.0,
+              "jitter": "top of each range",
+              "max_budget_usd": 10.0,
+              "clock": "manual",
+              "capacity_policy": {
+                "limits": {
+                  "m": {
+                    "max_in_flight": 2,
+                    "min_interval_s": null
+                  }
+                },
+                "round_robin": false,
+                "cooldown_max_s": 60.0
+              }
+            }
+          },
+          "results": {
+            "baseline": {
+              "error": null,
+              "elapsed_ms": 8750,
+              "calls": 20,
+              "answered": 8,
+              "rejected_429": 12,
+              "cancelled": 0,
+              "peak_in_flight": 8,
+              "nodes": {
+                "completed": 8
+              },
+              "waits_ms": {
+                "retry_backoff": 22000.0,
+                "admission": 0.0,
+                "supervision": 0.0,
+                "capacity": 0.0,
+                "drain": 0.0
+              },
+              "call_starts": [
+                [
+                  "w0",
+                  0,
+                  "answered"
+                ],
+                [
+                  "w1",
+                  0,
+                  "answered"
+                ],
+                [
+                  "w2",
+                  0,
+                  "failed"
+                ],
+                [
+                  "w3",
+                  0,
+                  "failed"
+                ],
+                [
+                  "w4",
+                  0,
+                  "failed"
+                ],
+                [
+                  "w5",
+                  0,
+                  "failed"
+                ],
+                [
+                  "w6",
+                  0,
+                  "failed"
+                ],
+                [
+                  "w7",
+                  0,
+                  "failed"
+                ],
+                [
+                  "w2",
+                  1250,
+                  "answered"
+                ],
+                [
+                  "w3",
+                  1250,
+                  "answered"
+                ],
+                [
+                  "w4",
+                  1250,
+                  "failed"
+                ],
+                [
+                  "w5",
+                  1250,
+                  "failed"
+                ],
+                [
+                  "w6",
+                  1250,
+                  "failed"
+                ],
+                [
+                  "w7",
+                  1250,
+                  "failed"
+                ],
+                [
+                  "w4",
+                  3500,
+                  "answered"
+                ],
+                [
+                  "w5",
+                  3500,
+                  "answered"
+                ],
+                [
+                  "w6",
+                  3500,
+                  "failed"
+                ],
+                [
+                  "w7",
+                  3500,
+                  "failed"
+                ],
+                [
+                  "w6",
+                  7750,
+                  "answered"
+                ],
+                [
+                  "w7",
+                  7750,
+                  "answered"
+                ]
+              ],
+              "failures": [
+                {
+                  "node": "w2",
+                  "attempt": 1,
+                  "outcome": "failed",
+                  "error": {
+                    "type": "RateLimitError",
+                    "message": "Error code: 429"
+                  },
+                  "failure_class": "transient",
+                  "caused_by": null
+                },
+                {
+                  "node": "w3",
+                  "attempt": 1,
+                  "outcome": "failed",
+                  "error": {
+                    "type": "RateLimitError",
+                    "message": "Error code: 429"
+                  },
+                  "failure_class": "transient",
+                  "caused_by": null
+                },
+                {
+                  "node": "w4",
+                  "attempt": 1,
+                  "outcome": "failed",
+                  "error": {
+                    "type": "RateLimitError",
+                    "message": "Error code: 429"
+                  },
+                  "failure_class": "transient",
+                  "caused_by": null
+                },
+                {
+                  "node": "w5",
+                  "attempt": 1,
+                  "outcome": "failed",
+                  "error": {
+                    "type": "RateLimitError",
+                    "message": "Error code: 429"
+                  },
+                  "failure_class": "transient",
+                  "caused_by": null
+                },
+                {
+                  "node": "w6",
+                  "attempt": 1,
+                  "outcome": "failed",
+                  "error": {
+                    "type": "RateLimitError",
+                    "message": "Error code: 429"
+                  },
+                  "failure_class": "transient",
+                  "caused_by": null
+                },
+                {
+                  "node": "w7",
+                  "attempt": 1,
+                  "outcome": "failed",
+                  "error": {
+                    "type": "RateLimitError",
+                    "message": "Error code: 429"
+                  },
+                  "failure_class": "transient",
+                  "caused_by": null
+                },
+                {
+                  "node": "w4",
+                  "attempt": 2,
+                  "outcome": "failed",
+                  "error": {
+                    "type": "RateLimitError",
+                    "message": "Error code: 429"
+                  },
+                  "failure_class": "transient",
+                  "caused_by": null
+                },
+                {
+                  "node": "w5",
+                  "attempt": 2,
+                  "outcome": "failed",
+                  "error": {
+                    "type": "RateLimitError",
+                    "message": "Error code: 429"
+                  },
+                  "failure_class": "transient",
+                  "caused_by": null
+                },
+                {
+                  "node": "w6",
+                  "attempt": 2,
+                  "outcome": "failed",
+                  "error": {
+                    "type": "RateLimitError",
+                    "message": "Error code: 429"
+                  },
+                  "failure_class": "transient",
+                  "caused_by": null
+                },
+                {
+                  "node": "w7",
+                  "attempt": 2,
+                  "outcome": "failed",
+                  "error": {
+                    "type": "RateLimitError",
+                    "message": "Error code: 429"
+                  },
+                  "failure_class": "transient",
+                  "caused_by": null
+                },
+                {
+                  "node": "w6",
+                  "attempt": 3,
+                  "outcome": "failed",
+                  "error": {
+                    "type": "RateLimitError",
+                    "message": "Error code: 429"
+                  },
+                  "failure_class": "transient",
+                  "caused_by": null
+                },
+                {
+                  "node": "w7",
+                  "attempt": 3,
+                  "outcome": "failed",
+                  "error": {
+                    "type": "RateLimitError",
+                    "message": "Error code: 429"
+                  },
+                  "failure_class": "transient",
+                  "caused_by": null
+                }
+              ],
+              "correlated_errors": [
+                {
+                  "kind": "shared_signature",
+                  "signature": {
+                    "outcome": "failed",
+                    "error_type": "RateLimitError",
+                    "failure_class": "transient",
+                    "message": "Error code: 429"
+                  },
+                  "failures": [
+                    {
+                      "node": "w2",
+                      "attempt": 1
+                    },
+                    {
+                      "node": "w3",
+                      "attempt": 1
+                    },
+                    {
+                      "node": "w4",
+                      "attempt": 1
+                    },
+                    {
+                      "node": "w5",
+                      "attempt": 1
+                    },
+                    {
+                      "node": "w6",
+                      "attempt": 1
+                    },
+                    {
+                      "node": "w7",
+                      "attempt": 1
+                    },
+                    {
+                      "node": "w4",
+                      "attempt": 2
+                    },
+                    {
+                      "node": "w5",
+                      "attempt": 2
+                    },
+                    {
+                      "node": "w6",
+                      "attempt": 2
+                    },
+                    {
+                      "node": "w7",
+                      "attempt": 2
+                    },
+                    {
+                      "node": "w6",
+                      "attempt": 3
+                    },
+                    {
+                      "node": "w7",
+                      "attempt": 3
+                    }
+                  ],
+                  "count": 12
+                }
+              ]
+            },
+            "policy": {
+              "error": null,
+              "elapsed_ms": 4000,
+              "calls": 8,
+              "answered": 8,
+              "rejected_429": 0,
+              "cancelled": 0,
+              "peak_in_flight": 2,
+              "nodes": {
+                "completed": 8
+              },
+              "waits_ms": {
+                "retry_backoff": 0.0,
+                "admission": 0.0,
+                "supervision": 0.0,
+                "capacity": 12000.0,
+                "drain": 0.0
+              },
+              "call_starts": [
+                [
+                  "w0",
+                  0,
+                  "answered"
+                ],
+                [
+                  "w1",
+                  0,
+                  "answered"
+                ],
+                [
+                  "w2",
+                  1000,
+                  "answered"
+                ],
+                [
+                  "w3",
+                  1000,
+                  "answered"
+                ],
+                [
+                  "w4",
+                  2000,
+                  "answered"
+                ],
+                [
+                  "w5",
+                  2000,
+                  "answered"
+                ],
+                [
+                  "w6",
+                  3000,
+                  "answered"
+                ],
+                [
+                  "w7",
+                  3000,
+                  "answered"
+                ]
+              ],
+              "failures": [],
+              "correlated_errors": []
+            }
+          },
+          "comparison": {
+            "nodes": {
+              "baseline": {
+                "completed": 8
+              },
+              "policy": {
+                "completed": 8
+              }
+            },
+            "rejected_429": {
+              "baseline": 12,
+              "policy": 0
+            },
+            "calls": {
+              "baseline": 20,
+              "policy": 8
+            },
+            "peak_in_flight": {
+              "baseline": 8,
+              "policy": 2
+            },
+            "retry_backoff_ms": {
+              "baseline": 22000.0,
+              "policy": 0.0
+            },
+            "capacity_wait_ms": {
+              "baseline": 0.0,
+              "policy": 12000.0
+            },
+            "elapsed_ms": {
+              "baseline": 8750,
+              "policy": 4000
+            }
+          }
+        },
+        {
+          "case": "retries_run_out",
+          "fixture": "the same fan-out; each node may retry once",
+          "differs_in": [
+            "capacity_policy"
+          ],
+          "arms": {
+            "baseline": {
+              "executor": "AsyncExecutor",
+              "graph": "fork_join: 8 nodes on model 'm'",
+              "nodes": 8,
+              "max_concurrency": 8,
+              "provider_quota_in_flight": 2,
+              "call_s": 1.0,
+              "rejection_s": 0.25,
+              "failure_policy": "retry",
+              "max_retries": 1,
+              "retry_policy": {
+                "backoff_max_s": 8.0
+              },
+              "retry_backoff_s": 1.0,
+              "jitter": "top of each range",
+              "max_budget_usd": 10.0,
+              "clock": "manual",
+              "capacity_policy": null
+            },
+            "policy": {
+              "executor": "AsyncExecutor",
+              "graph": "fork_join: 8 nodes on model 'm'",
+              "nodes": 8,
+              "max_concurrency": 8,
+              "provider_quota_in_flight": 2,
+              "call_s": 1.0,
+              "rejection_s": 0.25,
+              "failure_policy": "retry",
+              "max_retries": 1,
+              "retry_policy": {
+                "backoff_max_s": 8.0
+              },
+              "retry_backoff_s": 1.0,
+              "jitter": "top of each range",
+              "max_budget_usd": 10.0,
+              "clock": "manual",
+              "capacity_policy": {
+                "limits": {
+                  "m": {
+                    "max_in_flight": 2,
+                    "min_interval_s": null
+                  }
+                },
+                "round_robin": false,
+                "cooldown_max_s": 60.0
+              }
+            }
+          },
+          "results": {
+            "baseline": {
+              "error": {
+                "type": "RateLimitError",
+                "message": "Error code: 429"
+              },
+              "elapsed_ms": 1500,
+              "calls": 14,
+              "answered": 2,
+              "rejected_429": 10,
+              "cancelled": 2,
+              "peak_in_flight": 8,
+              "nodes": {
+                "completed": 2,
+                "failed": 4,
+                "pending": 2
+              },
+              "waits_ms": {
+                "retry_backoff": 6000.0,
+                "admission": 0.0,
+                "supervision": 0.0,
+                "capacity": 0.0,
+                "drain": 0.0
+              },
+              "call_starts": [
+                [
+                  "w0",
+                  0,
+                  "answered"
+                ],
+                [
+                  "w1",
+                  0,
+                  "answered"
+                ],
+                [
+                  "w2",
+                  0,
+                  "failed"
+                ],
+                [
+                  "w3",
+                  0,
+                  "failed"
+                ],
+                [
+                  "w4",
+                  0,
+                  "failed"
+                ],
+                [
+                  "w5",
+                  0,
+                  "failed"
+                ],
+                [
+                  "w6",
+                  0,
+                  "failed"
+                ],
+                [
+                  "w7",
+                  0,
+                  "failed"
+                ],
+                [
+                  "w2",
+                  1250,
+                  "cancelled"
+                ],
+                [
+                  "w3",
+                  1250,
+                  "cancelled"
+                ],
+                [
+                  "w4",
+                  1250,
+                  "failed"
+                ],
+                [
+                  "w5",
+                  1250,
+                  "failed"
+                ],
+                [
+                  "w6",
+                  1250,
+                  "failed"
+                ],
+                [
+                  "w7",
+                  1250,
+                  "failed"
+                ]
+              ],
+              "failures": [
+                {
+                  "node": "w2",
+                  "attempt": 1,
+                  "outcome": "failed",
+                  "error": {
+                    "type": "RateLimitError",
+                    "message": "Error code: 429"
+                  },
+                  "failure_class": "transient",
+                  "caused_by": null
+                },
+                {
+                  "node": "w3",
+                  "attempt": 1,
+                  "outcome": "failed",
+                  "error": {
+                    "type": "RateLimitError",
+                    "message": "Error code: 429"
+                  },
+                  "failure_class": "transient",
+                  "caused_by": null
+                },
+                {
+                  "node": "w4",
+                  "attempt": 1,
+                  "outcome": "failed",
+                  "error": {
+                    "type": "RateLimitError",
+                    "message": "Error code: 429"
+                  },
+                  "failure_class": "transient",
+                  "caused_by": null
+                },
+                {
+                  "node": "w5",
+                  "attempt": 1,
+                  "outcome": "failed",
+                  "error": {
+                    "type": "RateLimitError",
+                    "message": "Error code: 429"
+                  },
+                  "failure_class": "transient",
+                  "caused_by": null
+                },
+                {
+                  "node": "w6",
+                  "attempt": 1,
+                  "outcome": "failed",
+                  "error": {
+                    "type": "RateLimitError",
+                    "message": "Error code: 429"
+                  },
+                  "failure_class": "transient",
+                  "caused_by": null
+                },
+                {
+                  "node": "w7",
+                  "attempt": 1,
+                  "outcome": "failed",
+                  "error": {
+                    "type": "RateLimitError",
+                    "message": "Error code: 429"
+                  },
+                  "failure_class": "transient",
+                  "caused_by": null
+                },
+                {
+                  "node": "w2",
+                  "attempt": 2,
+                  "outcome": "cancelled",
+                  "error": null,
+                  "failure_class": null,
+                  "caused_by": "w4"
+                },
+                {
+                  "node": "w3",
+                  "attempt": 2,
+                  "outcome": "cancelled",
+                  "error": null,
+                  "failure_class": null,
+                  "caused_by": "w4"
+                },
+                {
+                  "node": "w4",
+                  "attempt": 2,
+                  "outcome": "failed",
+                  "error": {
+                    "type": "RateLimitError",
+                    "message": "Error code: 429"
+                  },
+                  "failure_class": "transient",
+                  "caused_by": null
+                },
+                {
+                  "node": "w5",
+                  "attempt": 2,
+                  "outcome": "failed",
+                  "error": {
+                    "type": "RateLimitError",
+                    "message": "Error code: 429"
+                  },
+                  "failure_class": "transient",
+                  "caused_by": null
+                },
+                {
+                  "node": "w6",
+                  "attempt": 2,
+                  "outcome": "failed",
+                  "error": {
+                    "type": "RateLimitError",
+                    "message": "Error code: 429"
+                  },
+                  "failure_class": "transient",
+                  "caused_by": null
+                },
+                {
+                  "node": "w7",
+                  "attempt": 2,
+                  "outcome": "failed",
+                  "error": {
+                    "type": "RateLimitError",
+                    "message": "Error code: 429"
+                  },
+                  "failure_class": "transient",
+                  "caused_by": null
+                }
+              ],
+              "correlated_errors": [
+                {
+                  "kind": "shared_signature",
+                  "signature": {
+                    "outcome": "failed",
+                    "error_type": "RateLimitError",
+                    "failure_class": "transient",
+                    "message": "Error code: 429"
+                  },
+                  "failures": [
+                    {
+                      "node": "w2",
+                      "attempt": 1
+                    },
+                    {
+                      "node": "w3",
+                      "attempt": 1
+                    },
+                    {
+                      "node": "w4",
+                      "attempt": 1
+                    },
+                    {
+                      "node": "w5",
+                      "attempt": 1
+                    },
+                    {
+                      "node": "w6",
+                      "attempt": 1
+                    },
+                    {
+                      "node": "w7",
+                      "attempt": 1
+                    },
+                    {
+                      "node": "w4",
+                      "attempt": 2
+                    },
+                    {
+                      "node": "w5",
+                      "attempt": 2
+                    },
+                    {
+                      "node": "w6",
+                      "attempt": 2
+                    },
+                    {
+                      "node": "w7",
+                      "attempt": 2
+                    }
+                  ],
+                  "count": 10
+                },
+                {
+                  "kind": "consequence",
+                  "cause": "the failure of 'w4'",
+                  "failures": [
+                    {
+                      "node": "w2",
+                      "attempt": 2
+                    },
+                    {
+                      "node": "w3",
+                      "attempt": 2
+                    }
+                  ],
+                  "count": 2
+                }
+              ]
+            },
+            "policy": {
+              "error": null,
+              "elapsed_ms": 4000,
+              "calls": 8,
+              "answered": 8,
+              "rejected_429": 0,
+              "cancelled": 0,
+              "peak_in_flight": 2,
+              "nodes": {
+                "completed": 8
+              },
+              "waits_ms": {
+                "retry_backoff": 0.0,
+                "admission": 0.0,
+                "supervision": 0.0,
+                "capacity": 12000.0,
+                "drain": 0.0
+              },
+              "call_starts": [
+                [
+                  "w0",
+                  0,
+                  "answered"
+                ],
+                [
+                  "w1",
+                  0,
+                  "answered"
+                ],
+                [
+                  "w2",
+                  1000,
+                  "answered"
+                ],
+                [
+                  "w3",
+                  1000,
+                  "answered"
+                ],
+                [
+                  "w4",
+                  2000,
+                  "answered"
+                ],
+                [
+                  "w5",
+                  2000,
+                  "answered"
+                ],
+                [
+                  "w6",
+                  3000,
+                  "answered"
+                ],
+                [
+                  "w7",
+                  3000,
+                  "answered"
+                ]
+              ],
+              "failures": [],
+              "correlated_errors": []
+            }
+          },
+          "comparison": {
+            "nodes": {
+              "baseline": {
+                "completed": 2,
+                "failed": 4,
+                "pending": 2
+              },
+              "policy": {
+                "completed": 8
+              }
+            },
+            "rejected_429": {
+              "baseline": 10,
+              "policy": 0
+            },
+            "calls": {
+              "baseline": 14,
+              "policy": 8
+            },
+            "peak_in_flight": {
+              "baseline": 8,
+              "policy": 2
+            },
+            "retry_backoff_ms": {
+              "baseline": 6000.0,
+              "policy": 0.0
+            },
+            "capacity_wait_ms": {
+              "baseline": 0.0,
+              "policy": 12000.0
+            },
+            "elapsed_ms": {
+              "baseline": 1500,
+              "policy": 4000
+            }
+          }
+        },
+        {
+          "case": "simulated_provider",
+          "fixture": "250 work items against a simulated provider with capacity 8, congestion latency and overload failures; each arm runs at the concurrency it admits, on the same seeds",
+          "differs_in": [
+            "capacity_policy"
+          ],
+          "arms": {
+            "baseline": {
+              "model": "smythe.optimize.concurrency simulator",
+              "scenario": {
+                "work_items": 250,
+                "provider_capacity": 8
+              },
+              "max_concurrency": 16,
+              "split": "development",
+              "seeds": [
+                0,
+                4
+              ],
+              "capacity_policy": null
+            },
+            "policy": {
+              "model": "smythe.optimize.concurrency simulator",
+              "scenario": {
+                "work_items": 250,
+                "provider_capacity": 8
+              },
+              "max_concurrency": 16,
+              "split": "development",
+              "seeds": [
+                0,
+                4
+              ],
+              "capacity_policy": {
+                "limits": {
+                  "m": {
+                    "max_in_flight": 8,
+                    "min_interval_s": null
+                  }
+                },
+                "round_robin": false,
+                "cooldown_max_s": 60.0
+              }
+            }
+          },
+          "results": {
+            "baseline": {
+              "admitted_concurrency": 16,
+              "evaluator_hash": "sha256:9d48ac2b3f33558b550cb6a8683bd294dd6ce06a92777fd2cab50cb2c52669a6",
+              "trials": [
+                {
+                  "seed": 0,
+                  "throughput_ops_s": 52.696,
+                  "p95_latency_ms": 357.157,
+                  "error_rate": 0.176,
+                  "successful_operations": 206.0,
+                  "wall_time_ms": 3909.236
+                },
+                {
+                  "seed": 1,
+                  "throughput_ops_s": 56.497,
+                  "p95_latency_ms": 360.651,
+                  "error_rate": 0.148,
+                  "successful_operations": 213.0,
+                  "wall_time_ms": 3770.138
+                },
+                {
+                  "seed": 2,
+                  "throughput_ops_s": 58.786,
+                  "p95_latency_ms": 353.214,
+                  "error_rate": 0.148,
+                  "successful_operations": 213.0,
+                  "wall_time_ms": 3623.328
+                },
+                {
+                  "seed": 3,
+                  "throughput_ops_s": 56.43,
+                  "p95_latency_ms": 344.074,
+                  "error_rate": 0.184,
+                  "successful_operations": 204.0,
+                  "wall_time_ms": 3615.109
+                },
+                {
+                  "seed": 4,
+                  "throughput_ops_s": 53.788,
+                  "p95_latency_ms": 359.76,
+                  "error_rate": 0.2,
+                  "successful_operations": 200.0,
+                  "wall_time_ms": 3718.275
+                }
+              ],
+              "mean": {
+                "throughput_ops_s": 55.639,
+                "p95_latency_ms": 354.971,
+                "error_rate": 0.171,
+                "successful_operations": 207.2,
+                "wall_time_ms": 3727.217
+              }
+            },
+            "policy": {
+              "admitted_concurrency": 8,
+              "evaluator_hash": "sha256:9d48ac2b3f33558b550cb6a8683bd294dd6ce06a92777fd2cab50cb2c52669a6",
+              "trials": [
+                {
+                  "seed": 0,
+                  "throughput_ops_s": 56.544,
+                  "p95_latency_ms": 194.985,
+                  "error_rate": 0.012,
+                  "successful_operations": 247.0,
+                  "wall_time_ms": 4368.269
+                },
+                {
+                  "seed": 1,
+                  "throughput_ops_s": 57.571,
+                  "p95_latency_ms": 194.232,
+                  "error_rate": 0.0,
+                  "successful_operations": 250.0,
+                  "wall_time_ms": 4342.443
+                },
+                {
+                  "seed": 2,
+                  "throughput_ops_s": 60.575,
+                  "p95_latency_ms": 193.149,
+                  "error_rate": 0.0,
+                  "successful_operations": 250.0,
+                  "wall_time_ms": 4127.083
+                },
+                {
+                  "seed": 3,
+                  "throughput_ops_s": 59.28,
+                  "p95_latency_ms": 187.28,
+                  "error_rate": 0.0,
+                  "successful_operations": 250.0,
+                  "wall_time_ms": 4217.276
+                },
+                {
+                  "seed": 4,
+                  "throughput_ops_s": 57.572,
+                  "p95_latency_ms": 191.259,
+                  "error_rate": 0.008,
+                  "successful_operations": 248.0,
+                  "wall_time_ms": 4307.62
+                }
+              ],
+              "mean": {
+                "throughput_ops_s": 58.308,
+                "p95_latency_ms": 192.181,
+                "error_rate": 0.004,
+                "successful_operations": 249.0,
+                "wall_time_ms": 4272.538
+              }
+            }
+          },
+          "comparison": {
+            "admitted_concurrency": {
+              "baseline": 16,
+              "policy": 8
+            },
+            "mean": {
+              "baseline": {
+                "throughput_ops_s": 55.639,
+                "p95_latency_ms": 354.971,
+                "error_rate": 0.171,
+                "successful_operations": 207.2,
+                "wall_time_ms": 3727.217
+              },
+              "policy": {
+                "throughput_ops_s": 58.308,
+                "p95_latency_ms": 192.181,
+                "error_rate": 0.004,
+                "successful_operations": 249.0,
+                "wall_time_ms": 4272.538
+              }
+            }
+          }
+        }
+      ]
+    },
+    "budget_holds": {
+      "policy": "Swarm(reserve_for_checks=True)",
+      "varied": "reserve_for_checks",
+      "question": "Does holding allowance for pending verifiers and an LLM_MERGE synthesis stop other work from spending it, so a short budget is refused before spend that cannot deliver?",
+      "clock": "none: admission and spend only; one node runs at a time, so each arm's calls and spend repeat exactly",
+      "cases": [
+        {
+          "case": "fan_out_short_budget",
+          "fixture": "eight workers then an LLM_MERGE synthesis, each call $0.125, under $1.00: the workers alone can spend it all",
+          "differs_in": [
+            "reserve_for_checks"
+          ],
+          "arms": {
+            "baseline": {
+              "swarm": "ordinary",
+              "parallel": true,
+              "max_concurrency": 1,
+              "graph": "broadcast_reduce: w0-w7",
+              "synthesis": "llm_merge",
+              "max_budget_usd": 1.0,
+              "call_price_usd": 0.125,
+              "reserve_for_checks": false
+            },
+            "policy": {
+              "swarm": "ordinary",
+              "parallel": true,
+              "max_concurrency": 1,
+              "graph": "broadcast_reduce: w0-w7",
+              "synthesis": "llm_merge",
+              "max_budget_usd": 1.0,
+              "call_price_usd": 0.125,
+              "reserve_for_checks": true
+            }
+          },
+          "results": {
+            "baseline": {
+              "outcome": "refused",
+              "error": {
+                "type": "SentinelAlert",
+                "message": "Budget exhausted before node '__synthesis__': $1.0000 spent of $1.0000 limit"
+              },
+              "refused": {
+                "node": "__synthesis__",
+                "role": "synthesis",
+                "called_before": 0
+              },
+              "calls": [
+                "w0",
+                "w1",
+                "w2",
+                "w3",
+                "w4",
+                "w5",
+                "w6",
+                "w7"
+              ],
+              "spend_usd": 1.0,
+              "delivered": false,
+              "output_sha256": null,
+              "failures": [
+                {
+                  "node": "__synthesis__",
+                  "attempt": null,
+                  "outcome": "refused",
+                  "error": {
+                    "type": "SentinelAlert",
+                    "message": "Budget exhausted before node '__synthesis__': $1.0000 spent of $1.0000 limit"
+                  },
+                  "failure_class": "terminal_accounting",
+                  "caused_by": null
+                }
+              ],
+              "correlated_errors": []
+            },
+            "policy": {
+              "outcome": "refused",
+              "error": {
+                "type": "SentinelAlert",
+                "message": "Budget exhausted before node 'w7': $0.8750 spent of $1.0000 limit"
+              },
+              "refused": {
+                "node": "w7",
+                "role": "worker",
+                "called_before": 0
+              },
+              "calls": [
+                "w0",
+                "w1",
+                "w2",
+                "w3",
+                "w4",
+                "w5",
+                "w6"
+              ],
+              "spend_usd": 0.875,
+              "delivered": false,
+              "output_sha256": null,
+              "failures": [
+                {
+                  "node": "w7",
+                  "attempt": null,
+                  "outcome": "refused",
+                  "error": {
+                    "type": "SentinelAlert",
+                    "message": "Budget exhausted before node 'w7': $0.8750 spent of $1.0000 limit"
+                  },
+                  "failure_class": "terminal_accounting",
+                  "caused_by": null
+                }
+              ],
+              "correlated_errors": []
+            }
+          },
+          "comparison": {
+            "outcome": {
+              "baseline": "refused",
+              "policy": "refused"
+            },
+            "refused": {
+              "baseline": {
+                "node": "__synthesis__",
+                "role": "synthesis",
+                "called_before": 0
+              },
+              "policy": {
+                "node": "w7",
+                "role": "worker",
+                "called_before": 0
+              }
+            },
+            "calls": {
+              "baseline": 8,
+              "policy": 7
+            },
+            "spend_usd": {
+              "baseline": 1.0,
+              "policy": 0.875
+            },
+            "delivered": {
+              "baseline": false,
+              "policy": false
+            }
+          }
+        },
+        {
+          "case": "fan_out_covered_budget",
+          "fixture": "the same fan-out under $1.125, which covers every worker and the merge",
+          "differs_in": [
+            "reserve_for_checks"
+          ],
+          "arms": {
+            "baseline": {
+              "swarm": "ordinary",
+              "parallel": true,
+              "max_concurrency": 1,
+              "graph": "broadcast_reduce: w0-w7",
+              "synthesis": "llm_merge",
+              "max_budget_usd": 1.125,
+              "call_price_usd": 0.125,
+              "reserve_for_checks": false
+            },
+            "policy": {
+              "swarm": "ordinary",
+              "parallel": true,
+              "max_concurrency": 1,
+              "graph": "broadcast_reduce: w0-w7",
+              "synthesis": "llm_merge",
+              "max_budget_usd": 1.125,
+              "call_price_usd": 0.125,
+              "reserve_for_checks": true
+            }
+          },
+          "results": {
+            "baseline": {
+              "outcome": "completed",
+              "error": null,
+              "refused": null,
+              "calls": [
+                "w0",
+                "w1",
+                "w2",
+                "w3",
+                "w4",
+                "w5",
+                "w6",
+                "w7",
+                "synthesis"
+              ],
+              "spend_usd": 1.125,
+              "delivered": true,
+              "output_sha256": "ae3db61a593542b494884edcb592a4c0f680b80293da1af2ef9bfacc24c4218a",
+              "failures": [],
+              "correlated_errors": []
+            },
+            "policy": {
+              "outcome": "completed",
+              "error": null,
+              "refused": null,
+              "calls": [
+                "w0",
+                "w1",
+                "w2",
+                "w3",
+                "w4",
+                "w5",
+                "w6",
+                "w7",
+                "synthesis"
+              ],
+              "spend_usd": 1.125,
+              "delivered": true,
+              "output_sha256": "ae3db61a593542b494884edcb592a4c0f680b80293da1af2ef9bfacc24c4218a",
+              "failures": [],
+              "correlated_errors": []
+            }
+          },
+          "comparison": {
+            "outcome": {
+              "baseline": "completed",
+              "policy": "completed"
+            },
+            "refused": {
+              "baseline": null,
+              "policy": null
+            },
+            "calls": {
+              "baseline": 9,
+              "policy": 9
+            },
+            "spend_usd": {
+              "baseline": 1.125,
+              "policy": 1.125
+            },
+            "delivered": {
+              "baseline": true,
+              "policy": true
+            }
+          }
+        },
+        {
+          "case": "regeneration_rerun",
+          "fixture": "a draft and its judge, which fails it once and then passes it, under $0.4375: after the first round enough remains for the draft's rerun or the judge's, not both",
+          "differs_in": [
+            "reserve_for_checks"
+          ],
+          "arms": {
+            "baseline": {
+              "swarm": "ordinary",
+              "parallel": true,
+              "max_concurrency": 1,
+              "graph": "serial: draft, judge (verifies draft, one regeneration)",
+              "synthesis": "deliverable",
+              "max_budget_usd": 0.4375,
+              "call_price_usd": 0.125,
+              "reserve_for_checks": false
+            },
+            "policy": {
+              "swarm": "ordinary",
+              "parallel": true,
+              "max_concurrency": 1,
+              "graph": "serial: draft, judge (verifies draft, one regeneration)",
+              "synthesis": "deliverable",
+              "max_budget_usd": 0.4375,
+              "call_price_usd": 0.125,
+              "reserve_for_checks": true
+            }
+          },
+          "results": {
+            "baseline": {
+              "outcome": "refused",
+              "error": {
+                "type": "SentinelAlert",
+                "message": "Budget exhausted before node 'judge': $0.3750 spent of $0.4375 limit"
+              },
+              "refused": {
+                "node": "judge",
+                "role": "verifier",
+                "called_before": 1
+              },
+              "calls": [
+                "draft",
+                "judge",
+                "draft"
+              ],
+              "spend_usd": 0.375,
+              "delivered": false,
+              "output_sha256": null,
+              "failures": [
+                {
+                  "node": "judge",
+                  "attempt": null,
+                  "outcome": "refused",
+                  "error": {
+                    "type": "SentinelAlert",
+                    "message": "Budget exhausted before node 'judge': $0.3750 spent of $0.4375 limit"
+                  },
+                  "failure_class": "terminal_accounting",
+                  "caused_by": null
+                }
+              ],
+              "correlated_errors": []
+            },
+            "policy": {
+              "outcome": "refused",
+              "error": {
+                "type": "SentinelAlert",
+                "message": "Budget exhausted before node 'draft': $0.2500 spent of $0.4375 limit"
+              },
+              "refused": {
+                "node": "draft",
+                "role": "rerun",
+                "called_before": 1
+              },
+              "calls": [
+                "draft",
+                "judge"
+              ],
+              "spend_usd": 0.25,
+              "delivered": false,
+              "output_sha256": null,
+              "failures": [
+                {
+                  "node": "draft",
+                  "attempt": null,
+                  "outcome": "refused",
+                  "error": {
+                    "type": "SentinelAlert",
+                    "message": "Budget exhausted before node 'draft': $0.2500 spent of $0.4375 limit"
+                  },
+                  "failure_class": "terminal_accounting",
+                  "caused_by": null
+                }
+              ],
+              "correlated_errors": []
+            }
+          },
+          "comparison": {
+            "outcome": {
+              "baseline": "refused",
+              "policy": "refused"
+            },
+            "refused": {
+              "baseline": {
+                "node": "judge",
+                "role": "verifier",
+                "called_before": 1
+              },
+              "policy": {
+                "node": "draft",
+                "role": "rerun",
+                "called_before": 1
+              }
+            },
+            "calls": {
+              "baseline": 3,
+              "policy": 2
+            },
+            "spend_usd": {
+              "baseline": 0.375,
+              "policy": 0.25
+            },
+            "delivered": {
+              "baseline": false,
+              "policy": false
+            }
+          }
+        }
+      ]
+    },
+    "contradiction_synthesis": {
+      "policy": "Synthesizer(retain_contradictions=True)",
+      "varied": "retain_contradictions",
+      "question": "Does contradiction-retaining synthesis carry each contradiction the source evidence lists into the delivered artifact, so strict acceptance reviews it instead of rejecting a silent choice?",
+      "clock": "none: synthesis and acceptance only",
+      "acceptance_policy": {
+        "version": 1,
+        "mode": "strict",
+        "final_validators": [
+          {
+            "name": "smythe.source-evidence",
+            "version": "1",
+            "config_sha256": "1e12c7fbfd95b6dd316ad87ef3a75c5fb3cf3f3cf6c2849259ec4dd02b78a15e"
+          }
+        ],
+        "on_exhausted": "rejected",
+        "on_invalid": "indeterminate",
+        "allow_gate_acceptance": true,
+        "sha256": "e14342bbe206894cca0c6102248b1a87eb7edcb481fd3c292429c6ec9f66e45e"
+      },
+      "sources": [
+        {
+          "source_id": "ferry-report",
+          "version": "2",
+          "sha256": "ba972f5c0f60d39f8dcae6881ea8335e3e28b76370c07445eea91f5a5ad0b404"
+        },
+        {
+          "source_id": "port-bulletin",
+          "version": "1",
+          "sha256": "0ddb08711c57504df87395dbd3d49847e543eb1d5fff6ffc530c0e614788cdb7"
+        },
+        {
+          "source_id": "community-board",
+          "version": "1",
+          "sha256": "d2bcaa3ee21692dfbb82a86f6000abbc484fbd37e606335d3e06490bb6850e5d"
+        }
+      ],
+      "cases": [
+        {
+          "case": "ferry-dropped",
+          "fixture": "deliverable synthesis; the writers deliver neither contradiction",
+          "sha256": "e931c0da1c3e75f0bdda4f4268edef989e901a33b1f9f89b3af5c26ad2f0df93",
+          "differs_in": [
+            "retain_contradictions"
+          ],
+          "arms": {
+            "baseline": {
+              "swarm": "ordinary",
+              "parallel": true,
+              "graph": "single_writer",
+              "strategy": "deliverable",
+              "acceptance": "strict: SourceEvidenceValidator over the three fixture sources",
+              "attempt_allowance": 2,
+              "retain_contradictions": false
+            },
+            "policy": {
+              "swarm": "ordinary",
+              "parallel": true,
+              "graph": "single_writer",
+              "strategy": "deliverable",
+              "acceptance": "strict: SourceEvidenceValidator over the three fixture sources",
+              "attempt_allowance": 2,
+              "retain_contradictions": true
+            }
+          },
+          "results": {
+            "baseline": {
+              "family": "contradiction-fixtures",
+              "task_id": "ferry-dropped",
+              "task_sha256": "e931c0da1c3e75f0bdda4f4268edef989e901a33b1f9f89b3af5c26ad2f0df93",
+              "arm": "baseline",
+              "repetition": 1,
+              "accepted": false,
+              "attempt_allowance": 2,
+              "failed_attempts": 2,
+              "cost_microusd": 4098,
+              "elapsed_ms": 4.4,
+              "attempts": [
+                {
+                  "attempt": 1,
+                  "planted": null,
+                  "outcome": "rejected",
+                  "decision": "rejected",
+                  "reasons": [
+                    "final validator 'smythe.source-evidence' rejected the output: contradiction_missing: the passage from source 'port-bulletin' that contradicts claim 'riders-2026' is not in the artifact; contradiction_missing: the passage from source 'community-board' that contradicts claim 'new-pier' is not in the a"
+                  ],
+                  "policy_sha256": "e14342bbe206894cca0c6102248b1a87eb7edcb481fd3c292429c6ec9f66e45e",
+                  "validators": [
+                    {
+                      "name": "smythe.source-evidence",
+                      "version": "1",
+                      "config_sha256": "1e12c7fbfd95b6dd316ad87ef3a75c5fb3cf3f3cf6c2849259ec4dd02b78a15e",
+                      "outcome": "rejected"
+                    }
+                  ],
+                  "output_sha256": "b34d99e8e04d233d0f02f9bcb7ec293bd0277cdb2253086b198d82e542a63e38",
+                  "output_bytes": 2600,
+                  "adjudication": {
+                    "deterministic_passed": false,
+                    "contradictions_required": 2,
+                    "contradictions_retained": 0,
+                    "missing": [
+                      "riders-2026",
+                      "new-pier"
+                    ]
+                  },
+                  "error": null,
+                  "provider_calls": 1,
+                  "provider_calls_failed": 0,
+                  "planning_calls": 0,
+                  "tokens": 683,
+                  "model_cost_microusd": 2049,
+                  "cost_microusd": 2049,
+                  "cost_known": true,
+                  "cost_is_estimate": false,
+                  "elapsed_ms": 2.2,
+                  "latency_source": "swarm_timing",
+                  "phases_ms": {
+                    "routing": null,
+                    "planning": 0.1,
+                    "recovery": null,
+                    "execution": 0.5,
+                    "verification": 0.5,
+                    "synthesis": 0.0,
+                    "supervision": 0.0,
+                    "checkpoint": 0.7,
+                    "waiting": 0.0
+                  },
+                  "graph": {
+                    "topology": "serial",
+                    "nodes": 1,
+                    "node_statuses": {
+                      "completed": 1
+                    }
+                  }
+                },
+                {
+                  "attempt": 2,
+                  "planted": null,
+                  "outcome": "rejected",
+                  "decision": "rejected",
+                  "reasons": [
+                    "final validator 'smythe.source-evidence' rejected the output: contradiction_missing: the passage from source 'port-bulletin' that contradicts claim 'riders-2026' is not in the artifact; contradiction_missing: the passage from source 'community-board' that contradicts claim 'new-pier' is not in the a"
+                  ],
+                  "policy_sha256": "e14342bbe206894cca0c6102248b1a87eb7edcb481fd3c292429c6ec9f66e45e",
+                  "validators": [
+                    {
+                      "name": "smythe.source-evidence",
+                      "version": "1",
+                      "config_sha256": "1e12c7fbfd95b6dd316ad87ef3a75c5fb3cf3f3cf6c2849259ec4dd02b78a15e",
+                      "outcome": "rejected"
+                    }
+                  ],
+                  "output_sha256": "b34d99e8e04d233d0f02f9bcb7ec293bd0277cdb2253086b198d82e542a63e38",
+                  "output_bytes": 2600,
+                  "adjudication": {
+                    "deterministic_passed": false,
+                    "contradictions_required": 2,
+                    "contradictions_retained": 0,
+                    "missing": [
+                      "riders-2026",
+                      "new-pier"
+                    ]
+                  },
+                  "error": null,
+                  "provider_calls": 1,
+                  "provider_calls_failed": 0,
+                  "planning_calls": 0,
+                  "tokens": 683,
+                  "model_cost_microusd": 2049,
+                  "cost_microusd": 2049,
+                  "cost_known": true,
+                  "cost_is_estimate": false,
+                  "elapsed_ms": 2.2,
+                  "latency_source": "swarm_timing",
+                  "phases_ms": {
+                    "routing": null,
+                    "planning": 0.1,
+                    "recovery": null,
+                    "execution": 0.6,
+                    "verification": 0.5,
+                    "synthesis": 0.0,
+                    "supervision": 0.0,
+                    "checkpoint": 0.7,
+                    "waiting": 0.0
+                  },
+                  "graph": {
+                    "topology": "serial",
+                    "nodes": 1,
+                    "node_statuses": {
+                      "completed": 1
+                    }
+                  }
+                }
+              ],
+              "failures": [
+                {
+                  "node": "delivery",
+                  "attempt": 1,
+                  "outcome": "rejected",
+                  "error": {
+                    "type": "delivery_acceptance",
+                    "message": "final validator 'smythe.source-evidence' rejected the output: contradiction_missing: the passage from source 'port-bulletin' that contradicts claim 'riders-2026' is not in the artifact; contradiction_missing: the passage from source 'community-board' that contradicts claim 'new-pier' is not in the a"
+                  },
+                  "failure_class": null,
+                  "caused_by": null
+                },
+                {
+                  "node": "delivery",
+                  "attempt": 2,
+                  "outcome": "rejected",
+                  "error": {
+                    "type": "delivery_acceptance",
+                    "message": "final validator 'smythe.source-evidence' rejected the output: contradiction_missing: the passage from source 'port-bulletin' that contradicts claim 'riders-2026' is not in the artifact; contradiction_missing: the passage from source 'community-board' that contradicts claim 'new-pier' is not in the a"
+                  },
+                  "failure_class": null,
+                  "caused_by": null
+                }
+              ],
+              "correlated_errors": [
+                {
+                  "kind": "shared_signature",
+                  "signature": {
+                    "outcome": "rejected",
+                    "error_type": "delivery_acceptance",
+                    "failure_class": null,
+                    "message": "final validator 'smythe.source-evidence' rejected the output: contradiction_missing: the passage from source 'port-bulletin' that contradicts claim 'riders-2026' is not in the artifact; contradiction_missing: the passage from source 'community-board' that contradicts claim 'new-pier' is not in the a"
+                  },
+                  "failures": [
+                    {
+                      "node": "delivery",
+                      "attempt": 1
+                    },
+                    {
+                      "node": "delivery",
+                      "attempt": 2
+                    }
+                  ],
+                  "count": 2
+                }
+              ]
+            },
+            "policy": {
+              "family": "contradiction-fixtures",
+              "task_id": "ferry-dropped",
+              "task_sha256": "e931c0da1c3e75f0bdda4f4268edef989e901a33b1f9f89b3af5c26ad2f0df93",
+              "arm": "policy",
+              "repetition": 1,
+              "accepted": true,
+              "attempt_allowance": 2,
+              "failed_attempts": 0,
+              "cost_microusd": 2049,
+              "elapsed_ms": 2.0,
+              "attempts": [
+                {
+                  "attempt": 1,
+                  "planted": null,
+                  "outcome": "accepted",
+                  "decision": "accepted",
+                  "reasons": [
+                    "every final validator passed"
+                  ],
+                  "policy_sha256": "e14342bbe206894cca0c6102248b1a87eb7edcb481fd3c292429c6ec9f66e45e",
+                  "validators": [
+                    {
+                      "name": "smythe.source-evidence",
+                      "version": "1",
+                      "config_sha256": "1e12c7fbfd95b6dd316ad87ef3a75c5fb3cf3f3cf6c2849259ec4dd02b78a15e",
+                      "outcome": "passed"
+                    }
+                  ],
+                  "output_sha256": "68823d78cebffaa3db7758b5240b90d96367cb963e3dab2fdcc35c5b60def9d6",
+                  "output_bytes": 3286,
+                  "adjudication": {
+                    "deterministic_passed": true,
+                    "contradictions_required": 2,
+                    "contradictions_retained": 2,
+                    "missing": []
+                  },
+                  "error": null,
+                  "provider_calls": 1,
+                  "provider_calls_failed": 0,
+                  "planning_calls": 0,
+                  "tokens": 683,
+                  "model_cost_microusd": 2049,
+                  "cost_microusd": 2049,
+                  "cost_known": true,
+                  "cost_is_estimate": false,
+                  "elapsed_ms": 2.0,
+                  "latency_source": "swarm_timing",
+                  "phases_ms": {
+                    "routing": null,
+                    "planning": 0.1,
+                    "recovery": null,
+                    "execution": 0.4,
+                    "verification": 0.3,
+                    "synthesis": 0.3,
+                    "supervision": 0.0,
+                    "checkpoint": 0.5,
+                    "waiting": 0.0
+                  },
+                  "graph": {
+                    "topology": "serial",
+                    "nodes": 1,
+                    "node_statuses": {
+                      "completed": 1
+                    }
+                  }
+                }
+              ],
+              "failures": [],
+              "correlated_errors": []
+            }
+          },
+          "comparison": {
+            "accepted": {
+              "baseline": false,
+              "policy": true
+            },
+            "failed_attempts": {
+              "baseline": 2,
+              "policy": 0
+            },
+            "contradictions_retained": {
+              "baseline": 0,
+              "policy": 2
+            },
+            "output_sha256": {
+              "baseline": "b34d99e8e04d233d0f02f9bcb7ec293bd0277cdb2253086b198d82e542a63e38",
+              "policy": "68823d78cebffaa3db7758b5240b90d96367cb963e3dab2fdcc35c5b60def9d6"
+            }
+          }
+        },
+        {
+          "case": "ferry-partly",
+          "fixture": "deliverable synthesis; the writers deliver only the bulletin's contradiction",
+          "sha256": "888d12adafba8f823a51021db3be42fce4b42bc20c3213c920ed7e8a089b1d37",
+          "differs_in": [
+            "retain_contradictions"
+          ],
+          "arms": {
+            "baseline": {
+              "swarm": "ordinary",
+              "parallel": true,
+              "graph": "single_writer",
+              "strategy": "deliverable",
+              "acceptance": "strict: SourceEvidenceValidator over the three fixture sources",
+              "attempt_allowance": 2,
+              "retain_contradictions": false
+            },
+            "policy": {
+              "swarm": "ordinary",
+              "parallel": true,
+              "graph": "single_writer",
+              "strategy": "deliverable",
+              "acceptance": "strict: SourceEvidenceValidator over the three fixture sources",
+              "attempt_allowance": 2,
+              "retain_contradictions": true
+            }
+          },
+          "results": {
+            "baseline": {
+              "family": "contradiction-fixtures",
+              "task_id": "ferry-partly",
+              "task_sha256": "888d12adafba8f823a51021db3be42fce4b42bc20c3213c920ed7e8a089b1d37",
+              "arm": "baseline",
+              "repetition": 1,
+              "accepted": false,
+              "attempt_allowance": 2,
+              "failed_attempts": 2,
+              "cost_microusd": 4176,
+              "elapsed_ms": 3.1,
+              "attempts": [
+                {
+                  "attempt": 1,
+                  "planted": null,
+                  "outcome": "rejected",
+                  "decision": "rejected",
+                  "reasons": [
+                    "final validator 'smythe.source-evidence' rejected the output: contradiction_missing: the passage from source 'community-board' that contradicts claim 'new-pier' is not in the artifact"
+                  ],
+                  "policy_sha256": "e14342bbe206894cca0c6102248b1a87eb7edcb481fd3c292429c6ec9f66e45e",
+                  "validators": [
+                    {
+                      "name": "smythe.source-evidence",
+                      "version": "1",
+                      "config_sha256": "1e12c7fbfd95b6dd316ad87ef3a75c5fb3cf3f3cf6c2849259ec4dd02b78a15e",
+                      "outcome": "rejected"
+                    }
+                  ],
+                  "output_sha256": "e95be50613f25ed606fb1ce10b34b3d26b213333e49c401a9685b3fa6b3c234b",
+                  "output_bytes": 2650,
+                  "adjudication": {
+                    "deterministic_passed": false,
+                    "contradictions_required": 2,
+                    "contradictions_retained": 1,
+                    "missing": [
+                      "new-pier"
+                    ]
+                  },
+                  "error": null,
+                  "provider_calls": 1,
+                  "provider_calls_failed": 0,
+                  "planning_calls": 0,
+                  "tokens": 696,
+                  "model_cost_microusd": 2088,
+                  "cost_microusd": 2088,
+                  "cost_known": true,
+                  "cost_is_estimate": false,
+                  "elapsed_ms": 1.5,
+                  "latency_source": "swarm_timing",
+                  "phases_ms": {
+                    "routing": null,
+                    "planning": 0.0,
+                    "recovery": null,
+                    "execution": 0.4,
+                    "verification": 0.3,
+                    "synthesis": 0.0,
+                    "supervision": 0.0,
+                    "checkpoint": 0.5,
+                    "waiting": 0.0
+                  },
+                  "graph": {
+                    "topology": "serial",
+                    "nodes": 1,
+                    "node_statuses": {
+                      "completed": 1
+                    }
+                  }
+                },
+                {
+                  "attempt": 2,
+                  "planted": null,
+                  "outcome": "rejected",
+                  "decision": "rejected",
+                  "reasons": [
+                    "final validator 'smythe.source-evidence' rejected the output: contradiction_missing: the passage from source 'community-board' that contradicts claim 'new-pier' is not in the artifact"
+                  ],
+                  "policy_sha256": "e14342bbe206894cca0c6102248b1a87eb7edcb481fd3c292429c6ec9f66e45e",
+                  "validators": [
+                    {
+                      "name": "smythe.source-evidence",
+                      "version": "1",
+                      "config_sha256": "1e12c7fbfd95b6dd316ad87ef3a75c5fb3cf3f3cf6c2849259ec4dd02b78a15e",
+                      "outcome": "rejected"
+                    }
+                  ],
+                  "output_sha256": "e95be50613f25ed606fb1ce10b34b3d26b213333e49c401a9685b3fa6b3c234b",
+                  "output_bytes": 2650,
+                  "adjudication": {
+                    "deterministic_passed": false,
+                    "contradictions_required": 2,
+                    "contradictions_retained": 1,
+                    "missing": [
+                      "new-pier"
+                    ]
+                  },
+                  "error": null,
+                  "provider_calls": 1,
+                  "provider_calls_failed": 0,
+                  "planning_calls": 0,
+                  "tokens": 696,
+                  "model_cost_microusd": 2088,
+                  "cost_microusd": 2088,
+                  "cost_known": true,
+                  "cost_is_estimate": false,
+                  "elapsed_ms": 1.6,
+                  "latency_source": "swarm_timing",
+                  "phases_ms": {
+                    "routing": null,
+                    "planning": 0.1,
+                    "recovery": null,
+                    "execution": 0.4,
+                    "verification": 0.3,
+                    "synthesis": 0.0,
+                    "supervision": 0.0,
+                    "checkpoint": 0.5,
+                    "waiting": 0.0
+                  },
+                  "graph": {
+                    "topology": "serial",
+                    "nodes": 1,
+                    "node_statuses": {
+                      "completed": 1
+                    }
+                  }
+                }
+              ],
+              "failures": [
+                {
+                  "node": "delivery",
+                  "attempt": 1,
+                  "outcome": "rejected",
+                  "error": {
+                    "type": "delivery_acceptance",
+                    "message": "final validator 'smythe.source-evidence' rejected the output: contradiction_missing: the passage from source 'community-board' that contradicts claim 'new-pier' is not in the artifact"
+                  },
+                  "failure_class": null,
+                  "caused_by": null
+                },
+                {
+                  "node": "delivery",
+                  "attempt": 2,
+                  "outcome": "rejected",
+                  "error": {
+                    "type": "delivery_acceptance",
+                    "message": "final validator 'smythe.source-evidence' rejected the output: contradiction_missing: the passage from source 'community-board' that contradicts claim 'new-pier' is not in the artifact"
+                  },
+                  "failure_class": null,
+                  "caused_by": null
+                }
+              ],
+              "correlated_errors": [
+                {
+                  "kind": "shared_signature",
+                  "signature": {
+                    "outcome": "rejected",
+                    "error_type": "delivery_acceptance",
+                    "failure_class": null,
+                    "message": "final validator 'smythe.source-evidence' rejected the output: contradiction_missing: the passage from source 'community-board' that contradicts claim 'new-pier' is not in the artifact"
+                  },
+                  "failures": [
+                    {
+                      "node": "delivery",
+                      "attempt": 1
+                    },
+                    {
+                      "node": "delivery",
+                      "attempt": 2
+                    }
+                  ],
+                  "count": 2
+                }
+              ]
+            },
+            "policy": {
+              "family": "contradiction-fixtures",
+              "task_id": "ferry-partly",
+              "task_sha256": "888d12adafba8f823a51021db3be42fce4b42bc20c3213c920ed7e8a089b1d37",
+              "arm": "policy",
+              "repetition": 1,
+              "accepted": true,
+              "attempt_allowance": 2,
+              "failed_attempts": 0,
+              "cost_microusd": 2088,
+              "elapsed_ms": 1.8,
+              "attempts": [
+                {
+                  "attempt": 1,
+                  "planted": null,
+                  "outcome": "accepted",
+                  "decision": "accepted",
+                  "reasons": [
+                    "every final validator passed"
+                  ],
+                  "policy_sha256": "e14342bbe206894cca0c6102248b1a87eb7edcb481fd3c292429c6ec9f66e45e",
+                  "validators": [
+                    {
+                      "name": "smythe.source-evidence",
+                      "version": "1",
+                      "config_sha256": "1e12c7fbfd95b6dd316ad87ef3a75c5fb3cf3f3cf6c2849259ec4dd02b78a15e",
+                      "outcome": "passed"
+                    }
+                  ],
+                  "output_sha256": "548b8b1926435fd2e603b7c62b7209b20d7644236be8a273c3008c84ed3a3fe7",
+                  "output_bytes": 3000,
+                  "adjudication": {
+                    "deterministic_passed": true,
+                    "contradictions_required": 2,
+                    "contradictions_retained": 2,
+                    "missing": []
+                  },
+                  "error": null,
+                  "provider_calls": 1,
+                  "provider_calls_failed": 0,
+                  "planning_calls": 0,
+                  "tokens": 696,
+                  "model_cost_microusd": 2088,
+                  "cost_microusd": 2088,
+                  "cost_known": true,
+                  "cost_is_estimate": false,
+                  "elapsed_ms": 1.8,
+                  "latency_source": "swarm_timing",
+                  "phases_ms": {
+                    "routing": null,
+                    "planning": 0.0,
+                    "recovery": null,
+                    "execution": 0.4,
+                    "verification": 0.3,
+                    "synthesis": 0.3,
+                    "supervision": 0.0,
+                    "checkpoint": 0.5,
+                    "waiting": 0.0
+                  },
+                  "graph": {
+                    "topology": "serial",
+                    "nodes": 1,
+                    "node_statuses": {
+                      "completed": 1
+                    }
+                  }
+                }
+              ],
+              "failures": [],
+              "correlated_errors": []
+            }
+          },
+          "comparison": {
+            "accepted": {
+              "baseline": false,
+              "policy": true
+            },
+            "failed_attempts": {
+              "baseline": 2,
+              "policy": 0
+            },
+            "contradictions_retained": {
+              "baseline": 1,
+              "policy": 2
+            },
+            "output_sha256": {
+              "baseline": "e95be50613f25ed606fb1ce10b34b3d26b213333e49c401a9685b3fa6b3c234b",
+              "policy": "548b8b1926435fd2e603b7c62b7209b20d7644236be8a273c3008c84ed3a3fe7"
+            }
+          }
+        },
+        {
+          "case": "ferry-kept",
+          "fixture": "deliverable synthesis; the writers deliver both contradictions",
+          "sha256": "dd40b0754512f7f72e5d5b6cd4c48f6ac790f02f7d1542b0b7a1a81fb965751f",
+          "differs_in": [
+            "retain_contradictions"
+          ],
+          "arms": {
+            "baseline": {
+              "swarm": "ordinary",
+              "parallel": true,
+              "graph": "single_writer",
+              "strategy": "deliverable",
+              "acceptance": "strict: SourceEvidenceValidator over the three fixture sources",
+              "attempt_allowance": 2,
+              "retain_contradictions": false
+            },
+            "policy": {
+              "swarm": "ordinary",
+              "parallel": true,
+              "graph": "single_writer",
+              "strategy": "deliverable",
+              "acceptance": "strict: SourceEvidenceValidator over the three fixture sources",
+              "attempt_allowance": 2,
+              "retain_contradictions": true
+            }
+          },
+          "results": {
+            "baseline": {
+              "family": "contradiction-fixtures",
+              "task_id": "ferry-kept",
+              "task_sha256": "dd40b0754512f7f72e5d5b6cd4c48f6ac790f02f7d1542b0b7a1a81fb965751f",
+              "arm": "baseline",
+              "repetition": 1,
+              "accepted": true,
+              "attempt_allowance": 2,
+              "failed_attempts": 0,
+              "cost_microusd": 2181,
+              "elapsed_ms": 1.5,
+              "attempts": [
+                {
+                  "attempt": 1,
+                  "planted": null,
+                  "outcome": "accepted",
+                  "decision": "accepted",
+                  "reasons": [
+                    "every final validator passed"
+                  ],
+                  "policy_sha256": "e14342bbe206894cca0c6102248b1a87eb7edcb481fd3c292429c6ec9f66e45e",
+                  "validators": [
+                    {
+                      "name": "smythe.source-evidence",
+                      "version": "1",
+                      "config_sha256": "1e12c7fbfd95b6dd316ad87ef3a75c5fb3cf3f3cf6c2849259ec4dd02b78a15e",
+                      "outcome": "passed"
+                    }
+                  ],
+                  "output_sha256": "d5ffdf656db52ada89cd97a7f13763fee9b8393b2b340d65c9674f8e3fc319e5",
+                  "output_bytes": 2776,
+                  "adjudication": {
+                    "deterministic_passed": true,
+                    "contradictions_required": 2,
+                    "contradictions_retained": 2,
+                    "missing": []
+                  },
+                  "error": null,
+                  "provider_calls": 1,
+                  "provider_calls_failed": 0,
+                  "planning_calls": 0,
+                  "tokens": 727,
+                  "model_cost_microusd": 2181,
+                  "cost_microusd": 2181,
+                  "cost_known": true,
+                  "cost_is_estimate": false,
+                  "elapsed_ms": 1.5,
+                  "latency_source": "swarm_timing",
+                  "phases_ms": {
+                    "routing": null,
+                    "planning": 0.1,
+                    "recovery": null,
+                    "execution": 0.3,
+                    "verification": 0.4,
+                    "synthesis": 0.0,
+                    "supervision": 0.0,
+                    "checkpoint": 0.5,
+                    "waiting": 0.0
+                  },
+                  "graph": {
+                    "topology": "serial",
+                    "nodes": 1,
+                    "node_statuses": {
+                      "completed": 1
+                    }
+                  }
+                }
+              ],
+              "failures": [],
+              "correlated_errors": []
+            },
+            "policy": {
+              "family": "contradiction-fixtures",
+              "task_id": "ferry-kept",
+              "task_sha256": "dd40b0754512f7f72e5d5b6cd4c48f6ac790f02f7d1542b0b7a1a81fb965751f",
+              "arm": "policy",
+              "repetition": 1,
+              "accepted": true,
+              "attempt_allowance": 2,
+              "failed_attempts": 0,
+              "cost_microusd": 2181,
+              "elapsed_ms": 2.0,
+              "attempts": [
+                {
+                  "attempt": 1,
+                  "planted": null,
+                  "outcome": "accepted",
+                  "decision": "accepted",
+                  "reasons": [
+                    "every final validator passed"
+                  ],
+                  "policy_sha256": "e14342bbe206894cca0c6102248b1a87eb7edcb481fd3c292429c6ec9f66e45e",
+                  "validators": [
+                    {
+                      "name": "smythe.source-evidence",
+                      "version": "1",
+                      "config_sha256": "1e12c7fbfd95b6dd316ad87ef3a75c5fb3cf3f3cf6c2849259ec4dd02b78a15e",
+                      "outcome": "passed"
+                    }
+                  ],
+                  "output_sha256": "d5ffdf656db52ada89cd97a7f13763fee9b8393b2b340d65c9674f8e3fc319e5",
+                  "output_bytes": 2776,
+                  "adjudication": {
+                    "deterministic_passed": true,
+                    "contradictions_required": 2,
+                    "contradictions_retained": 2,
+                    "missing": []
+                  },
+                  "error": null,
+                  "provider_calls": 1,
+                  "provider_calls_failed": 0,
+                  "planning_calls": 0,
+                  "tokens": 727,
+                  "model_cost_microusd": 2181,
+                  "cost_microusd": 2181,
+                  "cost_known": true,
+                  "cost_is_estimate": false,
+                  "elapsed_ms": 2.0,
+                  "latency_source": "swarm_timing",
+                  "phases_ms": {
+                    "routing": null,
+                    "planning": 0.0,
+                    "recovery": null,
+                    "execution": 0.4,
+                    "verification": 0.4,
+                    "synthesis": 0.4,
+                    "supervision": 0.0,
+                    "checkpoint": 0.5,
+                    "waiting": 0.0
+                  },
+                  "graph": {
+                    "topology": "serial",
+                    "nodes": 1,
+                    "node_statuses": {
+                      "completed": 1
+                    }
+                  }
+                }
+              ],
+              "failures": [],
+              "correlated_errors": []
+            }
+          },
+          "comparison": {
+            "accepted": {
+              "baseline": true,
+              "policy": true
+            },
+            "failed_attempts": {
+              "baseline": 0,
+              "policy": 0
+            },
+            "contradictions_retained": {
+              "baseline": 2,
+              "policy": 2
+            },
+            "output_sha256": {
+              "baseline": "d5ffdf656db52ada89cd97a7f13763fee9b8393b2b340d65c9674f8e3fc319e5",
+              "policy": "d5ffdf656db52ada89cd97a7f13763fee9b8393b2b340d65c9674f8e3fc319e5"
+            }
+          }
+        },
+        {
+          "case": "ferry-uncontested",
+          "fixture": "deliverable synthesis; the writers deliver an uncontested claim",
+          "sha256": "a64d675e6c43f4018826803b3ae200245a8a5ce8f15b74631f4fa58cbf75c8dc",
+          "differs_in": [
+            "retain_contradictions"
+          ],
+          "arms": {
+            "baseline": {
+              "swarm": "ordinary",
+              "parallel": true,
+              "graph": "single_writer",
+              "strategy": "deliverable",
+              "acceptance": "strict: SourceEvidenceValidator over the three fixture sources",
+              "attempt_allowance": 2,
+              "retain_contradictions": false
+            },
+            "policy": {
+              "swarm": "ordinary",
+              "parallel": true,
+              "graph": "single_writer",
+              "strategy": "deliverable",
+              "acceptance": "strict: SourceEvidenceValidator over the three fixture sources",
+              "attempt_allowance": 2,
+              "retain_contradictions": true
+            }
+          },
+          "results": {
+            "baseline": {
+              "family": "contradiction-fixtures",
+              "task_id": "ferry-uncontested",
+              "task_sha256": "a64d675e6c43f4018826803b3ae200245a8a5ce8f15b74631f4fa58cbf75c8dc",
+              "arm": "baseline",
+              "repetition": 1,
+              "accepted": true,
+              "attempt_allowance": 2,
+              "failed_attempts": 0,
+              "cost_microusd": 1137,
+              "elapsed_ms": 1.5,
+              "attempts": [
+                {
+                  "attempt": 1,
+                  "planted": null,
+                  "outcome": "accepted",
+                  "decision": "accepted",
+                  "reasons": [
+                    "every final validator passed"
+                  ],
+                  "policy_sha256": "e14342bbe206894cca0c6102248b1a87eb7edcb481fd3c292429c6ec9f66e45e",
+                  "validators": [
+                    {
+                      "name": "smythe.source-evidence",
+                      "version": "1",
+                      "config_sha256": "1e12c7fbfd95b6dd316ad87ef3a75c5fb3cf3f3cf6c2849259ec4dd02b78a15e",
+                      "outcome": "passed"
+                    }
+                  ],
+                  "output_sha256": "0658e2fc3dfd7087c9139a2c81d748e0df05cd5054d038184ba83827ae74c241",
+                  "output_bytes": 1382,
+                  "adjudication": {
+                    "deterministic_passed": true,
+                    "contradictions_required": 0,
+                    "contradictions_retained": 0,
+                    "missing": []
+                  },
+                  "error": null,
+                  "provider_calls": 1,
+                  "provider_calls_failed": 0,
+                  "planning_calls": 0,
+                  "tokens": 379,
+                  "model_cost_microusd": 1137,
+                  "cost_microusd": 1137,
+                  "cost_known": true,
+                  "cost_is_estimate": false,
+                  "elapsed_ms": 1.5,
+                  "latency_source": "swarm_timing",
+                  "phases_ms": {
+                    "routing": null,
+                    "planning": 0.1,
+                    "recovery": null,
+                    "execution": 0.5,
+                    "verification": 0.2,
+                    "synthesis": 0.0,
+                    "supervision": 0.0,
+                    "checkpoint": 0.5,
+                    "waiting": 0.0
+                  },
+                  "graph": {
+                    "topology": "serial",
+                    "nodes": 1,
+                    "node_statuses": {
+                      "completed": 1
+                    }
+                  }
+                }
+              ],
+              "failures": [],
+              "correlated_errors": []
+            },
+            "policy": {
+              "family": "contradiction-fixtures",
+              "task_id": "ferry-uncontested",
+              "task_sha256": "a64d675e6c43f4018826803b3ae200245a8a5ce8f15b74631f4fa58cbf75c8dc",
+              "arm": "policy",
+              "repetition": 1,
+              "accepted": true,
+              "attempt_allowance": 2,
+              "failed_attempts": 0,
+              "cost_microusd": 1137,
+              "elapsed_ms": 1.5,
+              "attempts": [
+                {
+                  "attempt": 1,
+                  "planted": null,
+                  "outcome": "accepted",
+                  "decision": "accepted",
+                  "reasons": [
+                    "every final validator passed"
+                  ],
+                  "policy_sha256": "e14342bbe206894cca0c6102248b1a87eb7edcb481fd3c292429c6ec9f66e45e",
+                  "validators": [
+                    {
+                      "name": "smythe.source-evidence",
+                      "version": "1",
+                      "config_sha256": "1e12c7fbfd95b6dd316ad87ef3a75c5fb3cf3f3cf6c2849259ec4dd02b78a15e",
+                      "outcome": "passed"
+                    }
+                  ],
+                  "output_sha256": "0658e2fc3dfd7087c9139a2c81d748e0df05cd5054d038184ba83827ae74c241",
+                  "output_bytes": 1382,
+                  "adjudication": {
+                    "deterministic_passed": true,
+                    "contradictions_required": 0,
+                    "contradictions_retained": 0,
+                    "missing": []
+                  },
+                  "error": null,
+                  "provider_calls": 1,
+                  "provider_calls_failed": 0,
+                  "planning_calls": 0,
+                  "tokens": 379,
+                  "model_cost_microusd": 1137,
+                  "cost_microusd": 1137,
+                  "cost_known": true,
+                  "cost_is_estimate": false,
+                  "elapsed_ms": 1.5,
+                  "latency_source": "swarm_timing",
+                  "phases_ms": {
+                    "routing": null,
+                    "planning": 0.1,
+                    "recovery": null,
+                    "execution": 0.3,
+                    "verification": 0.2,
+                    "synthesis": 0.1,
+                    "supervision": 0.0,
+                    "checkpoint": 0.4,
+                    "waiting": 0.0
+                  },
+                  "graph": {
+                    "topology": "serial",
+                    "nodes": 1,
+                    "node_statuses": {
+                      "completed": 1
+                    }
+                  }
+                }
+              ],
+              "failures": [],
+              "correlated_errors": []
+            }
+          },
+          "comparison": {
+            "accepted": {
+              "baseline": true,
+              "policy": true
+            },
+            "failed_attempts": {
+              "baseline": 0,
+              "policy": 0
+            },
+            "contradictions_retained": {
+              "baseline": 0,
+              "policy": 0
+            },
+            "output_sha256": {
+              "baseline": "0658e2fc3dfd7087c9139a2c81d748e0df05cd5054d038184ba83827ae74c241",
+              "policy": "0658e2fc3dfd7087c9139a2c81d748e0df05cd5054d038184ba83827ae74c241"
+            }
+          }
+        },
+        {
+          "case": "ferry-merge-dropped",
+          "fixture": "llm_merge synthesis; the writers deliver neither contradiction, and so does the merge",
+          "sha256": "d88c4b0b439f56d228ae406af2eed7b01974cc89e7446327d646dee19f62bd6f",
+          "differs_in": [
+            "retain_contradictions"
+          ],
+          "arms": {
+            "baseline": {
+              "swarm": "ordinary",
+              "parallel": true,
+              "graph": "two_writers",
+              "strategy": "llm_merge",
+              "acceptance": "strict: SourceEvidenceValidator over the three fixture sources",
+              "attempt_allowance": 2,
+              "retain_contradictions": false
+            },
+            "policy": {
+              "swarm": "ordinary",
+              "parallel": true,
+              "graph": "two_writers",
+              "strategy": "llm_merge",
+              "acceptance": "strict: SourceEvidenceValidator over the three fixture sources",
+              "attempt_allowance": 2,
+              "retain_contradictions": true
+            }
+          },
+          "results": {
+            "baseline": {
+              "family": "contradiction-fixtures",
+              "task_id": "ferry-merge-dropped",
+              "task_sha256": "d88c4b0b439f56d228ae406af2eed7b01974cc89e7446327d646dee19f62bd6f",
+              "arm": "baseline",
+              "repetition": 1,
+              "accepted": false,
+              "attempt_allowance": 2,
+              "failed_attempts": 2,
+              "cost_microusd": 20790,
+              "elapsed_ms": 4.2,
+              "attempts": [
+                {
+                  "attempt": 1,
+                  "planted": null,
+                  "outcome": "rejected",
+                  "decision": "rejected",
+                  "reasons": [
+                    "final validator 'smythe.source-evidence' rejected the output: contradiction_missing: the passage from source 'port-bulletin' that contradicts claim 'riders-2026' is not in the artifact; contradiction_missing: the passage from source 'community-board' that contradicts claim 'new-pier' is not in the a"
+                  ],
+                  "policy_sha256": "e14342bbe206894cca0c6102248b1a87eb7edcb481fd3c292429c6ec9f66e45e",
+                  "validators": [
+                    {
+                      "name": "smythe.source-evidence",
+                      "version": "1",
+                      "config_sha256": "1e12c7fbfd95b6dd316ad87ef3a75c5fb3cf3f3cf6c2849259ec4dd02b78a15e",
+                      "outcome": "rejected"
+                    }
+                  ],
+                  "output_sha256": "b34d99e8e04d233d0f02f9bcb7ec293bd0277cdb2253086b198d82e542a63e38",
+                  "output_bytes": 2600,
+                  "adjudication": {
+                    "deterministic_passed": false,
+                    "contradictions_required": 2,
+                    "contradictions_retained": 0,
+                    "missing": [
+                      "riders-2026",
+                      "new-pier"
+                    ]
+                  },
+                  "error": null,
+                  "provider_calls": 3,
+                  "provider_calls_failed": 0,
+                  "planning_calls": 0,
+                  "tokens": 3465,
+                  "model_cost_microusd": 10395,
+                  "cost_microusd": 10395,
+                  "cost_known": true,
+                  "cost_is_estimate": false,
+                  "elapsed_ms": 2.1,
+                  "latency_source": "swarm_timing",
+                  "phases_ms": {
+                    "routing": null,
+                    "planning": 0.1,
+                    "recovery": null,
+                    "execution": 1.2,
+                    "verification": 0.3,
+                    "synthesis": 0.0,
+                    "supervision": 0.0,
+                    "checkpoint": 0.7,
+                    "waiting": 0.0
+                  },
+                  "graph": {
+                    "topology": "broadcast_reduce",
+                    "nodes": 2,
+                    "node_statuses": {
+                      "completed": 2
+                    }
+                  }
+                },
+                {
+                  "attempt": 2,
+                  "planted": null,
+                  "outcome": "rejected",
+                  "decision": "rejected",
+                  "reasons": [
+                    "final validator 'smythe.source-evidence' rejected the output: contradiction_missing: the passage from source 'port-bulletin' that contradicts claim 'riders-2026' is not in the artifact; contradiction_missing: the passage from source 'community-board' that contradicts claim 'new-pier' is not in the a"
+                  ],
+                  "policy_sha256": "e14342bbe206894cca0c6102248b1a87eb7edcb481fd3c292429c6ec9f66e45e",
+                  "validators": [
+                    {
+                      "name": "smythe.source-evidence",
+                      "version": "1",
+                      "config_sha256": "1e12c7fbfd95b6dd316ad87ef3a75c5fb3cf3f3cf6c2849259ec4dd02b78a15e",
+                      "outcome": "rejected"
+                    }
+                  ],
+                  "output_sha256": "b34d99e8e04d233d0f02f9bcb7ec293bd0277cdb2253086b198d82e542a63e38",
+                  "output_bytes": 2600,
+                  "adjudication": {
+                    "deterministic_passed": false,
+                    "contradictions_required": 2,
+                    "contradictions_retained": 0,
+                    "missing": [
+                      "riders-2026",
+                      "new-pier"
+                    ]
+                  },
+                  "error": null,
+                  "provider_calls": 3,
+                  "provider_calls_failed": 0,
+                  "planning_calls": 0,
+                  "tokens": 3465,
+                  "model_cost_microusd": 10395,
+                  "cost_microusd": 10395,
+                  "cost_known": true,
+                  "cost_is_estimate": false,
+                  "elapsed_ms": 2.1,
+                  "latency_source": "swarm_timing",
+                  "phases_ms": {
+                    "routing": null,
+                    "planning": 0.1,
+                    "recovery": null,
+                    "execution": 1.1,
+                    "verification": 0.4,
+                    "synthesis": 0.0,
+                    "supervision": 0.0,
+                    "checkpoint": 0.7,
+                    "waiting": 0.0
+                  },
+                  "graph": {
+                    "topology": "broadcast_reduce",
+                    "nodes": 2,
+                    "node_statuses": {
+                      "completed": 2
+                    }
+                  }
+                }
+              ],
+              "failures": [
+                {
+                  "node": "delivery",
+                  "attempt": 1,
+                  "outcome": "rejected",
+                  "error": {
+                    "type": "delivery_acceptance",
+                    "message": "final validator 'smythe.source-evidence' rejected the output: contradiction_missing: the passage from source 'port-bulletin' that contradicts claim 'riders-2026' is not in the artifact; contradiction_missing: the passage from source 'community-board' that contradicts claim 'new-pier' is not in the a"
+                  },
+                  "failure_class": null,
+                  "caused_by": null
+                },
+                {
+                  "node": "delivery",
+                  "attempt": 2,
+                  "outcome": "rejected",
+                  "error": {
+                    "type": "delivery_acceptance",
+                    "message": "final validator 'smythe.source-evidence' rejected the output: contradiction_missing: the passage from source 'port-bulletin' that contradicts claim 'riders-2026' is not in the artifact; contradiction_missing: the passage from source 'community-board' that contradicts claim 'new-pier' is not in the a"
+                  },
+                  "failure_class": null,
+                  "caused_by": null
+                }
+              ],
+              "correlated_errors": [
+                {
+                  "kind": "shared_signature",
+                  "signature": {
+                    "outcome": "rejected",
+                    "error_type": "delivery_acceptance",
+                    "failure_class": null,
+                    "message": "final validator 'smythe.source-evidence' rejected the output: contradiction_missing: the passage from source 'port-bulletin' that contradicts claim 'riders-2026' is not in the artifact; contradiction_missing: the passage from source 'community-board' that contradicts claim 'new-pier' is not in the a"
+                  },
+                  "failures": [
+                    {
+                      "node": "delivery",
+                      "attempt": 1
+                    },
+                    {
+                      "node": "delivery",
+                      "attempt": 2
+                    }
+                  ],
+                  "count": 2
+                }
+              ]
+            },
+            "policy": {
+              "family": "contradiction-fixtures",
+              "task_id": "ferry-merge-dropped",
+              "task_sha256": "d88c4b0b439f56d228ae406af2eed7b01974cc89e7446327d646dee19f62bd6f",
+              "arm": "policy",
+              "repetition": 1,
+              "accepted": false,
+              "attempt_allowance": 2,
+              "failed_attempts": 2,
+              "cost_microusd": 21372,
+              "elapsed_ms": 5.2,
+              "attempts": [
+                {
+                  "attempt": 1,
+                  "planted": null,
+                  "outcome": "rejected",
+                  "decision": "rejected",
+                  "reasons": [
+                    "final validator 'smythe.source-evidence' rejected the output: contradiction_missing: the passage from source 'port-bulletin' that contradicts claim 'riders-2026' is not in the artifact; contradiction_missing: the passage from source 'community-board' that contradicts claim 'new-pier' is not in the a"
+                  ],
+                  "policy_sha256": "e14342bbe206894cca0c6102248b1a87eb7edcb481fd3c292429c6ec9f66e45e",
+                  "validators": [
+                    {
+                      "name": "smythe.source-evidence",
+                      "version": "1",
+                      "config_sha256": "1e12c7fbfd95b6dd316ad87ef3a75c5fb3cf3f3cf6c2849259ec4dd02b78a15e",
+                      "outcome": "rejected"
+                    }
+                  ],
+                  "output_sha256": "b34d99e8e04d233d0f02f9bcb7ec293bd0277cdb2253086b198d82e542a63e38",
+                  "output_bytes": 2600,
+                  "adjudication": {
+                    "deterministic_passed": false,
+                    "contradictions_required": 2,
+                    "contradictions_retained": 0,
+                    "missing": [
+                      "riders-2026",
+                      "new-pier"
+                    ]
+                  },
+                  "error": null,
+                  "provider_calls": 3,
+                  "provider_calls_failed": 0,
+                  "planning_calls": 0,
+                  "tokens": 3562,
+                  "model_cost_microusd": 10686,
+                  "cost_microusd": 10686,
+                  "cost_known": true,
+                  "cost_is_estimate": false,
+                  "elapsed_ms": 2.7,
+                  "latency_source": "swarm_timing",
+                  "phases_ms": {
+                    "routing": null,
+                    "planning": 0.1,
+                    "recovery": null,
+                    "execution": 1.8,
+                    "verification": 0.3,
+                    "synthesis": 0.0,
+                    "supervision": 0.0,
+                    "checkpoint": 0.7,
+                    "waiting": 0.0
+                  },
+                  "graph": {
+                    "topology": "broadcast_reduce",
+                    "nodes": 2,
+                    "node_statuses": {
+                      "completed": 2
+                    }
+                  }
+                },
+                {
+                  "attempt": 2,
+                  "planted": null,
+                  "outcome": "rejected",
+                  "decision": "rejected",
+                  "reasons": [
+                    "final validator 'smythe.source-evidence' rejected the output: contradiction_missing: the passage from source 'port-bulletin' that contradicts claim 'riders-2026' is not in the artifact; contradiction_missing: the passage from source 'community-board' that contradicts claim 'new-pier' is not in the a"
+                  ],
+                  "policy_sha256": "e14342bbe206894cca0c6102248b1a87eb7edcb481fd3c292429c6ec9f66e45e",
+                  "validators": [
+                    {
+                      "name": "smythe.source-evidence",
+                      "version": "1",
+                      "config_sha256": "1e12c7fbfd95b6dd316ad87ef3a75c5fb3cf3f3cf6c2849259ec4dd02b78a15e",
+                      "outcome": "rejected"
+                    }
+                  ],
+                  "output_sha256": "b34d99e8e04d233d0f02f9bcb7ec293bd0277cdb2253086b198d82e542a63e38",
+                  "output_bytes": 2600,
+                  "adjudication": {
+                    "deterministic_passed": false,
+                    "contradictions_required": 2,
+                    "contradictions_retained": 0,
+                    "missing": [
+                      "riders-2026",
+                      "new-pier"
+                    ]
+                  },
+                  "error": null,
+                  "provider_calls": 3,
+                  "provider_calls_failed": 0,
+                  "planning_calls": 0,
+                  "tokens": 3562,
+                  "model_cost_microusd": 10686,
+                  "cost_microusd": 10686,
+                  "cost_known": true,
+                  "cost_is_estimate": false,
+                  "elapsed_ms": 2.5,
+                  "latency_source": "swarm_timing",
+                  "phases_ms": {
+                    "routing": null,
+                    "planning": 0.0,
+                    "recovery": null,
+                    "execution": 1.2,
+                    "verification": 0.5,
+                    "synthesis": 0.1,
+                    "supervision": 0.0,
+                    "checkpoint": 1.0,
+                    "waiting": 0.0
+                  },
+                  "graph": {
+                    "topology": "broadcast_reduce",
+                    "nodes": 2,
+                    "node_statuses": {
+                      "completed": 2
+                    }
+                  }
+                }
+              ],
+              "failures": [
+                {
+                  "node": "delivery",
+                  "attempt": 1,
+                  "outcome": "rejected",
+                  "error": {
+                    "type": "delivery_acceptance",
+                    "message": "final validator 'smythe.source-evidence' rejected the output: contradiction_missing: the passage from source 'port-bulletin' that contradicts claim 'riders-2026' is not in the artifact; contradiction_missing: the passage from source 'community-board' that contradicts claim 'new-pier' is not in the a"
+                  },
+                  "failure_class": null,
+                  "caused_by": null
+                },
+                {
+                  "node": "delivery",
+                  "attempt": 2,
+                  "outcome": "rejected",
+                  "error": {
+                    "type": "delivery_acceptance",
+                    "message": "final validator 'smythe.source-evidence' rejected the output: contradiction_missing: the passage from source 'port-bulletin' that contradicts claim 'riders-2026' is not in the artifact; contradiction_missing: the passage from source 'community-board' that contradicts claim 'new-pier' is not in the a"
+                  },
+                  "failure_class": null,
+                  "caused_by": null
+                }
+              ],
+              "correlated_errors": [
+                {
+                  "kind": "shared_signature",
+                  "signature": {
+                    "outcome": "rejected",
+                    "error_type": "delivery_acceptance",
+                    "failure_class": null,
+                    "message": "final validator 'smythe.source-evidence' rejected the output: contradiction_missing: the passage from source 'port-bulletin' that contradicts claim 'riders-2026' is not in the artifact; contradiction_missing: the passage from source 'community-board' that contradicts claim 'new-pier' is not in the a"
+                  },
+                  "failures": [
+                    {
+                      "node": "delivery",
+                      "attempt": 1
+                    },
+                    {
+                      "node": "delivery",
+                      "attempt": 2
+                    }
+                  ],
+                  "count": 2
+                }
+              ]
+            }
+          },
+          "comparison": {
+            "accepted": {
+              "baseline": false,
+              "policy": false
+            },
+            "failed_attempts": {
+              "baseline": 2,
+              "policy": 2
+            },
+            "contradictions_retained": {
+              "baseline": 0,
+              "policy": 0
+            },
+            "output_sha256": {
+              "baseline": "b34d99e8e04d233d0f02f9bcb7ec293bd0277cdb2253086b198d82e542a63e38",
+              "policy": "b34d99e8e04d233d0f02f9bcb7ec293bd0277cdb2253086b198d82e542a63e38"
+            }
+          }
+        }
+      ],
+      "summary": {
+        "baseline": {
+          "cells": 5,
+          "accepted": 2,
+          "accepted_rate": 0.4,
+          "attempts": 8,
+          "failed_attempts": 6,
+          "false_acceptances": 0,
+          "cost_microusd": 32382,
+          "cost_per_accepted_microusd": 16191.0,
+          "elapsed_ms": {
+            "runs": 5,
+            "p50": 3.1,
+            "p95": 4.4,
+            "label": "small sample; not a tail estimate"
+          }
+        },
+        "policy": {
+          "cells": 5,
+          "accepted": 4,
+          "accepted_rate": 0.8,
+          "attempts": 6,
+          "failed_attempts": 2,
+          "false_acceptances": 0,
+          "cost_microusd": 28827,
+          "cost_per_accepted_microusd": 7206.75,
+          "elapsed_ms": {
+            "runs": 5,
+            "p50": 2.0,
+            "p95": 4.6,
+            "label": "small sample; not a tail estimate"
+          }
+        }
+      }
+    }
+  },
+  "scheduler_overhead": {
+    "graph": {
+      "name": "fixed_template",
+      "builder": "benchmarks/harness.py FixedPipelineArchitect",
+      "topology": "serial",
+      "nodes": [
+        "research",
+        "analyze",
+        "write"
+      ]
+    },
+    "executors": {
+      "reference": "a minimal asyncio executor: each ready node's provider call, with no checkpoint, budget, trace or acceptance",
+      "ordinary": "Swarm(parallel=True) with a FileCheckpointStore",
+      "durable": "Swarm(run_store=SQLiteWorkflowStore(...)), the durable runtime"
+    },
+    "transport": "OpenAIResponsesProvider on the shared fake Responses transport (tests/fakes.py), replies scripted per step",
+    "latencies_ms": [
+      0,
+      20
+    ],
+    "latency": "each wire call, a generation or an input-token count, waits the declared latency first",
+    "repetitions": 3,
+    "order": "the executors rotate their order with each repetition",
+    "outputs_identical": true,
+    "output_sha256": "885b9fd3a5594a1fbbc7c800197cdd12717581c6c6cfec298bb5cd17724a44f3",
+    "overhead": "each executor's elapsed time minus the reference's in the same repetition, per run and per node; store_ms is the time spent in checkpoint and journal store methods, reported apart and subtracted only in median_overhead_excluding_store_ms; extra_wire_latency_ms is the declared latency of the wire calls an executor makes beyond the reference's (the durable runtime's input-token counts), which every overhead figure includes",
+    "machine": {
+      "platform": "Windows-11-10.0.26200-SP0",
+      "machine": "AMD64",
+      "processor": "AMD64 Family 25 Model 33 Stepping 2, AuthenticAMD",
+      "cpu_count": 32,
+      "python": "3.12.10"
+    },
+    "note": "Real monotonic time on one machine: machine-specific, never a product claim.",
+    "runs": [
+      {
+        "repetition": 1,
+        "position": 0,
+        "executor": "reference",
+        "latency_ms": 0,
+        "elapsed_ms": 4.148,
+        "store_ms": {
+          "checkpoint": 0.0,
+          "journal": 0.0
+        },
+        "store_calls": {},
+        "wire_calls": {
+          "response": 3,
+          "input_tokens": 0
+        },
+        "nodes_ms": {
+          "research": 1.377,
+          "analyze": 0.863,
+          "write": 0.674
+        },
+        "output_sha256": "885b9fd3a5594a1fbbc7c800197cdd12717581c6c6cfec298bb5cd17724a44f3"
+      },
+      {
+        "repetition": 1,
+        "position": 1,
+        "executor": "ordinary",
+        "latency_ms": 0,
+        "elapsed_ms": 5528.726,
+        "store_ms": {
+          "checkpoint": 5519.21,
+          "journal": 0.0
+        },
+        "store_calls": {
+          "checkpoint": 5
+        },
+        "wire_calls": {
+          "response": 3,
+          "input_tokens": 0
+        },
+        "nodes_ms": {
+          "research": 2.1,
+          "analyze": 1.8,
+          "write": 1.4
+        },
+        "output_sha256": "885b9fd3a5594a1fbbc7c800197cdd12717581c6c6cfec298bb5cd17724a44f3"
+      },
+      {
+        "repetition": 1,
+        "position": 2,
+        "executor": "durable",
+        "latency_ms": 0,
+        "elapsed_ms": 21039.683,
+        "store_ms": {
+          "checkpoint": 5143.325,
+          "journal": 15878.494
+        },
+        "store_calls": {
+          "journal": 66,
+          "checkpoint": 6
+        },
+        "wire_calls": {
+          "response": 3,
+          "input_tokens": 3
+        },
+        "nodes_ms": {
+          "research": 4656.2,
+          "analyze": 3778.0,
+          "write": 3482.5
+        },
+        "output_sha256": "885b9fd3a5594a1fbbc7c800197cdd12717581c6c6cfec298bb5cd17724a44f3"
+      },
+      {
+        "repetition": 2,
+        "position": 0,
+        "executor": "ordinary",
+        "latency_ms": 0,
+        "elapsed_ms": 5750.469,
+        "store_ms": {
+          "checkpoint": 5712.998,
+          "journal": 0.0
+        },
+        "store_calls": {
+          "checkpoint": 5
+        },
+        "wire_calls": {
+          "response": 3,
+          "input_tokens": 0
+        },
+        "nodes_ms": {
+          "research": 2.4,
+          "analyze": 1.5,
+          "write": 27.9
+        },
+        "output_sha256": "885b9fd3a5594a1fbbc7c800197cdd12717581c6c6cfec298bb5cd17724a44f3"
+      },
+      {
+        "repetition": 2,
+        "position": 1,
+        "executor": "durable",
+        "latency_ms": 0,
+        "elapsed_ms": 20291.823,
+        "store_ms": {
+          "checkpoint": 3194.385,
+          "journal": 17079.768
+        },
+        "store_calls": {
+          "journal": 66,
+          "checkpoint": 6
+        },
+        "wire_calls": {
+          "response": 3,
+          "input_tokens": 3
+        },
+        "nodes_ms": {
+          "research": 3993.7,
+          "analyze": 4110.7,
+          "write": 5127.1
+        },
+        "output_sha256": "885b9fd3a5594a1fbbc7c800197cdd12717581c6c6cfec298bb5cd17724a44f3"
+      },
+      {
+        "repetition": 2,
+        "position": 2,
+        "executor": "reference",
+        "latency_ms": 0,
+        "elapsed_ms": 4.967,
+        "store_ms": {
+          "checkpoint": 0.0,
+          "journal": 0.0
+        },
+        "store_calls": {},
+        "wire_calls": {
+          "response": 3,
+          "input_tokens": 0
+        },
+        "nodes_ms": {
+          "research": 1.466,
+          "analyze": 1.002,
+          "write": 0.982
+        },
+        "output_sha256": "885b9fd3a5594a1fbbc7c800197cdd12717581c6c6cfec298bb5cd17724a44f3"
+      },
+      {
+        "repetition": 3,
+        "position": 0,
+        "executor": "durable",
+        "latency_ms": 0,
+        "elapsed_ms": 20248.85,
+        "store_ms": {
+          "checkpoint": 2977.087,
+          "journal": 17250.701
+        },
+        "store_calls": {
+          "journal": 66,
+          "checkpoint": 6
+        },
+        "wire_calls": {
+          "response": 3,
+          "input_tokens": 3
+        },
+        "nodes_ms": {
+          "research": 5575.5,
+          "analyze": 4019.5,
+          "write": 4270.4
+        },
+        "output_sha256": "885b9fd3a5594a1fbbc7c800197cdd12717581c6c6cfec298bb5cd17724a44f3"
+      },
+      {
+        "repetition": 3,
+        "position": 1,
+        "executor": "reference",
+        "latency_ms": 0,
+        "elapsed_ms": 5.166,
+        "store_ms": {
+          "checkpoint": 0.0,
+          "journal": 0.0
+        },
+        "store_calls": {},
+        "wire_calls": {
+          "response": 3,
+          "input_tokens": 0
+        },
+        "nodes_ms": {
+          "research": 1.357,
+          "analyze": 1.243,
+          "write": 1.042
+        },
+        "output_sha256": "885b9fd3a5594a1fbbc7c800197cdd12717581c6c6cfec298bb5cd17724a44f3"
+      },
+      {
+        "repetition": 3,
+        "position": 2,
+        "executor": "ordinary",
+        "latency_ms": 0,
+        "elapsed_ms": 5960.1,
+        "store_ms": {
+          "checkpoint": 5949.773,
+          "journal": 0.0
+        },
+        "store_calls": {
+          "checkpoint": 5
+        },
+        "wire_calls": {
+          "response": 3,
+          "input_tokens": 0
+        },
+        "nodes_ms": {
+          "research": 1.9,
+          "analyze": 1.7,
+          "write": 1.7
+        },
+        "output_sha256": "885b9fd3a5594a1fbbc7c800197cdd12717581c6c6cfec298bb5cd17724a44f3"
+      },
+      {
+        "repetition": 1,
+        "position": 0,
+        "executor": "reference",
+        "latency_ms": 20,
+        "elapsed_ms": 98.44,
+        "store_ms": {
+          "checkpoint": 0.0,
+          "journal": 0.0
+        },
+        "store_calls": {},
+        "wire_calls": {
+          "response": 3,
+          "input_tokens": 0
+        },
+        "nodes_ms": {
+          "research": 35.978,
+          "analyze": 30.584,
+          "write": 30.331
+        },
+        "output_sha256": "885b9fd3a5594a1fbbc7c800197cdd12717581c6c6cfec298bb5cd17724a44f3"
+      },
+      {
+        "repetition": 1,
+        "position": 1,
+        "executor": "ordinary",
+        "latency_ms": 20,
+        "elapsed_ms": 13466.11,
+        "store_ms": {
+          "checkpoint": 13357.544,
+          "journal": 0.0
+        },
+        "store_calls": {
+          "checkpoint": 5
+        },
+        "wire_calls": {
+          "response": 3,
+          "input_tokens": 0
+        },
+        "nodes_ms": {
+          "research": 30.6,
+          "analyze": 36.9,
+          "write": 36.2
+        },
+        "output_sha256": "885b9fd3a5594a1fbbc7c800197cdd12717581c6c6cfec298bb5cd17724a44f3"
+      },
+      {
+        "repetition": 1,
+        "position": 2,
+        "executor": "durable",
+        "latency_ms": 20,
+        "elapsed_ms": 21322.015,
+        "store_ms": {
+          "checkpoint": 4329.689,
+          "journal": 16813.645
+        },
+        "store_calls": {
+          "journal": 66,
+          "checkpoint": 6
+        },
+        "wire_calls": {
+          "response": 3,
+          "input_tokens": 3
+        },
+        "nodes_ms": {
+          "research": 4096.2,
+          "analyze": 4519.6,
+          "write": 4706.7
+        },
+        "output_sha256": "885b9fd3a5594a1fbbc7c800197cdd12717581c6c6cfec298bb5cd17724a44f3"
+      },
+      {
+        "repetition": 2,
+        "position": 0,
+        "executor": "ordinary",
+        "latency_ms": 20,
+        "elapsed_ms": 9637.096,
+        "store_ms": {
+          "checkpoint": 9536.279,
+          "journal": 0.0
+        },
+        "store_calls": {
+          "checkpoint": 5
+        },
+        "wire_calls": {
+          "response": 3,
+          "input_tokens": 0
+        },
+        "nodes_ms": {
+          "research": 31.3,
+          "analyze": 29.3,
+          "write": 35.3
+        },
+        "output_sha256": "885b9fd3a5594a1fbbc7c800197cdd12717581c6c6cfec298bb5cd17724a44f3"
+      },
+      {
+        "repetition": 2,
+        "position": 1,
+        "executor": "durable",
+        "latency_ms": 20,
+        "elapsed_ms": 23378.469,
+        "store_ms": {
+          "checkpoint": 4513.834,
+          "journal": 18699.804
+        },
+        "store_calls": {
+          "journal": 66,
+          "checkpoint": 6
+        },
+        "wire_calls": {
+          "response": 3,
+          "input_tokens": 3
+        },
+        "nodes_ms": {
+          "research": 4341.9,
+          "analyze": 7542.4,
+          "write": 4178.2
+        },
+        "output_sha256": "885b9fd3a5594a1fbbc7c800197cdd12717581c6c6cfec298bb5cd17724a44f3"
+      },
+      {
+        "repetition": 2,
+        "position": 2,
+        "executor": "reference",
+        "latency_ms": 20,
+        "elapsed_ms": 91.375,
+        "store_ms": {
+          "checkpoint": 0.0,
+          "journal": 0.0
+        },
+        "store_calls": {},
+        "wire_calls": {
+          "response": 3,
+          "input_tokens": 0
+        },
+        "nodes_ms": {
+          "research": 27.796,
+          "analyze": 31.24,
+          "write": 30.963
+        },
+        "output_sha256": "885b9fd3a5594a1fbbc7c800197cdd12717581c6c6cfec298bb5cd17724a44f3"
+      },
+      {
+        "repetition": 3,
+        "position": 0,
+        "executor": "durable",
+        "latency_ms": 20,
+        "elapsed_ms": 20194.53,
+        "store_ms": {
+          "checkpoint": 915.43,
+          "journal": 19115.879
+        },
+        "store_calls": {
+          "journal": 66,
+          "checkpoint": 6
+        },
+        "wire_calls": {
+          "response": 3,
+          "input_tokens": 3
+        },
+        "nodes_ms": {
+          "research": 6463.0,
+          "analyze": 7204.1,
+          "write": 4652.8
+        },
+        "output_sha256": "885b9fd3a5594a1fbbc7c800197cdd12717581c6c6cfec298bb5cd17724a44f3"
+      },
+      {
+        "repetition": 3,
+        "position": 1,
+        "executor": "reference",
+        "latency_ms": 20,
+        "elapsed_ms": 92.524,
+        "store_ms": {
+          "checkpoint": 0.0,
+          "journal": 0.0
+        },
+        "store_calls": {},
+        "wire_calls": {
+          "response": 3,
+          "input_tokens": 0
+        },
+        "nodes_ms": {
+          "research": 27.342,
+          "analyze": 31.023,
+          "write": 32.193
+        },
+        "output_sha256": "885b9fd3a5594a1fbbc7c800197cdd12717581c6c6cfec298bb5cd17724a44f3"
+      },
+      {
+        "repetition": 3,
+        "position": 2,
+        "executor": "ordinary",
+        "latency_ms": 20,
+        "elapsed_ms": 5373.77,
+        "store_ms": {
+          "checkpoint": 5285.621,
+          "journal": 0.0
+        },
+        "store_calls": {
+          "checkpoint": 5
+        },
+        "wire_calls": {
+          "response": 3,
+          "input_tokens": 0
+        },
+        "nodes_ms": {
+          "research": 28.1,
+          "analyze": 30.2,
+          "write": 25.3
+        },
+        "output_sha256": "885b9fd3a5594a1fbbc7c800197cdd12717581c6c6cfec298bb5cd17724a44f3"
+      }
+    ],
+    "summary": {
+      "0": {
+        "reference": {
+          "runs": 3,
+          "median_elapsed_ms": 4.967,
+          "median_overhead_ms": 0.0,
+          "median_store_ms": {
+            "checkpoint": 0.0,
+            "journal": 0.0
+          },
+          "median_overhead_excluding_store_ms": 0.0,
+          "median_node_overhead_ms": {
+            "research": 0.0,
+            "analyze": 0.0,
+            "write": 0.0
+          },
+          "wire_calls": {
+            "response": 3,
+            "input_tokens": 0
+          },
+          "extra_wire_latency_ms": 0
+        },
+        "ordinary": {
+          "runs": 3,
+          "median_elapsed_ms": 5750.469,
+          "median_overhead_ms": 5745.502,
+          "median_store_ms": {
+            "checkpoint": 5712.998,
+            "journal": 0.0
+          },
+          "median_overhead_excluding_store_ms": 5.368,
+          "median_node_overhead_ms": {
+            "research": 0.723,
+            "analyze": 0.498,
+            "write": 0.726
+          },
+          "wire_calls": {
+            "response": 3,
+            "input_tokens": 0
+          },
+          "extra_wire_latency_ms": 0
+        },
+        "durable": {
+          "runs": 3,
+          "median_elapsed_ms": 20291.823,
+          "median_overhead_ms": 20286.856,
+          "median_store_ms": {
+            "checkpoint": 3194.385,
+            "journal": 17079.768
+          },
+          "median_overhead_excluding_store_ms": 13.716,
+          "median_node_overhead_ms": {
+            "research": 4654.823,
+            "analyze": 4018.257,
+            "write": 4269.358
+          },
+          "wire_calls": {
+            "response": 3,
+            "input_tokens": 3
+          },
+          "extra_wire_latency_ms": 0
+        }
+      },
+      "20": {
+        "reference": {
+          "runs": 3,
+          "median_elapsed_ms": 92.524,
+          "median_overhead_ms": 0.0,
+          "median_store_ms": {
+            "checkpoint": 0.0,
+            "journal": 0.0
+          },
+          "median_overhead_excluding_store_ms": 0.0,
+          "median_node_overhead_ms": {
+            "research": 0.0,
+            "analyze": 0.0,
+            "write": 0.0
+          },
+          "wire_calls": {
+            "response": 3,
+            "input_tokens": 0
+          },
+          "extra_wire_latency_ms": 0
+        },
+        "ordinary": {
+          "runs": 3,
+          "median_elapsed_ms": 9637.096,
+          "median_overhead_ms": 9545.721,
+          "median_store_ms": {
+            "checkpoint": 9536.279,
+            "journal": 0.0
+          },
+          "median_overhead_excluding_store_ms": 9.442,
+          "median_node_overhead_ms": {
+            "research": 0.758,
+            "analyze": -0.823,
+            "write": 4.337
+          },
+          "wire_calls": {
+            "response": 3,
+            "input_tokens": 0
+          },
+          "extra_wire_latency_ms": 0
+        },
+        "durable": {
+          "runs": 3,
+          "median_elapsed_ms": 21322.015,
+          "median_overhead_ms": 21223.575,
+          "median_store_ms": {
+            "checkpoint": 4329.689,
+            "journal": 18699.804
+          },
+          "median_overhead_excluding_store_ms": 73.456,
+          "median_node_overhead_ms": {
+            "research": 4314.104,
+            "analyze": 7173.077,
+            "write": 4620.607
+          },
+          "wire_calls": {
+            "response": 3,
+            "input_tokens": 3
+          },
+          "extra_wire_latency_ms": 60
+        }
+      }
+    }
+  },
+  "environment": {
+    "python": "3.12.10",
+    "platform": "Windows-11-10.0.26200-SP0",
+    "packages": {
+      "smythe": "0.9.1"
+    },
+    "installed_packages": {
+      "smythe": "0.9.0"
+    },
+    "smythe_source": {
+      "version": "0.9.1",
+      "module": "smythe/__init__.py"
+    },
+    "source_control": {
+      "revision": "fc214aeaf382e85fdf1d5defadb8d636e026ae3e",
+      "dirty": true,
+      "untracked_files": 0
+    }
+  }
+}

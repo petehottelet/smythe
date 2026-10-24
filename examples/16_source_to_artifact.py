@@ -2,11 +2,12 @@
 
     python examples/16_source_to_artifact.py
 
-A durable research run answers one question from three bundled sources
-(examples/source_to_artifact/sources/). It is planned first, so the graph can
-be inspected before anything runs. Each source is then fetched by a journaled
-read step from a small HTTP server inside this process, on the loopback
-address: there is no other network traffic and no API key.
+A durable research run answers one question from three of the bundled
+sources (examples/source_to_artifact/sources/). It is planned first, so the
+graph can be inspected before anything runs. Each source is then fetched by a
+journaled read step from a small HTTP server inside this process, on the
+loopback address (examples/_source_library.py): there is no other network
+traffic and no API key.
 
 The run stops part way, as if the process died, after its second read is
 saved in the journal but before the run checkpoints it. Resuming replays that
@@ -28,11 +29,11 @@ Docs: docs/source-evidence.md and docs/runs.md
 from __future__ import annotations
 
 from contextlib import contextmanager
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 import sys
 from tempfile import TemporaryDirectory
-import threading
+
+from _source_library import library_profile, read_sources, source_library
 
 from smythe import (
     AcceptancePolicy, ClaimPassage, ClaimRecord, ContextSource, LocalOnly, MarkdownRenderer,
@@ -49,7 +50,6 @@ for _stream in (sys.stdout, sys.stderr):
     if _stream.encoding and _stream.encoding.lower() not in ("utf-8", "utf8"):
         _stream.reconfigure(encoding="utf-8")
 
-SOURCE_DIR = Path(__file__).resolve().parent / "source_to_artifact" / "sources"
 VERSIONS = {"survey-2019": "2019-spring", "renewals-2026": "2026-q2", "support-2026": "2026-09"}
 QUESTION = "Should new subscriptions default to monthly or annual billing?"
 
@@ -78,49 +78,7 @@ CLAIMS = (
 
 def load_sources() -> tuple[ContextSource, ...]:
     """The bundled sources, with their versions; the run is given exactly these."""
-    return tuple(ContextSource(path.stem, path.read_text(encoding="utf-8"), VERSIONS[path.stem])
-                 for path in sorted(SOURCE_DIR.glob("*.txt")))
-
-
-# ---------------------------------------------------------------------------
-# A source library on the loopback address, counting each read it answers
-# ---------------------------------------------------------------------------
-
-
-@contextmanager
-def source_library(sources: tuple[ContextSource, ...]):
-    texts = {source.source_id: source.text.encode("utf-8") for source in sources}
-    answered: list[str] = []
-
-    class Handler(BaseHTTPRequestHandler):
-        def do_GET(self):  # noqa: N802 - http.server's name
-            source_id = self.path.removeprefix("/sources/")
-            body = texts.get(source_id)
-            answered.append(source_id)
-            self.send_response(200 if body is not None else 404)
-            self.send_header("Content-Type", "text/plain; charset=utf-8")
-            self.send_header("Content-Length", str(len(body or b"")))
-            self.end_headers()
-            self.wfile.write(body or b"")
-
-        def log_message(self, *args):
-            pass
-
-    server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
-    thread = threading.Thread(target=server.serve_forever, daemon=True)
-    thread.start()
-    try:
-        yield server.server_address[1], answered
-    finally:
-        server.shutdown()
-        server.server_close()
-
-
-def library_profile(port: int) -> ReadProfile:
-    """One versioned, free read that is safe to repeat; loopback is allowed explicitly."""
-    return ReadProfile(name="library", version="1", url=f"http://127.0.0.1:{port}/sources/{{source_id}}",
-                       input_schema={"source_id": "string"}, metered=False, repeat_safe=True,
-                       timeout_s=10.0, allow_private_networks=True)
+    return read_sources(VERSIONS)
 
 
 # ---------------------------------------------------------------------------

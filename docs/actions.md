@@ -16,7 +16,10 @@ service's [notices](#notices) as untrusted records.
 that reconciliation left open, and [inspection](#inspecting-actions) shows
 what each action needs next. These types and functions may
 change before they leave preview. `import smythe` loads neither module;
-import them explicitly.
+import them explicitly. Actions run only after a
+[strict durable run](#where-actions-run) has accepted its output, and the
+[offline walkthrough](#an-offline-walkthrough) runs the whole path without
+keys.
 
 An external action has three parts that this page describes:
 
@@ -28,6 +31,27 @@ An external action has three parts that this page describes:
 
 A retry is another attempt of the same logical action, under the same intent
 and key. A changed intent is a different action, never a retry.
+
+## Where actions run
+
+An action delivers the accepted output of a completed
+[durable text workflow](workflow-accounting.md). It belongs to the run's
+journal, not to its graph: no node, generated plan, supervisor revision,
+source text or model output can create, approve or dispatch one, and the
+run's strict acceptance policy has decided on the exact content before
+anything is prepared.
+
+| Path | External actions |
+|---|---|
+| Durable text workflows with a strict acceptance policy | Supported once the run has completed and its current delivery decision is `accepted`, made by the policy, a re-evaluation or an operator |
+| Other durable text workflows | Refused: an advisory run has no decision, and a `rejected`, `needs_review` or `indeterminate` decision delivers nothing |
+| Ordinary runs | Unsupported: they keep no journal, so an action has no run record to bind |
+| Jobs | Unsupported: a manifest's profiles only generate artifacts, and none writes to another service |
+
+Smythe ships the contract, the journal and the runner, but no connector and
+no approval verifier: both are your host's code. The
+[support matrix](support-matrix.md#external-actions) names the test behind
+each row and each guarantee below.
 
 ## Intent identity
 
@@ -130,6 +154,32 @@ Seconds must be finite and non-negative, and positive for `timeout_s` and
 `max_attempts` is at least 1. `to_dict()` omits settings at their defaults, and
 `ConnectorProfile.from_dict()` refuses unknown keys.
 
+### What a connector declares
+
+The runner relies on each declaration and cannot check it against the
+service, so declare only what the service guarantees for an action's key
+within the target's tenant:
+
+- `deduplicates` only when the service answers a repeated key from its
+  earlier commit instead of writing again, and `dedupe_window_s` as the
+  shortest time it remembers a key.
+- `lookup_by_key` only when `lookup()` finds a committed key for that long,
+  or without expiry for a service that does not deduplicate.
+- `visibility_bound_s` only when the service bounds how long a commit can
+  stay invisible to lookups and reads.
+- `lookup_by_object` only when `read()` returns the object's exact current
+  bytes, with its version and the key that wrote it where the service
+  exposes them.
+- `timeout_s` as the longest one call can take to reach the service; a
+  request that arrives later is outside the contract.
+- `compensation="new_action"` only when a separate write can undo an effect.
+
+Declaring less is always safe: without lookup or deduplication, an unknown
+outcome waits for an [operator](#operator-decisions) and nothing is sent
+again. Declaring more than the service guarantees is not: it can make an
+empty lookup a false proof that a write was never made, or a retry a second
+effect.
+
 ## Connectors and approval verifiers
 
 Connectors and approval verifiers are trusted host code that you supply.
@@ -153,12 +203,17 @@ An empty lookup or read alone does not prove that nothing was written.
 
 An `ApprovalVerifier` authenticates approvals; Smythe ships none and does not
 authenticate users. It has an `identity` string naming the verifier and its
-version. `verify(assertion, intent_sha256, now_ns)` returns the `Principal`
-(issuer, subject and tenant) that issued the assertion for exactly that intent
-digest, or raises `ApprovalRejected`. `still_authorized(principal, intent,
-now_ns)` reports whether that principal may still approve the intent. The
-same `verify()` authenticates an [operator's decision](verifier.md#operator-decisions)
-on output that strict delivery acceptance left for review.
+version. `verify(assertion, subject_sha256, now_ns)` returns the `Principal`
+(issuer, subject and tenant) that issued the assertion for exactly that
+digest, or raises `ApprovalRejected`. For an approval or a rejection the
+digest is the action's [approval subject](#approvals), which binds the
+action's key and intent digest; for an
+[operator decision](#operator-decisions) or a
+[duplicate-risk approval](#duplicate-risk), it is the digest that section
+names. `still_authorized(principal, intent, now_ns)` reports whether that
+principal may still approve the intent. The same `verify()` authenticates an
+[operator's decision](verifier.md#operator-decisions) on output that strict
+delivery acceptance left for review.
 
 `check_connector()` returns the connector's profile and `check_verifier()`
 the verifier's identity. Both refuse a `Provider`, a class, a coroutine
@@ -235,7 +290,8 @@ its operations. A refusal raises `ActionNotAuthorized` and records nothing.
 `prepare_action()` returns a `PreparedAction`: its `action_id`, `run_id`,
 `slot`, `sequence`, `action_key`, `intent`, `profile`, `state`,
 `ceiling_nanousd` and `compensates_action_id`, which is None except for a
-[compensation](#compensation). The ceiling is the cost of `max_attempts`
+[compensation](#compensation), and its `approval_sha256`, the digest an
+[approval](#approvals) signs. The ceiling is the cost of `max_attempts`
 writes and `readback_reads` reads at the profile's ceilings, which an
 [approval](#approvals) must cover.
 No attempt, read or [reconciliation](#reconciliation) lookup is made that
@@ -259,25 +315,38 @@ action or an approval.
 
 Smythe does not authenticate users; your host's
 [approval verifier](#connectors-and-approval-verifiers) does. An approval
-covers one logical action and at most one effect: exactly the action's intent
-digest, up to a nanoUSD ceiling and until an expiry.
+covers one logical action and at most one effect: exactly that action and
+its intent, up to a nanoUSD ceiling and until an expiry.
 
 ```python
 from smythe.actions import approve, check_authority
 
-assertion = identity_host.issue(action.intent.digest(), ...)   # your host's approval flow
+assertion = identity_host.issue(action.approval_sha256, ...)   # your host's approval flow
 approval = approve(store, action.action_id, assertion, identity_host,
                    ceiling_nanousd=action.ceiling_nanousd, expires_at_ns=expiry_ns)
 assert check_authority(store, action.action_id, identity_host) == approval
 ```
 
+**What an approver signs.** `PreparedAction.approval_sha256` is the action's
+approval subject: the SHA-256 of the canonical JSON object
+`{"type": "smythe.action-approval.v1", "action_key": ..., "intent_sha256": ...}`
+with the action's [key](#action-keys) and [intent digest](#intent-identity),
+as plain hex (`APPROVAL_SUBJECT_VERSION` is the type tag). The verifier
+receives it in place of the bare intent digest. Because the key names the
+journal, the run, the slot and the sequence, an assertion for one action
+never approves another action, even one whose intent is identical in
+another journal, as when two journals' runs accepted the same document.
+Show the approver the intent and the action it belongs to, and sign the
+subject.
+
 `approve(store, action_id, assertion, verifier, *, ceiling_nanousd,
 expires_at_ns)` returns an `ActionApproval`: the `approval_id`, `action_id`,
 verified `principal`, `ceiling_nanousd` and `expires_at_ns`. It refuses:
 
-- an assertion the verifier does not accept for exactly this action's intent
-  digest: forged, expired, revoked or issued for another intent. The
-  verifier raises `ApprovalRejected`, which propagates;
+- an assertion the verifier does not accept for exactly this action's
+  approval subject: forged, expired, revoked, or issued for another action
+  or for the bare intent digest. The verifier raises `ApprovalRejected`,
+  which propagates;
 - a principal whose tenant is not the intent target's, or whom
   `still_authorized()` no longer authorizes, with `ApprovalRejected`;
 - a ceiling below the action's `ceiling_nanousd`, and an expiry that is not
@@ -292,17 +361,17 @@ verified `principal`, `ceiling_nanousd` and `expires_at_ns`. It refuses:
 
 An assertion is recorded once in a journal. The same approval again returns
 it; the assertion presented for any other action raises `ApprovalRejected`,
-even one whose intent is identical, as when two runs accepted the same
-document. Issue a new assertion for each approval. The newest approval of an
-action supersedes earlier ones, so a new approval can renew or replace one.
+in this journal or another, even for an identical intent. Issue a new
+assertion for each approval. The newest approval of an action supersedes
+earlier ones, so a new approval can renew or replace one.
 
 This differs from the Jobs [approval token](jobs.md#validate-plan-and-approve),
 an acknowledgment of a plan and its spend ceiling that anyone with the
 manifest can compute. It names no principal and has no expiry or revocation.
 
 `reject(store, action_id, assertion, verifier)` cancels an action that was
-never dispatched. Its assertion is verified as an approval's is, and the
-rejection is recorded with the principal. The action is `canceled` for good,
+never dispatched. Its assertion is verified as an approval's is, for the
+action's approval subject, and the rejection is recorded with the principal. The action is `canceled` for good,
 across restarts: preparing the same intent in its slot returns it, and it can
 no longer be approved. An attempt begun in the
 [dispatch journal](#dispatch-journal) but not yet claimed is released with
@@ -327,8 +396,8 @@ checks that:
   journal's clock, binds the action's intent digest, covers its ceiling,
   accepts any [duplicate risk](#duplicate-risk) and was recorded by this
   verifier;
-- the verifier accepts the stored assertion again, for the same principal,
-  and still authorizes that principal; and
+- the verifier accepts the stored assertion again, for the action's approval
+  subject and the same principal, and still authorizes that principal; and
 - the content is still deliverable, as for `prepare_action()`: no security
   stop holds the run, the run's current decision is still `accepted`, the
   published file still holds the bound bytes, and no source the accepted
@@ -444,8 +513,9 @@ The permit then records the outcome of the one submission:
   `begin_attempt()` then refuses the action, so dispatch never sends the
   write again. Only [reconciliation](#reconciliation) makes another attempt
   possible: `claim_retry()` claims a same-key retry, and a `not_executed`
-  finding from `record_finding()` returns the action to `not_dispatched`, so
-  that the next attempt can begin. The attempt keeps its exposure until a
+  finding from `record_finding()` returns the action to `not_dispatched`
+  once no other attempt's outcome is unknown, so that the next attempt can
+  begin. The attempt keeps its exposure until a
   receipt that a lookup finds reports the write's cost, which
   `record_lookup()` confirms.
 
@@ -466,6 +536,25 @@ recovered, a permit changes nothing: its receipt or error is kept as a
 `late_receipt` record, marked trusted because only the claim's permit can
 write it, and `WorkflowLeaseError` or `ActionStateError` is raised. A late
 receipt carries no cost, because the attempt keeps its exposure.
+
+A late receipt can contradict a `not_executed` finding of
+[reconciliation](#reconciliation) or an
+[operator's decision](#operator-decisions): a worker that stalled after its
+claim, past its lease, sends its request after another worker found the
+write not made. When a late receipt shows a commit of such an attempt, one
+the service did not answer from an earlier commit, the journal appends a
+`contradicted_absence` finding that cites it; the earlier finding and every
+other record stay as they were. The attempt is no longer settled, so an
+action that is `not_dispatched` again becomes `outcome_unknown`, an attempt
+begun but not claimed is released unsent, and nothing dispatches it again
+until [reconciliation](#reconciliation) or an operator settles the outcome.
+[Inspection](#inspecting-actions) lists a contradicted action as unresolved
+with a `second_effect` when the receipts name two commits, and until a read
+settles it otherwise. Once a late receipt shows a commit under the action's
+key, no empty lookup or operator decision finds any of its attempts not
+executed, so the action is not dispatched again: reconciliation reads that
+commit back when a lookup finds it, and otherwise leaves the outcome to an
+operator.
 
 ### Recovery
 
@@ -660,7 +749,20 @@ finding is then `not_executed`, and the action returns to `not_dispatched`
 under its unconsumed approval, so `dispatch()` can send it again while
 attempts remain; that attempt counts toward `max_attempts`. Without a
 declared bound, before the bound has passed, or once the key's window may
-have closed, empty lookups leave the outcome unknown.
+have closed, empty lookups leave the outcome unknown, as they do once a
+[late receipt](#leases-and-late-receipts) shows a commit of any of the
+action's attempts.
+
+The proof assumes that each request leaves within `timeout_s` of its
+dispatch claim. A worker that stalls between its claim and its request for
+longer than its lease, through a host sleep, a paused virtual machine or a
+long pause in the process, can send its request after another worker has
+proved the write absent and dispatched it again. Only a service that
+deduplicates the key answers that request from the earlier commit; a
+lookup-only service commits it a second time. The stalled worker's receipt
+is then kept as a late receipt that contradicts the finding, and the action
+is listed as unresolved with a `second_effect`, for a
+[compensation](#compensation) or an operator.
 
 **The key's window** is `dedupe_window_s` from the action's first dispatch
 claim, the earliest the service can have committed the key; `None` declares
@@ -709,6 +811,9 @@ is removed, and no confirmed cost is reduced.
 
 Host code that reconciles by itself calls `record_lookup()`, `claim_retry()`
 and `record_finding()` in `smythe.workflow_actions` under the run's lease.
+A `not_executed` finding returns the action to `not_dispatched` only once no
+other attempt's outcome is unknown, and `record_finding()` refuses it once a
+late receipt shows a commit under the action's key.
 
 ### Notices
 
@@ -728,9 +833,14 @@ The payload is a JSON object of at most 64 KiB as canonical JSON, which names
 the action key it reports as `key` and the action's target as `target`;
 other fields are kept as they are. A notice whose key names an action of the
 journal is kept with that action as an untrusted `notice` record, with an
-`action_notice` event; a notice under any other key is not kept. It returns
-the action only when the action is `dispatched` and the notice names its
-tenant and collection, and None otherwise. A notice never changes an action's
+`action_notice` event; a notice under any other key is not kept. Because
+anyone who can reach your callback endpoint can send notices, each action
+keeps a notice once, by the SHA-256 of its canonical JSON, and at most 64 of
+them: a notice identical to one it keeps is not kept again, and for each
+notice beyond 64 an `action_notice_dropped` event records its digest, never
+its body. Kept or not, the notice is still answered: `record_notice()`
+returns the action only when the action is `dispatched` and the notice names
+its tenant and collection, and None otherwise. A notice never changes an action's
 state: anyone can send one, so it can only prompt a readback, which reads the
 object the receipt names and decides by itself. A notice for another tenant,
 for an action not yet dispatched or for one already settled prompts nothing.
@@ -749,7 +859,7 @@ last read, or None, the `next_action`, and the `refusal` of an action that
 | `readback` | An acknowledged attempt has reads left that fit under its approval's ceiling. |
 | `reconcile` | The outcome is unknown, or the reads did not settle it. |
 | `operator_review` | Reconciliation found it can do no more: the outcome stays unknown or unverified. |
-| `compensate` | The action is `compensation_required`: a [compensation](#compensation) can undo its effect where the connector supports one. |
+| `compensate` | The action is `compensation_required`, or `observed` or `reconciled` with a `second_effect` that a [late receipt](#leases-and-late-receipts) showed: a [compensation](#compensation) can undo an effect where the connector supports one. |
 | None | The action is settled or `unresolved`, has used every attempt, or `dispatch_pending()` refused it. |
 
 Errors from the journal's checks, such as `ActionNotAuthorized`,
@@ -818,7 +928,7 @@ from smythe.actions import approve, prepare_compensation
 
 undo = prepare_compensation(store, action.action_id, operation="update",
                             parameters={"retracted": True})
-assertion = identity_host.issue(undo.intent.digest(), ...)   # its own approval
+assertion = identity_host.issue(undo.approval_sha256, ...)   # its own approval
 approve(store, undo.action_id, assertion, identity_host,
         ceiling_nanousd=undo.ceiling_nanousd, expires_at_ns=expiry_ns)
 runner.dispatch(run_id, undo.action_id)
@@ -837,9 +947,9 @@ Preparing the same operation and parameters again returns it; others raise
 `WorkflowConflictError` while it is unfinished. It needs no lease.
 
 A compensation is authorized like any other action, and never by the
-original's approval: an approval binds one intent digest, so the verifier
-refuses the original's assertion, and the journal refuses an assertion that
-it recorded for another action. The compensation needs its own approval and
+original's approval: an approval binds one action's key and intent, so the
+verifier refuses the original's assertion, and the journal refuses an
+assertion that it recorded for another action. The compensation needs its own approval and
 makes its own attempts, with its own receipt and readback, which checks that
 the object holds the canonical JSON of its parameters. The original's
 attempts, approvals, records, state and balances never change; each
@@ -966,12 +1076,19 @@ them, reading a journal opened read-only:
 |---|---|
 | `accounting_scope`, `unit` | `external_actions` and `nanoUSD` |
 | `confirmed_nanousd`, `reserved_nanousd`, `unknown_nanousd` | The run's action balances |
-| `unresolved` | The IDs of actions whose effect is unknown, unverified, wrong or abandoned: `outcome_unknown`, `compensation_required` and `unresolved` actions, and `dispatched` ones with no read left to confirm them |
-| `items` | Each action as `inspect_run()` shows it: identity, intent digest, operation, target, state, balances, attempts, approvals by principal, verifier, ceiling, expiry, consumption and revocation, and records by kind and digest, with `duplicate_risk` and `next_action` |
+| `unresolved` | The IDs of actions whose effect is unknown, unverified, wrong, abandoned or repeated: `outcome_unknown`, `compensation_required` and `unresolved` actions, `dispatched` ones with no read left to confirm them, and contradicted ones with a `second_effect` or not yet `observed` or `reconciled` |
+| `items` | Each action as `inspect_run()` shows it: identity, intent digest, operation, target, state, balances, attempts, approvals by principal, verifier, ceiling, expiry, consumption and revocation, and records by kind and digest, with `duplicate_risk`, `contradiction` and `next_action` |
 
 `next_action` is as [progress](#progress) names it, except that a
 `not_dispatched` action that no approval authorizes needs `approve`, or
-`approve_duplicate_risk` while it carries duplicate risk. Assertions,
+`approve_duplicate_risk` while it carries duplicate risk. `contradiction`
+is null until a [late receipt](#leases-and-late-receipts) shows a commit
+of an attempt found not executed: `second_effect` when the action's
+receipts name another commit as well, each a target and version the
+service did not answer from an earlier commit, and `contradicted_absence`
+otherwise. A contradicted action stays listed with a `second_effect`, as a
+`compensation_required` one does after its compensation; without one, a
+read that settles it as `observed` or `reconciled` clears the listing. Assertions,
 parameters, receipts, error text, evidence summaries, notes and record
 payloads are never shown. From the command line,
 [`smythe runs inspect`](runs.md#external-actions) prints the same block and
@@ -980,3 +1097,60 @@ exits with 12 while accepted output has an unresolved action, and
 fail-safe [`revoke()`](#approvals). Decisions and approvals stay in the
 Python API, because only your host can construct the verifier and the
 connector.
+
+## An offline walkthrough
+
+[`examples/19_governed_publication.py`](../examples/19_governed_publication.py)
+runs the whole path without keys or network access:
+
+1. A strict durable run publishes a release announcement, and a final
+   validator accepts the document's exact bytes.
+2. `prepare_action()` binds those bytes to a publishing service's
+   connector profile, and inspection names `approve` as the next action.
+3. An assertion from a local HMAC approval host for the bare intent digest
+   is refused; one for the action's approval subject approves it, up to its
+   ceiling, for one hour.
+4. The first submission commits on the service, but its answer is lost: the
+   action is `outcome_unknown`, and `smythe runs inspect` exits with 12.
+5. `reconcile()` finds the key with a lookup, reads the post back and
+   reconciles the action. The service holds one post from one submission,
+   and the receipt the lookup found confirms the write's cost, so no unknown
+   exposure remains.
+6. Inspection shows the attempt, the approval and the lookup and readback
+   records, never the assertion or the document.
+
+Its in-memory service, connector and approval host are short examples of
+the protocols on this page, not code that Smythe ships.
+
+## Guarantees under test
+
+These hold for every connector that declares only what its service
+guarantees, and the [support matrix](support-matrix.md#external-actions)
+cites the test behind each:
+
+- Two workers that race to dispatch one action, in one process with their
+  own journal connections or in two processes, make one dispatch claim and
+  one write. The run's lease fences the other, which raises
+  `WorkflowLeaseError` before it reads the payload.
+- Receipts and notices that arrive late and in any order, including the
+  answer to a copy the service deduplicated and a forged notice, are kept
+  as records and never move an action back to an earlier state.
+- Under the combinations of deduplication, lookup by key, visibility bound,
+  declared or not, and key window that the conformance sweep declares, a lost
+  answer, a lost request or a request that reaches the service only as the
+  connector's `timeout_s` ends never leads to a second write, as long as each
+  request leaves within `timeout_s` of its dispatch claim. Another submission
+  follows only a lookup that proved the first was never made, or is a
+  same-key retry inside the declared deduplication window, which the service
+  answers from its earlier commit. Without a declared bound, no lookup proves
+  absence.
+- An empty lookup proves absence only under that assumption. A worker that
+  stalls between its claim and its request past its lease can make a
+  lookup-only service commit twice; only a deduplicating service answers the
+  stalled request from the earlier commit. Its late receipt is kept, appends
+  a contradicting finding, and leaves the action listed as unresolved with a
+  `second_effect`, so `smythe runs inspect` exits with 12. From then on no
+  empty lookup or operator decision finds any of the action's attempts not
+  executed, so no further write follows.
+- A worker killed while its write is in flight leaves an unknown outcome,
+  which a restarted worker reconciles without writing again.

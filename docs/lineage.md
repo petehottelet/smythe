@@ -6,21 +6,33 @@ and the inputs it was given, as ids, versions and SHA-256 digests. A run opts
 in with a `LineagePolicy`, which also declares the access scope its results
 belong to and whether they may be reused.
 
-This release adds the policy, the recipe opt-in, the versioned record
-format, `ArtifactLineage`, and the record each opted-in run
-[writes when it completes](#the-record-a-run-writes), with its
-[coverage](#coverage). It also adds [reuse decisions](#reuse-decisions):
-a pure evaluator that says what a record calls for under the current
-sources, tools and validators, [repair plans](#plan-a-repair), which
-show before anything is dispatched what each run of an archive calls for
-and the work that would take, [repair in place](#repair-a-run-in-place),
-which decides a run again or publishes its damaged document again without
-running a node, the records of a
-[successor run](#reuse-in-a-successor-run) that reuses a completed run's
-results, [applying a plan](#apply-a-repair-plan) under an explicit
-allowance, and [source restriction](#restrict-a-source), which withdraws a
-source's text from every run that used it and can delete their published
-documents.
+With those records an archive of accepted artifacts stays current as its
+inputs change. When a source gets a new version, a validator changes or a
+published file is damaged, lineage shows which artifacts that affects, which
+of their results still stand, and what work makes each one accepted again:
+
+1. [Opt runs in](#opt-a-run-in). Each completed run
+   [writes its record](#the-record-a-run-writes), whose
+   [coverage](#coverage) says whether it declares every node's inputs.
+2. [Plan a repair](#plan-a-repair). A read-only plan applies the
+   [reuse decisions](#reuse-decisions), with their [rules](#rules) and
+   [reason codes](#reason-codes), to the runs of an access scope, and
+   predicts the work each calls for before anything is dispatched.
+3. [Apply the plan](#apply-a-repair-plan) under an explicit allowance. A run
+   whose inputs are all current but whose validators or published document
+   changed is [decided or published again in place](#repair-a-run-in-place);
+   a run with a changed input gets a [successor run](#reuse-in-a-successor-run)
+   that keeps its unaffected results and computes the rest.
+   [`reuse=False`](#the-reuse-switch) computes affected work again in full.
+4. [Restrict a source](#restrict-a-source) when its retention ends or
+   access to it is revoked.
+
+Lineage covers durable text workflows. [Where lineage applies](#where-lineage-applies)
+says what ordinary runs and Jobs support, [cache and access](#cache-and-access)
+where reused results come from and who may reuse them, and
+[inspect lineage](#inspect-lineage) how to read all of it without changing
+anything. Two offline [examples](#examples) show a durable research run and
+an archive of such runs kept current with lineage.
 
 ## Opt a run in
 
@@ -55,7 +67,8 @@ with SQLiteWorkflowStore("smythe-runs.db") as store:
   bytes, including `"type": "text_workflow"`, `"version": 1` and its
   `verifier`, so existing runs resume as before.
 - **Identity, not behavior.** Like `graph_policy`, the policy is compared
-  exactly whenever a run is planned, executed, resumed or re-evaluated. A run
+  exactly whenever a run is planned, executed, resumed or re-evaluated,
+  except that a re-evaluation, which reuses nothing, ignores `reuse`. A run
   never changes its access scope, reuse mode or coverage rule while in
   flight: resuming it with another policy or without its policy, or resuming
   a run without lineage under a policy, raises `WorkflowConflictError` before
@@ -113,7 +126,8 @@ form:
                         "context": {"snapshot_key", "assembly_version"},
                         "tool": {"name", "version", "decoder_version"},
                         "component": {"name", "version"},
-                        "agent_sha256"},
+                        "agent_sha256",
+                        "verifier": {"name", "validators": [validator identities]}},
              "coverage": "declared" | "undeclared",
              "reused_from": {"run_id", "generation"}}],
   "coverage": "complete" | "partial",
@@ -142,11 +156,12 @@ form:
   the result: a run writes `read`, `model`, `gate` and `synthesis`. A node
   is `declared` only when its inputs name a context snapshot, a read tool or
   a component; `coverage` is `complete` when every node is declared and
-  `partial` otherwise.
+  `partial` otherwise. Only a `gate` names a `verifier`, whose `validators`
+  are kept like the decision's.
 - **Optional blocks.** `context`, `tool`, `component`, `agent_sha256`,
-  `reused_from`, `predecessor` and `repair` appear only when present, never
-  as null. `predecessor` is another run in the same store, and every
-  `reused_from` names it.
+  `verifier`, `reused_from`, `predecessor` and `repair` appear only when
+  present, never as null. `predecessor` is another run in the same store,
+  and every `reused_from` names it.
 - **Strict reading.** `ArtifactLineage.from_dict()` rejects any other
   version and any missing or unknown key at every level, rather than
   guessing. `to_dict()` returns detached JSON data; the record's parts are
@@ -194,7 +209,10 @@ print(lineage.coverage, [(node["id"], node["kind"]) for node in lineage.nodes])
     was given, by its journal key (`context/<node>/<generation>`) and
     context-assembly version, the run's sources the snapshot held, and
     `agent_sha256`, the digest of its agent's registry description without
-    the agent's id.
+    the agent's id. A gate also names the `verifier` that judged it: the
+    recipe's gate verifier, `token-v2` for `TokenVerifier` or `validator-v1`
+    for a [gate validator](verifier.md#gate-validators-in-durable-workflows),
+    with each gate validator's identity under `validators`.
   - The synthesis (`synthesis`) comes last and depends on every node. Its id
     is the synthesis operation's key, its result the digest of the
     synthesized text, and a synthesizer that calls no model is its
@@ -220,8 +238,9 @@ print(lineage.coverage, [(node["id"], node["kind"]) for node in lineage.nodes])
   record again from the records its operation names; a record that is
   missing, has another digest or is not the record of the run's current
   decision and publication makes the decision `indeterminate`, and the
-  output moves to `rejected_output`. Each later decision, by re-evaluation
-  or republication, journals a record that
+  output moves to `rejected_output`. A record written before records named
+  their gates' `verifier` still matches without it. Each later decision, by
+  re-evaluation or republication, journals a record that
   [supersedes](#repair-a-run-in-place) the one before.
 - **Summarized in inspection.** `inspect_run()`, `list_runs()` and journal
   events never return the record. `smythe runs inspect` shows a
@@ -258,7 +277,8 @@ action for the item, one for each node, the [reason codes](#reason-codes)
 behind them, and the authority under which anything is kept.
 
 ```python
-from smythe import CurrentState, LineagePolicy, SourceStatus
+from smythe import CurrentState, LineagePolicy, MarkdownRenderer, SourceStatus
+from smythe.lineage import renderer_identity
 from smythe.reuse import evaluate
 
 
@@ -282,6 +302,7 @@ state = CurrentState(
     tools={"handbook": {"version": "1", "decoder_version": "utf8-text-v1"}},
     components={"brief-writer": "2"},
     agents=agent_digests,
+    renderer=renderer_identity(MarkdownRenderer()),  # the runs' renderer
     integrity={run_id: "verified"},
     lineage=LineagePolicy(access_scope="research-team"),
 )
@@ -311,8 +332,18 @@ would use now. Each part is checked when it is built and kept read-only.
 | `tasks` | `{}` | Optional task changes: a recorded task's digest mapped to the digest of the task that replaces it. |
 | `integrity` | `{}` | A run id mapped to its published document's integrity `status`: `verified`, `missing`, `changed`, `unsafe`, `unreadable` or `not_checked`, as [`smythe runs inspect`](runs.md#published-documents) reports it. |
 | `lineage` | `LineagePolicy()` | The configured policy, whose `access_scope`, `reuse` and `undeclared_coverage` apply. |
+| `gate_verifier` | `token-v2` | The gate verifier a run would judge its gates with, as its recipe's `verifier` names it: `smythe.verifier.TOKEN_VERIFIER_IDENTITY` for `TokenVerifier`, or `validator-v1` for a gate validator. |
+| `gate_validators` | none | The gate validators' `ValidatorIdentity` values (each validator's `identity`), kept as a sorted set. |
+| `renderer` | None | The renderer a run would publish its document with, as a record names it: `{"name", "version", "spec_sha256"}`, which `smythe.lineage.renderer_identity(renderer)` gives for a `MarkdownRenderer` or a `LocalOnly` renderer; None for none. |
 
-A price release changes none of these, so it never changes a decision.
+A part left at its default is compared as it is, not skipped. A state
+without a `renderer` regenerates the synthesis of every run that published a
+document (`renderer_changed`), and one without the `gate_verifier` and
+`gate_validators` a run would use regenerates every gate that a gate
+validator judged (`gate_validator_changed`). A
+[repair plan](#plan-a-repair) builds the state from the `Swarm`'s
+configuration, so it names them all. A price release changes none of these,
+so it never changes a decision.
 
 ### The source catalog
 
@@ -370,7 +401,10 @@ most conservative of its own reasons.
 | A node whose inputs are undeclared | `undeclared_coverage` | `coverage_undeclared`, and `coverage_partial` on the item |
 | A node that depends on one that regenerates | `regenerate` | `dependency_changed` |
 | A node that depends on one under review | `review` | `dependency_review` |
+| A gate whose recorded `verifier` is not the state's gate verifier and gate validators, and each node it depends on | `regenerate` | `gate_validator_changed` |
+| A gate recorded without a `verifier`, and each node it depends on, when the state names gate validators | `undeclared_coverage` | `gate_validator_unknown` |
 | A gate, and each node it depends on, in an item where any node regenerates or needs review | `regenerate` | `gate_pair` |
+| A recorded renderer that is not the state's, a run that published no document having none, for each node nothing depends on: the synthesis | `regenerate` | `renderer_changed` |
 | A published document that is missing, or holds other bytes | `rerender` | `artifact_missing`, `artifact_changed` |
 | A published document that cannot be checked safely, cannot be read, or has no `verified` finding | `review` | `artifact_unsafe`, `artifact_unreadable`, `artifact_unchecked` |
 | A recorded decision other than `accepted` | `review` | `decision_not_accepted` |
@@ -392,6 +426,21 @@ most conservative of its own reasons.
   node depends on the node it judges. When an item computes anything again,
   no gate and no node a gate depends on is reused. An item that computes
   nothing keeps its gates' results.
+- **Gate verifiers.** A gate's verdict holds only under the gate verifier
+  that gave it. Another gate verifier, a gate validator of another version or
+  configuration, or a gate validator in place of `TokenVerifier` or the other
+  way round, regenerates the gate and the nodes it judged rather than
+  rechecking their recorded verdicts; a local validator could judge again,
+  but regenerating is the conservative route. A record written before records
+  named their gates' verifier is unknown on that point, so under a gate
+  validator it gets `undeclared_coverage`.
+- **Renderers.** A document is published by the renderer its record names,
+  and a run that published no document was made without one. Another
+  renderer, another version or description of it, a renderer added since or
+  none makes the document another way, or makes one the run never had, so
+  the synthesis regenerates in a successor run that keeps the other nodes
+  and publishes with the current renderer, if any, as `republish`, which
+  renders only with the run's own renderer, cannot.
 - **Nothing computed, item rules decide.** When no node regenerates or needs
   review, the published document, the recorded decision, and the validator
   set and policy decide, and every node takes the item's action: `reuse`,
@@ -442,6 +491,7 @@ calls for, or None where the policy's `undeclared_coverage` decides.
 | `lineage_missing` | `undeclared_coverage` | The run has no lineage record. |
 | `coverage_partial` | `undeclared_coverage` | The record does not declare every node's inputs. |
 | `coverage_undeclared` | `undeclared_coverage` | This node's inputs are undeclared. |
+| `gate_validator_unknown` | `undeclared_coverage` | The record does not name the verifier that judged this gate, or the gate this node goes with, and the state names gate validators. |
 | `source_unavailable` | `review` | A source is unknown to the catalog or unavailable. |
 | `source_tombstoned` | `review` | A source was withdrawn. |
 | `dependency_review` | `review` | A node this one depends on needs review. |
@@ -459,13 +509,16 @@ calls for, or None where the policy's `undeclared_coverage` decides.
 | `task_changed` | `regenerate` | The run's task was replaced. |
 | `node_incomplete` | `regenerate` | The node has no result. |
 | `dependency_changed` | `regenerate` | A node this one depends on regenerates. |
+| `gate_validator_changed` | `regenerate` | Another gate verifier or gate validator would judge this gate, or the gate this node goes with. |
+| `renderer_changed` | `regenerate` | Another renderer, or none, would publish the document made from this node's result, or a renderer would publish one the run never had. |
 | `gate_pair` | `regenerate` | A gate, or a node a gate depends on, in an item that computes something again. |
 | `reuse_disabled` | `regenerate` | The policy's `reuse` is off. |
 | `artifact_missing` | `rerender` | The published document is missing. |
 | `artifact_changed` | `rerender` | The published document holds other bytes. |
 | `validator_set_changed` | `recheck` | The validator set differs. |
 | `policy_changed` | `recheck` | The acceptance policy differs. |
-| `run_in_progress` | `review` | The run has not completed, so it has no record yet; only a [repair plan](#plan-a-repair) gives it. |
+| `run_in_progress` | `review` | The run has not completed, so it has no record yet; a [repair plan](#plan-a-repair) and `smythe runs inspect` give it, never `evaluate`. |
+| `run_failed` | `review` | The run failed or is blocked, such as by a security stop, so it has no record; a [repair plan](#plan-a-repair) and `smythe runs inspect` give it, never `evaluate`. |
 | `repair_in_progress` | `review` | A successor that has not completed is repairing the run; only a [repair plan](#plan-a-repair) gives it. |
 | `outcome_unknown` | `review` | A Jobs provider call's outcome is unknown: it may have completed and been charged. Only the [Jobs repair preview](jobs.md#preview-repairs) gives it. |
 
@@ -506,15 +559,18 @@ with SQLiteWorkflowStore("smythe-runs.db") as store:
   `TypeError`.
 - **The current state.** Each run is [evaluated](#reuse-decisions) against
   what a new run of this Swarm would use: its strict policy's final
-  validators and digest, its read profiles' names, versions and decoder
-  versions, its synthesizer, its context assembly version and the agents
-  its registry defines. An agent that a run recorded and the registry does
-  not define, such as one assigned when the run was planned, stays
-  current. Each completed run's published document is checked through
+  validators and digest, its gate verifier and gate validator, its read
+  profiles' names, versions and decoder versions, its synthesizer, its
+  renderer, its context assembly version and the agents its registry
+  defines. An agent that a run recorded and the registry does not define,
+  such as one assigned when the run was planned, stays current. Each
+  completed run's published document is checked through
   `current_artifact`, the accessor resume and inspection use.
 - **Runs in progress.** A run that has not completed has no record yet. Its
-  item needs `review` with `run_in_progress`, and has no status, no nodes
-  and no work.
+  item needs `review` with `run_in_progress`, or `run_failed` when its last
+  checkpoint failed or it is blocked, such as by a security stop, and has no
+  status, no nodes and no work. [`smythe runs inspect`](runs.md#lineage)
+  gives a lineage run that has not completed the same code.
 - **Repairs in progress.** A run that a successor which has not completed
   is repairing, such as one a lost process left, needs `review` with
   `repair_in_progress` added to its decision's reasons, so the plan never
@@ -584,15 +640,15 @@ repairs.
 
 ### Predicted work
 
-`work` predicts what carrying out an item takes, from its record alone;
-nothing is called to predict it.
+`work` predicts what carrying out an item takes, from its record and the
+current state; nothing is called to predict it.
 
 | Action | Predicted work |
 |---|---|
 | `reuse` | Every node is kept (`nodes_reused`); nothing else |
 | `recheck` | Every node is kept; one acceptance evaluation |
 | `rerender` | Every node is kept; one publication and one acceptance evaluation |
-| `regenerate` | One new run that keeps the nodes marked `reuse` and runs the others (`nodes_regenerated`): a read call for each read step it runs, a model step for each model node and gate and for a synthesis without a local component; one publication when the run published a document; one acceptance evaluation |
+| `regenerate` | One new run that keeps the nodes marked `reuse` and runs the others (`nodes_regenerated`): a read call for each read step it runs, a model step for each model node and gate and for a synthesis without a local component; one publication when a renderer is configured; one acceptance evaluation |
 | `review` | Nothing: a person decides |
 
 `may_incur_charges` is true for a new run that makes a model step, a read
@@ -630,7 +686,13 @@ decision and lineage record stays in the journal.
 - **Recheck.** A changed validator never inherits the decision made under
   the old one. `swarm.reevaluate(run_id, acceptance=policy)`
   [decides the saved document again](verifier.md#re-evaluation) under the
-  new policy, as a new decision.
+  new policy, as a new decision. A new decision reads the verdicts the run's
+  gates recorded, so a changed gate verifier or gate validator is never
+  rechecked: its plan [regenerates](#rules) the gates, and `reevaluate` and
+  `republish` of a lineage run with gates raise `WorkflowStateError`, writing
+  nothing, under any gate verifier but the one that judged them. An
+  [operator's decision](verifier.md#operator-decisions) reads no verdict, so
+  it is not refused.
 - **Rerender.** When the published document is missing or changed,
   `swarm.republish(run_id)` renders the run's saved synthesis again with
   the run's renderer, publishes the bytes as a new file named for the new
@@ -645,7 +707,8 @@ swarm.reevaluate(run_id, acceptance=policy)  # a validator's version changed
 - **Checked first.** Rerendering needs a completed run whose recipe differs
   from the `Swarm`'s only in its acceptance policy and gate verifier: a
   changed renderer or synthesizer raises `WorkflowConflictError`, because a
-  document made another way is regenerated in a successor run. The saved
+  document made another way is regenerated in a successor run. A run with
+  gates also needs the gate verifier that judged them. The saved
   decision must still hold, the saved synthesis must have the digest the
   run's lineage records, and the lineage must match its journal; otherwise
   `WorkflowStateError` is raised. A document whose file still holds its
@@ -695,8 +758,9 @@ Gates, the nodes they judge or depend on, and nodes that depend on a node
 that runs again are never kept. The successor holds its predecessor's source
 tombstones from its first checkpoint, so text
 [withdrawn](#restrict-a-source) from the predecessor is withdrawn from it
-too. [Applying a plan](#apply-a-repair-plan) starts one for each
-`regenerate` item.
+too, and it takes any the predecessor holds later when it resumes and again
+before it decides. [Applying a plan](#apply-a-repair-plan) starts one for
+each `regenerate` item.
 
 When the successor completes, its record shows what it kept:
 
@@ -806,7 +870,11 @@ added to the journal: the new runs it started, and the read calls, model
 calls, `reuse` operations, publications and acceptance decisions of the run
 it repaired in place or the successor it started. Offline runs cost nothing,
 so these counts, not money, compare a selective repair with computing again
-in full.
+in full. The [archive-maintenance example](../examples/18_archive_maintenance.py)
+makes that comparison offline: it revises a source two of four runs share,
+damages one published brief and bumps a validator's version, applies the
+plan, computes the four runs again in full in a second journal and compares
+their documents, decisions and work.
 
 ### A repair in progress
 
@@ -827,8 +895,11 @@ for new work without touching what was recorded. Its plans
 [regenerate](#rules) every item that is not a `recheck` or a `review`, with
 `reuse_disabled`, so applying one computes each such item again in full: no
 `reuse` operation is written, every node of each successor runs, and the
-documents are byte for byte those of a new run. Every lineage record stays
-readable, and turning reuse on again makes later plans keep results again.
+documents are byte for byte those of a new run. A `recheck` item is decided
+again as before, since a decision reuses nothing; rendering a document again
+from its saved synthesis is reuse, so `republish` refuses a run recorded
+under another `reuse`. Every lineage record stays readable, and turning reuse
+on again makes later plans keep results again.
 
 ## Restrict a source
 
@@ -847,18 +918,23 @@ with SQLiteWorkflowStore("smythe-runs.db") as store:
 ```
 
 - **Which runs.** Every completed run whose recipe records a lineage policy
-  and whose applied record names the source as any node's input, in journal
-  order. `version` limits it to the references recorded with that version.
-  `scope` limits it to the runs in that access scope, compared before any
-  record or digest is read, so a run in another scope is never touched
-  however exactly its digests match; without it, every scope is covered.
+  and whose applied record names the source as any node's input, and every
+  [successor](#reuse-in-a-successor-run) in progress whose saved graph or
+  `reuse` operations name a result of its predecessor whose recorded inputs
+  name the source. Completed runs are restricted first, so a predecessor
+  holds its tombstones before its successors are reached. `version` limits it
+  to the references recorded with that version. `scope` limits it to the runs
+  in that access scope, compared before any record or digest is read, so a
+  run in another scope is never touched however exactly its digests match;
+  without it, every scope is covered.
 - **What it records.** Each such run journals a tombstone of each withdrawn
   text under the run's lease: the same `SourceRecord` and
   `source_tombstone` operation that
   [removing a source](tasks.md#remove-a-source) writes, with the source's id,
   version and SHA-256, the reason (1-500 characters) and `removed_at` from
   the journal's clock (the store's `clock_ns`), and none of the text. A copy
-  of the run's completed checkpoint applies it; nothing is called. A text a
+  of the run's latest checkpoint, the completed one for a completed run,
+  applies it; nothing is called. A text a
   run already holds a tombstone of keeps its first one, so calling
   `restrict_source` again, for example after another process released a run
   whose lease it held (`WorkflowLeaseError`), finishes a restriction without
@@ -870,15 +946,15 @@ with SQLiteWorkflowStore("smythe-runs.db") as store:
   reason and the time; `smythe.lineage.purged_artifacts(store, run_id)`
   reads them. Accepted documents are deleted only by an explicit purge, and
   tombstones and purge records always remain.
-- **What it returns.** One entry per restricted run: its `run_id`, the
-  `tombstones` of the withdrawn text as JSON records, and its `purged`
-  files.
+- **What it returns.** One entry per restricted run, in journal order: its
+  `run_id`, the `tombstones` of the withdrawn text as JSON records, and its
+  `purged` files.
 - **Refusals.** A blank or overlong source id or version, a reason that is
   not 1-500 characters without control characters, a scope that is not an
   access-scope label and a `purge` that is not `True` or `False` raise
-  `WorkflowBindingError`. A run in scope whose record cannot be read raises
-  `WorkflowStateError` before anything is written, and so does a journal
-  opened read-only.
+  `WorkflowBindingError`. A run in scope whose record, or a successor whose
+  `reuse` records, cannot be read raises `WorkflowStateError` before
+  anything is written, and so does a journal opened read-only.
 
 ### A restricted run
 
@@ -893,7 +969,15 @@ decision follows it:
   `reevaluate` refuses the run, so no new decision, by a policy or an
   operator, delivers it again.
 - **No reuse.** A successor never reuses a node whose inputs name a
-  withdrawn text, nor a node that depends on one.
+  withdrawn text, nor a node that depends on one, including a successor
+  already in progress when the text is withdrawn: it is restricted with its
+  predecessor, or, while another process holds it, takes its predecessor's
+  tombstones when it resumes and before it decides. Resuming it then
+  refuses, with `WorkflowStateError` and before any node runs, a reused
+  result that the text reached, whether or not a checkpoint already saved
+  that result, so neither the text nor a result derived from it is sent
+  again. A successor that is running when the text is withdrawn completes
+  `indeterminate`.
 - **No republication.** `republish` refuses the run, so a purged document is
   never published again.
 - **No external delivery.** Republication outside the journal goes through
@@ -909,8 +993,9 @@ decision follows it:
   new version, the run can `regenerate`; its status stays `restricted`.
 - **Successors.** A successor holds its predecessor's tombstones from its
   first checkpoint. One given such a text as a context source is refused
-  before it is created, and one that reads such a text again is restricted
-  when it completes.
+  before it is created, and a read step that reads such a text again is
+  [refused it](tasks.md#remove-a-source): the read is settled as rejected
+  and its node follows its failure policy.
 
 ### Limits
 
@@ -923,8 +1008,131 @@ decision follows it:
   read responses copied, including a completed run's output, is not
   scrubbed: those records are bound by their digests. Protect or delete the
   journal itself when those copies must go.
-- **Runs in progress.** Only a run that has completed with a record is
-  restricted. Call `restrict_source` again after a run in progress
-  completes.
+- **Runs in progress.** A run that has not completed has no record, so only
+  a successor that reuses a result derived from the text is restricted
+  before it completes. Another run in progress, such as one reading the
+  source itself, is not: call `restrict_source` again after it completes,
+  and after a run another process held (`WorkflowLeaseError`) is released.
+  A successor running in another process when the text is withdrawn takes
+  the tombstones only when it decides or resumes: until then its nodes can
+  still read a reused result derived from the text.
 - **Files elsewhere.** Only the files a run published into its artifact
   directory are purged, never copies made elsewhere.
+
+## Cache and access
+
+Lineage keeps no cache of its own. A result is reused only from the journal
+that holds it, through a `reuse` operation that names the run and the node
+it comes from; nothing is looked up by its digest.
+
+- **One store.** A successor reuses only from a completed predecessor in the
+  same journal, whose applied lineage record has the digest the plan was
+  made from. Results never move between journals.
+- **Scope before digest.** The evaluator, a plan, `archive_heads`, reuse and
+  `restrict_source` compare the [access scope](#access-scope) before they
+  read any digest. Identical content under another scope is never offered,
+  because a matching hash identifies content; it does not grant access to
+  it.
+- **Checked when kept.** A kept result must still have the digest its record
+  gives, its inputs must be declared, and no source it names may be
+  withdrawn; gates and the nodes they judge are never kept. A refusal
+  creates no run and makes no call.
+  [Reused results](workflow-accounting.md#reused-results) lists every check.
+- **Copied, never shared.** A kept result is copied byte for byte into the
+  successor's journal, so once its `reuse` operation commits, resume replays
+  it without reading the predecessor's results; only the predecessor's
+  tombstones are read again. The predecessor's rows, document and decisions
+  are never changed.
+- **Documents are rendered again, never copied.** A published document is
+  checked against the digest its publication recorded. One that is missing
+  or changed is rendered again from its own run's saved synthesis and
+  decided again; a document is never copied from another run.
+- **Freshness costs nothing.** Sources are described by the
+  [source catalog](#the-source-catalog), a zero-cost local read; a catalog
+  declared metered is refused, so a plan never spends to find out what
+  changed.
+- **The journal file.** A scope is a declared label, not a credential: it
+  says whose runs these are, not who may read the journal. `inspect_run()`,
+  `list_runs()` and journal events never return a lineage record or kept
+  text, and `smythe runs inspect` shows a summary without text. The journal
+  itself holds the text of sources, outputs and kept results, so protect it
+  as the [durable workflow guide](workflow-accounting.md#inspect-a-run)
+  describes.
+
+## Inspect lineage
+
+None of these takes a lease, writes anything or calls a provider:
+
+| To see | Use |
+|---|---|
+| A run's record | `smythe.lineage.load_lineage(store, run_id)`: the record of its latest applied `lineage` operation, or None before it has one |
+| A run's coverage, sources, document integrity, predecessor, successors and derived status | `smythe runs --journal <path> inspect <run id>`, whose [lineage summary](runs.md#lineage) holds no text |
+| What each run in a scope calls for, and the work it would take | `Swarm.plan_repair(sources=...)`, or `smythe.reuse.repair_plan(store, recipe, catalog)` |
+| What one record calls for | `smythe.reuse.evaluate(record, state)` |
+| The runs that nothing supersedes | `archive_heads(store, scope)` |
+| The tombstones that restrict a run | `smythe.lineage.restricted_sources(store, run_id)` |
+| The published files a restriction deleted | `smythe.lineage.purged_artifacts(store, run_id)` |
+
+Applying a plan returns a [`RepairResult`](#the-result) with each item's
+outcome, decision, successor and work. A record, a decision and a plan
+convert with `to_dict()` to JSON data that holds no source text, prompt or
+output, so they can be kept or reviewed apart from the journal.
+
+## Where lineage applies
+
+- **Durable text workflows** support everything on this page, with a
+  `run_store` and a strict acceptance policy.
+- **Ordinary runs** keep no journal, so they record no lineage. `lineage`
+  without a `run_store` raises `WorkflowBindingError` before any routing,
+  planning or node call, and `plan_repair()` and `repair()` raise
+  `ValueError`. An ordinary run still records each artifact file's SHA-256
+  and size with its node ([artifact records](architecture.md#artifact-records-and-lineage)).
+- **Jobs** write no lineage record and repair accepted output only within
+  its own run: an [integrity repair](jobs.md#repair-corrupted-accepted-outputs)
+  regenerates a missing or changed accepted file as a new attempt, a
+  [recheck](jobs.md#recheck-accepted-outputs) decides accepted files again
+  under changed validators, and the read-only
+  [repair preview](jobs.md#preview-repairs) gives each operation an action
+  and reason codes from the [same vocabulary](#reason-codes). An operation's
+  [input digest](jobs.md#operation-identity-and-input-digest) identifies
+  what it asks its provider for, but no run reuses another run's output by
+  it.
+
+The [support matrix](support-matrix.md#lineage-and-repair) names the test
+behind each of these.
+
+## What lineage does not cover
+
+- **Automatic repair.** Nothing repairs on its own: a plan is applied only
+  by a `Swarm.repair` call that names the digest a person approved, and the
+  Jobs preview repairs nothing.
+- **Reuse across Jobs runs.** A Jobs run never adopts another run's accepted
+  output, even for the same input digest; repairing an operation makes a new
+  attempt in its own run, under its own approval.
+- **Reuse across journals.** A successor reuses only from a run in its own
+  store.
+- **Supervised repairs.** A repair refuses a configured `supervisor`,
+  because a revision could change the graph a successor keeps results in.
+- **Another graph.** A successor runs its predecessor's task and graph. A
+  run with a different graph is a new run, and nothing is reused for it.
+- **Reused gates.** A gate and the nodes it judges or depends on are
+  computed again whenever their item computes anything.
+- **Erasure.** A restriction withdraws text and can delete published files,
+  but copies in the journal remain (see the [limits](#limits) of
+  restriction).
+
+## Examples
+
+Both run offline and without keys, reading bundled sources from a server on
+the loopback address:
+
+- [Source to artifact](../examples/16_source_to_artifact.py) runs one durable
+  research run of the kind a lineage record describes: journaled read steps
+  of bundled sources, context snapshots, source evidence, an interruption
+  and resume, and a published document accepted under a strict policy.
+- [Archive maintenance](../examples/18_archive_maintenance.py) records the
+  lineage of four such runs, which share two sources between them. It
+  revises one shared source, damages one published brief and bumps a
+  validator's version, prints the repair plan, applies it, then computes the
+  four runs again in full in a second journal and compares their documents,
+  decisions and work.

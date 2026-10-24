@@ -7,7 +7,9 @@ import asyncio
 import hmac
 import json
 import os
+import shlex
 import sqlite3
+import subprocess
 import sys
 import tempfile
 import unicodedata
@@ -22,6 +24,7 @@ from smythe._run_inspection import (
     list_runs,
     open_checkpoints,
     open_journal,
+    review_run,
 )
 from smythe.jobs.loading import load_manifest
 from smythe.jobs.models import JOB_MANIFEST_V1_JSON_SCHEMA, ManifestValidationError
@@ -226,6 +229,12 @@ def build_parser() -> argparse.ArgumentParser:
     inspection.add_argument("--out", default=None, metavar="HTML_PATH", help="write a standalone HTML report")
     _add_output_options(inspection, inherited=True)
 
+    review = commands.add_parser("review", help="list what in a run needs a decision, without changing the store")
+    review.add_argument("run_id")
+    review.add_argument("--limit", type=int, default=50, help="operation page size (1-500; default: 50)")
+    review.add_argument("--offset", type=int, default=0, help="number of operations to skip (default: 0)")
+    _add_output_options(review, inherited=True)
+
     resume = commands.add_parser("resume", help="resume only definitively safe work")
     resume.add_argument("run_id")
     resume.add_argument("--detach", action="store_true", help="resume in a detached worker")
@@ -373,8 +382,8 @@ def build_parser() -> argparse.ArgumentParser:
 
     runs = root_commands.add_parser(
         "runs",
-        help="inspect saved Swarm checkpoints and durable workflow runs without changing them, "
-             "and revoke external action approvals",
+        help="inspect and review saved Swarm checkpoints and durable workflow runs without "
+             "changing them, and revoke external action approvals",
     )
     _add_runs_output_options(runs, inherited=False)
     runs_commands = runs.add_subparsers(dest="runs_command", required=True)
@@ -389,6 +398,14 @@ def build_parser() -> argparse.ArgumentParser:
     run_listing.add_argument("--limit", type=int, default=50, help="page size (1-500; default: 50)")
     run_listing.add_argument("--offset", type=int, default=0, help="number of runs to skip (default: 0)")
     _add_runs_output_options(run_listing, inherited=True)
+    run_review = runs_commands.add_parser(
+        "review", help="list what in a run, or in the newest runs, needs a decision, without changing them",
+    )
+    run_review.add_argument("run_id", nargs="?", default=None,
+                            help="the run to review; without it, review a page of runs, newest first")
+    run_review.add_argument("--limit", type=int, default=50, help="runs to review (1-500; default: 50)")
+    run_review.add_argument("--offset", type=int, default=0, help="number of runs to skip (default: 0)")
+    _add_runs_output_options(run_review, inherited=True)
     revocation = runs_commands.add_parser(
         "revoke-action",
         help="revoke every approval of an external action, or one approval, without a principal or lease",
@@ -806,6 +823,128 @@ def _emit_job_inspection(value: dict[str, Any]) -> None:
         print(f"HTML report: {_terminal_text(value['report_path'], limit=1000)}")
 
 
+def _command_line(argv: Sequence[str], *, windows: bool | None = None) -> str:
+    """Quote *argv* for the shell it is shown in: cmd.exe on Windows, a POSIX shell elsewhere.
+
+    ``shlex.join`` quotes with single quotes, which cmd.exe keeps as part of
+    an argument; ``subprocess.list2cmdline`` quotes as Windows programs read
+    their command line. *windows* defaults to whether this host is Windows.
+    """
+    if windows is None:
+        windows = os.name == "nt"
+    return subprocess.list2cmdline(argv) if windows else shlex.join(argv)
+
+
+def _shown_command(argv: Sequence[str], *, windows: bool | None = None) -> str:
+    """A suggested ``smythe`` command line, quoted for the shell it is shown in."""
+    return f"smythe {_terminal_text(_command_line(argv, windows=windows), limit=1000)}"
+
+
+def _operation_span(page: dict[str, Any]) -> str:
+    """Which of the run's operations a page holds, by position."""
+    first, last, total = page["offset"] + 1, page["offset"] + page["returned"], page["total"]
+    if not page["returned"]:
+        return f"none of {total} operations at offset {page['offset']}"
+    return f"operation {first} of {total}" if first == last else f"operations {first}-{last} of {total}"
+
+
+def _review_lines(items: list[dict[str, Any]], label, extra, *,
+                  windows: bool | None = None) -> list[str]:
+    """Review items as printed: kind and subject, then what was observed, the decision and commands.
+
+    *label* names an item's subject; *extra* gives an observation's added lines.
+    Commands are quoted as ``_command_line`` quotes them for *windows*.
+    """
+    lines = []
+    for item in items:
+        observed = item["observed"]
+        lines.append(f"[{item['blocks']}] {item['kind']}: {_terminal_text(label(item))} "
+                     f"(item {item['item_id'][:12]})")
+        state = ", ".join(_terminal_text(part) for part in (observed["status"], observed["error_class"])
+                          if part)
+        lines.append(f"  Observed: {state}")
+        if observed["excerpt"]:
+            lines.append(f"  Detail: {_terminal_text(observed['excerpt'])}")
+        lines.extend(extra(observed))
+        lines.append(f"  Decision: {_terminal_text(item['decision_needed'], limit=1000)}")
+        lines.extend(f"  Resolve with: {_shown_command(argv, windows=windows)}"
+                     for argv in item["resolve_with"])
+    return lines
+
+
+def _review_notes(items: list[dict[str, Any]], option: str | None, *,
+                  printed: bool = False) -> list[str]:
+    """The reminder after review items whose commands need the store *option* or a reason.
+
+    *printed* says another command line was shown, which also needs the option.
+    """
+    commands = [argv for item in items for argv in item["resolve_with"]]
+    # Without it, every command line printed here would use the default store.
+    shown = bool(commands) or printed
+    notes = ([f"add the {option} option used here"] if option and shown else []) + (
+        ["replace REASON with your own reason"] if any("REASON" in argv for argv in commands) else [])
+    return [f"To run a command, {' and '.join(notes)}."] if notes else []
+
+
+def _emit_job_review(value: dict[str, Any], *, store_given: bool, windows: bool | None = None) -> None:
+    """Print a review packet at once, so an interruption leaves no partial output.
+
+    Suggested commands are quoted for this host's shell, or for cmd.exe when
+    *windows* is true and a POSIX shell when it is false.
+    """
+    page, items = value["page"], value["items"]
+    lines = [f"Run: {_terminal_text(value['run_id'])}", f"Name: {_terminal_text(value['name'])}",
+             f"Status: {_terminal_text(value['status'])}",
+             f"Operations (whole run): {_terminal_text(json.dumps(value['operation_counts'], sort_keys=True))}",
+             f"Needs a decision: {len(items)} ({_operation_span(page)}, limit {page['limit']})"]
+    lines += _review_lines(
+        items, lambda item: (item["subject"].get("operation_key") or item["subject"].get("launch_id")
+                             or value["run_id"]),
+        lambda observed: [f"  Kept exposure: {_usd(observed['exposure_microusd'])}"]
+        if "exposure_microusd" in observed else [], windows=windows)
+    if not items:
+        lines.append("Nothing on this page needs a decision.")
+    if page["has_more"]:
+        lines.append(f"More operations: use --offset {page['offset'] + page['returned']}")
+    unchecked = value["artifact_integrity"]["counts"].get("not_checked", 0)
+    if unchecked:
+        lines.append(f"Accepted files not hashed within the 64 MiB limit: {unchecked}; "
+                     f"{_shown_command(['jobs', 'reroll', value['run_id'], '--dry-run'], windows=windows)}"
+                     " hashes them all.")
+    lines += _review_notes(items, "--store" if store_given else None, printed=bool(unchecked))
+    print("\n".join(lines))
+
+
+def _run_review_extra(observed: dict[str, Any]) -> list[str]:
+    """A runs review item's unknown exposure and validators, when it has them."""
+    lines = []
+    if observed.get("unknown_nanousd"):
+        calls = ", ".join(call["call_id"] for call in observed.get("unknown_calls") or ())
+        lines.append(f"  Unknown exposure: {observed['unknown_nanousd']} nanoUSD"
+                     + (f" on calls {_terminal_text(calls, limit=1000)}" if calls else ""))
+    lines.extend(f"  Validator {_terminal_text(result['name'])} {_terminal_text(result['version'])}: "
+                 f"{result['outcome']}" for result in observed.get("validators") or ())
+    return lines
+
+
+def _emit_run_review(value: dict[str, Any], *, journal: bool) -> None:
+    """Print a runs review packet at once, so an interruption leaves no partial output."""
+    page, items = value["page"], value["items"]
+    store = "durable workflow journal" if value["store"] == "journal" else "ordinary checkpoints"
+    lines = [f"Run: {_terminal_text(value['run_id'])} ({store})" if page is None else
+             f"Runs reviewed: {page['returned']} of {page['total']} in {store}, newest first "
+             f"(offset {page['offset']}, limit {page['limit']})", f"Needs a decision: {len(items)}"]
+    lines += _review_lines(items, lambda item: " ".join(
+        f"{key} {name}" if key != "run_id" else str(name) for key, name in item["subject"].items()),
+        _run_review_extra)
+    if not items:
+        lines.append("Nothing needs a decision.")
+    if page is not None and page["has_more"]:
+        lines.append(f"More runs: use --offset {page['offset'] + page['returned']}")
+    lines += _review_notes(items, "--journal" if journal else None)
+    print("\n".join(lines))
+
+
 def _emit_repair_preview(value: dict[str, Any]) -> None:
     print(f"Run: {_terminal_text(value['run_id'])}")
     print(f"Status: {_terminal_text(value['status'])}; nothing was changed")
@@ -833,9 +972,10 @@ def _emit_run_list(value: dict[str, Any]) -> None:
         if run["error"] is not None:
             print(f"{_terminal_text(run['run_id'])}  unreadable: {_terminal_text(run['error'])}")
             continue
-        decision = run["decision"] or "not recorded"
+        decision, unresolved = run["decision"] or "not recorded", run["unresolved_actions"]
+        marker = f"  {unresolved} unresolved action{'' if unresolved == 1 else 's'}" if unresolved else ""
         print(f"{_terminal_text(run['run_id'])}  {run['state']}  acceptance {decision}  "
-              f"next {run['next_action']}")
+              f"next {run['next_action']}{marker}")
     if not value["runs"]:
         print("No runs matched.")
     if value["has_more"]:
@@ -923,9 +1063,12 @@ def _emit_actions(actions: dict[str, Any]) -> None:
           f"{len(actions['unresolved'])} unresolved")
     for item in actions["items"]:
         risk = "; duplicate risk" if item["duplicate_risk"] else ""
+        if item["contradiction"] is not None:
+            risk += "; " + item["contradiction"].replace("_", " ")
+        attempts = len(item["attempts"])
         print(f"  Action {_terminal_text(item['slot'])}/{item['sequence']} ({_terminal_text(item['action_id'])}): "
-              f"{item['state']}; {len(item['attempts'])} attempts; {item['confirmed_nanousd']} confirmed, "
-              f"{item['unknown_nanousd']} unknown {unit}{risk}; next {item['next_action'] or 'none'}")
+              f"{item['state']}; {attempts} attempt{'' if attempts == 1 else 's'}; {item['confirmed_nanousd']} "
+              f"confirmed, {item['unknown_nanousd']} unknown {unit}{risk}; next {item['next_action'] or 'none'}")
         for approval in item["approvals"]:
             principal, expiry = approval["principal"], approval["expires_at_ns"]
             standing = (f"revoked {approval['revocation']}" if approval["revoked_at_ns"] is not None
@@ -958,6 +1101,31 @@ def _emit_revisions(log: list[dict[str, Any]]) -> None:
                 print(f"  {label}: {_terminal_text(entry[key])}")
 
 
+def _emit_routing(routing: dict[str, Any] | None) -> None:
+    """One line for the tier the router chose, how, and what its classifier call used."""
+    if routing is None:
+        return
+    if not routing["readable"]:
+        print("Routing: a decision this build cannot read")
+        return
+    method = routing["method"]
+    how = (f"rule {_terminal_text(routing['rule'] or 'unnamed')}" if method == "rule"
+           else "the classifier" if method == "classifier" else method.replace("_", " "))
+    line = f"Routing: tier {_terminal_text(routing['tier'])}, chosen by {how}"
+    classifier = routing["classifier"]
+    usage = None if classifier is None else classifier["usage"]
+    if usage is not None:
+        cost = ("cost unknown" if usage["cost_usd_unknown"] or usage["cost_usd"] is None
+                else f"${usage['cost_usd']:.6f}" + (" estimated" if usage["cost_usd_is_estimate"]
+                                                   else ""))
+        line += (f"; classifier call: {usage['prompt_tokens']} prompt and "
+                 f"{usage['completion_tokens']} completion tokens, {cost}")
+    elif classifier is not None:
+        calls = len(classifier["call_ids"])
+        line += f"; classifier charge in {calls} journal call{'' if calls == 1 else 's'}"
+    print(line)
+
+
 def _emit_run_inspection(value: dict[str, Any]) -> None:
     print(f"Run: {_terminal_text(value['run_id'])}")
     saved = value["format"]
@@ -969,6 +1137,7 @@ def _emit_run_inspection(value: dict[str, Any]) -> None:
     execution = value["execution"]
     blocked = f" ({_terminal_text(execution['blocked_reason'])})" if execution["blocked_reason"] else ""
     print(f"Execution: {execution['state']}{blocked}; nodes: {json.dumps(execution['nodes'], sort_keys=True)}")
+    _emit_routing(value.get("routing"))
     delivery = value["delivery"]
     record = delivery["record"]
     if record is None:
@@ -1053,6 +1222,8 @@ def _emit(args: argparse.Namespace, command: str, value: Any) -> None:
     if args.root_command == "runs":
         if command == "list":
             _emit_run_list(value)
+        elif command == "review":
+            _emit_run_review(value, journal=args.journal is not None)
         elif command == "revoke-action":
             revoked = value["revoked"]
             print(f"Revoked {len(revoked)} approvals of {_terminal_text(value['target'])}"
@@ -1098,6 +1269,8 @@ def _emit(args: argparse.Namespace, command: str, value: Any) -> None:
         _emit_job_list(value)
     elif command == "inspect" and args.root_command == "jobs":
         _emit_job_inspection(value)
+    elif command == "review":
+        _emit_job_review(value, store_given=args.store != str(_default_store()))
     else:
         print(json.dumps(value, indent=2, ensure_ascii=False))
 
@@ -1390,6 +1563,19 @@ def _dispatch_jobs(args: argparse.Namespace) -> int:
         _emit(args, command, payload)
         return EXIT_OK
 
+    if command == "review":
+        from smythe.jobs.inspection import review_job
+
+        try:
+            with SQLiteRunStore(args.store, read_only=True) as store:
+                packet = review_job(store, args.run_id, limit=args.limit, offset=args.offset)
+            # Each format is rendered whole before it is written.
+            _emit(args, command, packet)
+        except KeyboardInterrupt:
+            _emit_error(args, command, KeyboardInterrupt("review interrupted"))
+            return EXIT_INTERRUPTED
+        return EXIT_OK
+
     if command == "reroll" and args.dry_run:
         with SQLiteRunStore(args.store, read_only=True) as store:
             preview = JobRunner(store).repair_preview(args.run_id, args.operation_keys or None)
@@ -1465,15 +1651,37 @@ def _revoke_action(args: argparse.Namespace) -> int:
     return EXIT_OK
 
 
+def _open_runs(args: argparse.Namespace) -> Any:
+    if args.journal is not None:
+        return open_journal(args.journal)
+    return open_checkpoints(args.checkpoints if args.checkpoints is not None else _default_checkpoints())
+
+
+def _review_runs(args: argparse.Namespace) -> int:
+    """Review saved runs; an interruption prints only its structured error, never part of the packet."""
+    try:
+        store = _open_runs(args)
+        try:
+            packet = review_run(store, args.run_id, limit=args.limit, offset=args.offset)
+        finally:
+            if args.journal is not None:
+                store.close()
+        # Each format is rendered whole before it is written.
+        _emit(args, "review", packet)
+    except KeyboardInterrupt:
+        _emit_error(args, "review", KeyboardInterrupt("review interrupted"))
+        return EXIT_INTERRUPTED
+    return EXIT_OK
+
+
 def _dispatch_runs(args: argparse.Namespace) -> int:
     if args.journal is not None and args.checkpoints is not None:
         raise ValueError("Choose --checkpoints or --journal, not both")
     if args.runs_command == "revoke-action":
         return _revoke_action(args)
-    if args.journal is not None:
-        store = open_journal(args.journal)
-    else:
-        store = open_checkpoints(args.checkpoints if args.checkpoints is not None else _default_checkpoints())
+    if args.runs_command == "review":
+        return _review_runs(args)
+    store = _open_runs(args)
     try:
         if args.runs_command == "list":
             _emit(args, "list", list_runs(store, limit=args.limit, offset=args.offset))

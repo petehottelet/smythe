@@ -9,6 +9,7 @@ verifier authenticates each approval for one action's intent digest, and
 from __future__ import annotations
 
 from contextlib import closing
+import hashlib
 import json
 import sqlite3
 import time
@@ -21,11 +22,14 @@ from fixture_service import FixtureService
 from smythe import (
     MarkdownRenderer, OfflineProvider, SimpleArchitect, SQLiteWorkflowStore, Swarm, Task,
 )
+from smythe._canonical import canonical_bytes
 from smythe.actions import (
+    APPROVAL_SUBJECT_VERSION,
     ActionApproval,
     ActionIntent,
     ActionNotAuthorized,
     ActionStateError,
+    ActionRunner,
     ActionTarget,
     ApprovalRejected,
     ContentRef,
@@ -67,9 +71,9 @@ class Host(HmacApprovalHost):
         self.verified: list[str] = []
         self.authorized = True
 
-    def verify(self, assertion, intent_sha256, now_ns):
-        self.verified.append(intent_sha256)
-        return super().verify(assertion, intent_sha256, now_ns)
+    def verify(self, assertion, subject_sha256, now_ns):
+        self.verified.append(subject_sha256)
+        return super().verify(assertion, subject_sha256, now_ns)
 
     def still_authorized(self, principal, intent, now_ns):
         return self.authorized and super().still_authorized(principal, intent, now_ns)
@@ -131,8 +135,8 @@ def prepare(store, run_id, slot="publish", **changes) -> PreparedAction:
 
 
 def sign(host, action, *, subject="editor-1", tenant="acme", expires_at_ns=FAR) -> str:
-    return host.issue(action.intent.digest(), subject=subject, tenant=tenant,
-                      expires_at_ns=expires_at_ns)
+    """An assertion that *subject* approves *action*: its approval subject, the action's key and intent."""
+    return host.issue(action.approval_sha256, subject=subject, tenant=tenant, expires_at_ns=expires_at_ns)
 
 
 def approved(store, host, action, clock, assertion=None, *, hours=1) -> ActionApproval:
@@ -319,9 +323,14 @@ def test_an_approval_is_verified_for_the_action_and_checked_again(
     principal = Principal(host.issuer, "editor-1", "acme")
     assert approval == ActionApproval(approval.approval_id, action.action_id, principal, CEILING,
                                       clock.now_ns + HOUR_NS)
-    assert host.verified == [action.intent.digest()]
+    # The verifier checks the action's approval subject: a versioned digest of its key and intent digest.
+    assert APPROVAL_SUBJECT_VERSION == "smythe.action-approval.v1"
+    assert action.approval_sha256 == hashlib.sha256(canonical_bytes({
+        "type": "smythe.action-approval.v1", "action_key": action.action_key,
+        "intent_sha256": action.intent.digest()})).hexdigest()
+    assert host.verified == [action.approval_sha256]
     assert check_authority(store, action.action_id, host) == approval
-    assert host.verified == [action.intent.digest()] * 2
+    assert host.verified == [action.approval_sha256] * 2
     # The same approval again is recorded once.
     assert approved(store, host, action, clock, assertion) == approval
     assert len(approval_rows(store.path)) == 1
@@ -337,7 +346,13 @@ def test_an_approval_is_verified_for_the_action_and_checked_again(
 
 def _another_intent(host, store, run_id, action):
     other = prepare(store, run_id, slot="announce", title="Another post")
-    return sign(host, other), "approves another intent"
+    return sign(host, other), "approves another"
+
+
+def _intent_digest(host, store, run_id, action):
+    # The bare intent digest would fit an identical intent of any other action.
+    return host.issue(action.intent.digest(), subject="editor-1", tenant="acme", expires_at_ns=FAR), (
+        "approves another")
 
 
 def _forged(host, store, run_id, action):
@@ -360,6 +375,7 @@ def _withdrawn(host, store, run_id, action):
 
 MISBOUND = {
     "another-intent": _another_intent,
+    "intent-digest": _intent_digest,
     "forged": _forged,
     "other-tenant": _other_tenant,
     "revoked-subject": _revoked_subject,
@@ -408,14 +424,47 @@ def test_an_assertion_approves_one_action_even_where_intents_match(
     assertion = sign(host, first)
     approved(store, host, first, clock, assertion)
 
-    with pytest.raises(ApprovalRejected, match="already recorded"):
+    # The verifier refuses it for the second action, whose approval subject differs.
+    with pytest.raises(ApprovalRejected, match="approves another"):
         approved(store, host, second, clock, assertion)
+    # The journal refuses it too, even from a verifier that ignores the subject.
+    class Careless(Host):
+        def verify(self, assertion, subject_sha256, now_ns):
+            return super().verify(assertion, self._claims(assertion)["subject_sha256"], now_ns)
+
+    with pytest.raises(ApprovalRejected, match="already recorded"):
+        approved(store, Careless(key=host.key), second, clock, assertion)
     # Nor can the same assertion approve the first action again on other terms.
     with pytest.raises(ApprovalRejected, match="already recorded"):
         approved(store, host, first, clock, assertion, hours=2)
     with pytest.raises(ActionNotAuthorized, match="no approval"):
         check_authority(store, second.action_id, host)
     assert len(approval_rows(store.path)) == 1
+
+
+def test_an_assertion_recorded_in_another_journal_does_not_approve_the_same_intent(
+        tmp_path, replies, host, clock):  # noqa: F811
+    service = FixtureService(clock_ns=clock)
+    connector = FixtureConnector(service, write_ceiling_nanousd=2_000_000, read_ceiling_nanousd=10_000,
+                                 max_attempts=2, readback_reads=2)
+    with (SQLiteWorkflowStore(tmp_path / "first.db", clock_ns=clock) as first_store,
+          SQLiteWorkflowStore(tmp_path / "second.db", clock_ns=clock) as second_store):
+        # Two journals whose runs accepted the same document prepare the identical intent.
+        first = prepare(first_store, completed(first_store, tmp_path / "first", replies))
+        second = prepare(second_store, completed(second_store, tmp_path / "second", replies))
+        assert first.intent == second.intent and first.action_key != second.action_key
+        assertion = sign(host, first)
+        approved(first_store, host, first, clock, assertion)
+
+        # The assertion that one journal recorded approves no action of another.
+        with pytest.raises(ApprovalRejected, match="approves another"):
+            approved(second_store, host, second, clock, assertion)
+        assert approval_rows(second_store.path) == []
+        with pytest.raises(ActionNotAuthorized, match="it has no approval"):
+            ActionRunner(second_store, connector, host).dispatch(second.run_id, second.action_id)
+        assert service.snapshot()["deliveries"] == []
+        # The journal that recorded it is authorized, as before.
+        assert check_authority(first_store, first.action_id, host).action_id == first.action_id
 
 
 def test_an_assertion_must_be_text(store, tmp_path, replies, host, clock):  # noqa: F811

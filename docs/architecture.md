@@ -203,6 +203,8 @@ and it never enters node metadata. The record holds no elapsed time:
 charging it to the run's budget, whose scope stays execution and synthesis.
 Checkpoints keep the record, and resume restores it
 ([graph planning records](checkpoint-format.md#graph-planning-records)).
+`smythe runs inspect` shows it as its
+[`routing` block](runs.md#routing-decisions), for ordinary and durable runs.
 
 In a durable run, the `planning` operation's result carries the decision under
 `routing` as well as in its saved graph. Resuming restores the whole
@@ -378,6 +380,32 @@ complete worst-case preflight, approval bound to the exact plan and ceiling,
 SQLite attempt/event journaling, explicit unknown outcomes, selective rerolls,
 and portable exports. See [Jobs](jobs.md).
 
+### Artifact records and lineage
+
+Each path records what it delivered by digest, to a different depth:
+
+- **Ordinary runs** record each artifact file's path, MIME type, SHA-256 and
+  size with its node, and a strict policy hashes delivered files again when
+  it decides.
+- **Durable text workflows** can
+  [publish the delivered document](workflow-accounting.md#published-documents)
+  as a local file whose SHA-256 the run's delivery decision binds. With a
+  [lineage policy](lineage.md), each completed run also records how that
+  document was made: the decision, and each node's result and inputs (read
+  profiles, sources by id, version and digest, context snapshots,
+  components and agents) as ids, versions and digests, without text. A
+  read-only [repair plan](lineage.md#plan-a-repair) compares those records
+  with the current sources, tools and validators, and
+  [applying it](lineage.md#apply-a-repair-plan) decides a run again,
+  publishes its document again, or starts a successor run that keeps the
+  unaffected results, so a changed source recomputes only what depends on
+  it.
+- **Jobs** record every attempt's artifacts with their SHA-256 in the
+  dispatch journal. Within its own run, a damaged accepted output can be
+  [regenerated](jobs.md#repair-corrupted-accepted-outputs) and an accepted
+  output [decided again](jobs.md#recheck-accepted-outputs) under changed
+  validators; no run reuses another run's output.
+
 ## Tools and skills
 
 Agents can carry MCP server specifications. The runtime discovers an allowed
@@ -389,7 +417,9 @@ written before 0.8.1 drops its servers. See [MCP](mcp.md).
 
 Capability hydration influences assignment; MCP tools enable execution. The
 Architect receives the effective agent/tool inventory so it can design the
-graph around capabilities that actually exist.
+graph around capabilities that actually exist. Skills come from Agent Skills
+directories, MCP tools or OpenClaw and add only capability tags; see
+[Skills](skills.md).
 
 ## Learning loop
 
@@ -412,6 +442,21 @@ before these fields existed recall with them `null`, meaning not recorded, and
 recall skips rows where they are malformed. Planner prompts still show only the
 summed node time.
 
+A run that left verification or acceptance evidence also records its
+`execution_id`, its graph's `structure_sha256`, a `verification` entry per
+gate receipt (`gate`, `target`, `state`, `passed`, `regenerations_used`) and,
+for rejected output, `rejected_output_sha256`, a digest that never holds the
+text. An exhausted gate, or one whose target did not complete, is recorded
+with `passed` false while `success` keeps its meaning. Other runs write the
+same keys as before, and planner prompts do not show these fields. See
+[evidence in planner history](learning.md#evidence-in-planner-history).
+
+`PlannerMemory(record_failures=True)` also records runs that raise, with
+their failure class, exception type and, for a provider or service error, a
+capped excerpt with account identifiers and local paths redacted. Planner
+prompts show each of these runs as a failure. Recording failures is off by
+default; see [failed runs](learning.md#failed-runs).
+
 **Added in 0.8.0:** recalled topology, success, cost, and duration fields
 are validated before ranking. Malformed records are skipped without rewriting
 the history file; valid values, legacy keys, and relevance ordering remain
@@ -423,6 +468,15 @@ constrained tier. The template keeps the graph's dependency edges,
 verification gates, and node failure policies, retries, and timeouts; results,
 costs, and statuses stay behind. The template is an in-memory object that you
 pass to `ConstrainedArchitect`; `PlannerMemory` does not store templates.
+`distill_record` returns the same template as a versioned `TemplateRecord`:
+JSON data with a `template_version` digest, optional applicability,
+prerequisites and evidence sections, and a review that flags labels that
+repeat the source goal and text that holds a rooted or home path. A
+`TemplateCatalog` keeps records in append-only, content-addressed files and
+stores only a record that `validate_template_record` accepts as an untrusted
+candidate: no key that grants authority, the generated-plan limits, and no
+weaker gate than its parent's. `record.local_only()` pins an exact version
+in a durable run's recipe. See [learning from runs](learning.md).
 
 This keeps learning reviewable: execution history informs future choices, and
 promoted graph structure becomes an explicit template rather than an invisible
@@ -447,6 +501,10 @@ prompt mutation.
   the snapshot it was first given, and new sources enter a run only through
   `refresh_context`, which re-evaluates its nodes. See
   [context snapshots](tasks.md#context-snapshots).
+- With a lineage policy, a run's results are reused only by an explicit
+  repair under an allowance, from a completed run in the same journal and
+  access scope, which is compared before any digest. See
+  [cache and access](lineage.md#cache-and-access).
 - A supervisor may change only pending work. It cannot drop a verification
   gate or the node it judges, or leave the gate no longer depending on that
   node; a step it adds after that node is not judged by the gate. One

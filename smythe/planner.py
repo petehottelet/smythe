@@ -282,13 +282,15 @@ class LLMArchitect(Architect):
         outcomes = self._memory.recall(task)
         if not outcomes:
             return None
+        # A run that raised is shown as a failure, even one whose nodes all
+        # completed before synthesis or acceptance failed.
         return [
             {
                 "task_goal": o.task_goal,
                 "topology": o.topology,
                 "total_cost_usd": o.total_cost_usd,
                 "total_duration_ms": o.total_duration_ms,
-                "success": o.success,
+                "success": o.success and o.failure_category is None,
             }
             for o in outcomes
         ]

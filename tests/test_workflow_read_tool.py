@@ -22,9 +22,10 @@ from fakes import Crash, Gate, ManualClock, crash_when, kill_and_reap, launch_ch
 from fixture_service import FixtureService, serve_http
 from smythe import (
     DeterministicArchitect, MCPToolRuntime, OfflineProvider, ReadProfile, ReadToolError,
-    SimpleArchitect, SQLiteWorkflowStore, Swarm, Task,
+    SimpleArchitect, SourceRecord, SQLiteWorkflowStore, Swarm, Task,
 )
 from smythe.checkpoint import FileCheckpointStore
+from smythe.evidence import _journal_tombstone
 from smythe.graph import ExecutionGraph, FailurePolicy, Node, Topology
 from smythe.loader import build_graph_from_model_output
 from smythe.registry import Registry
@@ -599,6 +600,32 @@ def test_a_decoder_failure_is_a_settled_rejection_with_a_redacted_reason(tmp_pat
     assert "decoder refuse-v1 raised ValueError" in message
     assert (record["billing_state"], record["result_state"]) == ("known", "rejected")
     assert identifier not in record["error"] and BRIEF not in record["error"]
+
+
+def test_the_text_of_a_source_removed_from_the_run_is_refused_not_delivered(tmp_path, service):
+    service.add_source("other", "Other text.")
+    profile = profile_for(service.port)
+    removed = SourceRecord("brief-doc", BRIEF, "v1").tombstoned("withdrawn by its owner")
+    earlier, refused, other = (CallKey("tool", f"node/{name}") for name in ("earlier", "fetch", "other"))
+    with journal(tmp_path) as (store, lease):
+        assert read(store, lease, profile, {"source_id": "brief"}, earlier).text == BRIEF
+        _journal_tombstone(store, lease, removed)
+        with pytest.raises(ReadToolError, match="the response is the text of source 'brief-doc', "
+                                                r"which was removed from this run \(withdrawn"):
+            read(store, lease, profile, {"source_id": "brief"}, refused)
+        record = store.lookup_call("run", refused)
+        # A read accepted before the removal keeps its record and is not delivered again.
+        with pytest.raises(ReadToolError, match="'brief-doc', which was removed"):
+            read(store, lease, profile, {"source_id": "brief"}, earlier)
+        kept = store.lookup_call("run", earlier)
+        assert read(store, lease, profile, {"source_id": "other"}, other).text == "Other text."
+
+    # The refused read was sent and settled; its text was never accepted as the step's result.
+    assert (record["billing_state"], record["result_state"], record["decoded_result"]) == (
+        "known", "rejected", None)
+    assert "withdrawn by its owner" in record["error"] and BRIEF not in record["error"]
+    assert (kept["result_state"], kept["decoded_result"]) == ("accepted", {"text": BRIEF})
+    assert service.arrivals == ["brief", "brief", "other"]
 
 
 # ---------------------------------------------------------------------------

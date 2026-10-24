@@ -651,6 +651,13 @@ On a durable run, `smythe.workflow.current_decision(store, run_id)` gives the
   stands: `reevaluate` raises `ValueError` (`WorkflowStateError` on a durable
   run) before the assertion is checked. As with re-evaluation, the run must
   be completed and everything its record binds must still hold.
+- On a durable run that delivered from a
+  [removed source](tasks.md#remove-a-source), an operator can reject the
+  output but accepts it only through a `Swarm` whose own policy has a
+  `SourceEvidenceValidator` that holds the source's tombstone, as a policy's
+  decision needs. Otherwise `reevaluate` raises `WorkflowStateError`, naming
+  the removed source, before the assertion is checked, and nothing is
+  written.
 - The verifier must accept the assertion for exactly that digest. A forged,
   expired or revoked assertion, or one issued for another run, decision,
   sequence, record or evidence, makes it raise `ApprovalRejected`, which
@@ -817,6 +824,12 @@ policy, and records the decision in its journal:
   kind `acceptance`, keyed by the output digest and everything else the
   record binds, runs the final validators and reads the gates, and the
   completed checkpoint consumes it in the same transaction as the output.
+  Its inputs also bind `gate_receipts_sha256`, the SHA-256 of each gate's
+  final receipt: its node id and status, and everything its verdict is read
+  from in the record it keeps: the record's version and state, the target id
+  and generation and the judge generation it is bound to, and its outcome and
+  passed flag. A re-evaluation's decision binds the same receipts, which
+  nothing changes once the run completes.
   A run stopped after synthesis and before the decision is committed decides
   again when it resumes: the validators run on the same saved output, which
   is never accepted for having been synthesized. A committed decision is read
@@ -830,21 +843,29 @@ policy, and records the decision in its journal:
   already refuse their recipes.
 - **Completed runs.** Resuming a completed run checks the saved output
   against the record's digest, the task and source generations against the
-  record, and the record against the journal's current decision. Any
-  mismatch returns an `indeterminate` record with the saved text in
-  `rejected_output`, never acceptance. A run without a strict policy returns
-  `acceptance=None`. [`smythe runs inspect`](runs.md) makes the same checks
-  without resuming the run.
+  record, the record against the journal's current decision, each decision's
+  inputs against its key, and every gate's final receipt against the digest
+  the run's decisions bound. Any mismatch returns an `indeterminate` record
+  with the saved text in `rejected_output`, never acceptance. A run without
+  a strict policy returns `acceptance=None`. [`smythe runs inspect`](runs.md)
+  makes the same checks without resuming the run.
 - **Re-evaluation.** `Swarm(run_store=...).reevaluate(run_id,
   acceptance=policy)`, or `WorkflowRuntime.reevaluate(run_id)`,
   [decides a completed run again](#re-evaluation). The saved recipe may
   differ from the `Swarm`'s only in its acceptance policy and gate verifier,
-  since no gate judges again; anything else raises `WorkflowConflictError`.
+  since no gate judges again, and in its lineage policy's `reuse`, since a
+  decision reuses nothing; anything else raises `WorkflowConflictError`.
+  A lineage run with gates is decided again by a policy only under the gate
+  verifier that judged them, or `WorkflowStateError` is raised
+  ([lineage](lineage.md#repair-a-run-in-place)).
   The decision is a new `acceptance` operation keyed
   `acceptance/<sequence>/<digest>`, the digest covering the output, the
   policy and everything else the decision binds, and a new completed
   checkpoint applies it in one transaction. The run's calls, charges,
-  budget, counters and recipe are unchanged. A re-evaluation stopped before
+  budget, counters and recipe are unchanged. Gates do not judge again, so
+  their saved receipts must still match the digest the run's decisions
+  bound; a gate verdict changed in the journal afterwards raises
+  `WorkflowStateError` and nothing is written. A re-evaluation stopped before
   that checkpoint is finished by the next one under the same policy, without
   validating again, unless a source was [removed](tasks.md#remove-a-source)
   from the run after it decided; the next one then decides again.

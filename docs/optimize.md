@@ -27,7 +27,9 @@ ambiguous after a connection failure.
 | `smythe.optimize.statistics` | Direction-normalized paired comparisons, paired Student-t promotion bounds, three-way verdicts, descriptive bootstrap intervals, and promotion policy |
 | `smythe.optimize.ledger` | Durable campaign, candidate, trial-event, cost-exposure, and decision history |
 | `smythe.optimize.engine` | Bounded development, confirmation, and holdout orchestration with conservative recovery |
+| `smythe.optimize.workflow_eval` | A trial evaluator that runs one durable text workflow per trial and reports its exact cost |
 | `smythe.optimize.inspection` and `smythe.optimize.report` | Read-only evidence collection and standalone HTML reports |
+| `smythe.optimize.registry` | Append-only reviews of terminal decisions and history of the policy version in effect for each target, with activation, rollback and retirement |
 
 These modules are deliberately separable from proposal generation. A human,
 an agent, or a deterministic grid can propose candidates, but every candidate
@@ -87,6 +89,31 @@ Confirmation and holdout compare the incumbent with only the one selected
 challenger, limiting both cost and repeated testing; declared
 [reference arms](#reference-arms) join those comparisons but are never
 promoted.
+
+A campaign tunes a policy, never how candidates are judged, what they may
+spend, or what they may do. The runner refuses a contract with a mutable field
+named `acceptance`, `validators`, `verifier`, `evaluator`, `harness`,
+`budget`, `spend`, `ceilings`, `capabilities`, `tools`, `permissions`,
+`authority`, or `holdout`, or any path under one, such as `acceptance.mode`,
+in any letter case. It raises `OptimizationError` naming those fields before
+it reads or writes the ledger. Only whole segments match: `toolbar.layout` is
+not under `tools`. Contract parsing does not apply this rule, so a stored
+contract that declares such a field still loads for inspection and holdout
+accounting, but a campaign stored under it no longer runs or resumes. The rule
+reads field names only; the evaluator decides what each policy value controls,
+so it must not apply a differently named field to acceptance, spend, tools, or
+held-out data.
+
+`OptimizationRunner(..., single_change=True)` holds each challenger to one
+targeted change: it must differ from the incumbent in exactly one policy path,
+counting a path that only one of the two sets. A plan with a challenger that
+changes more is refused with `OptimizationError`, naming the challenger and
+its changed paths, before the campaign is created.
+[References](#reference-arms) are not limited, since they are never promoted.
+The setting joins the plan hash only when it is true, so plans without it keep
+their hashes and automatic campaign IDs, and reopening an explicit campaign ID
+with the other setting is refused as campaign binding drift. It is not part of
+the holdout identity.
 
 Independent implementation ceilings bound otherwise-valid contracts to 1,024
 candidates, 256 parallel candidate series, 10,000 repetitions per split, and
@@ -375,8 +402,9 @@ promote the candidate. Rejection never emits a patch to apply.
 The optimization plan hash binds the contract, incumbent, ordered challenger
 set, policy hashes, evaluator hash, runner version, promotion method,
 descriptive bootstrap configuration, ledger durability, and required trial
-count, plus any declared [task pools and holdout draw cap](#finite-task-pools)
-and [reference arms](#reference-arms).
+count, plus any declared [task pools and holdout draw cap](#finite-task-pools),
+[reference arms](#reference-arms), and
+[single-change constraint](#experiment-contracts-and-budgets).
 When `--campaign-id` is omitted, the durable campaign identity is
 derived from that full plan. Repeating the same command reuses completed
 trials; changing a candidate, contract, evaluator, bootstrap, or durability
@@ -647,6 +675,86 @@ reopens a policy's used holdout. It joins the plan hash when set, like task
 pools. To test again after the pack is used up, author a new holdout pack:
 its manifest digest changes the evaluator hash and so defines a new holdout.
 
+### Durable workflow trials
+
+`workflow_trial_evaluator` runs each trial as one
+[durable text workflow](workflow-accounting.md) and reports the cost its
+journal confirmed:
+
+```python
+from smythe import Swarm, Task
+from smythe.optimize.workflow_eval import workflow_trial_evaluator
+
+
+def build(context, max_budget_usd):
+    return Swarm(model=context.candidate.policy["model"], provider=provider,
+                 run_store=store, max_budget_usd=max_budget_usd)
+
+
+def task_for(context):
+    return Task(tasks[context.split][context.task_index])
+
+
+def measure(context, result):
+    return {"quality": score(result.output)}, {"delivered": result.accepted}
+
+
+evaluate = workflow_trial_evaluator(build, task_for, measure)
+runner = OptimizationRunner(contract, ledger, evaluate,
+                            evaluator_hash=manifest.evaluator_hash)
+```
+
+For each trial the adapter:
+
+- calls `build(context, max_budget_usd)` for the candidate's `Swarm`, which
+  needs a durable `run_store` and exactly the budget it is given:
+  `ceiling_microusd` × 1,000 nanoUSD, the trial's full reservation;
+- creates the run under `trial_run_id(context.trial_key)`, a run id derived
+  from the trial key, and runs it once from `task_for(context)`;
+- calls `measure(context, result)` on the `SwarmResult` of a run that
+  completed with all of its spend confirmed, for the trial's metrics and
+  gates; and
+- reports the run's confirmed nanoUSD as micro-USD rounded up, never down.
+  A trial that confirmed 3,002,500 nanoUSD costs 3,003 micro-USD.
+
+Every other case raises `WorkflowTrialError`, and the runner records the
+trial as [unknown](#unknown-outcomes-stop-the-campaign) at its full ceiling
+and stops the campaign. That covers a run that leaves any reserved or
+unknown spend or any unknown call, such as a step whose response was lost,
+or whose state the journal cannot report; a run that fails, even with its
+spend confirmed; a configuration the adapter refuses before the run exists,
+including a `run_control` that is already revoked; a trial whose run id the
+journal already holds; and a measurement that raises or does not return two
+mappings. The ledger keeps the error's text, so every one of these is a
+fixed sentence and never a provider's message; the original error stays
+chained to it in the process, and a failed workflow's own error stays in
+that chain even when its run's state then cannot be read.
+
+A configuration that only the run's own planning check refuses, such as a
+strict acceptance policy that no gate of its plan could accept, is refused
+after its run is created: the run stays in the journal with nothing spent,
+and the trial raises the text for a failed workflow.
+
+The runner still checks every outcome the adapter reports against its
+contract. When `measure` returns metrics or gates that do not exactly match
+the contract's objectives and required gates, no `WorkflowTrialError` is
+raised: the runner records the trial as unknown itself, as an invalid
+outcome with its own validation text
+(`evaluator returned an invalid outcome: ...`).
+
+Nothing retries. The runner never dispatches a trial twice, the journal
+owns each call, and the adapter refuses a trial whose run exists rather than
+resuming it. A runner killed during a trial leaves the trial dispatched,
+with its reservation, and its run in the journal; the next runner stops
+with `OptimizationNeedsAttention` before building any workflow. Inspect the
+run with [`smythe runs inspect`](runs.md) before deciding how to proceed.
+
+Measurement must be local: a judge model or anything else `measure` spends
+is not counted. The adapter is tested offline only, with `OfflineProvider`
+and simulated provider responses. Pointed at a paid provider, a campaign can
+spend up to its `max_budget_microusd`, so approve that budget explicitly
+before running one.
+
 <a id="campaign-ownership-unreleased"></a>
 
 ### Campaign ownership
@@ -823,6 +931,189 @@ Lease expiry permits a new owner to acquire the campaign; it does not prove
 that a previous external request was unexecuted or unbilled. There is no
 automatic retry or reconciliation command for these ambiguous trials.
 
+## Policy registry
+
+A promoted decision is a statistical result, not a change to what runs.
+`PolicyRegistry` records which policy version is in effect for each
+**target**, a dotted policy name such as `planner.template.report`, and how
+that changed: review, activation and rollback are separate, explicit
+operations, each with its own record. The registry never edits application
+configuration; callers resolve the active version when they build new work.
+
+The registry is its own SQLite file, `~/.smythe/policy-registry.sqlite3` by
+default, with schema version 1. It never writes an Autotune ledger: the ledger
+schema (version 4), its writer barrier, `snapshot()` and
+`smythe optimize inspect --json` are unchanged, and a writable open refuses a
+database that already holds other tables, such as a ledger. Review records
+refer to a ledger campaign by its ID, plan hash and holdout commitment and to
+its decision by ID and payload digest, never by file path.
+
+Each target has one active pointer and an append-only history numbered 1, 2,
+3, and so on:
+
+| Event | Effect |
+|---|---|
+| `baseline` | The target's first event: the policy in effect before any activation |
+| `activate` | Puts a reviewed policy in effect; it names its review record |
+| `rollback` | Restores an earlier `baseline` or `activate` entry as a new event, copying its policy and review |
+| `retire` | Leaves the target with no policy in effect |
+
+Every policy path is the target or lies under it, and a stored policy hash is
+the same `sha256:` digest of canonical JSON as an Autotune candidate's
+`policy_hash`, so one policy has one identity across campaigns and the
+registry.
+
+### Review and activate a decision
+
+A campaign's terminal decision is reviewed, and an approving review of a
+promoted decision is then activated for a target:
+
+```python
+from smythe.optimize import PolicyRegistry, RegistryConflictError, RegistryError
+
+target = "planner.template.report"
+with PolicyRegistry("policy-registry.sqlite3") as registry:
+    try:
+        review = registry.record_review(
+            "optimize.sqlite3",                    # a closed Autotune ledger
+            result.campaign_id,                    # from OptimizationRunner.run()
+            reviewer="report-owner",               # declared, not authenticated
+            verdict="approve",
+            note="holdout gain holds on the long-report task pack",
+        )
+        registry.activate(
+            target,
+            review.review_id,
+            expected_seq=len(registry.history(target)),  # 0 for a new target
+            actor="release-operator",
+            reason="approved for new report runs",
+        )
+    except RegistryConflictError:
+        ...  # someone changed the target first; read it again and decide
+    except RegistryError:
+        ...  # refused, such as a decision that was not promoted; nothing was written
+```
+
+`record_review(ledger, campaign_id, *, reviewer, verdict, evidence_sha256=None,
+note="")` records `"approve"` or `"reject"` for the campaign's terminal
+decision. `ledger` is a ledger path or an open `ExperimentLedger`. A path is
+opened read-only for the read, so the ledger must be closed and checkpointed,
+as for `smythe optimize inspect`, and a version 3 ledger is read without
+migration. An open ledger is used as it is: a writable open of a version 4
+ledger writes nothing, but a writable open migrates a version 3 ledger, so
+open one read-only. The review never writes the ledger. It first validates
+the campaign's decision inventory with
+`ExperimentLedger.validate_decision_inventory()`. A ledger path that a writer
+still holds open, a missing campaign, a campaign without a terminal decision,
+and evidence that no longer validates are refused with `RegistryError`, the
+ledger's error chained. Only a promoted decision can be approved; any
+decision can be rejected.
+
+The returned `PolicyReview` names the campaign (`campaign_id`, `plan_hash`,
+`holdout_commitment`) and its decision (`decision_id`, and
+`decision_payload_sha256`, the plain hex SHA-256 of the decision's canonical
+payload) and records `promoted`, the decision candidate's `candidate_id`,
+`policy_hash` and `policy`, the campaign incumbent's `incumbent_candidate_id`,
+`incumbent_policy_hash` and `incumbent_policy`, the `verdict`, the
+`reviewer`, the optional `evidence_sha256` (the plain hex SHA-256 of evidence
+the reviewer examined, kept outside Smythe) and `note` (one line of up to
+1,024 characters), and `created_at_ns`. Its `review_id` is `review_v1_` followed by
+the SHA-256 of the canonical record without its time, so recording the same
+review again returns the stored one. Reviews are append-only: a rejecting
+review is kept, and a later review never changes an earlier one or revokes
+its approval, since activation names the review it acts on.
+`reviews(campaign_id)` returns every review of a campaign in recorded order,
+`review(review_id)` returns one, and `to_dict()` gives JSON.
+
+A review is not authentication. `reviewer` is whatever name the caller
+declares, and anyone who can write the registry file can record any name.
+Establish who may approve outside Smythe before recording a review.
+
+`activate(target, review_id, *, expected_seq, actor, reason)` puts the
+review's policy in effect and returns the `activate` event. The review must
+approve a promoted decision, and every policy path must be the target or lie
+under it: `planner.template.report` covers
+`planner.template.report.max_sections` but not `planner.template.reporting`.
+The first activation of a target (`expected_seq=0`) appends the campaign
+incumbent's policy as the `baseline`, naming no review, and then the
+`activate` event, in one transaction. A later activation requires the policy
+in effect to be that incumbent, compared by policy hash, so the decision
+always compared the candidate with the policy it replaces: a review of a
+campaign run against another incumbent is refused, and a retired target needs
+a rollback first. Rolling back to `seq` 1 restores the incumbent baseline.
+A refused review or activation raises `RegistryError`, a stale
+`expected_seq` raises `RegistryConflictError`, and malformed arguments or a
+policy path outside the target raise `ValueError`; none of them writes
+anything.
+
+### Resolve, roll back and retire
+
+This snippet opens or creates the default
+`~/.smythe/policy-registry.sqlite3`; pass a path to use another file. It
+assumes the target has history, whose first event is its baseline:
+
+```python
+from smythe.optimize import PolicyRegistry, RegistryConflictError, RegistryError
+
+with PolicyRegistry() as registry:
+    target = "planner.template.report"
+    active = registry.resolve(target)          # ActiveVersion or None
+    history = registry.history(target)         # every event, in order
+    try:
+        registry.rollback(
+            target,
+            to_seq=1,
+            expected_seq=len(history),             # the head this decision saw
+            actor="release-operator",
+            reason="v2 drops a required section",
+        )
+    except RegistryConflictError:
+        ...  # someone changed the target first; read it again and decide
+    except RegistryError:
+        ...  # refused, such as when seq 1 is already in effect; nothing was written
+```
+
+`resolve(target)` returns an `ActiveVersion` with the head event's `seq`, the
+policy and its hash, the authorizing review, and `source_seq`, the baseline or
+activate entry that supplied the policy. It returns `None` for a target with
+no events or whose last event is `retire`. `history(target)` returns every
+`ActivationEvent` in sequence order, and `to_dict()` on either gives JSON.
+
+Every change names the head it expects as `expected_seq` (0 for a target
+without events). The check and the append happen in one `BEGIN IMMEDIATE`
+transaction, so of two writers working from the same head exactly one
+succeeds; the other gets `RegistryConflictError` and writes nothing.
+`rollback(target, to_seq=..., expected_seq=..., actor=..., reason=...)` accepts
+only an earlier `baseline` or `activate` entry that is not already in effect,
+and can restore a retired target. `retire(target, expected_seq=..., actor=...,
+reason=...)` needs a policy in effect. A refused change raises `RegistryError`
+and writes nothing; malformed arguments raise `ValueError`. `actor` is a
+declared reference to whoever made the change, recorded with the reason. It is
+not authentication.
+
+The registry uses SQLite WAL with full synchronous durability. A writer that
+is killed before its transaction commits leaves the previous head; nothing
+partial is visible on reopen. A writable open creates a missing file
+owner-only (`0600`), and the `-wal` and `-shm` files inherit that mode.
+Triggers refuse every `UPDATE` and `DELETE` on registry tables, from Smythe
+or any other SQLite client, and refuse inserts from a writer of another
+schema version. Since `INSERT OR REPLACE` removes a conflicting row without
+firing a delete trigger, they also refuse an insert that names an existing
+rowid, review or event, and keep each table's rowids numbered 1, 2, 3
+without gaps, so an insert that removes a row through any unique key,
+including an index another client added, is refused too. An event must
+take its target's next number.
+A writable open checks the schema version before it writes and refuses a
+missing or altered trigger. As with the ledger, this protects
+the history from accidental edits, not from an operator who can drop
+triggers or rewrite the file.
+
+`PolicyRegistry(path, read_only=True)` inspects without writing. It requires
+the file to exist and every writer to be closed, with no `-wal` or `-shm`
+file, and repeats that check and the file fingerprint check immediately after
+opening and at close, like ledger inspection. A read-only registry refuses
+`record_review`, `activate`, `rollback` and `retire`.
+
 ## Current boundaries
 
 The following pieces remain future work:
@@ -833,8 +1124,17 @@ The following pieces remain future work:
   per-trial price ceilings;
 - calibrated sample-size guidance and a multiple-comparison correction across
   development challengers; and
-- cross-campaign comparison and human-approval surfaces.
+- cross-campaign comparison, and authenticated reviewers for the
+  [policy registry](#policy-registry).
+
+The runner bounds what a campaign may vary:
+[reserved fields](#experiment-contracts-and-budgets) such as acceptance,
+spend, and tool settings cannot be mutable, and `single_change` limits each
+challenger to one changed field. It does not sandbox evaluator code, which
+runs in the runner's process and decides what each policy value controls.
 
 The installed concurrency campaign is intentionally offline. Custom in-process
-evaluators can use `OptimizationRunner`, but a live evaluator must supply its
-own bounded side-effect and price-ceiling implementation.
+evaluators can use `OptimizationRunner`. A live evaluator must supply its own
+bounded side-effect and price-ceiling implementation, or run each trial as a
+[durable workflow](#durable-workflow-trials), whose journal bounds and records
+every call.

@@ -35,12 +35,15 @@ from smythe.acceptance import OperatorDecision, operator_decision_sha256
 from smythe.cli import EXIT_OK, main
 from smythe.graph import ExecutionGraph, Node, Topology
 from smythe.lineage import load_lineage, validator_set_sha256
+from smythe.provider import CompletionResult
+from smythe.validation import hard_finding
 from smythe.workflow import current_decision, decision_history
 from smythe.workflow_artifact import current_artifact
 from smythe.workflow_store import (
     WorkflowBudgetError, WorkflowConflictError, WorkflowStateError, _canonical, _sha,
 )
-from test_workflow_lineage import TEXTS, Brief, research, research_graph
+from test_workflow_lineage import NODES as LINEAGE_NODES
+from test_workflow_lineage import QUESTION, TEXTS, Brief, research, research_graph
 
 PLAN = sha256_hex("repair plan")
 REASON = "The published brief was damaged"
@@ -450,6 +453,212 @@ def test_an_operator_decision_on_a_lineage_run_supersedes_its_lineage(store, lib
             plan_sha256=PLAN, reason=REASON))
 
 
+@pytest.mark.parametrize("recorded", [True, False], ids=["reuse-on", "reuse-off"])
+def test_an_operator_decision_under_the_other_reuse_setting_keeps_the_run_s_lineage(
+        store, library, tmp_path, recorded):
+    review = policy("1", Raises(), on_invalid="needs_review")
+    _, result = completed(store, library, tmp_path, acceptance=review,
+                          lineage=LineagePolicy(access_scope="research-team", reuse=recorded))
+    run_id = result.execution_id
+    config = store.load_run(run_id)["config"]
+    lineage = load_lineage(store, run_id)
+    host = HmacApprovalHost()
+    current = current_decision(store, run_id)
+    digest = operator_decision_sha256(run_id, current["sequence"], current["record"], "accepted",
+                                      EVIDENCE)
+    assertion = host.issue(digest, subject="reviewer-3", tenant="acme", expires_at_ns=2**62)
+    switched = LineagePolicy(access_scope="research-team", reuse=not recorded)
+
+    # A decision reuses nothing, so the reuse setting does not bind it.
+    decided = research(store, library, tmp_path, acceptance=review, lineage=switched).reevaluate(
+        run_id, operator=OperatorDecision("accepted", EVIDENCE, assertion=assertion,
+                                          verifier=host))
+
+    assert decided.accepted
+    superseding = load_lineage(store, run_id)
+    assert superseding.acceptance["decision"] == "accepted"
+    assert superseding.acceptance["policy_sha256"] == review.sha256
+    assert superseding.acceptance["validators"] == lineage.acceptance["validators"]
+    # Everything else is built from the run's saved recipe, not the deciding Swarm's.
+    assert superseding.run["recipe_sha256"] == store.load_run(run_id)["config_sha256"]
+    assert ({**superseding.to_dict(), "acceptance": None}
+            == {**lineage.to_dict(), "acceptance": None})
+    assert store.load_run(run_id)["config"] == config
+    assert config["lineage"]["reuse"] is recorded
+    # The run resumes under the policy it recorded, and only under it.
+    assert research(store, library, tmp_path, acceptance=review,
+                    lineage=LineagePolicy(access_scope="research-team", reuse=recorded)
+                    ).resume(run_id).accepted
+    with pytest.raises(WorkflowConflictError, match="lineage policy"):
+        research(store, library, tmp_path, acceptance=review, lineage=switched).resume(run_id)
+
+
+class Contains:
+    """A gate validator that passes text containing its needle."""
+
+    def __init__(self, needle: str, version: str) -> None:
+        self.needle = needle
+        self.identity = ValidatorIdentity.for_config("contains", version, {"needle": needle})
+
+    def validate(self, subject):
+        if self.needle in subject.text():
+            return ValidationReport("output", (), validator=self.identity)
+        return ValidationReport("output", (hard_finding("missing", f"no {self.needle!r}"),),
+                                validator=self.identity)
+
+
+class Draft:
+    """Local synthesis that delivers the draft exactly."""
+
+    def synthesize(self, graph: ExecutionGraph) -> str:
+        return next(node.result for node in graph.nodes if node.id == "draft")
+
+
+class NoSources:
+    """A catalog for runs that name no source."""
+
+    def describe(self, source_id):
+        return None
+
+
+@pytest.fixture
+def drafts(monkeypatch) -> list[str]:
+    """Answer the judge with PASS and any other step with a draft that names the needle."""
+    labels: list[str] = []
+
+    async def complete(self, system, prompt, model):
+        step = next((line for line in prompt.splitlines() if line.startswith("Your step: ")), "")
+        labels.append(step.removeprefix("Your step: "))
+        return CompletionResult("PASS" if labels[-1] == "Judge" else "A draft with the needle.",
+                                cost_usd=0)
+
+    monkeypatch.setattr(OfflineProvider, "complete", complete)
+    return labels
+
+
+def gate_validator(needle: str, version: str) -> LocalOnly:
+    return LocalOnly(lambda: Contains(needle, version), "contains", version, role="validator")
+
+
+def judged(store, verifier, **options) -> Swarm:
+    """A lineage run whose gate *verifier* judges the draft, which local code then delivers."""
+    return Swarm(model="offline", provider=OfflineProvider(), architect=SimpleArchitect(),
+                 run_store=store, max_budget_usd=1, verifier=verifier, acceptance=policy(),
+                 lineage=LineagePolicy(access_scope=SCOPE), context_sources=[],
+                 synthesizer=LocalOnly(Draft, "deliver-draft", "1", role="synthesizer"),
+                 **options)
+
+
+def gated() -> ExecutionGraph:
+    graph = ExecutionGraph([Topology.SERIAL], [
+        Node(id="draft", label="Draft"),
+        Node(id="judge", label="Judge", depends_on=["draft"], verifies="draft",
+             max_regenerations=1)])
+    graph.task = Task("Write a sentence that mentions the needle")
+    return graph
+
+
+def test_a_changed_gate_validator_is_not_rechecked_from_old_verdicts(store, tmp_path, drafts):
+    first = judged(store, gate_validator("needle", "1")).execute(gated())
+    assert first.accepted
+    run_id = first.execution_id
+    # Another gate validator would reject the same draft.
+    changed = judged(store, gate_validator("absent", "2"))
+
+    plan = changed.plan_repair(sources=NoSources())
+
+    (item,) = plan.to_dict()["items"]
+    assert (item["action"], item["status"]) == ("regenerate", "stale")
+    assert {node["id"]: (node["action"], node["reasons"]) for node in item["nodes"]} == {
+        "draft": ("regenerate", ["gate_validator_changed"]),
+        "judge": ("regenerate", ["dependency_changed", "gate_validator_changed"]),
+        "synthesis": ("regenerate", ["dependency_changed"])}
+    # The record names the gate verifier that judged the gate.
+    gate = next(node for node in load_lineage(store, run_id).to_dict()["nodes"]
+                if node["id"] == "judge")
+    assert gate["inputs"]["verifier"] == {
+        "name": "validator-v1", "validators": [Contains("needle", "1").identity.to_dict()]}
+
+    # The gates' recorded verdicts never decide the run under another gate validator.
+    before, revision = journal_rows(store, run_id), store.load_run(run_id)["revision"]
+    Counted.checked = []
+    with pytest.raises(WorkflowStateError, match="another gate verifier"):
+        changed.reevaluate(run_id)
+    with pytest.raises(WorkflowStateError, match="another gate verifier"):
+        recheck(changed, run_id, plan.plan_sha256)
+    assert journal_rows(store, run_id) == before and store.load_run(run_id)["revision"] == revision
+    assert Counted.checked == [] and current_decision(store, run_id)["sequence"] == 0
+
+    # Applying the plan judges the same draft again, under the new gate validator, which rejects it.
+    labels = len(drafts)
+    result = changed.repair(plan, plan_sha256=plan.plan_sha256, max_total_budget_usd=1,
+                            reason=REASON, sources=NoSources())
+    (entry,) = result.to_dict()["items"]
+    assert (entry["action"], entry["outcome"], entry["decision"]) == (
+        "regenerate", "failed", "rejected")
+    assert drafts[labels:] == ["Draft", "Judge", "Draft", "Judge"]
+    rejected = result.decisions[entry["successor_run_id"]]
+    assert rejected.output_sha256 == first.acceptance.output_sha256
+    assert any("gate validator 'contains' rejected" in reason for reason in rejected.reasons)
+    # Under the gate validator that judged it, the run is decided again as before.
+    assert judged(store, gate_validator("needle", "1")).reevaluate(run_id).accepted
+
+
+def test_a_gated_document_is_not_published_again_under_another_gate_verifier(
+        store, tmp_path, drafts):
+    publishing = {"renderer": MarkdownRenderer(), "artifact_dir": tmp_path / "artifacts"}
+    first = judged(store, gate_validator("needle", "1"), **publishing).execute(gated())
+    run_id = first.execution_id
+    document = current_artifact(store, run_id).publication.path
+    damage(document, "delete")
+    # Another gate validator would reject the same draft.
+    changed = judged(store, gate_validator("absent", "2"), **publishing)
+    before, revision = journal_rows(store, run_id), store.load_run(run_id)["revision"]
+    Counted.checked = []
+
+    # A new decision on the new bytes would read the gates' recorded verdicts.
+    with pytest.raises(WorkflowStateError, match="another gate verifier"):
+        changed.republish(run_id)
+
+    assert journal_rows(store, run_id) == before and store.load_run(run_id)["revision"] == revision
+    assert listing(document.parent) == [".smythe-run-owner.json"]
+    assert Counted.checked == [] and current_decision(store, run_id)["sequence"] == 0
+    # Under the gate validator that judged it, the document is published again.
+    record = judged(store, gate_validator("needle", "1"), **publishing).republish(run_id)
+    assert (record.sequence, record.name) == (1, "document-p1.md")
+
+
+def without_gate_verifiers(saved: dict) -> dict:
+    """A lineage operation's result as written before records named their gates' verifier."""
+    for node in saved["lineage"]["nodes"]:
+        node["inputs"].pop("verifier", None)
+    return saved
+
+
+def test_a_record_without_its_gate_verifier_still_holds_and_needs_review_under_a_gate_validator(
+        store, drafts):
+    swarm = judged(store, gate_validator("needle", "1"))
+    first = swarm.execute(gated())
+    run_id = first.execution_id
+    tamper(store, run_id, "lineage", without_gate_verifiers)
+    assert "verifier" not in load_lineage(store, run_id).nodes[1]["inputs"]
+
+    # The record still matches its journal, so the run still delivers.
+    resumed = swarm.resume(run_id)
+    assert resumed.accepted and resumed.acceptance == first.acceptance
+    # Which gate verifier judged the gate is unknown, so a plan never reuses the run.
+    (item,) = swarm.plan_repair(sources=NoSources()).to_dict()["items"]
+    assert (item["action"], item["status"]) == ("review", "stale")
+    assert "gate_validator_unknown" in item["reasons"]
+    # A plan under TokenVerifier compares nothing it cannot know.
+    token = Swarm(model="offline", provider=OfflineProvider(), architect=SimpleArchitect(),
+                  run_store=store, max_budget_usd=1, acceptance=policy(),
+                  lineage=LineagePolicy(access_scope=SCOPE), context_sources=[],
+                  synthesizer=LocalOnly(Draft, "deliver-draft", "1", role="synthesizer"))
+    (item,) = token.plan_repair(sources=NoSources()).to_dict()["items"]
+    assert (item["action"], item["reasons"]) == ("reuse", [])
+
+
 # ---------------------------------------------------------------------------
 # Refusals
 # ---------------------------------------------------------------------------
@@ -490,6 +699,95 @@ def test_republication_is_refused_when_the_renderer_or_synthesizer_changed(
 
     assert journal_rows(store, run_id) == before and store.load_run(run_id)["revision"] == revision
     assert Counted.checked == [result.output]
+
+
+def test_a_changed_renderer_regenerates_the_document_in_a_successor(
+        store, library, tmp_path, model_calls):
+    service = library[0]
+    _, result = completed(store, library, tmp_path)
+    run_id = result.execution_id
+    original = current_artifact(store, run_id).publication
+    document = original.path.read_bytes()
+    plain = research(store, library, tmp_path, acceptance=policy(),
+                     renderer=LocalOnly(PlainBrief, "plain-brief", "1", role="renderer"))
+    catalog = Catalog(service)
+
+    plan = plain.plan_repair(sources=catalog)
+
+    # The document would be made another way: its synthesis is regenerated, and nothing else.
+    (item,) = plan.to_dict()["items"]
+    assert (item["action"], item["status"], item["reasons"]) == (
+        "regenerate", "stale", ["renderer_changed"])
+    assert {node["id"]: node["action"] for node in item["nodes"]} == {
+        **dict.fromkeys(LINEAGE_NODES[:-1], "reuse"), "synthesis": "regenerate"}
+    assert (item["work"]["read_calls"], item["work"]["model_steps"],
+            item["work"]["publications"]) == (0, 0, 1)
+    reads, prompts = source_reads(service), list(model_calls)
+    applied = plain.repair(plan, plan_sha256=plan.plan_sha256, max_total_budget_usd=1,
+                           reason=REASON, sources=catalog)
+    (entry,) = applied.to_dict()["items"]
+    assert (entry["outcome"], entry["decision"]) == ("applied", "accepted")
+    # Every node is kept: nothing is read or called, and the new renderer publishes the brief.
+    assert entry["work"] == IDLE | {"new_runs": 1, "reused_nodes": 4, "publications": 1,
+                                    "acceptance_evaluations": 1}
+    assert source_reads(service) == reads and model_calls == prompts
+    published = current_artifact(store, entry["successor_run_id"]).publication
+    synthesis = store.load_operation(run_id, "synthesis")["result"]["output"]
+    assert published.name == "brief.txt"
+    assert published.path.read_bytes() == f"BRIEF: {QUESTION}\n{synthesis}\n".encode()
+    assert original.path.read_bytes() == document
+    # The successor replaced the run, and nothing is left to repair.
+    (after,) = plain.plan_repair(sources=catalog).to_dict()["items"]
+    assert (after["run_id"], after["action"]) == (entry["successor_run_id"], "reuse")
+
+
+def test_a_renderer_added_since_a_run_publishes_its_document_in_a_successor(
+        store, library, tmp_path, model_calls):
+    service = library[0]
+    # A run made without a renderer published no document.
+    _, result = completed(store, library, tmp_path, renderer=None, artifact_dir=None)
+    run_id = result.execution_id
+    assert load_lineage(store, run_id).artifact is None
+    rendered = research(store, library, tmp_path, acceptance=policy())
+    catalog = Catalog(service)
+    # The run itself never publishes under the renderer it was not made with.
+    with pytest.raises(WorkflowConflictError, match="renderer differs"):
+        rendered.resume(run_id)
+
+    plan = rendered.plan_repair(sources=catalog)
+
+    # A new run would publish a document: the synthesis is regenerated to make it, and nothing else.
+    (item,) = plan.to_dict()["items"]
+    assert (item["action"], item["status"], item["reasons"]) == (
+        "regenerate", "stale", ["renderer_changed"])
+    assert {node["id"]: node["action"] for node in item["nodes"]} == {
+        **dict.fromkeys(LINEAGE_NODES[:-1], "reuse"), "synthesis": "regenerate"}
+    assert (item["work"]["read_calls"], item["work"]["model_steps"],
+            item["work"]["publications"]) == (0, 0, 1)
+    reads, prompts = source_reads(service), list(model_calls)
+    applied = rendered.repair(plan, plan_sha256=plan.plan_sha256, max_total_budget_usd=1,
+                              reason=REASON, sources=catalog)
+    (entry,) = applied.to_dict()["items"]
+    assert (entry["outcome"], entry["decision"]) == ("applied", "accepted")
+    # Every node is kept: nothing is read or called, and the renderer publishes the brief.
+    assert entry["work"] == IDLE | {"new_runs": 1, "reused_nodes": 4, "publications": 1,
+                                    "acceptance_evaluations": 1}
+    assert source_reads(service) == reads and model_calls == prompts
+    successor = entry["successor_run_id"]
+    published = current_artifact(store, successor).publication
+    assert published.name == "document.md"
+    assert published.path.read_bytes() == f"# {QUESTION}\n\n{result.output.rstrip()}\n".encode()
+    assert load_lineage(store, successor).artifact["renderer"]["name"] == "markdown_renderer"
+    # The successor replaced the run, and nothing is left to repair.
+    (after,) = rendered.plan_repair(sources=catalog).to_dict()["items"]
+    assert (after["run_id"], after["action"]) == (successor, "reuse")
+    # Without a renderer again, a new run would publish nothing.
+    unrendered = research(store, library, tmp_path, acceptance=policy(), renderer=None,
+                          artifact_dir=None)
+    (removed,) = unrendered.plan_repair(sources=catalog).to_dict()["items"]
+    assert (removed["run_id"], removed["action"], removed["reasons"]) == (
+        successor, "regenerate", ["renderer_changed"])
+    assert removed["work"]["publications"] == 0
 
 
 def test_republication_is_refused_when_the_synthesis_digest_does_not_match_the_lineage(
@@ -972,3 +1270,52 @@ def test_a_lost_successor_is_a_repair_in_progress_that_resumes_rather_than_resta
     (item,) = swarm.plan_repair(sources=catalog).to_dict()["items"]
     assert (item["run_id"], item["action"], item["status"]) == (successor, "reuse", "current")
     assert "repairs_in_progress" not in item
+
+
+# ---------------------------------------------------------------------------
+# A recheck under the reuse switch
+# ---------------------------------------------------------------------------
+
+
+def test_with_reuse_off_a_recheck_applies_and_the_items_after_it_still_apply(
+        store, archive_sources, tmp_path, replies):
+    service, endpoint = archive_sources
+    intact = maintained(store, endpoint, tmp_path).execute(survey_only(endpoint)).execution_id
+    full = maintained(store, endpoint, tmp_path).execute(
+        successors.research_graph(endpoint)).execution_id
+    service.change_source("churn", successors.CHANGED)
+    # The rollback switch, with the counted validator's version bumped too.
+    off = LineagePolicy(access_scope=SCOPE, reuse=False)
+    swarm = maintained(store, endpoint, tmp_path, acceptance=policy("2"), lineage=off)
+    catalog = successors.Catalog(service)
+    plan = swarm.plan_repair(sources=catalog)
+    # A changed validator alone still calls for a recheck, which reuses nothing.
+    assert [(item["run_id"], item["action"]) for item in plan.to_dict()["items"]] == [
+        (intact, "recheck"), (full, "regenerate")]
+    Counted.checked = []
+
+    result = repair(swarm, plan, catalog)
+
+    items = result.to_dict()["items"]
+    assert [(item["run_id"], item["action"], item["outcome"]) for item in items] == [
+        (intact, "recheck", "applied"), (full, "regenerate", "applied")]
+    assert items[0]["work"] == IDLE | {"acceptance_evaluations": 1}
+    decision = current_decision(store, intact)
+    assert decision["record"] == result.decisions[intact]
+    assert decision["record"].policy_sha256 == policy("2").sha256
+    assert decision["inputs"]["repair"] == {"plan_sha256": plan.plan_sha256, "reason": REASON}
+    assert load_lineage(store, intact).acceptance["policy_sha256"] == policy("2").sha256
+    # The regenerated item kept nothing.
+    (successor,) = result.successor_run_ids
+    assert store.list_operations(successor, "reuse") == []
+    # The rechecked run keeps the lineage policy it recorded: resuming it
+    # still needs that policy, and rendering its document again, which reuses
+    # its saved synthesis, is refused with reuse off.
+    assert store.load_run(intact)["config"]["lineage"] == LineagePolicy(
+        access_scope=SCOPE).to_dict()
+    with pytest.raises(WorkflowConflictError, match="lineage policy"):
+        maintained(store, endpoint, tmp_path, lineage=off).resume(intact)
+    with pytest.raises(WorkflowConflictError, match="lineage policy"):
+        swarm.republish(intact)
+    resumed = maintained(store, endpoint, tmp_path).resume(intact)
+    assert resumed.accepted and resumed.acceptance == result.decisions[intact]

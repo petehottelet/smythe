@@ -17,7 +17,7 @@ agent = Agent(profile=AgentProfile(name="Researcher", mcp_servers=[fs]))
 swarm = Swarm(tool_runtime=MCPToolRuntime(), ...)
 ```
 
-The same shape works in YAML under `agent.mcp_servers`. Install the extra: `pip install smythe[mcp]`.
+The same shape works in YAML under `agent.mcp_servers`. Install the extra: `pip install smythe[mcp]`. To offer Python functions beside MCP servers, merge a `LocalToolRuntime` with `CompositeToolRuntime(local, MCPToolRuntime())` ([Python-backed skills](skills.md#python-backed-skills)).
 
 ## Secrets: env_passthrough
 
@@ -51,7 +51,7 @@ Sessions are opened per node execution and closed when the node finishes. The se
 
 ## Side effects are at-least-once
 
-Two paths re-execute tool calls that already ran: `failure_policy: RETRY` re-runs a node's whole loop after a provider error, and `swarm.resume()` re-runs incomplete nodes from scratch. If a tool has side effects (posting, writing, sending), idempotency is the tool's or your responsibility. Tool calls and their results are not journaled, so this holds for every MCP tool, and durable text workflows (`run_store`) accept no tool runtime.
+Two paths re-execute tool calls that already ran: `failure_policy: RETRY` re-runs a node's whole loop after a provider error, and `swarm.resume()` re-runs incomplete nodes from scratch. If a tool has side effects (posting, writing, sending), idempotency is the tool's or your responsibility. Tool calls and their results are not journaled, so this holds for every MCP tool and every local tool a `LocalToolRuntime` runs, and durable text workflows (`run_store`) accept no tool runtime.
 
 For a read whose result must survive interruption without being fetched again, declare it as a [recorded read step](workflow-accounting.md#recorded-read-steps) in a durable workflow instead: a versioned HTTP read that you add to the graph yourself, never one a model chooses. Its saved response is reused on resume, and a read whose response was lost is sent again only when its profile declares it free and safe to repeat.
 
@@ -59,7 +59,7 @@ For a read whose result must survive interruption without being fetched again, d
 
 - `Swarm` passes its registry to the default `LLMArchitect`, so the planning prompt includes an inventory of existing agents and their tools, and instructs the model to route nodes to them via `required_capabilities`.
 - A generated plan cannot declare servers. `LLMArchitect` reads the model's reply under a strict schema that rejects `mcp_servers`, commands, URLs, environment variables, model overrides, and unknown fields, so tools reach a generated plan only through agents you registered. MCP declarations in Python and YAML are unaffected.
-- `MCPSkillProvider` plugs into the registry's capability hydration, so the same tools ground assignment: allowlisted tools contribute capabilities statically; `await provider.prefetch(agents)` discovers tools for servers without allowlists.
+- `MCPSkillProvider` plugs into the registry's capability hydration, so the same tools ground assignment: allowlisted tools contribute capabilities statically; `await provider.prefetch(agents)` discovers tools for servers without allowlists. [Skills](skills.md) compares it with the other skill sources, including Agent Skills directories, whose declared tools are never granted.
 
 ## Threat model
 

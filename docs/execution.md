@@ -724,6 +724,11 @@ revoked control stays revoked, with its first code.
   and a revocation during a [drain](#draining-in-flight-work) ends it
   without waiting for the deadline; the run then raises `SecurityStop` with
   its original error as the cause.
+- A revocation while a supervisor review is pending, including an
+  `EvidenceTriggeredSupervisor`'s and a durable run's, cancels the review
+  and the nodes in flight at once, without waiting for the review to
+  return. In a durable run, a review call that was sent and not answered
+  holds unknown exposure in the journal, as a node's call does.
 - A call that was sent and not answered keeps its reservation as unknown
   cost, as under `retain_uncertain_dispatch` ([calls without an
   answer](#calls-without-an-answer)), whatever the retry policy. A native

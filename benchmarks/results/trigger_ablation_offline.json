@@ -5,7 +5,7 @@
   "api_calls": 0,
   "paid_execution_allowed": false,
   "mode": "offline",
-  "record_version": 1,
+  "record_version": 2,
   "scope": "Fixture runs establish harness mechanics, not a measured benefit. A scripted reviewer decides every review, the fixture worker writes every step, and the anomalies are planted of kinds the default triggers detect, so equal accepted outcomes and fewer supervision calls follow from the fixtures and arm structure. The campaign thresholds are placeholders, no default changes, and no number here is a product, README or roadmap claim.",
   "default_change": false,
   "promotion": {
@@ -13,6 +13,7 @@
     "reasons": [
       "a scripted reviewer and planted anomalies establish harness mechanics, not a measured benefit",
       "promotion thresholds are not decided; the campaign's are placeholders",
+      "the campaign's decision is mechanics only: its holdout is an offline stand-in, so its 'promoted' promotes nothing",
       "live evaluation needs an approved budget and decided thresholds"
     ]
   },
@@ -214,8 +215,8 @@
       "cost_per_accepted_microusd": 10293.0,
       "elapsed_ms": {
         "runs": 9,
-        "p50": 6.5,
-        "p95": 11.0,
+        "p50": 6.7,
+        "p95": 10.4,
         "label": "small sample; not a tail estimate"
       },
       "supervision": {
@@ -239,8 +240,8 @@
       "cost_per_accepted_microusd": 7813.125,
       "elapsed_ms": {
         "runs": 9,
-        "p50": 6.6,
-        "p95": 10.0,
+        "p50": 6.8,
+        "p95": 10.5,
         "label": "small sample; not a tail estimate"
       },
       "supervision": {
@@ -271,8 +272,8 @@
       "cost_per_accepted_microusd": 10059.6,
       "elapsed_ms": {
         "runs": 9,
-        "p50": 3.7,
-        "p95": 6.4,
+        "p50": 3.8,
+        "p95": 6.5,
         "label": "small sample; not a tail estimate"
       },
       "supervision": {
@@ -456,7 +457,7 @@
       "attempt_allowance": 1,
       "failed_attempts": 0,
       "cost_microusd": 5289,
-      "elapsed_ms": 6.4,
+      "elapsed_ms": 6.9,
       "attempts": [
         {
           "attempt": 1,
@@ -499,18 +500,18 @@
           "cost_microusd": 5289,
           "cost_known": true,
           "cost_is_estimate": false,
-          "elapsed_ms": 6.4,
+          "elapsed_ms": 6.9,
           "latency_source": "swarm_timing",
           "phases_ms": {
             "routing": null,
-            "planning": 1.5,
+            "planning": 1.4,
             "recovery": null,
             "execution": 1.9,
             "verification": 0.2,
             "synthesis": 0.0,
             "supervision": 0.1,
             "checkpoint": 0.9,
-            "waiting": 1.2
+            "waiting": 1.4
           },
           "graph": {
             "topology": "fork_join",
@@ -537,7 +538,7 @@
       "attempt_allowance": 1,
       "failed_attempts": 0,
       "cost_microusd": 5289,
-      "elapsed_ms": 3.9,
+      "elapsed_ms": 4.4,
       "attempts": [
         {
           "attempt": 1,
@@ -580,11 +581,11 @@
           "cost_microusd": 5289,
           "cost_known": true,
           "cost_is_estimate": false,
-          "elapsed_ms": 3.9,
+          "elapsed_ms": 4.4,
           "latency_source": "swarm_timing",
           "phases_ms": {
             "routing": null,
-            "planning": 0.9,
+            "planning": 1.1,
             "recovery": null,
             "execution": 1.9,
             "verification": 0.1,
@@ -618,7 +619,7 @@
       "attempt_allowance": 1,
       "failed_attempts": 0,
       "cost_microusd": 8151,
-      "elapsed_ms": 5.6,
+      "elapsed_ms": 6.0,
       "attempts": [
         {
           "attempt": 1,
@@ -667,21 +668,21 @@
             "added_steps": [],
             "tokens": 954,
             "cost_microusd": 2862,
-            "latency_ms": 0.2
+            "latency_ms": 0.3
           },
           "cost_microusd": 8151,
           "cost_known": true,
           "cost_is_estimate": false,
-          "elapsed_ms": 5.6,
+          "elapsed_ms": 6.0,
           "latency_source": "swarm_timing",
           "phases_ms": {
             "routing": null,
-            "planning": 0.9,
+            "planning": 0.8,
             "recovery": null,
-            "execution": 1.6,
+            "execution": 1.7,
             "verification": 0.1,
             "synthesis": 0.0,
-            "supervision": 0.2,
+            "supervision": 0.3,
             "checkpoint": 0.9,
             "waiting": 1.2
           },
@@ -710,7 +711,7 @@
       "attempt_allowance": 1,
       "failed_attempts": 0,
       "cost_microusd": 5301,
-      "elapsed_ms": 5.6,
+      "elapsed_ms": 5.4,
       "attempts": [
         {
           "attempt": 1,
@@ -753,18 +754,18 @@
           "cost_microusd": 5301,
           "cost_known": true,
           "cost_is_estimate": false,
-          "elapsed_ms": 5.6,
+          "elapsed_ms": 5.4,
           "latency_source": "swarm_timing",
           "phases_ms": {
             "routing": null,
-            "planning": 1.1,
+            "planning": 0.9,
             "recovery": null,
             "execution": 1.6,
             "verification": 0.1,
             "synthesis": 0.0,
             "supervision": 0.1,
-            "checkpoint": 0.9,
-            "waiting": 1.0
+            "checkpoint": 0.8,
+            "waiting": 1.1
           },
           "graph": {
             "topology": "fork_join",
@@ -791,7 +792,7 @@
       "attempt_allowance": 1,
       "failed_attempts": 0,
       "cost_microusd": 8175,
-      "elapsed_ms": 5.6,
+      "elapsed_ms": 5.4,
       "attempts": [
         {
           "attempt": 1,
@@ -845,13 +846,13 @@
           "cost_microusd": 8175,
           "cost_known": true,
           "cost_is_estimate": false,
-          "elapsed_ms": 5.6,
+          "elapsed_ms": 5.4,
           "latency_source": "swarm_timing",
           "phases_ms": {
             "routing": null,
-            "planning": 0.9,
+            "planning": 0.8,
             "recovery": null,
-            "execution": 1.8,
+            "execution": 1.6,
             "verification": 0.1,
             "synthesis": 0.0,
             "supervision": 0.2,
@@ -883,7 +884,7 @@
       "attempt_allowance": 1,
       "failed_attempts": 0,
       "cost_microusd": 5301,
-      "elapsed_ms": 3.6,
+      "elapsed_ms": 3.4,
       "attempts": [
         {
           "attempt": 1,
@@ -926,11 +927,11 @@
           "cost_microusd": 5301,
           "cost_known": true,
           "cost_is_estimate": false,
-          "elapsed_ms": 3.6,
+          "elapsed_ms": 3.4,
           "latency_source": "swarm_timing",
           "phases_ms": {
             "routing": null,
-            "planning": 0.9,
+            "planning": 0.7,
             "recovery": null,
             "execution": 1.5,
             "verification": 0.1,
@@ -964,7 +965,7 @@
       "attempt_allowance": 1,
       "failed_attempts": 0,
       "cost_microusd": 6081,
-      "elapsed_ms": 3.6,
+      "elapsed_ms": 3.8,
       "attempts": [
         {
           "attempt": 1,
@@ -1007,17 +1008,17 @@
           "cost_microusd": 6081,
           "cost_known": true,
           "cost_is_estimate": false,
-          "elapsed_ms": 3.6,
+          "elapsed_ms": 3.8,
           "latency_source": "swarm_timing",
           "phases_ms": {
             "routing": null,
-            "planning": 0.6,
+            "planning": 0.7,
             "recovery": null,
-            "execution": 1.7,
+            "execution": 1.8,
             "verification": 0.1,
             "synthesis": 0.0,
             "supervision": 0.0,
-            "checkpoint": 0.8,
+            "checkpoint": 0.9,
             "waiting": 0.0
           },
           "graph": {
@@ -1045,7 +1046,7 @@
       "attempt_allowance": 1,
       "failed_attempts": 0,
       "cost_microusd": 8082,
-      "elapsed_ms": 5.7,
+      "elapsed_ms": 5.5,
       "attempts": [
         {
           "attempt": 1,
@@ -1101,13 +1102,13 @@
           "cost_microusd": 8082,
           "cost_known": true,
           "cost_is_estimate": false,
-          "elapsed_ms": 5.7,
+          "elapsed_ms": 5.5,
           "latency_source": "swarm_timing",
           "phases_ms": {
             "routing": null,
-            "planning": 0.7,
+            "planning": 0.6,
             "recovery": null,
-            "execution": 1.8,
+            "execution": 1.6,
             "verification": 0.1,
             "synthesis": 0.0,
             "supervision": 0.4,
@@ -1139,7 +1140,7 @@
       "attempt_allowance": 1,
       "failed_attempts": 0,
       "cost_microusd": 9726,
-      "elapsed_ms": 5.3,
+      "elapsed_ms": 5.6,
       "attempts": [
         {
           "attempt": 1,
@@ -1193,18 +1194,18 @@
           "cost_microusd": 9726,
           "cost_known": true,
           "cost_is_estimate": false,
-          "elapsed_ms": 5.3,
+          "elapsed_ms": 5.6,
           "latency_source": "swarm_timing",
           "phases_ms": {
             "routing": null,
-            "planning": 0.8,
+            "planning": 0.7,
             "recovery": null,
-            "execution": 1.6,
+            "execution": 1.7,
             "verification": 0.1,
             "synthesis": 0.0,
             "supervision": 0.2,
-            "checkpoint": 0.8,
-            "waiting": 1.1
+            "checkpoint": 0.9,
+            "waiting": 1.2
           },
           "graph": {
             "topology": "fork_join",
@@ -1231,7 +1232,7 @@
       "attempt_allowance": 1,
       "failed_attempts": 1,
       "cost_microusd": 5196,
-      "elapsed_ms": 3.4,
+      "elapsed_ms": 3.8,
       "attempts": [
         {
           "attempt": 1,
@@ -1274,13 +1275,13 @@
           "cost_microusd": 5196,
           "cost_known": true,
           "cost_is_estimate": false,
-          "elapsed_ms": 3.4,
+          "elapsed_ms": 3.8,
           "latency_source": "swarm_timing",
           "phases_ms": {
             "routing": null,
-            "planning": 0.7,
+            "planning": 0.9,
             "recovery": null,
-            "execution": 1.6,
+            "execution": 1.7,
             "verification": 0.1,
             "synthesis": 0.0,
             "supervision": 0.0,
@@ -1312,7 +1313,7 @@
       "attempt_allowance": 1,
       "failed_attempts": 0,
       "cost_microusd": 8613,
-      "elapsed_ms": 6.5,
+      "elapsed_ms": 6.7,
       "attempts": [
         {
           "attempt": 1,
@@ -1368,7 +1369,7 @@
           "cost_microusd": 8613,
           "cost_known": true,
           "cost_is_estimate": false,
-          "elapsed_ms": 6.5,
+          "elapsed_ms": 6.7,
           "latency_source": "swarm_timing",
           "phases_ms": {
             "routing": null,
@@ -1379,7 +1380,7 @@
             "synthesis": 0.0,
             "supervision": 0.2,
             "checkpoint": 1.1,
-            "waiting": 1.6
+            "waiting": 1.7
           },
           "graph": {
             "topology": "fork_join",
@@ -1406,7 +1407,7 @@
       "attempt_allowance": 1,
       "failed_attempts": 0,
       "cost_microusd": 7287,
-      "elapsed_ms": 6.7,
+      "elapsed_ms": 6.5,
       "attempts": [
         {
           "attempt": 1,
@@ -1464,13 +1465,13 @@
           "cost_microusd": 7287,
           "cost_known": true,
           "cost_is_estimate": false,
-          "elapsed_ms": 6.7,
+          "elapsed_ms": 6.5,
           "latency_source": "swarm_timing",
           "phases_ms": {
             "routing": null,
-            "planning": 0.9,
+            "planning": 0.7,
             "recovery": null,
-            "execution": 2.1,
+            "execution": 2.0,
             "verification": 0.1,
             "synthesis": 0.0,
             "supervision": 0.2,
@@ -1502,7 +1503,7 @@
       "attempt_allowance": 1,
       "failed_attempts": 0,
       "cost_microusd": 8946,
-      "elapsed_ms": 7.4,
+      "elapsed_ms": 7.1,
       "attempts": [
         {
           "attempt": 1,
@@ -1556,11 +1557,11 @@
           "cost_microusd": 8946,
           "cost_known": true,
           "cost_is_estimate": false,
-          "elapsed_ms": 7.4,
+          "elapsed_ms": 7.1,
           "latency_source": "swarm_timing",
           "phases_ms": {
             "routing": null,
-            "planning": 1.0,
+            "planning": 0.8,
             "recovery": null,
             "execution": 1.6,
             "verification": 0.8,
@@ -1594,7 +1595,7 @@
       "attempt_allowance": 1,
       "failed_attempts": 0,
       "cost_microusd": 5886,
-      "elapsed_ms": 6.8,
+      "elapsed_ms": 7.1,
       "attempts": [
         {
           "attempt": 1,
@@ -1637,18 +1638,18 @@
           "cost_microusd": 5886,
           "cost_known": true,
           "cost_is_estimate": false,
-          "elapsed_ms": 6.8,
+          "elapsed_ms": 7.1,
           "latency_source": "swarm_timing",
           "phases_ms": {
             "routing": null,
-            "planning": 0.8,
+            "planning": 0.9,
             "recovery": null,
             "execution": 1.6,
             "verification": 0.8,
             "synthesis": 0.0,
             "supervision": 0.1,
             "checkpoint": 1.4,
-            "waiting": 1.5
+            "waiting": 1.6
           },
           "graph": {
             "topology": "fork_join",
@@ -1675,7 +1676,7 @@
       "attempt_allowance": 1,
       "failed_attempts": 0,
       "cost_microusd": 5886,
-      "elapsed_ms": 4.7,
+      "elapsed_ms": 4.6,
       "attempts": [
         {
           "attempt": 1,
@@ -1718,11 +1719,11 @@
           "cost_microusd": 5886,
           "cost_known": true,
           "cost_is_estimate": false,
-          "elapsed_ms": 4.7,
+          "elapsed_ms": 4.6,
           "latency_source": "swarm_timing",
           "phases_ms": {
             "routing": null,
-            "planning": 0.8,
+            "planning": 0.7,
             "recovery": null,
             "execution": 1.5,
             "verification": 0.8,
@@ -1756,7 +1757,7 @@
       "attempt_allowance": 1,
       "failed_attempts": 0,
       "cost_microusd": 8952,
-      "elapsed_ms": 6.5,
+      "elapsed_ms": 6.8,
       "attempts": [
         {
           "attempt": 1,
@@ -1812,13 +1813,13 @@
           "cost_microusd": 8952,
           "cost_known": true,
           "cost_is_estimate": false,
-          "elapsed_ms": 6.5,
+          "elapsed_ms": 6.8,
           "latency_source": "swarm_timing",
           "phases_ms": {
             "routing": null,
-            "planning": 0.7,
+            "planning": 0.8,
             "recovery": null,
-            "execution": 2.1,
+            "execution": 2.3,
             "verification": 0.1,
             "synthesis": 0.0,
             "supervision": 0.2,
@@ -1851,7 +1852,7 @@
       "attempt_allowance": 1,
       "failed_attempts": 1,
       "cost_microusd": 5085,
-      "elapsed_ms": 3.6,
+      "elapsed_ms": 3.7,
       "attempts": [
         {
           "attempt": 1,
@@ -1894,11 +1895,11 @@
           "cost_microusd": 5085,
           "cost_known": true,
           "cost_is_estimate": false,
-          "elapsed_ms": 3.6,
+          "elapsed_ms": 3.7,
           "latency_source": "swarm_timing",
           "phases_ms": {
             "routing": null,
-            "planning": 0.7,
+            "planning": 0.8,
             "recovery": null,
             "execution": 1.7,
             "verification": 0.1,
@@ -1933,7 +1934,7 @@
       "attempt_allowance": 1,
       "failed_attempts": 0,
       "cost_microusd": 7662,
-      "elapsed_ms": 6.6,
+      "elapsed_ms": 6.8,
       "attempts": [
         {
           "attempt": 1,
@@ -1991,18 +1992,18 @@
           "cost_microusd": 7662,
           "cost_known": true,
           "cost_is_estimate": false,
-          "elapsed_ms": 6.6,
+          "elapsed_ms": 6.8,
           "latency_source": "swarm_timing",
           "phases_ms": {
             "routing": null,
             "planning": 0.8,
             "recovery": null,
-            "execution": 2.1,
-            "verification": 0.2,
+            "execution": 2.3,
+            "verification": 0.1,
             "synthesis": 0.0,
             "supervision": 0.2,
-            "checkpoint": 1.0,
-            "waiting": 1.0
+            "checkpoint": 1.1,
+            "waiting": 1.1
           },
           "graph": {
             "topology": "fork_join",
@@ -2030,7 +2031,7 @@
       "attempt_allowance": 1,
       "failed_attempts": 1,
       "cost_microusd": 9750,
-      "elapsed_ms": 12.0,
+      "elapsed_ms": 12.7,
       "attempts": [
         {
           "attempt": 1,
@@ -2084,23 +2085,23 @@
             ],
             "tokens": 677,
             "cost_microusd": 2031,
-            "latency_ms": 0.2
+            "latency_ms": 0.3
           },
           "cost_microusd": 9750,
           "cost_known": true,
           "cost_is_estimate": false,
-          "elapsed_ms": 12.0,
+          "elapsed_ms": 12.7,
           "latency_source": "swarm_timing",
           "phases_ms": {
             "routing": null,
-            "planning": 0.8,
+            "planning": 0.9,
             "recovery": null,
-            "execution": 2.6,
+            "execution": 2.8,
             "verification": 2.3,
             "synthesis": 0.0,
-            "supervision": 0.2,
-            "checkpoint": 3.1,
-            "waiting": 2.5
+            "supervision": 0.3,
+            "checkpoint": 3.2,
+            "waiting": 2.6
           },
           "graph": {
             "topology": "fork_join",
@@ -2127,7 +2128,7 @@
       "attempt_allowance": 1,
       "failed_attempts": 1,
       "cost_microusd": 6900,
-      "elapsed_ms": 7.6,
+      "elapsed_ms": 7.7,
       "attempts": [
         {
           "attempt": 1,
@@ -2170,14 +2171,14 @@
           "cost_microusd": 6900,
           "cost_known": true,
           "cost_is_estimate": false,
-          "elapsed_ms": 7.6,
+          "elapsed_ms": 7.7,
           "latency_source": "swarm_timing",
           "phases_ms": {
             "routing": null,
             "planning": 0.9,
             "recovery": null,
-            "execution": 2.3,
-            "verification": 2.2,
+            "execution": 2.2,
+            "verification": 2.3,
             "synthesis": 0.0,
             "supervision": 0.0,
             "checkpoint": 2.8,
@@ -2208,7 +2209,7 @@
       "attempt_allowance": 1,
       "failed_attempts": 1,
       "cost_microusd": 12495,
-      "elapsed_ms": 13.4,
+      "elapsed_ms": 12.6,
       "attempts": [
         {
           "attempt": 1,
@@ -2264,23 +2265,23 @@
             ],
             "tokens": 1592,
             "cost_microusd": 4776,
-            "latency_ms": 0.3
+            "latency_ms": 0.4
           },
           "cost_microusd": 12495,
           "cost_known": true,
           "cost_is_estimate": false,
-          "elapsed_ms": 13.4,
+          "elapsed_ms": 12.6,
           "latency_source": "swarm_timing",
           "phases_ms": {
             "routing": null,
-            "planning": 0.8,
+            "planning": 0.9,
             "recovery": null,
-            "execution": 3.0,
-            "verification": 2.3,
+            "execution": 2.6,
+            "verification": 2.2,
             "synthesis": 0.0,
-            "supervision": 0.3,
-            "checkpoint": 3.4,
-            "waiting": 3.1
+            "supervision": 0.4,
+            "checkpoint": 3.1,
+            "waiting": 2.7
           },
           "graph": {
             "topology": "fork_join",
@@ -2307,7 +2308,7 @@
       "attempt_allowance": 1,
       "failed_attempts": 0,
       "cost_microusd": 7977,
-      "elapsed_ms": 7.0,
+      "elapsed_ms": 6.8,
       "attempts": [
         {
           "attempt": 1,
@@ -2366,7 +2367,7 @@
           "cost_microusd": 7977,
           "cost_known": true,
           "cost_is_estimate": false,
-          "elapsed_ms": 7.0,
+          "elapsed_ms": 6.8,
           "latency_source": "swarm_timing",
           "phases_ms": {
             "routing": null,
@@ -2376,7 +2377,7 @@
             "verification": 0.1,
             "synthesis": 0.0,
             "supervision": 0.2,
-            "checkpoint": 1.2,
+            "checkpoint": 1.1,
             "waiting": 1.0
           },
           "graph": {
@@ -2405,7 +2406,7 @@
       "attempt_allowance": 1,
       "failed_attempts": 0,
       "cost_microusd": 9174,
-      "elapsed_ms": 6.7,
+      "elapsed_ms": 6.9,
       "attempts": [
         {
           "attempt": 1,
@@ -2461,18 +2462,18 @@
           "cost_microusd": 9174,
           "cost_known": true,
           "cost_is_estimate": false,
-          "elapsed_ms": 6.7,
+          "elapsed_ms": 6.9,
           "latency_source": "swarm_timing",
           "phases_ms": {
             "routing": null,
             "planning": 0.7,
             "recovery": null,
-            "execution": 2.1,
+            "execution": 2.2,
             "verification": 0.1,
             "synthesis": 0.0,
             "supervision": 0.2,
-            "checkpoint": 1.1,
-            "waiting": 1.0
+            "checkpoint": 1.2,
+            "waiting": 1.1
           },
           "graph": {
             "topology": "fork_join",
@@ -2500,7 +2501,7 @@
       "attempt_allowance": 1,
       "failed_attempts": 1,
       "cost_microusd": 5289,
-      "elapsed_ms": 3.8,
+      "elapsed_ms": 3.7,
       "attempts": [
         {
           "attempt": 1,
@@ -2543,17 +2544,17 @@
           "cost_microusd": 5289,
           "cost_known": true,
           "cost_is_estimate": false,
-          "elapsed_ms": 3.8,
+          "elapsed_ms": 3.7,
           "latency_source": "swarm_timing",
           "phases_ms": {
             "routing": null,
-            "planning": 0.6,
+            "planning": 0.7,
             "recovery": null,
-            "execution": 2.0,
+            "execution": 1.7,
             "verification": 0.1,
             "synthesis": 0.0,
             "supervision": 0.0,
-            "checkpoint": 0.9,
+            "checkpoint": 0.8,
             "waiting": 0.0
           },
           "graph": {
@@ -2582,7 +2583,7 @@
       "attempt_allowance": 1,
       "failed_attempts": 0,
       "cost_microusd": 5271,
-      "elapsed_ms": 3.7,
+      "elapsed_ms": 4.2,
       "attempts": [
         {
           "attempt": 1,
@@ -2625,17 +2626,17 @@
           "cost_microusd": 5271,
           "cost_known": true,
           "cost_is_estimate": false,
-          "elapsed_ms": 3.7,
+          "elapsed_ms": 4.2,
           "latency_source": "swarm_timing",
           "phases_ms": {
             "routing": null,
             "planning": 0.8,
             "recovery": null,
-            "execution": 1.6,
+            "execution": 2.1,
             "verification": 0.1,
             "synthesis": 0.0,
             "supervision": 0.0,
-            "checkpoint": 0.8,
+            "checkpoint": 0.9,
             "waiting": 0.0
           },
           "graph": {
@@ -2663,7 +2664,7 @@
       "attempt_allowance": 1,
       "failed_attempts": 0,
       "cost_microusd": 5271,
-      "elapsed_ms": 5.0,
+      "elapsed_ms": 5.4,
       "attempts": [
         {
           "attempt": 1,
@@ -2706,18 +2707,18 @@
           "cost_microusd": 5271,
           "cost_known": true,
           "cost_is_estimate": false,
-          "elapsed_ms": 5.0,
+          "elapsed_ms": 5.4,
           "latency_source": "swarm_timing",
           "phases_ms": {
             "routing": null,
-            "planning": 0.8,
+            "planning": 0.7,
             "recovery": null,
             "execution": 1.5,
             "verification": 0.1,
             "synthesis": 0.0,
             "supervision": 0.1,
             "checkpoint": 0.8,
-            "waiting": 1.0
+            "waiting": 1.3
           },
           "graph": {
             "topology": "fork_join",
@@ -2744,7 +2745,7 @@
       "attempt_allowance": 1,
       "failed_attempts": 0,
       "cost_microusd": 8112,
-      "elapsed_ms": 5.0,
+      "elapsed_ms": 5.6,
       "attempts": [
         {
           "attempt": 1,
@@ -2798,18 +2799,18 @@
           "cost_microusd": 8112,
           "cost_known": true,
           "cost_is_estimate": false,
-          "elapsed_ms": 5.0,
+          "elapsed_ms": 5.6,
           "latency_source": "swarm_timing",
           "phases_ms": {
             "routing": null,
-            "planning": 0.7,
+            "planning": 0.8,
             "recovery": null,
-            "execution": 1.6,
+            "execution": 1.7,
             "verification": 0.1,
             "synthesis": 0.0,
             "supervision": 0.2,
-            "checkpoint": 0.8,
-            "waiting": 1.0
+            "checkpoint": 0.9,
+            "waiting": 1.2
           },
           "graph": {
             "topology": "fork_join",
@@ -2901,9 +2902,14 @@
     "contract_hash": "sha256:72b10e82e55abd1db0ba63be05f2f28b1fd82a2e1e55d88f3eb49948e40e1949",
     "thresholds": "placeholders for offline mechanics; promotion thresholds are not decided",
     "decision_scope": "the decision of a campaign on fixtures, in a ledger the run discards: it activates nothing and changes no default",
+    "decision_status": {
+      "mechanics_only": true,
+      "promotes": false,
+      "note": "the decision below is the Autotune engine's own, kept as it ran: its 'promoted' and the 'untouched holdout' of its reason describe a holdout that is an offline stand-in, so the decision shows mechanics only and promotes nothing"
+    },
     "evaluator_manifest": {
       "version": 1,
-      "code_digest": "sha256:939eae213ddd5df896a31982a3771e4781b84f18da9bc5bca80720edd4d33145",
+      "code_digest": "sha256:ca547583650f73b1906cb3d939f66000579364de5ef0d14ad3d90a6fbcc8ad91",
       "split_manifests": {
         "development": "sha256:5387563da728e4c9bceef8bf379dd28a650f5689bddf8f65131ef211454d3b93",
         "confirmation": "sha256:5387563da728e4c9bceef8bf379dd28a650f5689bddf8f65131ef211454d3b93",
@@ -2918,7 +2924,7 @@
       ],
       "price_snapshot_version": "offline-fixture-3-microusd-per-token-v1"
     },
-    "evaluator_hash": "sha256:8e01139c07f45765302242081deffb4c6f86ca2596f651a4f94f4ffdafa82f1d",
+    "evaluator_hash": "sha256:32c97256d9040d3eea9a503664226a887f2429ff0e3773d4cdb90000d3631e83",
     "split_manifest": {
       "family": "trigger-fixtures",
       "text_hash_policy": "sha256-utf8-text-crlf-to-lf-v1",
@@ -2948,18 +2954,19 @@
     "holdout": {
       "source": "development-stand-in",
       "held_out": false,
-      "note": "the holdout split reuses the fixture tasks, so its verdict shows mechanics only"
+      "label": "offline stand-in",
+      "note": "an offline stand-in, not an untouched holdout: the holdout split reuses the fixture tasks every split runs, so its verdict shows mechanics only"
     },
     "decision": {
-      "campaign_id": "optimization_v4_6e98282294f79408a7947c86b531cf9f64de39d0f529e7254ffbea636f134409",
-      "optimization_plan_hash": "sha256:6e98282294f79408a7947c86b531cf9f64de39d0f529e7254ffbea636f134409",
-      "holdout_seed_commitment": "sha256:b0f328e0bda7943eccf9c0db45242d1eb85d2bdb71b499079525a7d1ab2f3e11",
+      "campaign_id": "optimization_v4_192373a020487590835504f759456c9e55d2de6d092f5e4e843bb86d8a4ab67d",
+      "optimization_plan_hash": "sha256:192373a020487590835504f759456c9e55d2de6d092f5e4e843bb86d8a4ab67d",
+      "holdout_seed_commitment": "sha256:7abba108ead6db237a2c72d4a945345e40b3f7dd58881deac8160cb8a31bb265",
       "incumbent_candidate_id": "cand_2ad378104ca0fa9e9764d16fbfbf9de0c0581bc81cabcfb55f97ab721ba6d000",
       "selected_candidate_id": "cand_4ac62b9cb32f446c31d909c0fe0bf46bd90d9ece5474d42eea2cb6d4a9786e5c",
       "promoted": true,
       "verdict": "improved",
       "reason": "confirmation and untouched holdout both passed promotion policy",
-      "decision_id": "decision_v1_516cf4af1143a63f4140cb89049a3fcd17654878f7c4afea9fc4276078c5defe",
+      "decision_id": "decision_v1_a3c8999b83ef2049c9c6975466142c6baa1b6a33c61ba0bb9e7e9c43eed47e52",
       "development_scores": [
         {
           "candidate_id": "cand_4ac62b9cb32f446c31d909c0fe0bf46bd90d9ece5474d42eea2cb6d4a9786e5c",
@@ -3000,8 +3007,8 @@
             "cost_microusd": true
           },
           "trial_keys": [
-            "trial_v1_831ce74932cf21c88343f7d02398a617870dff92d72f203da3d30dda06c5f9db",
-            "trial_v1_45a3a583e59fc0e4dd8cc122bc0799f6d2ff99c8c59b034899a1ba0f4752e4a8"
+            "trial_v1_4d0618ecf7bca9033fe22c0138e16c3a6705da4b64bf227cd6fb6e5261e08b57",
+            "trial_v1_b6d0c32906fb9d16dc1417f6bed0e47b8b656c49732081e4738470b0c429d466"
           ],
           "viable": true,
           "arm": "triggered"
@@ -3029,7 +3036,7 @@
           "mean_improvement": 1.5555555555555556,
           "confidence_level": 0.8,
           "bootstrap_resamples": 2000,
-          "bootstrap_seed": 4132183553650297488,
+          "bootstrap_seed": 8250826816305997949,
           "confidence_interval": [
             1.3101601194786558,
             1.8009509916324553
@@ -3067,7 +3074,7 @@
             "mean_improvement": 0.0,
             "confidence_level": 0.8,
             "bootstrap_resamples": 2000,
-            "bootstrap_seed": 4132183553650297488,
+            "bootstrap_seed": 8250826816305997949,
             "confidence_interval": [
               0.0,
               0.0
@@ -3104,7 +3111,7 @@
             "mean_improvement": 2204.3333333333335,
             "confidence_level": 0.8,
             "bootstrap_resamples": 2000,
-            "bootstrap_seed": 4132183553650297488,
+            "bootstrap_seed": 8250826816305997949,
             "confidence_interval": [
               1827.2586631384986,
               2581.4080035281686
@@ -3117,8 +3124,8 @@
             "standard_error": 269.95313379259824,
             "critical_value": 1.396815309743864,
             "descriptive_bootstrap_interval": [
-              1865.2666666666664,
-              2532.4000000000005
+              1875.9,
+              2546.6666666666665
             ]
           }
         ],
@@ -3142,22 +3149,22 @@
           "direction": "minimize",
           "sample_count": 9,
           "sample_seeds": [
-            1650696032100229853,
-            7674479098667884973,
-            428282492802812666,
-            7100281402069449684,
-            524451427906280649,
-            978019950474971650,
-            8251605169234449824,
-            7248089458673075828,
-            9103454135563114705
+            8580474349070620851,
+            3786563806812680626,
+            977712877836564258,
+            6978656548928174796,
+            6737531317709033504,
+            1475888603896696711,
+            3639304079377221454,
+            4247590835852547626,
+            8668147220632939885
           ],
           "baseline_mean": 2.111111111111111,
           "candidate_mean": 0.5555555555555556,
           "mean_improvement": 1.5555555555555556,
           "confidence_level": 0.8,
           "bootstrap_resamples": 2000,
-          "bootstrap_seed": 2039325905699548778,
+          "bootstrap_seed": 6740549799904999483,
           "confidence_interval": [
             1.3101601194786558,
             1.8009509916324553
@@ -3180,22 +3187,22 @@
             "direction": "maximize",
             "sample_count": 9,
             "sample_seeds": [
-              1650696032100229853,
-              7674479098667884973,
-              428282492802812666,
-              7100281402069449684,
-              524451427906280649,
-              978019950474971650,
-              8251605169234449824,
-              7248089458673075828,
-              9103454135563114705
+              8580474349070620851,
+              3786563806812680626,
+              977712877836564258,
+              6978656548928174796,
+              6737531317709033504,
+              1475888603896696711,
+              3639304079377221454,
+              4247590835852547626,
+              8668147220632939885
             ],
             "baseline_mean": 0.8888888888888888,
             "candidate_mean": 0.8888888888888888,
             "mean_improvement": 0.0,
             "confidence_level": 0.8,
             "bootstrap_resamples": 2000,
-            "bootstrap_seed": 2039325905699548778,
+            "bootstrap_seed": 6740549799904999483,
             "confidence_interval": [
               0.0,
               0.0
@@ -3217,22 +3224,22 @@
             "direction": "minimize",
             "sample_count": 9,
             "sample_seeds": [
-              1650696032100229853,
-              7674479098667884973,
-              428282492802812666,
-              7100281402069449684,
-              524451427906280649,
-              978019950474971650,
-              8251605169234449824,
-              7248089458673075828,
-              9103454135563114705
+              8580474349070620851,
+              3786563806812680626,
+              977712877836564258,
+              6978656548928174796,
+              6737531317709033504,
+              1475888603896696711,
+              3639304079377221454,
+              4247590835852547626,
+              8668147220632939885
             ],
             "baseline_mean": 9149.333333333334,
             "candidate_mean": 6945.0,
             "mean_improvement": 2204.3333333333335,
             "confidence_level": 0.8,
             "bootstrap_resamples": 2000,
-            "bootstrap_seed": 2039325905699548778,
+            "bootstrap_seed": 6740549799904999483,
             "confidence_interval": [
               1827.2586631384986,
               2581.4080035281686
@@ -3245,8 +3252,8 @@
             "standard_error": 269.95313379259824,
             "critical_value": 1.396815309743864,
             "descriptive_bootstrap_interval": [
-              1861.2999999999997,
-              2540.6666666666665
+              1868.1666666666665,
+              2540.5333333333338
             ]
           }
         ],
@@ -3279,7 +3286,7 @@
             "primary": {
               "baseline_mean": 0.0,
               "bootstrap_resamples": 2000,
-              "bootstrap_seed": 4132183553650297488,
+              "bootstrap_seed": 8250826816305997949,
               "candidate_mean": 0.5555555555555556,
               "confidence_interval": [
                 -0.8009509916324553,
@@ -3321,7 +3328,7 @@
               {
                 "baseline_mean": 0.5555555555555556,
                 "bootstrap_resamples": 2000,
-                "bootstrap_seed": 4132183553650297488,
+                "bootstrap_seed": 8250826816305997949,
                 "candidate_mean": 0.8888888888888888,
                 "confidence_interval": [
                   0.10053078170935598,
@@ -3358,7 +3365,7 @@
               {
                 "baseline_mean": 5588.666666666667,
                 "bootstrap_resamples": 2000,
-                "bootstrap_seed": 4132183553650297488,
+                "bootstrap_seed": 8250826816305997949,
                 "candidate_mean": 6945.0,
                 "confidence_interval": [
                   -1968.0393481553815,
@@ -3368,8 +3375,8 @@
                 "critical_value": 1.396815309743864,
                 "degrees_of_freedom": 8,
                 "descriptive_bootstrap_interval": [
-                  -1885.4333333333334,
-                  -807.3333333333334
+                  -1895.333333333333,
+                  -819.433333333333
                 ],
                 "direction": "minimize",
                 "hard_bounds_passed": true,
@@ -3409,7 +3416,7 @@
             "primary": {
               "baseline_mean": 0.0,
               "bootstrap_resamples": 2000,
-              "bootstrap_seed": 2039325905699548778,
+              "bootstrap_seed": 6740549799904999483,
               "candidate_mean": 0.5555555555555556,
               "confidence_interval": [
                 -0.8009509916324553,
@@ -3431,15 +3438,15 @@
               "objective_name": "supervision_calls",
               "sample_count": 9,
               "sample_seeds": [
-                1650696032100229853,
-                7674479098667884973,
-                428282492802812666,
-                7100281402069449684,
-                524451427906280649,
-                978019950474971650,
-                8251605169234449824,
-                7248089458673075828,
-                9103454135563114705
+                8580474349070620851,
+                3786563806812680626,
+                977712877836564258,
+                6978656548928174796,
+                6737531317709033504,
+                1475888603896696711,
+                3639304079377221454,
+                4247590835852547626,
+                8668147220632939885
               ],
               "standard_error": 0.17568209223157663
             },
@@ -3451,7 +3458,7 @@
               {
                 "baseline_mean": 0.5555555555555556,
                 "bootstrap_resamples": 2000,
-                "bootstrap_seed": 2039325905699548778,
+                "bootstrap_seed": 6740549799904999483,
                 "candidate_mean": 0.8888888888888888,
                 "confidence_interval": [
                   0.10053078170935598,
@@ -3473,22 +3480,22 @@
                 "objective_name": "accepted_outcome_rate",
                 "sample_count": 9,
                 "sample_seeds": [
-                  1650696032100229853,
-                  7674479098667884973,
-                  428282492802812666,
-                  7100281402069449684,
-                  524451427906280649,
-                  978019950474971650,
-                  8251605169234449824,
-                  7248089458673075828,
-                  9103454135563114705
+                  8580474349070620851,
+                  3786563806812680626,
+                  977712877836564258,
+                  6978656548928174796,
+                  6737531317709033504,
+                  1475888603896696711,
+                  3639304079377221454,
+                  4247590835852547626,
+                  8668147220632939885
                 ],
                 "standard_error": 0.16666666666666666
               },
               {
                 "baseline_mean": 5588.666666666667,
                 "bootstrap_resamples": 2000,
-                "bootstrap_seed": 2039325905699548778,
+                "bootstrap_seed": 6740549799904999483,
                 "candidate_mean": 6945.0,
                 "confidence_interval": [
                   -1968.0393481553815,
@@ -3498,8 +3505,8 @@
                 "critical_value": 1.396815309743864,
                 "degrees_of_freedom": 8,
                 "descriptive_bootstrap_interval": [
-                  -1901.2,
-                  -807.3333333333334
+                  -1895.333333333333,
+                  -807.0999999999997
                 ],
                 "direction": "minimize",
                 "hard_bounds_passed": true,
@@ -3510,15 +3517,15 @@
                 "objective_name": "cost_microusd",
                 "sample_count": 9,
                 "sample_seeds": [
-                  1650696032100229853,
-                  7674479098667884973,
-                  428282492802812666,
-                  7100281402069449684,
-                  524451427906280649,
-                  978019950474971650,
-                  8251605169234449824,
-                  7248089458673075828,
-                  9103454135563114705
+                  8580474349070620851,
+                  3786563806812680626,
+                  977712877836564258,
+                  6978656548928174796,
+                  6737531317709033504,
+                  1475888603896696711,
+                  3639304079377221454,
+                  4247590835852547626,
+                  8668147220632939885
                 ],
                 "standard_error": 437.92905945039905
               }
@@ -3536,7 +3543,7 @@
     },
     "trials": [
       {
-        "trial_key": "trial_v1_831ce74932cf21c88343f7d02398a617870dff92d72f203da3d30dda06c5f9db",
+        "trial_key": "trial_v1_4d0618ecf7bca9033fe22c0138e16c3a6705da4b64bf227cd6fb6e5261e08b57",
         "split": "development",
         "role": "incumbent",
         "task_index": 0,
@@ -3553,190 +3560,7 @@
         "attempt_allowance": 1,
         "failed_attempts": 0,
         "cost_microusd": 8175,
-        "elapsed_ms": 6.6,
-        "attempts": [
-          {
-            "attempt": 1,
-            "planted": null,
-            "outcome": "accepted",
-            "decision": "accepted",
-            "reasons": [
-              "every final validator passed"
-            ],
-            "policy_sha256": "8084ccebb98a4ff92d43ecba84bc49693f13d258f9facc91369e28f029f54857",
-            "validators": [
-              {
-                "name": "smythe.text-spec",
-                "version": "1",
-                "config_sha256": "c90841d686afcbef0388656e9c5ac2f8eccbca23ca7d2634bf56966cce01a549",
-                "outcome": "passed"
-              }
-            ],
-            "output_sha256": "a76a9740e01d65855ceb301e0eb2d427f97b69a4e079d41c29e58714075eb7f1",
-            "output_bytes": 121,
-            "adjudication": null,
-            "error": null,
-            "provider_calls": 4,
-            "provider_calls_failed": 0,
-            "planning_calls": 1,
-            "tokens": 1767,
-            "model_cost_microusd": 5301,
-            "supervision": {
-              "calls": 2,
-              "proposals": 0,
-              "reviews": [
-                {
-                  "after_node": "risks",
-                  "with_evidence": false,
-                  "change": false
-                },
-                {
-                  "after_node": "deliver",
-                  "with_evidence": false,
-                  "change": false
-                }
-              ],
-              "reviews_triggered": [],
-              "revisions_applied": 0,
-              "revisions_refused": 0,
-              "added_steps": [],
-              "tokens": 958,
-              "cost_microusd": 2874,
-              "latency_ms": 0.7
-            },
-            "cost_microusd": 8175,
-            "cost_known": true,
-            "cost_is_estimate": false,
-            "elapsed_ms": 6.6,
-            "latency_source": "swarm_timing",
-            "phases_ms": {
-              "routing": null,
-              "planning": 1.1,
-              "recovery": null,
-              "execution": 1.9,
-              "verification": 0.1,
-              "synthesis": 0.0,
-              "supervision": 0.7,
-              "checkpoint": 0.8,
-              "waiting": 1.7
-            },
-            "graph": {
-              "topology": "fork_join",
-              "nodes": 3,
-              "node_statuses": {
-                "completed": 3
-              }
-            }
-          }
-        ],
-        "anomaly": null,
-        "supervision_calls": 2
-      },
-      {
-        "trial_key": "trial_v1_45a3a583e59fc0e4dd8cc122bc0799f6d2ff99c8c59b034899a1ba0f4752e4a8",
-        "split": "development",
-        "role": "challenger",
-        "task_index": 0,
-        "gates": {
-          "acceptance.policy_unchanged": true,
-          "accounting.complete": true
-        },
-        "family": "trigger-fixtures",
-        "task_id": "rail-pass",
-        "task_sha256": "71cb590a913dab2be3d275a1acad466b010409de0e900a0ca58729fb8662b7b5",
-        "arm": "triggered",
-        "repetition": 1,
-        "accepted": true,
-        "attempt_allowance": 1,
-        "failed_attempts": 0,
-        "cost_microusd": 5301,
-        "elapsed_ms": 5.5,
-        "attempts": [
-          {
-            "attempt": 1,
-            "planted": null,
-            "outcome": "accepted",
-            "decision": "accepted",
-            "reasons": [
-              "every final validator passed"
-            ],
-            "policy_sha256": "8084ccebb98a4ff92d43ecba84bc49693f13d258f9facc91369e28f029f54857",
-            "validators": [
-              {
-                "name": "smythe.text-spec",
-                "version": "1",
-                "config_sha256": "c90841d686afcbef0388656e9c5ac2f8eccbca23ca7d2634bf56966cce01a549",
-                "outcome": "passed"
-              }
-            ],
-            "output_sha256": "a76a9740e01d65855ceb301e0eb2d427f97b69a4e079d41c29e58714075eb7f1",
-            "output_bytes": 121,
-            "adjudication": null,
-            "error": null,
-            "provider_calls": 4,
-            "provider_calls_failed": 0,
-            "planning_calls": 1,
-            "tokens": 1767,
-            "model_cost_microusd": 5301,
-            "supervision": {
-              "calls": 0,
-              "proposals": 0,
-              "reviews": [],
-              "reviews_triggered": [],
-              "revisions_applied": 0,
-              "revisions_refused": 0,
-              "added_steps": [],
-              "tokens": 0,
-              "cost_microusd": 0,
-              "latency_ms": 0.1
-            },
-            "cost_microusd": 5301,
-            "cost_known": true,
-            "cost_is_estimate": false,
-            "elapsed_ms": 5.5,
-            "latency_source": "swarm_timing",
-            "phases_ms": {
-              "routing": null,
-              "planning": 1.0,
-              "recovery": null,
-              "execution": 1.7,
-              "verification": 0.1,
-              "synthesis": 0.0,
-              "supervision": 0.1,
-              "checkpoint": 0.8,
-              "waiting": 1.1
-            },
-            "graph": {
-              "topology": "fork_join",
-              "nodes": 3,
-              "node_statuses": {
-                "completed": 3
-              }
-            }
-          }
-        ],
-        "anomaly": null,
-        "supervision_calls": 0
-      },
-      {
-        "trial_key": "trial_v1_d1a3ac952da098d284e2c1eb4ce73699c099d04d4b7b35c32751e80292d04c85",
-        "split": "confirmation",
-        "role": "incumbent",
-        "task_index": 0,
-        "gates": {
-          "acceptance.policy_unchanged": true,
-          "accounting.complete": true
-        },
-        "family": "trigger-fixtures",
-        "task_id": "rail-pass",
-        "task_sha256": "71cb590a913dab2be3d275a1acad466b010409de0e900a0ca58729fb8662b7b5",
-        "arm": "routine",
-        "repetition": 1,
-        "accepted": true,
-        "attempt_allowance": 1,
-        "failed_attempts": 0,
-        "cost_microusd": 8175,
-        "elapsed_ms": 5.2,
+        "elapsed_ms": 6.0,
         "attempts": [
           {
             "attempt": 1,
@@ -3790,13 +3614,196 @@
             "cost_microusd": 8175,
             "cost_known": true,
             "cost_is_estimate": false,
-            "elapsed_ms": 5.2,
+            "elapsed_ms": 6.0,
             "latency_source": "swarm_timing",
             "phases_ms": {
               "routing": null,
-              "planning": 0.7,
+              "planning": 1.2,
               "recovery": null,
-              "execution": 1.5,
+              "execution": 1.6,
+              "verification": 0.1,
+              "synthesis": 0.0,
+              "supervision": 0.2,
+              "checkpoint": 0.9,
+              "waiting": 1.2
+            },
+            "graph": {
+              "topology": "fork_join",
+              "nodes": 3,
+              "node_statuses": {
+                "completed": 3
+              }
+            }
+          }
+        ],
+        "anomaly": null,
+        "supervision_calls": 2
+      },
+      {
+        "trial_key": "trial_v1_b6d0c32906fb9d16dc1417f6bed0e47b8b656c49732081e4738470b0c429d466",
+        "split": "development",
+        "role": "challenger",
+        "task_index": 0,
+        "gates": {
+          "acceptance.policy_unchanged": true,
+          "accounting.complete": true
+        },
+        "family": "trigger-fixtures",
+        "task_id": "rail-pass",
+        "task_sha256": "71cb590a913dab2be3d275a1acad466b010409de0e900a0ca58729fb8662b7b5",
+        "arm": "triggered",
+        "repetition": 1,
+        "accepted": true,
+        "attempt_allowance": 1,
+        "failed_attempts": 0,
+        "cost_microusd": 5301,
+        "elapsed_ms": 5.4,
+        "attempts": [
+          {
+            "attempt": 1,
+            "planted": null,
+            "outcome": "accepted",
+            "decision": "accepted",
+            "reasons": [
+              "every final validator passed"
+            ],
+            "policy_sha256": "8084ccebb98a4ff92d43ecba84bc49693f13d258f9facc91369e28f029f54857",
+            "validators": [
+              {
+                "name": "smythe.text-spec",
+                "version": "1",
+                "config_sha256": "c90841d686afcbef0388656e9c5ac2f8eccbca23ca7d2634bf56966cce01a549",
+                "outcome": "passed"
+              }
+            ],
+            "output_sha256": "a76a9740e01d65855ceb301e0eb2d427f97b69a4e079d41c29e58714075eb7f1",
+            "output_bytes": 121,
+            "adjudication": null,
+            "error": null,
+            "provider_calls": 4,
+            "provider_calls_failed": 0,
+            "planning_calls": 1,
+            "tokens": 1767,
+            "model_cost_microusd": 5301,
+            "supervision": {
+              "calls": 0,
+              "proposals": 0,
+              "reviews": [],
+              "reviews_triggered": [],
+              "revisions_applied": 0,
+              "revisions_refused": 0,
+              "added_steps": [],
+              "tokens": 0,
+              "cost_microusd": 0,
+              "latency_ms": 0.1
+            },
+            "cost_microusd": 5301,
+            "cost_known": true,
+            "cost_is_estimate": false,
+            "elapsed_ms": 5.4,
+            "latency_source": "swarm_timing",
+            "phases_ms": {
+              "routing": null,
+              "planning": 0.9,
+              "recovery": null,
+              "execution": 1.6,
+              "verification": 0.1,
+              "synthesis": 0.0,
+              "supervision": 0.1,
+              "checkpoint": 0.8,
+              "waiting": 1.1
+            },
+            "graph": {
+              "topology": "fork_join",
+              "nodes": 3,
+              "node_statuses": {
+                "completed": 3
+              }
+            }
+          }
+        ],
+        "anomaly": null,
+        "supervision_calls": 0
+      },
+      {
+        "trial_key": "trial_v1_8836fe6d08da492335de6f9adf0636290b1a9147546f5cad38993d3c3dd9029c",
+        "split": "confirmation",
+        "role": "incumbent",
+        "task_index": 0,
+        "gates": {
+          "acceptance.policy_unchanged": true,
+          "accounting.complete": true
+        },
+        "family": "trigger-fixtures",
+        "task_id": "rail-pass",
+        "task_sha256": "71cb590a913dab2be3d275a1acad466b010409de0e900a0ca58729fb8662b7b5",
+        "arm": "routine",
+        "repetition": 1,
+        "accepted": true,
+        "attempt_allowance": 1,
+        "failed_attempts": 0,
+        "cost_microusd": 8175,
+        "elapsed_ms": 5.8,
+        "attempts": [
+          {
+            "attempt": 1,
+            "planted": null,
+            "outcome": "accepted",
+            "decision": "accepted",
+            "reasons": [
+              "every final validator passed"
+            ],
+            "policy_sha256": "8084ccebb98a4ff92d43ecba84bc49693f13d258f9facc91369e28f029f54857",
+            "validators": [
+              {
+                "name": "smythe.text-spec",
+                "version": "1",
+                "config_sha256": "c90841d686afcbef0388656e9c5ac2f8eccbca23ca7d2634bf56966cce01a549",
+                "outcome": "passed"
+              }
+            ],
+            "output_sha256": "a76a9740e01d65855ceb301e0eb2d427f97b69a4e079d41c29e58714075eb7f1",
+            "output_bytes": 121,
+            "adjudication": null,
+            "error": null,
+            "provider_calls": 4,
+            "provider_calls_failed": 0,
+            "planning_calls": 1,
+            "tokens": 1767,
+            "model_cost_microusd": 5301,
+            "supervision": {
+              "calls": 2,
+              "proposals": 0,
+              "reviews": [
+                {
+                  "after_node": "risks",
+                  "with_evidence": false,
+                  "change": false
+                },
+                {
+                  "after_node": "deliver",
+                  "with_evidence": false,
+                  "change": false
+                }
+              ],
+              "reviews_triggered": [],
+              "revisions_applied": 0,
+              "revisions_refused": 0,
+              "added_steps": [],
+              "tokens": 958,
+              "cost_microusd": 2874,
+              "latency_ms": 0.2
+            },
+            "cost_microusd": 8175,
+            "cost_known": true,
+            "cost_is_estimate": false,
+            "elapsed_ms": 5.8,
+            "latency_source": "swarm_timing",
+            "phases_ms": {
+              "routing": null,
+              "planning": 1.1,
+              "recovery": null,
+              "execution": 1.6,
               "verification": 0.1,
               "synthesis": 0.0,
               "supervision": 0.2,
@@ -3816,7 +3823,7 @@
         "supervision_calls": 2
       },
       {
-        "trial_key": "trial_v1_ed0000b4010acf0741c44e9da9cc80f5d02541764cf8c45f7707b0ac1cd0c1e7",
+        "trial_key": "trial_v1_5ff2ac892b98092f0633aea3c15b901c94be8b336d049eaf82dda3467cf4b501",
         "split": "confirmation",
         "role": "incumbent",
         "task_index": 5,
@@ -3833,7 +3840,7 @@
         "attempt_allowance": 1,
         "failed_attempts": 0,
         "cost_microusd": 8952,
-        "elapsed_ms": 6.8,
+        "elapsed_ms": 7.3,
         "attempts": [
           {
             "attempt": 1,
@@ -3889,11 +3896,11 @@
             "cost_microusd": 8952,
             "cost_known": true,
             "cost_is_estimate": false,
-            "elapsed_ms": 6.8,
+            "elapsed_ms": 7.3,
             "latency_source": "swarm_timing",
             "phases_ms": {
               "routing": null,
-              "planning": 0.8,
+              "planning": 1.0,
               "recovery": null,
               "execution": 2.3,
               "verification": 0.1,
@@ -3916,7 +3923,7 @@
         "supervision_calls": 2
       },
       {
-        "trial_key": "trial_v1_3b4a9f3a3a5fbbf2fc37d5f5216e7ed122ab2cdc626df93439b52f649613b799",
+        "trial_key": "trial_v1_b29f8b168138c504ba77207231f1b73e91c610dc9704033f3630ec2b6422749e",
         "split": "confirmation",
         "role": "incumbent",
         "task_index": 7,
@@ -3933,7 +3940,7 @@
         "attempt_allowance": 1,
         "failed_attempts": 0,
         "cost_microusd": 9726,
-        "elapsed_ms": 5.3,
+        "elapsed_ms": 5.4,
         "attempts": [
           {
             "attempt": 1,
@@ -3987,7 +3994,7 @@
             "cost_microusd": 9726,
             "cost_known": true,
             "cost_is_estimate": false,
-            "elapsed_ms": 5.3,
+            "elapsed_ms": 5.4,
             "latency_source": "swarm_timing",
             "phases_ms": {
               "routing": null,
@@ -4013,7 +4020,7 @@
         "supervision_calls": 2
       },
       {
-        "trial_key": "trial_v1_e31ffe994760c9c32dc91323ef749bf8587b473fa84cc8e2b13abacbd6453937",
+        "trial_key": "trial_v1_9ed19f8787139ae02860339290932e7c46c5af3b1a043426c4a908188864f210",
         "split": "confirmation",
         "role": "incumbent",
         "task_index": 6,
@@ -4090,14 +4097,14 @@
             "latency_source": "swarm_timing",
             "phases_ms": {
               "routing": null,
-              "planning": 0.8,
+              "planning": 0.7,
               "recovery": null,
-              "execution": 2.1,
+              "execution": 2.3,
               "verification": 0.1,
               "synthesis": 0.0,
               "supervision": 0.2,
               "checkpoint": 1.1,
-              "waiting": 1.1
+              "waiting": 1.0
             },
             "graph": {
               "topology": "fork_join",
@@ -4113,7 +4120,7 @@
         "supervision_calls": 2
       },
       {
-        "trial_key": "trial_v1_80a17178725f50e7e07592d1c9b4b83e9447a14e9c224aac7158f4bc922df482",
+        "trial_key": "trial_v1_64b57252418ca477a82c22898ed94acae28a4aa5a62bbf93754003d9b5ca9d8c",
         "split": "confirmation",
         "role": "incumbent",
         "task_index": 3,
@@ -4130,7 +4137,7 @@
         "attempt_allowance": 1,
         "failed_attempts": 0,
         "cost_microusd": 8946,
-        "elapsed_ms": 6.8,
+        "elapsed_ms": 7.1,
         "attempts": [
           {
             "attempt": 1,
@@ -4184,7 +4191,7 @@
             "cost_microusd": 8946,
             "cost_known": true,
             "cost_is_estimate": false,
-            "elapsed_ms": 6.8,
+            "elapsed_ms": 7.1,
             "latency_source": "swarm_timing",
             "phases_ms": {
               "routing": null,
@@ -4195,7 +4202,7 @@
               "synthesis": 0.0,
               "supervision": 0.2,
               "checkpoint": 1.4,
-              "waiting": 1.5
+              "waiting": 1.6
             },
             "graph": {
               "topology": "fork_join",
@@ -4210,7 +4217,7 @@
         "supervision_calls": 2
       },
       {
-        "trial_key": "trial_v1_450b5fe1444954cd5fb3b504efe0b408e4273812dce2d2a82ab28567119111c8",
+        "trial_key": "trial_v1_f31923ee4c57edc72fdbfc1d14848faebc553f1aeb86ddcf4b6909be2253ba08",
         "split": "confirmation",
         "role": "incumbent",
         "task_index": 2,
@@ -4227,7 +4234,7 @@
         "attempt_allowance": 1,
         "failed_attempts": 0,
         "cost_microusd": 8151,
-        "elapsed_ms": 5.3,
+        "elapsed_ms": 5.6,
         "attempts": [
           {
             "attempt": 1,
@@ -4281,13 +4288,13 @@
             "cost_microusd": 8151,
             "cost_known": true,
             "cost_is_estimate": false,
-            "elapsed_ms": 5.3,
+            "elapsed_ms": 5.6,
             "latency_source": "swarm_timing",
             "phases_ms": {
               "routing": null,
-              "planning": 0.8,
+              "planning": 1.0,
               "recovery": null,
-              "execution": 1.6,
+              "execution": 1.7,
               "verification": 0.1,
               "synthesis": 0.0,
               "supervision": 0.2,
@@ -4307,7 +4314,7 @@
         "supervision_calls": 2
       },
       {
-        "trial_key": "trial_v1_08e0524b2616aa9c0a645d9cb0edfbaf1f74011c887ad011c38da87f091f9194",
+        "trial_key": "trial_v1_1979cdfa66b2e1f4bc1f02f18d207a0c2849eea29850c7376e0a1a19842b47a9",
         "split": "confirmation",
         "role": "incumbent",
         "task_index": 1,
@@ -4324,7 +4331,7 @@
         "attempt_allowance": 1,
         "failed_attempts": 0,
         "cost_microusd": 8112,
-        "elapsed_ms": 5.7,
+        "elapsed_ms": 5.3,
         "attempts": [
           {
             "attempt": 1,
@@ -4373,23 +4380,23 @@
               "added_steps": [],
               "tokens": 947,
               "cost_microusd": 2841,
-              "latency_ms": 0.3
+              "latency_ms": 0.2
             },
             "cost_microusd": 8112,
             "cost_known": true,
             "cost_is_estimate": false,
-            "elapsed_ms": 5.7,
+            "elapsed_ms": 5.3,
             "latency_source": "swarm_timing",
             "phases_ms": {
               "routing": null,
-              "planning": 0.9,
+              "planning": 0.8,
               "recovery": null,
-              "execution": 1.6,
+              "execution": 1.5,
               "verification": 0.1,
               "synthesis": 0.0,
-              "supervision": 0.3,
-              "checkpoint": 0.9,
-              "waiting": 1.3
+              "supervision": 0.2,
+              "checkpoint": 0.8,
+              "waiting": 1.1
             },
             "graph": {
               "topology": "fork_join",
@@ -4404,7 +4411,7 @@
         "supervision_calls": 2
       },
       {
-        "trial_key": "trial_v1_da198585028a2096e3659bb01de0a713ebbe262d6b773da3a9e4e1e688363031",
+        "trial_key": "trial_v1_295b6105dfaa028c8394db4c27ef16dadfbf893caddca0aa67bb56c285bc509e",
         "split": "confirmation",
         "role": "incumbent",
         "task_index": 8,
@@ -4421,7 +4428,7 @@
         "attempt_allowance": 1,
         "failed_attempts": 1,
         "cost_microusd": 12495,
-        "elapsed_ms": 12.6,
+        "elapsed_ms": 12.5,
         "attempts": [
           {
             "attempt": 1,
@@ -4482,18 +4489,18 @@
             "cost_microusd": 12495,
             "cost_known": true,
             "cost_is_estimate": false,
-            "elapsed_ms": 12.6,
+            "elapsed_ms": 12.5,
             "latency_source": "swarm_timing",
             "phases_ms": {
               "routing": null,
-              "planning": 0.9,
+              "planning": 0.8,
               "recovery": null,
-              "execution": 2.8,
+              "execution": 2.6,
               "verification": 2.3,
               "synthesis": 0.0,
               "supervision": 0.3,
               "checkpoint": 3.2,
-              "waiting": 2.5
+              "waiting": 2.7
             },
             "graph": {
               "topology": "fork_join",
@@ -4508,7 +4515,7 @@
         "supervision_calls": 3
       },
       {
-        "trial_key": "trial_v1_13c4890cc2bd4f5a6776d083ca3e9494eee6ec6afe4ee9318a8f9380a3a84d0c",
+        "trial_key": "trial_v1_949fb9e8ff94de332e41ffa3b8b04718b21e9bb3fbc9a918878f31229ba30bb9",
         "split": "confirmation",
         "role": "incumbent",
         "task_index": 4,
@@ -4525,7 +4532,7 @@
         "attempt_allowance": 1,
         "failed_attempts": 0,
         "cost_microusd": 8613,
-        "elapsed_ms": 6.7,
+        "elapsed_ms": 6.9,
         "attempts": [
           {
             "attempt": 1,
@@ -4581,18 +4588,18 @@
             "cost_microusd": 8613,
             "cost_known": true,
             "cost_is_estimate": false,
-            "elapsed_ms": 6.7,
+            "elapsed_ms": 6.9,
             "latency_source": "swarm_timing",
             "phases_ms": {
               "routing": null,
-              "planning": 0.9,
+              "planning": 1.0,
               "recovery": null,
-              "execution": 2.1,
+              "execution": 2.0,
               "verification": 0.1,
               "synthesis": 0.0,
               "supervision": 0.2,
               "checkpoint": 1.1,
-              "waiting": 1.6
+              "waiting": 1.7
             },
             "graph": {
               "topology": "fork_join",
@@ -4607,7 +4614,7 @@
         "supervision_calls": 2
       },
       {
-        "trial_key": "trial_v1_a76639cdd2d85a2f69de699779c231c3324caf01d5b1eb703aad49cbe21612a6",
+        "trial_key": "trial_v1_30a5451ea829c6d22272da4e9a09b0d1a5322caa001b239ba624e3dbd8e9e3b8",
         "split": "confirmation",
         "role": "challenger",
         "task_index": 0,
@@ -4624,7 +4631,7 @@
         "attempt_allowance": 1,
         "failed_attempts": 0,
         "cost_microusd": 5301,
-        "elapsed_ms": 5.1,
+        "elapsed_ms": 5.2,
         "attempts": [
           {
             "attempt": 1,
@@ -4667,18 +4674,18 @@
             "cost_microusd": 5301,
             "cost_known": true,
             "cost_is_estimate": false,
-            "elapsed_ms": 5.1,
+            "elapsed_ms": 5.2,
             "latency_source": "swarm_timing",
             "phases_ms": {
               "routing": null,
-              "planning": 0.8,
+              "planning": 0.7,
               "recovery": null,
               "execution": 1.6,
               "verification": 0.1,
               "synthesis": 0.0,
               "supervision": 0.1,
               "checkpoint": 0.8,
-              "waiting": 1.0
+              "waiting": 1.1
             },
             "graph": {
               "topology": "fork_join",
@@ -4693,7 +4700,7 @@
         "supervision_calls": 0
       },
       {
-        "trial_key": "trial_v1_2462ef9563601f294ef82a2d8eedca804dc36c07e0fcc7bd9eb356fc0c0a498f",
+        "trial_key": "trial_v1_edf83892d5c96d447d82c95ff3fe3f43873e03a7e8fa3a91363c3534887c12d2",
         "split": "confirmation",
         "role": "challenger",
         "task_index": 5,
@@ -4710,7 +4717,7 @@
         "attempt_allowance": 1,
         "failed_attempts": 0,
         "cost_microusd": 7662,
-        "elapsed_ms": 6.5,
+        "elapsed_ms": 6.7,
         "attempts": [
           {
             "attempt": 1,
@@ -4768,13 +4775,13 @@
             "cost_microusd": 7662,
             "cost_known": true,
             "cost_is_estimate": false,
-            "elapsed_ms": 6.5,
+            "elapsed_ms": 6.7,
             "latency_source": "swarm_timing",
             "phases_ms": {
               "routing": null,
-              "planning": 0.8,
+              "planning": 0.7,
               "recovery": null,
-              "execution": 2.2,
+              "execution": 2.1,
               "verification": 0.1,
               "synthesis": 0.0,
               "supervision": 0.2,
@@ -4795,7 +4802,7 @@
         "supervision_calls": 1
       },
       {
-        "trial_key": "trial_v1_48037025463fa65f58b86bc78f1a357f5045c331352fb384b8913125d8f1a4e6",
+        "trial_key": "trial_v1_dfecf9ee1382cf0748ca58e874b746c82f47404d9f047778e80eaeafaff6ec3c",
         "split": "confirmation",
         "role": "challenger",
         "task_index": 7,
@@ -4812,7 +4819,7 @@
         "attempt_allowance": 1,
         "failed_attempts": 0,
         "cost_microusd": 8082,
-        "elapsed_ms": 5.6,
+        "elapsed_ms": 5.7,
         "attempts": [
           {
             "attempt": 1,
@@ -4868,18 +4875,18 @@
             "cost_microusd": 8082,
             "cost_known": true,
             "cost_is_estimate": false,
-            "elapsed_ms": 5.6,
+            "elapsed_ms": 5.7,
             "latency_source": "swarm_timing",
             "phases_ms": {
               "routing": null,
               "planning": 0.8,
               "recovery": null,
-              "execution": 1.8,
+              "execution": 1.7,
               "verification": 0.1,
               "synthesis": 0.0,
               "supervision": 0.3,
               "checkpoint": 0.9,
-              "waiting": 1.2
+              "waiting": 1.4
             },
             "graph": {
               "topology": "fork_join",
@@ -4894,7 +4901,7 @@
         "supervision_calls": 1
       },
       {
-        "trial_key": "trial_v1_b9397501d4cdfe920964cd18498cf04f9f459534bd790fae5ef8194630de2206",
+        "trial_key": "trial_v1_7bf8cdd6245f1fe02f2da013375e58d1fc3130d31318e2d7c8a1bcd301cc82a0",
         "split": "confirmation",
         "role": "challenger",
         "task_index": 6,
@@ -4911,7 +4918,7 @@
         "attempt_allowance": 1,
         "failed_attempts": 0,
         "cost_microusd": 7977,
-        "elapsed_ms": 6.7,
+        "elapsed_ms": 7.6,
         "attempts": [
           {
             "attempt": 1,
@@ -4970,14 +4977,14 @@
             "cost_microusd": 7977,
             "cost_known": true,
             "cost_is_estimate": false,
-            "elapsed_ms": 6.7,
+            "elapsed_ms": 7.6,
             "latency_source": "swarm_timing",
             "phases_ms": {
               "routing": null,
-              "planning": 0.8,
+              "planning": 1.4,
               "recovery": null,
-              "execution": 2.3,
-              "verification": 0.1,
+              "execution": 2.2,
+              "verification": 0.2,
               "synthesis": 0.0,
               "supervision": 0.2,
               "checkpoint": 1.1,
@@ -4997,7 +5004,7 @@
         "supervision_calls": 1
       },
       {
-        "trial_key": "trial_v1_cabdcad5510d72202850f79c7b29433a4e5f496c0b019b4860b43f24aecc6191",
+        "trial_key": "trial_v1_5a28924e687db2d8446b0ffe509db91ef2f9d9af23408201534e65967e5ffb40",
         "split": "confirmation",
         "role": "challenger",
         "task_index": 3,
@@ -5014,7 +5021,7 @@
         "attempt_allowance": 1,
         "failed_attempts": 0,
         "cost_microusd": 5886,
-        "elapsed_ms": 8.1,
+        "elapsed_ms": 7.5,
         "attempts": [
           {
             "attempt": 1,
@@ -5057,18 +5064,18 @@
             "cost_microusd": 5886,
             "cost_known": true,
             "cost_is_estimate": false,
-            "elapsed_ms": 8.1,
+            "elapsed_ms": 7.5,
             "latency_source": "swarm_timing",
             "phases_ms": {
               "routing": null,
-              "planning": 1.3,
+              "planning": 1.0,
               "recovery": null,
-              "execution": 1.7,
+              "execution": 1.6,
               "verification": 0.8,
               "synthesis": 0.0,
               "supervision": 0.1,
-              "checkpoint": 1.6,
-              "waiting": 1.8
+              "checkpoint": 1.5,
+              "waiting": 1.7
             },
             "graph": {
               "topology": "fork_join",
@@ -5083,7 +5090,7 @@
         "supervision_calls": 0
       },
       {
-        "trial_key": "trial_v1_69dfca668c90d46c721ef6daed51a7097b8622fe9361f26400b6905b55198c3f",
+        "trial_key": "trial_v1_cb51fed01bdae64ca6395dc9cbe5082893e452c442f8af059f390bca58649146",
         "split": "confirmation",
         "role": "challenger",
         "task_index": 2,
@@ -5100,7 +5107,7 @@
         "attempt_allowance": 1,
         "failed_attempts": 0,
         "cost_microusd": 5289,
-        "elapsed_ms": 7.2,
+        "elapsed_ms": 7.5,
         "attempts": [
           {
             "attempt": 1,
@@ -5143,18 +5150,18 @@
             "cost_microusd": 5289,
             "cost_known": true,
             "cost_is_estimate": false,
-            "elapsed_ms": 7.2,
+            "elapsed_ms": 7.5,
             "latency_source": "swarm_timing",
             "phases_ms": {
               "routing": null,
-              "planning": 1.6,
+              "planning": 1.1,
               "recovery": null,
-              "execution": 2.3,
-              "verification": 0.1,
+              "execution": 2.4,
+              "verification": 0.2,
               "synthesis": 0.0,
               "supervision": 0.1,
-              "checkpoint": 1.0,
-              "waiting": 1.4
+              "checkpoint": 1.2,
+              "waiting": 1.5
             },
             "graph": {
               "topology": "fork_join",
@@ -5169,7 +5176,7 @@
         "supervision_calls": 0
       },
       {
-        "trial_key": "trial_v1_43cf867c5a4d7223ba4fed96703ce98f9d5e4a9310aa438b15fa3e0bf34c64c8",
+        "trial_key": "trial_v1_ff84b7e4c9ac2b400629c382e5c32599ed56248641eeeeff36acb8243b4a1d43",
         "split": "confirmation",
         "role": "challenger",
         "task_index": 1,
@@ -5186,7 +5193,7 @@
         "attempt_allowance": 1,
         "failed_attempts": 0,
         "cost_microusd": 5271,
-        "elapsed_ms": 5.4,
+        "elapsed_ms": 7.8,
         "attempts": [
           {
             "attempt": 1,
@@ -5229,18 +5236,18 @@
             "cost_microusd": 5271,
             "cost_known": true,
             "cost_is_estimate": false,
-            "elapsed_ms": 5.4,
+            "elapsed_ms": 7.8,
             "latency_source": "swarm_timing",
             "phases_ms": {
               "routing": null,
-              "planning": 1.0,
+              "planning": 1.3,
               "recovery": null,
-              "execution": 1.7,
-              "verification": 0.1,
+              "execution": 2.3,
+              "verification": 0.2,
               "synthesis": 0.0,
               "supervision": 0.1,
-              "checkpoint": 0.8,
-              "waiting": 1.0
+              "checkpoint": 1.4,
+              "waiting": 1.6
             },
             "graph": {
               "topology": "fork_join",
@@ -5255,7 +5262,7 @@
         "supervision_calls": 0
       },
       {
-        "trial_key": "trial_v1_5679249135c6b28f1264d2b821c748f16856a383a8a1f9631431688cc883e078",
+        "trial_key": "trial_v1_617334c79972f5427ca12e6efbc7067a0219c6faa9a3b0ed16a42a786f620e5c",
         "split": "confirmation",
         "role": "challenger",
         "task_index": 8,
@@ -5272,7 +5279,7 @@
         "attempt_allowance": 1,
         "failed_attempts": 1,
         "cost_microusd": 9750,
-        "elapsed_ms": 13.2,
+        "elapsed_ms": 18.5,
         "attempts": [
           {
             "attempt": 1,
@@ -5331,18 +5338,18 @@
             "cost_microusd": 9750,
             "cost_known": true,
             "cost_is_estimate": false,
-            "elapsed_ms": 13.2,
+            "elapsed_ms": 18.5,
             "latency_source": "swarm_timing",
             "phases_ms": {
               "routing": null,
-              "planning": 1.0,
+              "planning": 1.4,
               "recovery": null,
-              "execution": 2.9,
-              "verification": 2.3,
+              "execution": 4.0,
+              "verification": 3.5,
               "synthesis": 0.0,
               "supervision": 0.3,
-              "checkpoint": 3.2,
-              "waiting": 2.8
+              "checkpoint": 5.2,
+              "waiting": 3.6
             },
             "graph": {
               "topology": "fork_join",
@@ -5357,7 +5364,7 @@
         "supervision_calls": 1
       },
       {
-        "trial_key": "trial_v1_d669a8fa7201f0646a25c26b0c0a1bbe1c6099cc7e5c2dd517cf58a068c66964",
+        "trial_key": "trial_v1_b292dfa2f7ea660357bc1e3893fd5472a60f2754df37bb7d5e1a03c3e218c0ab",
         "split": "confirmation",
         "role": "challenger",
         "task_index": 4,
@@ -5374,7 +5381,7 @@
         "attempt_allowance": 1,
         "failed_attempts": 0,
         "cost_microusd": 7287,
-        "elapsed_ms": 7.1,
+        "elapsed_ms": 8.8,
         "attempts": [
           {
             "attempt": 1,
@@ -5427,23 +5434,23 @@
               ],
               "tokens": 562,
               "cost_microusd": 1686,
-              "latency_ms": 0.2
+              "latency_ms": 0.3
             },
             "cost_microusd": 7287,
             "cost_known": true,
             "cost_is_estimate": false,
-            "elapsed_ms": 7.1,
+            "elapsed_ms": 8.8,
             "latency_source": "swarm_timing",
             "phases_ms": {
               "routing": null,
               "planning": 1.0,
               "recovery": null,
-              "execution": 2.2,
-              "verification": 0.1,
+              "execution": 2.8,
+              "verification": 0.2,
               "synthesis": 0.0,
-              "supervision": 0.2,
-              "checkpoint": 1.2,
-              "waiting": 1.8
+              "supervision": 0.3,
+              "checkpoint": 1.4,
+              "waiting": 2.3
             },
             "graph": {
               "topology": "fork_join",
@@ -5458,7 +5465,7 @@
         "supervision_calls": 1
       },
       {
-        "trial_key": "trial_v1_4200e7bd82640014cea6ae8941597deb5f8e4b9466dc53d6a1dfef2ed331055d",
+        "trial_key": "trial_v1_18f88d33181bd48cbaf531e13f281772a967898d5ba0549d3289be45af5bcc1c",
         "split": "confirmation",
         "role": "reference",
         "task_index": 0,
@@ -5475,7 +5482,7 @@
         "attempt_allowance": 1,
         "failed_attempts": 0,
         "cost_microusd": 5301,
-        "elapsed_ms": 3.8,
+        "elapsed_ms": 4.4,
         "attempts": [
           {
             "attempt": 1,
@@ -5518,17 +5525,17 @@
             "cost_microusd": 5301,
             "cost_known": true,
             "cost_is_estimate": false,
-            "elapsed_ms": 3.8,
+            "elapsed_ms": 4.4,
             "latency_source": "swarm_timing",
             "phases_ms": {
               "routing": null,
-              "planning": 0.9,
+              "planning": 1.0,
               "recovery": null,
-              "execution": 1.7,
-              "verification": 0.1,
+              "execution": 2.0,
+              "verification": 0.2,
               "synthesis": 0.0,
               "supervision": 0.0,
-              "checkpoint": 0.9,
+              "checkpoint": 1.0,
               "waiting": 0.0
             },
             "graph": {
@@ -5544,7 +5551,7 @@
         "supervision_calls": 0
       },
       {
-        "trial_key": "trial_v1_d98b89b05c45dc00fbbba7c6adac019921bd8998518d767003b871312c9a7b7c",
+        "trial_key": "trial_v1_57956a6ed5128652d5cf4e22e6d99e2eb41aaf86b8fda7b084daea5ab20d7407",
         "split": "confirmation",
         "role": "reference",
         "task_index": 5,
@@ -5561,7 +5568,7 @@
         "attempt_allowance": 1,
         "failed_attempts": 1,
         "cost_microusd": 5085,
-        "elapsed_ms": 4.6,
+        "elapsed_ms": 4.1,
         "attempts": [
           {
             "attempt": 1,
@@ -5604,13 +5611,13 @@
             "cost_microusd": 5085,
             "cost_known": true,
             "cost_is_estimate": false,
-            "elapsed_ms": 4.6,
+            "elapsed_ms": 4.1,
             "latency_source": "swarm_timing",
             "phases_ms": {
               "routing": null,
               "planning": 0.8,
               "recovery": null,
-              "execution": 2.4,
+              "execution": 2.1,
               "verification": 0.1,
               "synthesis": 0.0,
               "supervision": 0.0,
@@ -5631,7 +5638,7 @@
         "supervision_calls": 0
       },
       {
-        "trial_key": "trial_v1_948a8e12bc05bde8a9c99749aa77fdcf05370ff9168cf1af1789a6d9d9f86556",
+        "trial_key": "trial_v1_ed3f2844181228f8f193bc26d3819b911dffed715a42a21a0d5be52971b7f2f7",
         "split": "confirmation",
         "role": "reference",
         "task_index": 7,
@@ -5648,7 +5655,7 @@
         "attempt_allowance": 1,
         "failed_attempts": 0,
         "cost_microusd": 6081,
-        "elapsed_ms": 3.6,
+        "elapsed_ms": 3.8,
         "attempts": [
           {
             "attempt": 1,
@@ -5691,17 +5698,17 @@
             "cost_microusd": 6081,
             "cost_known": true,
             "cost_is_estimate": false,
-            "elapsed_ms": 3.6,
+            "elapsed_ms": 3.8,
             "latency_source": "swarm_timing",
             "phases_ms": {
               "routing": null,
-              "planning": 0.7,
+              "planning": 0.8,
               "recovery": null,
               "execution": 1.6,
               "verification": 0.1,
               "synthesis": 0.0,
               "supervision": 0.0,
-              "checkpoint": 0.8,
+              "checkpoint": 0.9,
               "waiting": 0.0
             },
             "graph": {
@@ -5717,7 +5724,7 @@
         "supervision_calls": 0
       },
       {
-        "trial_key": "trial_v1_7457a41fa091f597295b8ac71901a302b7810680bda3af1f1c0eaed639829ca1",
+        "trial_key": "trial_v1_b2bc57d2ac72b332eb2d3c4123938045624229a94ce23f6691283a5254db5fc8",
         "split": "confirmation",
         "role": "reference",
         "task_index": 6,
@@ -5734,7 +5741,7 @@
         "attempt_allowance": 1,
         "failed_attempts": 1,
         "cost_microusd": 5289,
-        "elapsed_ms": 3.9,
+        "elapsed_ms": 4.5,
         "attempts": [
           {
             "attempt": 1,
@@ -5777,17 +5784,17 @@
             "cost_microusd": 5289,
             "cost_known": true,
             "cost_is_estimate": false,
-            "elapsed_ms": 3.9,
+            "elapsed_ms": 4.5,
             "latency_source": "swarm_timing",
             "phases_ms": {
               "routing": null,
               "planning": 1.0,
               "recovery": null,
-              "execution": 1.7,
+              "execution": 2.1,
               "verification": 0.1,
               "synthesis": 0.0,
               "supervision": 0.0,
-              "checkpoint": 0.8,
+              "checkpoint": 1.0,
               "waiting": 0.0
             },
             "graph": {
@@ -5804,7 +5811,7 @@
         "supervision_calls": 0
       },
       {
-        "trial_key": "trial_v1_e939c19d94fcd7353cbda403f2a2f042a44eb1fbf4c6ec0bf4c727fa6c9c7e0b",
+        "trial_key": "trial_v1_ada7cb8d27ee53a527c793b83f3e033805209215efecc6b597cda46d39f2a049",
         "split": "confirmation",
         "role": "reference",
         "task_index": 3,
@@ -5821,7 +5828,7 @@
         "attempt_allowance": 1,
         "failed_attempts": 0,
         "cost_microusd": 5886,
-        "elapsed_ms": 4.8,
+        "elapsed_ms": 7.6,
         "attempts": [
           {
             "attempt": 1,
@@ -5864,17 +5871,17 @@
             "cost_microusd": 5886,
             "cost_known": true,
             "cost_is_estimate": false,
-            "elapsed_ms": 4.8,
+            "elapsed_ms": 7.6,
             "latency_source": "swarm_timing",
             "phases_ms": {
               "routing": null,
-              "planning": 0.8,
+              "planning": 1.3,
               "recovery": null,
-              "execution": 1.6,
-              "verification": 0.8,
+              "execution": 2.5,
+              "verification": 1.2,
               "synthesis": 0.0,
               "supervision": 0.0,
-              "checkpoint": 1.5,
+              "checkpoint": 2.3,
               "waiting": 0.0
             },
             "graph": {
@@ -5890,7 +5897,7 @@
         "supervision_calls": 0
       },
       {
-        "trial_key": "trial_v1_da5d4868a3ad60225b4303fa27098bb74d9a1067221591b067324723746f2cab",
+        "trial_key": "trial_v1_0d5812729b0ad986d234fb49f4ece50c79a889de6eb34e0d9e36c7f5d094f26e",
         "split": "confirmation",
         "role": "reference",
         "task_index": 2,
@@ -5907,7 +5914,7 @@
         "attempt_allowance": 1,
         "failed_attempts": 0,
         "cost_microusd": 5289,
-        "elapsed_ms": 7.0,
+        "elapsed_ms": 3.9,
         "attempts": [
           {
             "attempt": 1,
@@ -5950,17 +5957,17 @@
             "cost_microusd": 5289,
             "cost_known": true,
             "cost_is_estimate": false,
-            "elapsed_ms": 7.0,
+            "elapsed_ms": 3.9,
             "latency_source": "swarm_timing",
             "phases_ms": {
               "routing": null,
-              "planning": 0.7,
+              "planning": 1.0,
               "recovery": null,
-              "execution": 4.4,
-              "verification": 0.2,
+              "execution": 1.6,
+              "verification": 0.1,
               "synthesis": 0.0,
               "supervision": 0.0,
-              "checkpoint": 1.3,
+              "checkpoint": 0.9,
               "waiting": 0.0
             },
             "graph": {
@@ -5976,7 +5983,7 @@
         "supervision_calls": 0
       },
       {
-        "trial_key": "trial_v1_a30f27d9404006550dca5463ec32c3846d38e341904af71c3ac26b63424b4f51",
+        "trial_key": "trial_v1_b0c307a914dabf2f2ba8c3bdf608fa57a1c823d1f490dd677582c8c3df5e9b03",
         "split": "confirmation",
         "role": "reference",
         "task_index": 1,
@@ -5993,7 +6000,7 @@
         "attempt_allowance": 1,
         "failed_attempts": 0,
         "cost_microusd": 5271,
-        "elapsed_ms": 3.5,
+        "elapsed_ms": 5.4,
         "attempts": [
           {
             "attempt": 1,
@@ -6036,17 +6043,17 @@
             "cost_microusd": 5271,
             "cost_known": true,
             "cost_is_estimate": false,
-            "elapsed_ms": 3.5,
+            "elapsed_ms": 5.4,
             "latency_source": "swarm_timing",
             "phases_ms": {
               "routing": null,
-              "planning": 0.8,
+              "planning": 1.2,
               "recovery": null,
-              "execution": 1.5,
-              "verification": 0.1,
+              "execution": 2.3,
+              "verification": 0.2,
               "synthesis": 0.0,
               "supervision": 0.0,
-              "checkpoint": 0.8,
+              "checkpoint": 1.2,
               "waiting": 0.0
             },
             "graph": {
@@ -6062,7 +6069,7 @@
         "supervision_calls": 0
       },
       {
-        "trial_key": "trial_v1_1acb59246e77db0e5e7c75b105e4dee2f7be71efdf3ae80e5bccfe92dad10401",
+        "trial_key": "trial_v1_15dfb2bf793299c60f2502d86abfc6475614d775b3f50667374543c29f7fcc2c",
         "split": "confirmation",
         "role": "reference",
         "task_index": 8,
@@ -6079,7 +6086,7 @@
         "attempt_allowance": 1,
         "failed_attempts": 1,
         "cost_microusd": 6900,
-        "elapsed_ms": 7.4,
+        "elapsed_ms": 8.0,
         "attempts": [
           {
             "attempt": 1,
@@ -6122,17 +6129,17 @@
             "cost_microusd": 6900,
             "cost_known": true,
             "cost_is_estimate": false,
-            "elapsed_ms": 7.4,
+            "elapsed_ms": 8.0,
             "latency_source": "swarm_timing",
             "phases_ms": {
               "routing": null,
-              "planning": 0.9,
+              "planning": 1.0,
               "recovery": null,
-              "execution": 2.1,
-              "verification": 2.2,
+              "execution": 2.4,
+              "verification": 2.4,
               "synthesis": 0.0,
               "supervision": 0.0,
-              "checkpoint": 2.7,
+              "checkpoint": 2.8,
               "waiting": 0.0
             },
             "graph": {
@@ -6148,7 +6155,7 @@
         "supervision_calls": 0
       },
       {
-        "trial_key": "trial_v1_3f5b1cdf2df7d91eb4583be8618be4d8a40642b3b0e8141e1d5164e7fb3d3e62",
+        "trial_key": "trial_v1_760b0102efb080f15f1710b29eb797ab9dbe575620f08b42a6ac96deb22ffddb",
         "split": "confirmation",
         "role": "reference",
         "task_index": 4,
@@ -6214,7 +6221,7 @@
               "routing": null,
               "planning": 0.9,
               "recovery": null,
-              "execution": 1.6,
+              "execution": 1.7,
               "verification": 0.1,
               "synthesis": 0.0,
               "supervision": 0.0,
@@ -6234,7 +6241,203 @@
         "supervision_calls": 0
       },
       {
-        "trial_key": "trial_v1_95a25a2d234d092be55a785353ae4cde7debe1d8ccd293a3368bb8cdc91ece65",
+        "trial_key": "trial_v1_9ab2729423460cb32b9e3fba1b4dbb0af32bffede0b3d2fcde7c9527f4dfa8cd",
+        "split": "holdout",
+        "role": "incumbent",
+        "task_index": 4,
+        "gates": {
+          "acceptance.policy_unchanged": true,
+          "accounting.complete": true
+        },
+        "family": "trigger-fixtures",
+        "task_id": "solar-permits",
+        "task_sha256": "bd47270c5bc5ce7065c1b54de413b8e061b7b895bd4af1f9ac0a88e8b9fd6d40",
+        "arm": "routine",
+        "repetition": 1,
+        "accepted": true,
+        "attempt_allowance": 1,
+        "failed_attempts": 0,
+        "cost_microusd": 8613,
+        "elapsed_ms": 7.5,
+        "attempts": [
+          {
+            "attempt": 1,
+            "planted": "empty_output",
+            "outcome": "accepted",
+            "decision": "accepted",
+            "reasons": [
+              "every final validator passed"
+            ],
+            "policy_sha256": "8084ccebb98a4ff92d43ecba84bc49693f13d258f9facc91369e28f029f54857",
+            "validators": [
+              {
+                "name": "smythe.text-spec",
+                "version": "1",
+                "config_sha256": "c90841d686afcbef0388656e9c5ac2f8eccbca23ca7d2634bf56966cce01a549",
+                "outcome": "passed"
+              }
+            ],
+            "output_sha256": "2ddb2913dcb8742d7871fa7fed0abe5055fbf3bf19b9f067c5747c75de93a272",
+            "output_bytes": 102,
+            "adjudication": null,
+            "error": null,
+            "provider_calls": 5,
+            "provider_calls_failed": 0,
+            "planning_calls": 1,
+            "tokens": 1867,
+            "model_cost_microusd": 5601,
+            "supervision": {
+              "calls": 2,
+              "proposals": 1,
+              "reviews": [
+                {
+                  "after_node": "risks",
+                  "with_evidence": false,
+                  "change": true
+                },
+                {
+                  "after_node": "revise",
+                  "with_evidence": false,
+                  "change": false
+                }
+              ],
+              "reviews_triggered": [],
+              "revisions_applied": 1,
+              "revisions_refused": 0,
+              "added_steps": [
+                "revise"
+              ],
+              "tokens": 1004,
+              "cost_microusd": 3012,
+              "latency_ms": 0.2
+            },
+            "cost_microusd": 8613,
+            "cost_known": true,
+            "cost_is_estimate": false,
+            "elapsed_ms": 7.5,
+            "latency_source": "swarm_timing",
+            "phases_ms": {
+              "routing": null,
+              "planning": 1.1,
+              "recovery": null,
+              "execution": 2.3,
+              "verification": 0.2,
+              "synthesis": 0.0,
+              "supervision": 0.2,
+              "checkpoint": 1.3,
+              "waiting": 1.7
+            },
+            "graph": {
+              "topology": "fork_join",
+              "nodes": 4,
+              "node_statuses": {
+                "completed": 4
+              }
+            }
+          }
+        ],
+        "anomaly": "empty_output",
+        "supervision_calls": 2
+      },
+      {
+        "trial_key": "trial_v1_fa90b0970f3594d6b16d85584f35c09cec4e7cd0d44cecf3e963dc69b838b3c8",
+        "split": "holdout",
+        "role": "incumbent",
+        "task_index": 1,
+        "gates": {
+          "acceptance.policy_unchanged": true,
+          "accounting.complete": true
+        },
+        "family": "trigger-fixtures",
+        "task_id": "clinic-hours",
+        "task_sha256": "62537d629acd2cf0dc33649d28381fb27cefd4a275ef1573f63bfb9a63464948",
+        "arm": "routine",
+        "repetition": 1,
+        "accepted": true,
+        "attempt_allowance": 1,
+        "failed_attempts": 0,
+        "cost_microusd": 8112,
+        "elapsed_ms": 8.6,
+        "attempts": [
+          {
+            "attempt": 1,
+            "planted": null,
+            "outcome": "accepted",
+            "decision": "accepted",
+            "reasons": [
+              "every final validator passed"
+            ],
+            "policy_sha256": "8084ccebb98a4ff92d43ecba84bc49693f13d258f9facc91369e28f029f54857",
+            "validators": [
+              {
+                "name": "smythe.text-spec",
+                "version": "1",
+                "config_sha256": "c90841d686afcbef0388656e9c5ac2f8eccbca23ca7d2634bf56966cce01a549",
+                "outcome": "passed"
+              }
+            ],
+            "output_sha256": "7f7c838f16c833fa2208bf3d8ac4a01541e0d32edbb877f9197ae26348b0aecc",
+            "output_bytes": 103,
+            "adjudication": null,
+            "error": null,
+            "provider_calls": 4,
+            "provider_calls_failed": 0,
+            "planning_calls": 1,
+            "tokens": 1757,
+            "model_cost_microusd": 5271,
+            "supervision": {
+              "calls": 2,
+              "proposals": 0,
+              "reviews": [
+                {
+                  "after_node": "risks",
+                  "with_evidence": false,
+                  "change": false
+                },
+                {
+                  "after_node": "deliver",
+                  "with_evidence": false,
+                  "change": false
+                }
+              ],
+              "reviews_triggered": [],
+              "revisions_applied": 0,
+              "revisions_refused": 0,
+              "added_steps": [],
+              "tokens": 947,
+              "cost_microusd": 2841,
+              "latency_ms": 0.3
+            },
+            "cost_microusd": 8112,
+            "cost_known": true,
+            "cost_is_estimate": false,
+            "elapsed_ms": 8.6,
+            "latency_source": "swarm_timing",
+            "phases_ms": {
+              "routing": null,
+              "planning": 1.6,
+              "recovery": null,
+              "execution": 2.4,
+              "verification": 0.2,
+              "synthesis": 0.0,
+              "supervision": 0.3,
+              "checkpoint": 1.3,
+              "waiting": 1.6
+            },
+            "graph": {
+              "topology": "fork_join",
+              "nodes": 3,
+              "node_statuses": {
+                "completed": 3
+              }
+            }
+          }
+        ],
+        "anomaly": null,
+        "supervision_calls": 2
+      },
+      {
+        "trial_key": "trial_v1_f1ea67ac7d26202f935a52f366dc5d5c9cf156ac817e22759c4ac2291054d4a6",
         "split": "holdout",
         "role": "incumbent",
         "task_index": 2,
@@ -6251,7 +6454,7 @@
         "attempt_allowance": 1,
         "failed_attempts": 0,
         "cost_microusd": 8151,
-        "elapsed_ms": 5.5,
+        "elapsed_ms": 6.2,
         "attempts": [
           {
             "attempt": 1,
@@ -6305,18 +6508,18 @@
             "cost_microusd": 8151,
             "cost_known": true,
             "cost_is_estimate": false,
-            "elapsed_ms": 5.5,
+            "elapsed_ms": 6.2,
             "latency_source": "swarm_timing",
             "phases_ms": {
               "routing": null,
-              "planning": 1.0,
+              "planning": 1.1,
               "recovery": null,
-              "execution": 1.6,
-              "verification": 0.1,
+              "execution": 1.7,
+              "verification": 0.2,
               "synthesis": 0.0,
               "supervision": 0.2,
-              "checkpoint": 0.9,
-              "waiting": 1.1
+              "checkpoint": 1.0,
+              "waiting": 1.3
             },
             "graph": {
               "topology": "fork_join",
@@ -6331,7 +6534,7 @@
         "supervision_calls": 2
       },
       {
-        "trial_key": "trial_v1_93b21e1a85b93256d1796c07c413676b83f822fc186c950c544e86a2f0df0dd0",
+        "trial_key": "trial_v1_f3b692c922caf31dcd5ba37ec2a041aabf19297b9c321f932ce16abae90e535a",
         "split": "holdout",
         "role": "incumbent",
         "task_index": 8,
@@ -6348,7 +6551,7 @@
         "attempt_allowance": 1,
         "failed_attempts": 1,
         "cost_microusd": 12495,
-        "elapsed_ms": 12.4,
+        "elapsed_ms": 13.6,
         "attempts": [
           {
             "attempt": 1,
@@ -6409,18 +6612,18 @@
             "cost_microusd": 12495,
             "cost_known": true,
             "cost_is_estimate": false,
-            "elapsed_ms": 12.4,
+            "elapsed_ms": 13.6,
             "latency_source": "swarm_timing",
             "phases_ms": {
               "routing": null,
-              "planning": 0.9,
+              "planning": 1.1,
               "recovery": null,
-              "execution": 2.7,
-              "verification": 2.2,
+              "execution": 3.0,
+              "verification": 2.5,
               "synthesis": 0.0,
               "supervision": 0.4,
-              "checkpoint": 3.1,
-              "waiting": 2.5
+              "checkpoint": 3.3,
+              "waiting": 2.8
             },
             "graph": {
               "topology": "fork_join",
@@ -6435,398 +6638,7 @@
         "supervision_calls": 3
       },
       {
-        "trial_key": "trial_v1_2ab1b9d409c56ab2f89ad066d60ce5eaf761b218cbf063aef841466e35b854c4",
-        "split": "holdout",
-        "role": "incumbent",
-        "task_index": 7,
-        "gates": {
-          "acceptance.policy_unchanged": true,
-          "accounting.complete": true
-        },
-        "family": "trigger-fixtures",
-        "task_id": "coffee-sourcing",
-        "task_sha256": "798917a2f264880388e092b1dd0409386c1ffde760b8fe7fdbeb6119490e5156",
-        "arm": "routine",
-        "repetition": 1,
-        "accepted": true,
-        "attempt_allowance": 1,
-        "failed_attempts": 0,
-        "cost_microusd": 9726,
-        "elapsed_ms": 5.5,
-        "attempts": [
-          {
-            "attempt": 1,
-            "planted": "contradicting_evidence",
-            "outcome": "accepted",
-            "decision": "accepted",
-            "reasons": [
-              "every final validator passed"
-            ],
-            "policy_sha256": "8084ccebb98a4ff92d43ecba84bc49693f13d258f9facc91369e28f029f54857",
-            "validators": [
-              {
-                "name": "smythe.text-spec",
-                "version": "1",
-                "config_sha256": "c90841d686afcbef0388656e9c5ac2f8eccbca23ca7d2634bf56966cce01a549",
-                "outcome": "passed"
-              }
-            ],
-            "output_sha256": "e3c7541887b823e68b9e60a0d6a5bd1e03798aca8dd4b910e9d1d9ffe69909ac",
-            "output_bytes": 109,
-            "adjudication": null,
-            "error": null,
-            "provider_calls": 4,
-            "provider_calls_failed": 0,
-            "planning_calls": 1,
-            "tokens": 2027,
-            "model_cost_microusd": 6081,
-            "supervision": {
-              "calls": 2,
-              "proposals": 0,
-              "reviews": [
-                {
-                  "after_node": "risks",
-                  "with_evidence": false,
-                  "change": false
-                },
-                {
-                  "after_node": "deliver",
-                  "with_evidence": false,
-                  "change": false
-                }
-              ],
-              "reviews_triggered": [],
-              "revisions_applied": 0,
-              "revisions_refused": 0,
-              "added_steps": [],
-              "tokens": 1215,
-              "cost_microusd": 3645,
-              "latency_ms": 0.2
-            },
-            "cost_microusd": 9726,
-            "cost_known": true,
-            "cost_is_estimate": false,
-            "elapsed_ms": 5.5,
-            "latency_source": "swarm_timing",
-            "phases_ms": {
-              "routing": null,
-              "planning": 0.9,
-              "recovery": null,
-              "execution": 1.7,
-              "verification": 0.1,
-              "synthesis": 0.0,
-              "supervision": 0.2,
-              "checkpoint": 0.9,
-              "waiting": 1.1
-            },
-            "graph": {
-              "topology": "fork_join",
-              "nodes": 3,
-              "node_statuses": {
-                "completed": 3
-              }
-            }
-          }
-        ],
-        "anomaly": "contradicting_evidence",
-        "supervision_calls": 2
-      },
-      {
-        "trial_key": "trial_v1_0d2c7cb30e9003929db767abb291b0ffa1b6200aace505199c9df2b734f9aa75",
-        "split": "holdout",
-        "role": "incumbent",
-        "task_index": 5,
-        "gates": {
-          "acceptance.policy_unchanged": true,
-          "accounting.complete": true
-        },
-        "family": "trigger-fixtures",
-        "task_id": "port-expansion",
-        "task_sha256": "b8557c6b1f282df507efd1efe3434673e33d09cf326163dbf78481231c6ca622",
-        "arm": "routine",
-        "repetition": 1,
-        "accepted": true,
-        "attempt_allowance": 1,
-        "failed_attempts": 0,
-        "cost_microusd": 8952,
-        "elapsed_ms": 6.8,
-        "attempts": [
-          {
-            "attempt": 1,
-            "planted": "failed_step",
-            "outcome": "accepted",
-            "decision": "accepted",
-            "reasons": [
-              "every final validator passed"
-            ],
-            "policy_sha256": "8084ccebb98a4ff92d43ecba84bc49693f13d258f9facc91369e28f029f54857",
-            "validators": [
-              {
-                "name": "smythe.text-spec",
-                "version": "1",
-                "config_sha256": "c90841d686afcbef0388656e9c5ac2f8eccbca23ca7d2634bf56966cce01a549",
-                "outcome": "passed"
-              }
-            ],
-            "output_sha256": "7d1733a765302ad2c3a96cb4e9674064045b110a109eee54d366ccd7a717224f",
-            "output_bytes": 105,
-            "adjudication": null,
-            "error": null,
-            "provider_calls": 5,
-            "provider_calls_failed": 1,
-            "planning_calls": 1,
-            "tokens": 1972,
-            "model_cost_microusd": 5916,
-            "supervision": {
-              "calls": 2,
-              "proposals": 1,
-              "reviews": [
-                {
-                  "after_node": "deliver",
-                  "with_evidence": false,
-                  "change": true
-                },
-                {
-                  "after_node": "revise",
-                  "with_evidence": false,
-                  "change": false
-                }
-              ],
-              "reviews_triggered": [],
-              "revisions_applied": 1,
-              "revisions_refused": 0,
-              "added_steps": [
-                "revise"
-              ],
-              "tokens": 1012,
-              "cost_microusd": 3036,
-              "latency_ms": 0.2
-            },
-            "cost_microusd": 8952,
-            "cost_known": true,
-            "cost_is_estimate": false,
-            "elapsed_ms": 6.8,
-            "latency_source": "swarm_timing",
-            "phases_ms": {
-              "routing": null,
-              "planning": 0.9,
-              "recovery": null,
-              "execution": 2.2,
-              "verification": 0.1,
-              "synthesis": 0.0,
-              "supervision": 0.2,
-              "checkpoint": 1.1,
-              "waiting": 1.0
-            },
-            "graph": {
-              "topology": "fork_join",
-              "nodes": 4,
-              "node_statuses": {
-                "completed": 3,
-                "skipped": 1
-              }
-            }
-          }
-        ],
-        "anomaly": "failed_step",
-        "supervision_calls": 2
-      },
-      {
-        "trial_key": "trial_v1_c89bb7feb7f564ec2c127249040269cd03ba4a1143f80b6fd8a274eaeac54b55",
-        "split": "holdout",
-        "role": "incumbent",
-        "task_index": 1,
-        "gates": {
-          "acceptance.policy_unchanged": true,
-          "accounting.complete": true
-        },
-        "family": "trigger-fixtures",
-        "task_id": "clinic-hours",
-        "task_sha256": "62537d629acd2cf0dc33649d28381fb27cefd4a275ef1573f63bfb9a63464948",
-        "arm": "routine",
-        "repetition": 1,
-        "accepted": true,
-        "attempt_allowance": 1,
-        "failed_attempts": 0,
-        "cost_microusd": 8112,
-        "elapsed_ms": 5.9,
-        "attempts": [
-          {
-            "attempt": 1,
-            "planted": null,
-            "outcome": "accepted",
-            "decision": "accepted",
-            "reasons": [
-              "every final validator passed"
-            ],
-            "policy_sha256": "8084ccebb98a4ff92d43ecba84bc49693f13d258f9facc91369e28f029f54857",
-            "validators": [
-              {
-                "name": "smythe.text-spec",
-                "version": "1",
-                "config_sha256": "c90841d686afcbef0388656e9c5ac2f8eccbca23ca7d2634bf56966cce01a549",
-                "outcome": "passed"
-              }
-            ],
-            "output_sha256": "7f7c838f16c833fa2208bf3d8ac4a01541e0d32edbb877f9197ae26348b0aecc",
-            "output_bytes": 103,
-            "adjudication": null,
-            "error": null,
-            "provider_calls": 4,
-            "provider_calls_failed": 0,
-            "planning_calls": 1,
-            "tokens": 1757,
-            "model_cost_microusd": 5271,
-            "supervision": {
-              "calls": 2,
-              "proposals": 0,
-              "reviews": [
-                {
-                  "after_node": "risks",
-                  "with_evidence": false,
-                  "change": false
-                },
-                {
-                  "after_node": "deliver",
-                  "with_evidence": false,
-                  "change": false
-                }
-              ],
-              "reviews_triggered": [],
-              "revisions_applied": 0,
-              "revisions_refused": 0,
-              "added_steps": [],
-              "tokens": 947,
-              "cost_microusd": 2841,
-              "latency_ms": 0.2
-            },
-            "cost_microusd": 8112,
-            "cost_known": true,
-            "cost_is_estimate": false,
-            "elapsed_ms": 5.9,
-            "latency_source": "swarm_timing",
-            "phases_ms": {
-              "routing": null,
-              "planning": 1.3,
-              "recovery": null,
-              "execution": 1.7,
-              "verification": 0.1,
-              "synthesis": 0.0,
-              "supervision": 0.2,
-              "checkpoint": 0.8,
-              "waiting": 1.0
-            },
-            "graph": {
-              "topology": "fork_join",
-              "nodes": 3,
-              "node_statuses": {
-                "completed": 3
-              }
-            }
-          }
-        ],
-        "anomaly": null,
-        "supervision_calls": 2
-      },
-      {
-        "trial_key": "trial_v1_6e186d570cd234a252eb5bb8d5a25a25f60a06edf21d0f0bebbdf183d565092d",
-        "split": "holdout",
-        "role": "incumbent",
-        "task_index": 0,
-        "gates": {
-          "acceptance.policy_unchanged": true,
-          "accounting.complete": true
-        },
-        "family": "trigger-fixtures",
-        "task_id": "rail-pass",
-        "task_sha256": "71cb590a913dab2be3d275a1acad466b010409de0e900a0ca58729fb8662b7b5",
-        "arm": "routine",
-        "repetition": 1,
-        "accepted": true,
-        "attempt_allowance": 1,
-        "failed_attempts": 0,
-        "cost_microusd": 8175,
-        "elapsed_ms": 5.1,
-        "attempts": [
-          {
-            "attempt": 1,
-            "planted": null,
-            "outcome": "accepted",
-            "decision": "accepted",
-            "reasons": [
-              "every final validator passed"
-            ],
-            "policy_sha256": "8084ccebb98a4ff92d43ecba84bc49693f13d258f9facc91369e28f029f54857",
-            "validators": [
-              {
-                "name": "smythe.text-spec",
-                "version": "1",
-                "config_sha256": "c90841d686afcbef0388656e9c5ac2f8eccbca23ca7d2634bf56966cce01a549",
-                "outcome": "passed"
-              }
-            ],
-            "output_sha256": "a76a9740e01d65855ceb301e0eb2d427f97b69a4e079d41c29e58714075eb7f1",
-            "output_bytes": 121,
-            "adjudication": null,
-            "error": null,
-            "provider_calls": 4,
-            "provider_calls_failed": 0,
-            "planning_calls": 1,
-            "tokens": 1767,
-            "model_cost_microusd": 5301,
-            "supervision": {
-              "calls": 2,
-              "proposals": 0,
-              "reviews": [
-                {
-                  "after_node": "risks",
-                  "with_evidence": false,
-                  "change": false
-                },
-                {
-                  "after_node": "deliver",
-                  "with_evidence": false,
-                  "change": false
-                }
-              ],
-              "reviews_triggered": [],
-              "revisions_applied": 0,
-              "revisions_refused": 0,
-              "added_steps": [],
-              "tokens": 958,
-              "cost_microusd": 2874,
-              "latency_ms": 0.2
-            },
-            "cost_microusd": 8175,
-            "cost_known": true,
-            "cost_is_estimate": false,
-            "elapsed_ms": 5.1,
-            "latency_source": "swarm_timing",
-            "phases_ms": {
-              "routing": null,
-              "planning": 0.8,
-              "recovery": null,
-              "execution": 1.6,
-              "verification": 0.1,
-              "synthesis": 0.0,
-              "supervision": 0.2,
-              "checkpoint": 0.8,
-              "waiting": 1.0
-            },
-            "graph": {
-              "topology": "fork_join",
-              "nodes": 3,
-              "node_statuses": {
-                "completed": 3
-              }
-            }
-          }
-        ],
-        "anomaly": null,
-        "supervision_calls": 2
-      },
-      {
-        "trial_key": "trial_v1_9230e01d8a9c356a0f36016002d61ba7b0bee5fe804e899891324e49c571a7a7",
+        "trial_key": "trial_v1_2802b13261d06306a2ba75776fe25bcb652e9f7925f27818a414723c4387cde1",
         "split": "holdout",
         "role": "incumbent",
         "task_index": 6,
@@ -6843,7 +6655,7 @@
         "attempt_allowance": 1,
         "failed_attempts": 0,
         "cost_microusd": 9174,
-        "elapsed_ms": 6.7,
+        "elapsed_ms": 7.9,
         "attempts": [
           {
             "attempt": 1,
@@ -6899,13 +6711,13 @@
             "cost_microusd": 9174,
             "cost_known": true,
             "cost_is_estimate": false,
-            "elapsed_ms": 6.7,
+            "elapsed_ms": 7.9,
             "latency_source": "swarm_timing",
             "phases_ms": {
               "routing": null,
-              "planning": 0.7,
+              "planning": 1.7,
               "recovery": null,
-              "execution": 2.3,
+              "execution": 2.2,
               "verification": 0.1,
               "synthesis": 0.0,
               "supervision": 0.2,
@@ -6926,7 +6738,7 @@
         "supervision_calls": 2
       },
       {
-        "trial_key": "trial_v1_8c9c3256aa9fad89e3c628b00457c690c68e1604985887a56ac48e43b9bb4d13",
+        "trial_key": "trial_v1_c71948ec2d632c072fc770a53c59cc834df99a9a6bc789abcdf45adfe75ae494",
         "split": "holdout",
         "role": "incumbent",
         "task_index": 3,
@@ -6943,7 +6755,7 @@
         "attempt_allowance": 1,
         "failed_attempts": 0,
         "cost_microusd": 8946,
-        "elapsed_ms": 7.3,
+        "elapsed_ms": 9.8,
         "attempts": [
           {
             "attempt": 1,
@@ -6992,23 +6804,23 @@
               "added_steps": [],
               "tokens": 1020,
               "cost_microusd": 3060,
-              "latency_ms": 0.2
+              "latency_ms": 0.3
             },
             "cost_microusd": 8946,
             "cost_known": true,
             "cost_is_estimate": false,
-            "elapsed_ms": 7.3,
+            "elapsed_ms": 9.8,
             "latency_source": "swarm_timing",
             "phases_ms": {
               "routing": null,
-              "planning": 1.0,
+              "planning": 1.1,
               "recovery": null,
-              "execution": 1.6,
-              "verification": 0.8,
+              "execution": 2.1,
+              "verification": 1.2,
               "synthesis": 0.0,
-              "supervision": 0.2,
-              "checkpoint": 1.5,
-              "waiting": 1.5
+              "supervision": 0.3,
+              "checkpoint": 2.3,
+              "waiting": 2.2
             },
             "graph": {
               "topology": "fork_join",
@@ -7023,9 +6835,303 @@
         "supervision_calls": 2
       },
       {
-        "trial_key": "trial_v1_812620ebe8477fb5502b0deb27e7ca7f700774181ffd01cf243ab048966a80e9",
+        "trial_key": "trial_v1_f640acd480a7d2971a8b50fe36cd692bc1287c4b895c7f5957b0ea8b76db254a",
         "split": "holdout",
         "role": "incumbent",
+        "task_index": 7,
+        "gates": {
+          "acceptance.policy_unchanged": true,
+          "accounting.complete": true
+        },
+        "family": "trigger-fixtures",
+        "task_id": "coffee-sourcing",
+        "task_sha256": "798917a2f264880388e092b1dd0409386c1ffde760b8fe7fdbeb6119490e5156",
+        "arm": "routine",
+        "repetition": 1,
+        "accepted": true,
+        "attempt_allowance": 1,
+        "failed_attempts": 0,
+        "cost_microusd": 9726,
+        "elapsed_ms": 5.8,
+        "attempts": [
+          {
+            "attempt": 1,
+            "planted": "contradicting_evidence",
+            "outcome": "accepted",
+            "decision": "accepted",
+            "reasons": [
+              "every final validator passed"
+            ],
+            "policy_sha256": "8084ccebb98a4ff92d43ecba84bc49693f13d258f9facc91369e28f029f54857",
+            "validators": [
+              {
+                "name": "smythe.text-spec",
+                "version": "1",
+                "config_sha256": "c90841d686afcbef0388656e9c5ac2f8eccbca23ca7d2634bf56966cce01a549",
+                "outcome": "passed"
+              }
+            ],
+            "output_sha256": "e3c7541887b823e68b9e60a0d6a5bd1e03798aca8dd4b910e9d1d9ffe69909ac",
+            "output_bytes": 109,
+            "adjudication": null,
+            "error": null,
+            "provider_calls": 4,
+            "provider_calls_failed": 0,
+            "planning_calls": 1,
+            "tokens": 2027,
+            "model_cost_microusd": 6081,
+            "supervision": {
+              "calls": 2,
+              "proposals": 0,
+              "reviews": [
+                {
+                  "after_node": "risks",
+                  "with_evidence": false,
+                  "change": false
+                },
+                {
+                  "after_node": "deliver",
+                  "with_evidence": false,
+                  "change": false
+                }
+              ],
+              "reviews_triggered": [],
+              "revisions_applied": 0,
+              "revisions_refused": 0,
+              "added_steps": [],
+              "tokens": 1215,
+              "cost_microusd": 3645,
+              "latency_ms": 0.2
+            },
+            "cost_microusd": 9726,
+            "cost_known": true,
+            "cost_is_estimate": false,
+            "elapsed_ms": 5.8,
+            "latency_source": "swarm_timing",
+            "phases_ms": {
+              "routing": null,
+              "planning": 1.0,
+              "recovery": null,
+              "execution": 1.8,
+              "verification": 0.1,
+              "synthesis": 0.0,
+              "supervision": 0.2,
+              "checkpoint": 0.9,
+              "waiting": 1.1
+            },
+            "graph": {
+              "topology": "fork_join",
+              "nodes": 3,
+              "node_statuses": {
+                "completed": 3
+              }
+            }
+          }
+        ],
+        "anomaly": "contradicting_evidence",
+        "supervision_calls": 2
+      },
+      {
+        "trial_key": "trial_v1_a24cb6be705f15bbf31776b4b3b68f252ad5cc818bcf1e4cb9793da69444d21b",
+        "split": "holdout",
+        "role": "incumbent",
+        "task_index": 0,
+        "gates": {
+          "acceptance.policy_unchanged": true,
+          "accounting.complete": true
+        },
+        "family": "trigger-fixtures",
+        "task_id": "rail-pass",
+        "task_sha256": "71cb590a913dab2be3d275a1acad466b010409de0e900a0ca58729fb8662b7b5",
+        "arm": "routine",
+        "repetition": 1,
+        "accepted": true,
+        "attempt_allowance": 1,
+        "failed_attempts": 0,
+        "cost_microusd": 8175,
+        "elapsed_ms": 6.1,
+        "attempts": [
+          {
+            "attempt": 1,
+            "planted": null,
+            "outcome": "accepted",
+            "decision": "accepted",
+            "reasons": [
+              "every final validator passed"
+            ],
+            "policy_sha256": "8084ccebb98a4ff92d43ecba84bc49693f13d258f9facc91369e28f029f54857",
+            "validators": [
+              {
+                "name": "smythe.text-spec",
+                "version": "1",
+                "config_sha256": "c90841d686afcbef0388656e9c5ac2f8eccbca23ca7d2634bf56966cce01a549",
+                "outcome": "passed"
+              }
+            ],
+            "output_sha256": "a76a9740e01d65855ceb301e0eb2d427f97b69a4e079d41c29e58714075eb7f1",
+            "output_bytes": 121,
+            "adjudication": null,
+            "error": null,
+            "provider_calls": 4,
+            "provider_calls_failed": 0,
+            "planning_calls": 1,
+            "tokens": 1767,
+            "model_cost_microusd": 5301,
+            "supervision": {
+              "calls": 2,
+              "proposals": 0,
+              "reviews": [
+                {
+                  "after_node": "risks",
+                  "with_evidence": false,
+                  "change": false
+                },
+                {
+                  "after_node": "deliver",
+                  "with_evidence": false,
+                  "change": false
+                }
+              ],
+              "reviews_triggered": [],
+              "revisions_applied": 0,
+              "revisions_refused": 0,
+              "added_steps": [],
+              "tokens": 958,
+              "cost_microusd": 2874,
+              "latency_ms": 0.2
+            },
+            "cost_microusd": 8175,
+            "cost_known": true,
+            "cost_is_estimate": false,
+            "elapsed_ms": 6.1,
+            "latency_source": "swarm_timing",
+            "phases_ms": {
+              "routing": null,
+              "planning": 0.8,
+              "recovery": null,
+              "execution": 1.9,
+              "verification": 0.2,
+              "synthesis": 0.0,
+              "supervision": 0.2,
+              "checkpoint": 1.0,
+              "waiting": 1.2
+            },
+            "graph": {
+              "topology": "fork_join",
+              "nodes": 3,
+              "node_statuses": {
+                "completed": 3
+              }
+            }
+          }
+        ],
+        "anomaly": null,
+        "supervision_calls": 2
+      },
+      {
+        "trial_key": "trial_v1_5a4c44304332358ab41253956a40d1747354f1879ffef668e790b48021d06ccd",
+        "split": "holdout",
+        "role": "incumbent",
+        "task_index": 5,
+        "gates": {
+          "acceptance.policy_unchanged": true,
+          "accounting.complete": true
+        },
+        "family": "trigger-fixtures",
+        "task_id": "port-expansion",
+        "task_sha256": "b8557c6b1f282df507efd1efe3434673e33d09cf326163dbf78481231c6ca622",
+        "arm": "routine",
+        "repetition": 1,
+        "accepted": true,
+        "attempt_allowance": 1,
+        "failed_attempts": 0,
+        "cost_microusd": 8952,
+        "elapsed_ms": 9.2,
+        "attempts": [
+          {
+            "attempt": 1,
+            "planted": "failed_step",
+            "outcome": "accepted",
+            "decision": "accepted",
+            "reasons": [
+              "every final validator passed"
+            ],
+            "policy_sha256": "8084ccebb98a4ff92d43ecba84bc49693f13d258f9facc91369e28f029f54857",
+            "validators": [
+              {
+                "name": "smythe.text-spec",
+                "version": "1",
+                "config_sha256": "c90841d686afcbef0388656e9c5ac2f8eccbca23ca7d2634bf56966cce01a549",
+                "outcome": "passed"
+              }
+            ],
+            "output_sha256": "7d1733a765302ad2c3a96cb4e9674064045b110a109eee54d366ccd7a717224f",
+            "output_bytes": 105,
+            "adjudication": null,
+            "error": null,
+            "provider_calls": 5,
+            "provider_calls_failed": 1,
+            "planning_calls": 1,
+            "tokens": 1972,
+            "model_cost_microusd": 5916,
+            "supervision": {
+              "calls": 2,
+              "proposals": 1,
+              "reviews": [
+                {
+                  "after_node": "deliver",
+                  "with_evidence": false,
+                  "change": true
+                },
+                {
+                  "after_node": "revise",
+                  "with_evidence": false,
+                  "change": false
+                }
+              ],
+              "reviews_triggered": [],
+              "revisions_applied": 1,
+              "revisions_refused": 0,
+              "added_steps": [
+                "revise"
+              ],
+              "tokens": 1012,
+              "cost_microusd": 3036,
+              "latency_ms": 0.2
+            },
+            "cost_microusd": 8952,
+            "cost_known": true,
+            "cost_is_estimate": false,
+            "elapsed_ms": 9.2,
+            "latency_source": "swarm_timing",
+            "phases_ms": {
+              "routing": null,
+              "planning": 0.9,
+              "recovery": null,
+              "execution": 2.9,
+              "verification": 0.2,
+              "synthesis": 0.0,
+              "supervision": 0.2,
+              "checkpoint": 1.6,
+              "waiting": 1.4
+            },
+            "graph": {
+              "topology": "fork_join",
+              "nodes": 4,
+              "node_statuses": {
+                "completed": 3,
+                "skipped": 1
+              }
+            }
+          }
+        ],
+        "anomaly": "failed_step",
+        "supervision_calls": 2
+      },
+      {
+        "trial_key": "trial_v1_236ad5b5a340be337057b27d6448fa54e83db044ee9a885609a07f5944bfe2cb",
+        "split": "holdout",
+        "role": "challenger",
         "task_index": 4,
         "gates": {
           "acceptance.policy_unchanged": true,
@@ -7034,13 +7140,13 @@
         "family": "trigger-fixtures",
         "task_id": "solar-permits",
         "task_sha256": "bd47270c5bc5ce7065c1b54de413b8e061b7b895bd4af1f9ac0a88e8b9fd6d40",
-        "arm": "routine",
+        "arm": "triggered",
         "repetition": 1,
         "accepted": true,
         "attempt_allowance": 1,
         "failed_attempts": 0,
-        "cost_microusd": 8613,
-        "elapsed_ms": 6.5,
+        "cost_microusd": 7287,
+        "elapsed_ms": 6.9,
         "attempts": [
           {
             "attempt": 1,
@@ -7069,45 +7175,47 @@
             "tokens": 1867,
             "model_cost_microusd": 5601,
             "supervision": {
-              "calls": 2,
+              "calls": 1,
               "proposals": 1,
               "reviews": [
                 {
                   "after_node": "risks",
-                  "with_evidence": false,
+                  "with_evidence": true,
                   "change": true
-                },
-                {
-                  "after_node": "revise",
-                  "with_evidence": false,
-                  "change": false
                 }
               ],
-              "reviews_triggered": [],
+              "reviews_triggered": [
+                {
+                  "after_node": "risks",
+                  "triggers": [
+                    "empty_or_short_output"
+                  ]
+                }
+              ],
               "revisions_applied": 1,
               "revisions_refused": 0,
               "added_steps": [
                 "revise"
               ],
-              "tokens": 1004,
-              "cost_microusd": 3012,
+              "tokens": 562,
+              "cost_microusd": 1686,
               "latency_ms": 0.2
             },
-            "cost_microusd": 8613,
+            "cost_microusd": 7287,
             "cost_known": true,
             "cost_is_estimate": false,
-            "elapsed_ms": 6.5,
+            "elapsed_ms": 6.9,
             "latency_source": "swarm_timing",
             "phases_ms": {
               "routing": null,
-              "planning": 0.7,
+              "planning": 0.8,
               "recovery": null,
               "execution": 2.1,
               "verification": 0.1,
               "synthesis": 0.0,
               "supervision": 0.2,
               "checkpoint": 1.1,
-              "waiting": 1.6
+              "waiting": 1.8
             },
             "graph": {
               "topology": "fork_join",
@@ -7119,10 +7227,96 @@
           }
         ],
         "anomaly": "empty_output",
-        "supervision_calls": 2
+        "supervision_calls": 1
       },
       {
-        "trial_key": "trial_v1_36060c6ecaea08de0b91f75a9520b6e63292b22999dc40c1b0b248a81f291a9e",
+        "trial_key": "trial_v1_72b4e07662e0ddb3c70af462878ff08a5628a20d0ae4c3521226801f054e6193",
+        "split": "holdout",
+        "role": "challenger",
+        "task_index": 1,
+        "gates": {
+          "acceptance.policy_unchanged": true,
+          "accounting.complete": true
+        },
+        "family": "trigger-fixtures",
+        "task_id": "clinic-hours",
+        "task_sha256": "62537d629acd2cf0dc33649d28381fb27cefd4a275ef1573f63bfb9a63464948",
+        "arm": "triggered",
+        "repetition": 1,
+        "accepted": true,
+        "attempt_allowance": 1,
+        "failed_attempts": 0,
+        "cost_microusd": 5271,
+        "elapsed_ms": 5.5,
+        "attempts": [
+          {
+            "attempt": 1,
+            "planted": null,
+            "outcome": "accepted",
+            "decision": "accepted",
+            "reasons": [
+              "every final validator passed"
+            ],
+            "policy_sha256": "8084ccebb98a4ff92d43ecba84bc49693f13d258f9facc91369e28f029f54857",
+            "validators": [
+              {
+                "name": "smythe.text-spec",
+                "version": "1",
+                "config_sha256": "c90841d686afcbef0388656e9c5ac2f8eccbca23ca7d2634bf56966cce01a549",
+                "outcome": "passed"
+              }
+            ],
+            "output_sha256": "7f7c838f16c833fa2208bf3d8ac4a01541e0d32edbb877f9197ae26348b0aecc",
+            "output_bytes": 103,
+            "adjudication": null,
+            "error": null,
+            "provider_calls": 4,
+            "provider_calls_failed": 0,
+            "planning_calls": 1,
+            "tokens": 1757,
+            "model_cost_microusd": 5271,
+            "supervision": {
+              "calls": 0,
+              "proposals": 0,
+              "reviews": [],
+              "reviews_triggered": [],
+              "revisions_applied": 0,
+              "revisions_refused": 0,
+              "added_steps": [],
+              "tokens": 0,
+              "cost_microusd": 0,
+              "latency_ms": 0.1
+            },
+            "cost_microusd": 5271,
+            "cost_known": true,
+            "cost_is_estimate": false,
+            "elapsed_ms": 5.5,
+            "latency_source": "swarm_timing",
+            "phases_ms": {
+              "routing": null,
+              "planning": 0.8,
+              "recovery": null,
+              "execution": 1.7,
+              "verification": 0.1,
+              "synthesis": 0.0,
+              "supervision": 0.1,
+              "checkpoint": 1.0,
+              "waiting": 1.0
+            },
+            "graph": {
+              "topology": "fork_join",
+              "nodes": 3,
+              "node_statuses": {
+                "completed": 3
+              }
+            }
+          }
+        ],
+        "anomaly": null,
+        "supervision_calls": 0
+      },
+      {
+        "trial_key": "trial_v1_cd95f506b6daa89e5e88a6c203cf5d976524fd71dd69fd75529760fc257acc9e",
         "split": "holdout",
         "role": "challenger",
         "task_index": 2,
@@ -7139,7 +7333,7 @@
         "attempt_allowance": 1,
         "failed_attempts": 0,
         "cost_microusd": 5289,
-        "elapsed_ms": 4.9,
+        "elapsed_ms": 5.3,
         "attempts": [
           {
             "attempt": 1,
@@ -7182,13 +7376,13 @@
             "cost_microusd": 5289,
             "cost_known": true,
             "cost_is_estimate": false,
-            "elapsed_ms": 4.9,
+            "elapsed_ms": 5.3,
             "latency_source": "swarm_timing",
             "phases_ms": {
               "routing": null,
-              "planning": 0.7,
+              "planning": 0.9,
               "recovery": null,
-              "execution": 1.5,
+              "execution": 1.6,
               "verification": 0.1,
               "synthesis": 0.0,
               "supervision": 0.1,
@@ -7208,7 +7402,7 @@
         "supervision_calls": 0
       },
       {
-        "trial_key": "trial_v1_79cac2ea4c2f57b64f4efd9f9479071641d5d1110443724cb7f60fed74efd471",
+        "trial_key": "trial_v1_04d760d11889722988a9b7aab199bbce350b5d18b5519030b74fb40b7ae665b4",
         "split": "holdout",
         "role": "challenger",
         "task_index": 8,
@@ -7225,7 +7419,7 @@
         "attempt_allowance": 1,
         "failed_attempts": 1,
         "cost_microusd": 9750,
-        "elapsed_ms": 12.4,
+        "elapsed_ms": 13.6,
         "attempts": [
           {
             "attempt": 1,
@@ -7284,18 +7478,18 @@
             "cost_microusd": 9750,
             "cost_known": true,
             "cost_is_estimate": false,
-            "elapsed_ms": 12.4,
+            "elapsed_ms": 13.6,
             "latency_source": "swarm_timing",
             "phases_ms": {
               "routing": null,
-              "planning": 0.8,
+              "planning": 1.1,
               "recovery": null,
-              "execution": 2.6,
-              "verification": 2.4,
+              "execution": 3.0,
+              "verification": 2.5,
               "synthesis": 0.0,
               "supervision": 0.2,
-              "checkpoint": 3.3,
-              "waiting": 2.5
+              "checkpoint": 3.4,
+              "waiting": 2.7
             },
             "graph": {
               "topology": "fork_join",
@@ -7310,380 +7504,7 @@
         "supervision_calls": 1
       },
       {
-        "trial_key": "trial_v1_1c0aaada2a2ea3c1251a7d69a490345390f5331306779694c8b687e282054120",
-        "split": "holdout",
-        "role": "challenger",
-        "task_index": 7,
-        "gates": {
-          "acceptance.policy_unchanged": true,
-          "accounting.complete": true
-        },
-        "family": "trigger-fixtures",
-        "task_id": "coffee-sourcing",
-        "task_sha256": "798917a2f264880388e092b1dd0409386c1ffde760b8fe7fdbeb6119490e5156",
-        "arm": "triggered",
-        "repetition": 1,
-        "accepted": true,
-        "attempt_allowance": 1,
-        "failed_attempts": 0,
-        "cost_microusd": 8082,
-        "elapsed_ms": 5.3,
-        "attempts": [
-          {
-            "attempt": 1,
-            "planted": "contradicting_evidence",
-            "outcome": "accepted",
-            "decision": "accepted",
-            "reasons": [
-              "every final validator passed"
-            ],
-            "policy_sha256": "8084ccebb98a4ff92d43ecba84bc49693f13d258f9facc91369e28f029f54857",
-            "validators": [
-              {
-                "name": "smythe.text-spec",
-                "version": "1",
-                "config_sha256": "c90841d686afcbef0388656e9c5ac2f8eccbca23ca7d2634bf56966cce01a549",
-                "outcome": "passed"
-              }
-            ],
-            "output_sha256": "e3c7541887b823e68b9e60a0d6a5bd1e03798aca8dd4b910e9d1d9ffe69909ac",
-            "output_bytes": 109,
-            "adjudication": null,
-            "error": null,
-            "provider_calls": 4,
-            "provider_calls_failed": 0,
-            "planning_calls": 1,
-            "tokens": 2027,
-            "model_cost_microusd": 6081,
-            "supervision": {
-              "calls": 1,
-              "proposals": 0,
-              "reviews": [
-                {
-                  "after_node": "facts",
-                  "with_evidence": true,
-                  "change": false
-                }
-              ],
-              "reviews_triggered": [
-                {
-                  "after_node": "facts",
-                  "triggers": [
-                    "contradiction_records"
-                  ]
-                }
-              ],
-              "revisions_applied": 0,
-              "revisions_refused": 0,
-              "added_steps": [],
-              "tokens": 667,
-              "cost_microusd": 2001,
-              "latency_ms": 0.3
-            },
-            "cost_microusd": 8082,
-            "cost_known": true,
-            "cost_is_estimate": false,
-            "elapsed_ms": 5.3,
-            "latency_source": "swarm_timing",
-            "phases_ms": {
-              "routing": null,
-              "planning": 0.7,
-              "recovery": null,
-              "execution": 1.6,
-              "verification": 0.1,
-              "synthesis": 0.0,
-              "supervision": 0.3,
-              "checkpoint": 0.9,
-              "waiting": 1.3
-            },
-            "graph": {
-              "topology": "fork_join",
-              "nodes": 3,
-              "node_statuses": {
-                "completed": 3
-              }
-            }
-          }
-        ],
-        "anomaly": "contradicting_evidence",
-        "supervision_calls": 1
-      },
-      {
-        "trial_key": "trial_v1_1dabdd154b0d2b55428d7ea0c72c7e13029dd115e466626acb7aad4b57aba180",
-        "split": "holdout",
-        "role": "challenger",
-        "task_index": 5,
-        "gates": {
-          "acceptance.policy_unchanged": true,
-          "accounting.complete": true
-        },
-        "family": "trigger-fixtures",
-        "task_id": "port-expansion",
-        "task_sha256": "b8557c6b1f282df507efd1efe3434673e33d09cf326163dbf78481231c6ca622",
-        "arm": "triggered",
-        "repetition": 1,
-        "accepted": true,
-        "attempt_allowance": 1,
-        "failed_attempts": 0,
-        "cost_microusd": 7662,
-        "elapsed_ms": 6.7,
-        "attempts": [
-          {
-            "attempt": 1,
-            "planted": "failed_step",
-            "outcome": "accepted",
-            "decision": "accepted",
-            "reasons": [
-              "every final validator passed"
-            ],
-            "policy_sha256": "8084ccebb98a4ff92d43ecba84bc49693f13d258f9facc91369e28f029f54857",
-            "validators": [
-              {
-                "name": "smythe.text-spec",
-                "version": "1",
-                "config_sha256": "c90841d686afcbef0388656e9c5ac2f8eccbca23ca7d2634bf56966cce01a549",
-                "outcome": "passed"
-              }
-            ],
-            "output_sha256": "7d1733a765302ad2c3a96cb4e9674064045b110a109eee54d366ccd7a717224f",
-            "output_bytes": 105,
-            "adjudication": null,
-            "error": null,
-            "provider_calls": 5,
-            "provider_calls_failed": 1,
-            "planning_calls": 1,
-            "tokens": 1972,
-            "model_cost_microusd": 5916,
-            "supervision": {
-              "calls": 1,
-              "proposals": 1,
-              "reviews": [
-                {
-                  "after_node": "deliver",
-                  "with_evidence": true,
-                  "change": true
-                }
-              ],
-              "reviews_triggered": [
-                {
-                  "after_node": "deliver",
-                  "triggers": [
-                    "failed_or_skipped"
-                  ]
-                }
-              ],
-              "revisions_applied": 1,
-              "revisions_refused": 0,
-              "added_steps": [
-                "revise"
-              ],
-              "tokens": 582,
-              "cost_microusd": 1746,
-              "latency_ms": 0.2
-            },
-            "cost_microusd": 7662,
-            "cost_known": true,
-            "cost_is_estimate": false,
-            "elapsed_ms": 6.7,
-            "latency_source": "swarm_timing",
-            "phases_ms": {
-              "routing": null,
-              "planning": 0.7,
-              "recovery": null,
-              "execution": 2.1,
-              "verification": 0.1,
-              "synthesis": 0.0,
-              "supervision": 0.2,
-              "checkpoint": 1.2,
-              "waiting": 1.1
-            },
-            "graph": {
-              "topology": "fork_join",
-              "nodes": 4,
-              "node_statuses": {
-                "completed": 3,
-                "skipped": 1
-              }
-            }
-          }
-        ],
-        "anomaly": "failed_step",
-        "supervision_calls": 1
-      },
-      {
-        "trial_key": "trial_v1_75d5ed4fa116a6e14c1d8c8c67297980f4e670da94ee2ed9a978ca798e8f3e96",
-        "split": "holdout",
-        "role": "challenger",
-        "task_index": 1,
-        "gates": {
-          "acceptance.policy_unchanged": true,
-          "accounting.complete": true
-        },
-        "family": "trigger-fixtures",
-        "task_id": "clinic-hours",
-        "task_sha256": "62537d629acd2cf0dc33649d28381fb27cefd4a275ef1573f63bfb9a63464948",
-        "arm": "triggered",
-        "repetition": 1,
-        "accepted": true,
-        "attempt_allowance": 1,
-        "failed_attempts": 0,
-        "cost_microusd": 5271,
-        "elapsed_ms": 4.9,
-        "attempts": [
-          {
-            "attempt": 1,
-            "planted": null,
-            "outcome": "accepted",
-            "decision": "accepted",
-            "reasons": [
-              "every final validator passed"
-            ],
-            "policy_sha256": "8084ccebb98a4ff92d43ecba84bc49693f13d258f9facc91369e28f029f54857",
-            "validators": [
-              {
-                "name": "smythe.text-spec",
-                "version": "1",
-                "config_sha256": "c90841d686afcbef0388656e9c5ac2f8eccbca23ca7d2634bf56966cce01a549",
-                "outcome": "passed"
-              }
-            ],
-            "output_sha256": "7f7c838f16c833fa2208bf3d8ac4a01541e0d32edbb877f9197ae26348b0aecc",
-            "output_bytes": 103,
-            "adjudication": null,
-            "error": null,
-            "provider_calls": 4,
-            "provider_calls_failed": 0,
-            "planning_calls": 1,
-            "tokens": 1757,
-            "model_cost_microusd": 5271,
-            "supervision": {
-              "calls": 0,
-              "proposals": 0,
-              "reviews": [],
-              "reviews_triggered": [],
-              "revisions_applied": 0,
-              "revisions_refused": 0,
-              "added_steps": [],
-              "tokens": 0,
-              "cost_microusd": 0,
-              "latency_ms": 0.1
-            },
-            "cost_microusd": 5271,
-            "cost_known": true,
-            "cost_is_estimate": false,
-            "elapsed_ms": 4.9,
-            "latency_source": "swarm_timing",
-            "phases_ms": {
-              "routing": null,
-              "planning": 0.7,
-              "recovery": null,
-              "execution": 1.5,
-              "verification": 0.1,
-              "synthesis": 0.0,
-              "supervision": 0.1,
-              "checkpoint": 0.8,
-              "waiting": 1.0
-            },
-            "graph": {
-              "topology": "fork_join",
-              "nodes": 3,
-              "node_statuses": {
-                "completed": 3
-              }
-            }
-          }
-        ],
-        "anomaly": null,
-        "supervision_calls": 0
-      },
-      {
-        "trial_key": "trial_v1_6cb7fb6c42235f7c10779a35eb00e60f76d154a4142322ab368ade06a2edadcc",
-        "split": "holdout",
-        "role": "challenger",
-        "task_index": 0,
-        "gates": {
-          "acceptance.policy_unchanged": true,
-          "accounting.complete": true
-        },
-        "family": "trigger-fixtures",
-        "task_id": "rail-pass",
-        "task_sha256": "71cb590a913dab2be3d275a1acad466b010409de0e900a0ca58729fb8662b7b5",
-        "arm": "triggered",
-        "repetition": 1,
-        "accepted": true,
-        "attempt_allowance": 1,
-        "failed_attempts": 0,
-        "cost_microusd": 5301,
-        "elapsed_ms": 5.1,
-        "attempts": [
-          {
-            "attempt": 1,
-            "planted": null,
-            "outcome": "accepted",
-            "decision": "accepted",
-            "reasons": [
-              "every final validator passed"
-            ],
-            "policy_sha256": "8084ccebb98a4ff92d43ecba84bc49693f13d258f9facc91369e28f029f54857",
-            "validators": [
-              {
-                "name": "smythe.text-spec",
-                "version": "1",
-                "config_sha256": "c90841d686afcbef0388656e9c5ac2f8eccbca23ca7d2634bf56966cce01a549",
-                "outcome": "passed"
-              }
-            ],
-            "output_sha256": "a76a9740e01d65855ceb301e0eb2d427f97b69a4e079d41c29e58714075eb7f1",
-            "output_bytes": 121,
-            "adjudication": null,
-            "error": null,
-            "provider_calls": 4,
-            "provider_calls_failed": 0,
-            "planning_calls": 1,
-            "tokens": 1767,
-            "model_cost_microusd": 5301,
-            "supervision": {
-              "calls": 0,
-              "proposals": 0,
-              "reviews": [],
-              "reviews_triggered": [],
-              "revisions_applied": 0,
-              "revisions_refused": 0,
-              "added_steps": [],
-              "tokens": 0,
-              "cost_microusd": 0,
-              "latency_ms": 0.1
-            },
-            "cost_microusd": 5301,
-            "cost_known": true,
-            "cost_is_estimate": false,
-            "elapsed_ms": 5.1,
-            "latency_source": "swarm_timing",
-            "phases_ms": {
-              "routing": null,
-              "planning": 0.7,
-              "recovery": null,
-              "execution": 1.5,
-              "verification": 0.1,
-              "synthesis": 0.1,
-              "supervision": 0.1,
-              "checkpoint": 0.8,
-              "waiting": 1.0
-            },
-            "graph": {
-              "topology": "fork_join",
-              "nodes": 3,
-              "node_statuses": {
-                "completed": 3
-              }
-            }
-          }
-        ],
-        "anomaly": null,
-        "supervision_calls": 0
-      },
-      {
-        "trial_key": "trial_v1_f46213c9e4dea2a0296f7eb269b046a0f8fc6e3031b63c793df7338fa9b27404",
+        "trial_key": "trial_v1_5183b154e56770e69f94b2f3b8c19a5806c8e1cafa3475c93274c117fa2e2499",
         "split": "holdout",
         "role": "challenger",
         "task_index": 6,
@@ -7700,7 +7521,7 @@
         "attempt_allowance": 1,
         "failed_attempts": 0,
         "cost_microusd": 7977,
-        "elapsed_ms": 6.7,
+        "elapsed_ms": 7.1,
         "attempts": [
           {
             "attempt": 1,
@@ -7759,18 +7580,18 @@
             "cost_microusd": 7977,
             "cost_known": true,
             "cost_is_estimate": false,
-            "elapsed_ms": 6.7,
+            "elapsed_ms": 7.1,
             "latency_source": "swarm_timing",
             "phases_ms": {
               "routing": null,
               "planning": 0.7,
               "recovery": null,
-              "execution": 2.2,
-              "verification": 0.1,
+              "execution": 2.3,
+              "verification": 0.2,
               "synthesis": 0.0,
               "supervision": 0.2,
               "checkpoint": 1.1,
-              "waiting": 1.1
+              "waiting": 1.0
             },
             "graph": {
               "topology": "fork_join",
@@ -7786,7 +7607,7 @@
         "supervision_calls": 1
       },
       {
-        "trial_key": "trial_v1_9b6ddf1595623797a806be608f44ed57798ce54365d3f5c3f251ac652d913241",
+        "trial_key": "trial_v1_d09633cffddaf780dad2bf59152aaeb212fdc4dcbb53296e804fd01677a32fd8",
         "split": "holdout",
         "role": "challenger",
         "task_index": 3,
@@ -7803,7 +7624,7 @@
         "attempt_allowance": 1,
         "failed_attempts": 0,
         "cost_microusd": 5886,
-        "elapsed_ms": 6.9,
+        "elapsed_ms": 7.7,
         "attempts": [
           {
             "attempt": 1,
@@ -7846,118 +7667,17 @@
             "cost_microusd": 5886,
             "cost_known": true,
             "cost_is_estimate": false,
-            "elapsed_ms": 6.9,
+            "elapsed_ms": 7.7,
             "latency_source": "swarm_timing",
             "phases_ms": {
               "routing": null,
-              "planning": 0.8,
+              "planning": 0.9,
               "recovery": null,
               "execution": 1.6,
-              "verification": 0.8,
+              "verification": 1.0,
               "synthesis": 0.0,
               "supervision": 0.1,
-              "checkpoint": 1.4,
-              "waiting": 1.6
-            },
-            "graph": {
-              "topology": "fork_join",
-              "nodes": 4,
-              "node_statuses": {
-                "completed": 4
-              }
-            }
-          }
-        ],
-        "anomaly": null,
-        "supervision_calls": 0
-      },
-      {
-        "trial_key": "trial_v1_c411daea4eaa88d95c3c1430a9c73f09d8c8e3ba2fd03412178c93a9f6d4e096",
-        "split": "holdout",
-        "role": "challenger",
-        "task_index": 4,
-        "gates": {
-          "acceptance.policy_unchanged": true,
-          "accounting.complete": true
-        },
-        "family": "trigger-fixtures",
-        "task_id": "solar-permits",
-        "task_sha256": "bd47270c5bc5ce7065c1b54de413b8e061b7b895bd4af1f9ac0a88e8b9fd6d40",
-        "arm": "triggered",
-        "repetition": 1,
-        "accepted": true,
-        "attempt_allowance": 1,
-        "failed_attempts": 0,
-        "cost_microusd": 7287,
-        "elapsed_ms": 6.7,
-        "attempts": [
-          {
-            "attempt": 1,
-            "planted": "empty_output",
-            "outcome": "accepted",
-            "decision": "accepted",
-            "reasons": [
-              "every final validator passed"
-            ],
-            "policy_sha256": "8084ccebb98a4ff92d43ecba84bc49693f13d258f9facc91369e28f029f54857",
-            "validators": [
-              {
-                "name": "smythe.text-spec",
-                "version": "1",
-                "config_sha256": "c90841d686afcbef0388656e9c5ac2f8eccbca23ca7d2634bf56966cce01a549",
-                "outcome": "passed"
-              }
-            ],
-            "output_sha256": "2ddb2913dcb8742d7871fa7fed0abe5055fbf3bf19b9f067c5747c75de93a272",
-            "output_bytes": 102,
-            "adjudication": null,
-            "error": null,
-            "provider_calls": 5,
-            "provider_calls_failed": 0,
-            "planning_calls": 1,
-            "tokens": 1867,
-            "model_cost_microusd": 5601,
-            "supervision": {
-              "calls": 1,
-              "proposals": 1,
-              "reviews": [
-                {
-                  "after_node": "risks",
-                  "with_evidence": true,
-                  "change": true
-                }
-              ],
-              "reviews_triggered": [
-                {
-                  "after_node": "risks",
-                  "triggers": [
-                    "empty_or_short_output"
-                  ]
-                }
-              ],
-              "revisions_applied": 1,
-              "revisions_refused": 0,
-              "added_steps": [
-                "revise"
-              ],
-              "tokens": 562,
-              "cost_microusd": 1686,
-              "latency_ms": 0.3
-            },
-            "cost_microusd": 7287,
-            "cost_known": true,
-            "cost_is_estimate": false,
-            "elapsed_ms": 6.7,
-            "latency_source": "swarm_timing",
-            "phases_ms": {
-              "routing": null,
-              "planning": 0.8,
-              "recovery": null,
-              "execution": 2.1,
-              "verification": 0.1,
-              "synthesis": 0.0,
-              "supervision": 0.3,
-              "checkpoint": 1.1,
+              "checkpoint": 1.6,
               "waiting": 1.8
             },
             "graph": {
@@ -7969,185 +7689,13 @@
             }
           }
         ],
-        "anomaly": "empty_output",
-        "supervision_calls": 1
-      },
-      {
-        "trial_key": "trial_v1_e9a7c5198f5c0c4324ce241bf953b7c33f13e49b1f0fde94bb10b25e1781096b",
-        "split": "holdout",
-        "role": "reference",
-        "task_index": 2,
-        "gates": {
-          "acceptance.policy_unchanged": true,
-          "accounting.complete": true
-        },
-        "family": "trigger-fixtures",
-        "task_id": "warehouse-robots",
-        "task_sha256": "359e1fbb78fa62ca8de14fd7ef015b643ffc9c60fdaa2136491a2951d9e1faee",
-        "arm": "none",
-        "repetition": 1,
-        "accepted": true,
-        "attempt_allowance": 1,
-        "failed_attempts": 0,
-        "cost_microusd": 5289,
-        "elapsed_ms": 3.6,
-        "attempts": [
-          {
-            "attempt": 1,
-            "planted": null,
-            "outcome": "accepted",
-            "decision": "accepted",
-            "reasons": [
-              "every final validator passed"
-            ],
-            "policy_sha256": "8084ccebb98a4ff92d43ecba84bc49693f13d258f9facc91369e28f029f54857",
-            "validators": [
-              {
-                "name": "smythe.text-spec",
-                "version": "1",
-                "config_sha256": "c90841d686afcbef0388656e9c5ac2f8eccbca23ca7d2634bf56966cce01a549",
-                "outcome": "passed"
-              }
-            ],
-            "output_sha256": "22638ec6813ab2aac220621a87804ecdec6e4186f20d4e124cf8fe9b96dc15ca",
-            "output_bytes": 112,
-            "adjudication": null,
-            "error": null,
-            "provider_calls": 4,
-            "provider_calls_failed": 0,
-            "planning_calls": 1,
-            "tokens": 1763,
-            "model_cost_microusd": 5289,
-            "supervision": {
-              "calls": 0,
-              "proposals": 0,
-              "reviews": [],
-              "reviews_triggered": [],
-              "revisions_applied": 0,
-              "revisions_refused": 0,
-              "added_steps": [],
-              "tokens": 0,
-              "cost_microusd": 0,
-              "latency_ms": 0.0
-            },
-            "cost_microusd": 5289,
-            "cost_known": true,
-            "cost_is_estimate": false,
-            "elapsed_ms": 3.6,
-            "latency_source": "swarm_timing",
-            "phases_ms": {
-              "routing": null,
-              "planning": 0.7,
-              "recovery": null,
-              "execution": 1.5,
-              "verification": 0.1,
-              "synthesis": 0.0,
-              "supervision": 0.0,
-              "checkpoint": 0.9,
-              "waiting": 0.0
-            },
-            "graph": {
-              "topology": "fork_join",
-              "nodes": 3,
-              "node_statuses": {
-                "completed": 3
-              }
-            }
-          }
-        ],
         "anomaly": null,
         "supervision_calls": 0
       },
       {
-        "trial_key": "trial_v1_418f9bdc9971db67c2853f34a177ec7377e77d461a433e22851a2ac73a9ad910",
+        "trial_key": "trial_v1_22647eb99e092d28387aab3e85ffb65e02c4711107fd765175fc82c94008bf38",
         "split": "holdout",
-        "role": "reference",
-        "task_index": 8,
-        "gates": {
-          "acceptance.policy_unchanged": true,
-          "accounting.complete": true
-        },
-        "family": "trigger-fixtures",
-        "task_id": "payroll-migration",
-        "task_sha256": "540039f5a01b0ed8b2af1dc350b745a6009dfbf1a29c6671902da740802795fb",
-        "arm": "none",
-        "repetition": 1,
-        "accepted": false,
-        "attempt_allowance": 1,
-        "failed_attempts": 1,
-        "cost_microusd": 6900,
-        "elapsed_ms": 7.6,
-        "attempts": [
-          {
-            "attempt": 1,
-            "planted": "rejecting_gate",
-            "outcome": "rejected",
-            "decision": "rejected",
-            "reasons": [
-              "gate 'check' has a failing final verdict on 'deliver': FAIL - the Risks section names no mitigation"
-            ],
-            "policy_sha256": "8084ccebb98a4ff92d43ecba84bc49693f13d258f9facc91369e28f029f54857",
-            "validators": [
-              {
-                "name": "smythe.text-spec",
-                "version": "1",
-                "config_sha256": "c90841d686afcbef0388656e9c5ac2f8eccbca23ca7d2634bf56966cce01a549",
-                "outcome": "passed"
-              }
-            ],
-            "output_sha256": "65700057c4b1b7cbaa50851a86a9e8b77ad444a54ae4184b57fc4080728d505a",
-            "output_bytes": 103,
-            "adjudication": null,
-            "error": null,
-            "provider_calls": 7,
-            "provider_calls_failed": 0,
-            "planning_calls": 1,
-            "tokens": 2300,
-            "model_cost_microusd": 6900,
-            "supervision": {
-              "calls": 0,
-              "proposals": 0,
-              "reviews": [],
-              "reviews_triggered": [],
-              "revisions_applied": 0,
-              "revisions_refused": 0,
-              "added_steps": [],
-              "tokens": 0,
-              "cost_microusd": 0,
-              "latency_ms": 0.0
-            },
-            "cost_microusd": 6900,
-            "cost_known": true,
-            "cost_is_estimate": false,
-            "elapsed_ms": 7.6,
-            "latency_source": "swarm_timing",
-            "phases_ms": {
-              "routing": null,
-              "planning": 0.8,
-              "recovery": null,
-              "execution": 2.2,
-              "verification": 2.3,
-              "synthesis": 0.0,
-              "supervision": 0.0,
-              "checkpoint": 2.8,
-              "waiting": 0.0
-            },
-            "graph": {
-              "topology": "fork_join",
-              "nodes": 4,
-              "node_statuses": {
-                "completed": 4
-              }
-            }
-          }
-        ],
-        "anomaly": "rejecting_gate",
-        "supervision_calls": 0
-      },
-      {
-        "trial_key": "trial_v1_feed364ba5451eb7a5ece56214718c719a6e3e3bd267b2ba9135f47350070484",
-        "split": "holdout",
-        "role": "reference",
+        "role": "challenger",
         "task_index": 7,
         "gates": {
           "acceptance.policy_unchanged": true,
@@ -8156,13 +7704,13 @@
         "family": "trigger-fixtures",
         "task_id": "coffee-sourcing",
         "task_sha256": "798917a2f264880388e092b1dd0409386c1ffde760b8fe7fdbeb6119490e5156",
-        "arm": "none",
+        "arm": "triggered",
         "repetition": 1,
         "accepted": true,
         "attempt_allowance": 1,
         "failed_attempts": 0,
-        "cost_microusd": 6081,
-        "elapsed_ms": 4.3,
+        "cost_microusd": 8082,
+        "elapsed_ms": 5.9,
         "attempts": [
           {
             "attempt": 1,
@@ -8191,32 +7739,45 @@
             "tokens": 2027,
             "model_cost_microusd": 6081,
             "supervision": {
-              "calls": 0,
+              "calls": 1,
               "proposals": 0,
-              "reviews": [],
-              "reviews_triggered": [],
+              "reviews": [
+                {
+                  "after_node": "facts",
+                  "with_evidence": true,
+                  "change": false
+                }
+              ],
+              "reviews_triggered": [
+                {
+                  "after_node": "facts",
+                  "triggers": [
+                    "contradiction_records"
+                  ]
+                }
+              ],
               "revisions_applied": 0,
               "revisions_refused": 0,
               "added_steps": [],
-              "tokens": 0,
-              "cost_microusd": 0,
-              "latency_ms": 0.0
+              "tokens": 667,
+              "cost_microusd": 2001,
+              "latency_ms": 0.3
             },
-            "cost_microusd": 6081,
+            "cost_microusd": 8082,
             "cost_known": true,
             "cost_is_estimate": false,
-            "elapsed_ms": 4.3,
+            "elapsed_ms": 5.9,
             "latency_source": "swarm_timing",
             "phases_ms": {
               "routing": null,
-              "planning": 1.0,
+              "planning": 0.8,
               "recovery": null,
-              "execution": 1.9,
-              "verification": 0.2,
+              "execution": 1.7,
+              "verification": 0.1,
               "synthesis": 0.0,
-              "supervision": 0.0,
+              "supervision": 0.3,
               "checkpoint": 0.9,
-              "waiting": 0.0
+              "waiting": 1.4
             },
             "graph": {
               "topology": "fork_join",
@@ -8228,185 +7789,12 @@
           }
         ],
         "anomaly": "contradicting_evidence",
-        "supervision_calls": 0
+        "supervision_calls": 1
       },
       {
-        "trial_key": "trial_v1_a3ba1abb7133807a41623c1e0b5e0cb08b5b6f31bf9ed02116a53bf9974a6831",
+        "trial_key": "trial_v1_88775db0fdd1091439c09358b902a36324a4c2db1616ae2ad9d1b8da94dd58f4",
         "split": "holdout",
-        "role": "reference",
-        "task_index": 5,
-        "gates": {
-          "acceptance.policy_unchanged": true,
-          "accounting.complete": true
-        },
-        "family": "trigger-fixtures",
-        "task_id": "port-expansion",
-        "task_sha256": "b8557c6b1f282df507efd1efe3434673e33d09cf326163dbf78481231c6ca622",
-        "arm": "none",
-        "repetition": 1,
-        "accepted": false,
-        "attempt_allowance": 1,
-        "failed_attempts": 1,
-        "cost_microusd": 5085,
-        "elapsed_ms": 4.1,
-        "attempts": [
-          {
-            "attempt": 1,
-            "planted": "failed_step",
-            "outcome": "rejected",
-            "decision": "rejected",
-            "reasons": [
-              "final validator 'smythe.text-spec' rejected the output: section_missing: required section 'Risks' is missing"
-            ],
-            "policy_sha256": "8084ccebb98a4ff92d43ecba84bc49693f13d258f9facc91369e28f029f54857",
-            "validators": [
-              {
-                "name": "smythe.text-spec",
-                "version": "1",
-                "config_sha256": "c90841d686afcbef0388656e9c5ac2f8eccbca23ca7d2634bf56966cce01a549",
-                "outcome": "rejected"
-              }
-            ],
-            "output_sha256": "81dfab3e826abf7245581532da012609f72807c99ed5be11a4785e0f0533d040",
-            "output_bytes": 106,
-            "adjudication": null,
-            "error": null,
-            "provider_calls": 4,
-            "provider_calls_failed": 1,
-            "planning_calls": 1,
-            "tokens": 1695,
-            "model_cost_microusd": 5085,
-            "supervision": {
-              "calls": 0,
-              "proposals": 0,
-              "reviews": [],
-              "reviews_triggered": [],
-              "revisions_applied": 0,
-              "revisions_refused": 0,
-              "added_steps": [],
-              "tokens": 0,
-              "cost_microusd": 0,
-              "latency_ms": 0.0
-            },
-            "cost_microusd": 5085,
-            "cost_known": true,
-            "cost_is_estimate": false,
-            "elapsed_ms": 4.1,
-            "latency_source": "swarm_timing",
-            "phases_ms": {
-              "routing": null,
-              "planning": 1.0,
-              "recovery": null,
-              "execution": 1.8,
-              "verification": 0.1,
-              "synthesis": 0.0,
-              "supervision": 0.0,
-              "checkpoint": 0.9,
-              "waiting": 0.0
-            },
-            "graph": {
-              "topology": "fork_join",
-              "nodes": 3,
-              "node_statuses": {
-                "completed": 2,
-                "skipped": 1
-              }
-            }
-          }
-        ],
-        "anomaly": "failed_step",
-        "supervision_calls": 0
-      },
-      {
-        "trial_key": "trial_v1_5f1f30ad4b4d385ff81436260840ad142b6d4f4f68337c7f5f3019d8c8cecdd9",
-        "split": "holdout",
-        "role": "reference",
-        "task_index": 1,
-        "gates": {
-          "acceptance.policy_unchanged": true,
-          "accounting.complete": true
-        },
-        "family": "trigger-fixtures",
-        "task_id": "clinic-hours",
-        "task_sha256": "62537d629acd2cf0dc33649d28381fb27cefd4a275ef1573f63bfb9a63464948",
-        "arm": "none",
-        "repetition": 1,
-        "accepted": true,
-        "attempt_allowance": 1,
-        "failed_attempts": 0,
-        "cost_microusd": 5271,
-        "elapsed_ms": 3.9,
-        "attempts": [
-          {
-            "attempt": 1,
-            "planted": null,
-            "outcome": "accepted",
-            "decision": "accepted",
-            "reasons": [
-              "every final validator passed"
-            ],
-            "policy_sha256": "8084ccebb98a4ff92d43ecba84bc49693f13d258f9facc91369e28f029f54857",
-            "validators": [
-              {
-                "name": "smythe.text-spec",
-                "version": "1",
-                "config_sha256": "c90841d686afcbef0388656e9c5ac2f8eccbca23ca7d2634bf56966cce01a549",
-                "outcome": "passed"
-              }
-            ],
-            "output_sha256": "7f7c838f16c833fa2208bf3d8ac4a01541e0d32edbb877f9197ae26348b0aecc",
-            "output_bytes": 103,
-            "adjudication": null,
-            "error": null,
-            "provider_calls": 4,
-            "provider_calls_failed": 0,
-            "planning_calls": 1,
-            "tokens": 1757,
-            "model_cost_microusd": 5271,
-            "supervision": {
-              "calls": 0,
-              "proposals": 0,
-              "reviews": [],
-              "reviews_triggered": [],
-              "revisions_applied": 0,
-              "revisions_refused": 0,
-              "added_steps": [],
-              "tokens": 0,
-              "cost_microusd": 0,
-              "latency_ms": 0.0
-            },
-            "cost_microusd": 5271,
-            "cost_known": true,
-            "cost_is_estimate": false,
-            "elapsed_ms": 3.9,
-            "latency_source": "swarm_timing",
-            "phases_ms": {
-              "routing": null,
-              "planning": 1.0,
-              "recovery": null,
-              "execution": 1.6,
-              "verification": 0.1,
-              "synthesis": 0.0,
-              "supervision": 0.0,
-              "checkpoint": 0.8,
-              "waiting": 0.0
-            },
-            "graph": {
-              "topology": "fork_join",
-              "nodes": 3,
-              "node_statuses": {
-                "completed": 3
-              }
-            }
-          }
-        ],
-        "anomaly": null,
-        "supervision_calls": 0
-      },
-      {
-        "trial_key": "trial_v1_626a48b216cf61bcc7d210b769001774f94057503927045f73ccc42d53fa76e5",
-        "split": "holdout",
-        "role": "reference",
+        "role": "challenger",
         "task_index": 0,
         "gates": {
           "acceptance.policy_unchanged": true,
@@ -8415,13 +7803,13 @@
         "family": "trigger-fixtures",
         "task_id": "rail-pass",
         "task_sha256": "71cb590a913dab2be3d275a1acad466b010409de0e900a0ca58729fb8662b7b5",
-        "arm": "none",
+        "arm": "triggered",
         "repetition": 1,
         "accepted": true,
         "attempt_allowance": 1,
         "failed_attempts": 0,
         "cost_microusd": 5301,
-        "elapsed_ms": 4.2,
+        "elapsed_ms": 6.8,
         "attempts": [
           {
             "attempt": 1,
@@ -8459,23 +7847,23 @@
               "added_steps": [],
               "tokens": 0,
               "cost_microusd": 0,
-              "latency_ms": 0.0
+              "latency_ms": 0.1
             },
             "cost_microusd": 5301,
             "cost_known": true,
             "cost_is_estimate": false,
-            "elapsed_ms": 4.2,
+            "elapsed_ms": 6.8,
             "latency_source": "swarm_timing",
             "phases_ms": {
               "routing": null,
-              "planning": 1.0,
+              "planning": 0.9,
               "recovery": null,
-              "execution": 1.7,
-              "verification": 0.1,
+              "execution": 2.1,
+              "verification": 0.2,
               "synthesis": 0.0,
-              "supervision": 0.0,
-              "checkpoint": 1.0,
-              "waiting": 0.0
+              "supervision": 0.1,
+              "checkpoint": 1.3,
+              "waiting": 1.3
             },
             "graph": {
               "topology": "fork_join",
@@ -8490,115 +7878,28 @@
         "supervision_calls": 0
       },
       {
-        "trial_key": "trial_v1_191f675e15d36909e4b853c876d96329fc89abd339d3b07489ef106b9af7d229",
+        "trial_key": "trial_v1_07840b00bde2456d07a2f3439167e402341fe0945178ea21b7f0d32ed5a97465",
         "split": "holdout",
-        "role": "reference",
-        "task_index": 6,
+        "role": "challenger",
+        "task_index": 5,
         "gates": {
           "acceptance.policy_unchanged": true,
           "accounting.complete": true
         },
         "family": "trigger-fixtures",
-        "task_id": "bike-share",
-        "task_sha256": "44a3356bfc73b673724e6d8cbccc2d3599d479a9384e8ae6e0b349abbb62fc71",
-        "arm": "none",
-        "repetition": 1,
-        "accepted": false,
-        "attempt_allowance": 1,
-        "failed_attempts": 1,
-        "cost_microusd": 5289,
-        "elapsed_ms": 4.2,
-        "attempts": [
-          {
-            "attempt": 1,
-            "planted": "truncated_step",
-            "outcome": "rejected",
-            "decision": "rejected",
-            "reasons": [
-              "final validator 'smythe.text-spec' rejected the output: section_missing: required section 'Risks' is missing"
-            ],
-            "policy_sha256": "8084ccebb98a4ff92d43ecba84bc49693f13d258f9facc91369e28f029f54857",
-            "validators": [
-              {
-                "name": "smythe.text-spec",
-                "version": "1",
-                "config_sha256": "c90841d686afcbef0388656e9c5ac2f8eccbca23ca7d2634bf56966cce01a549",
-                "outcome": "rejected"
-              }
-            ],
-            "output_sha256": "ed624979e0c97b11c4d1e88da26343a50e557211ebc2bde0676bbbb02e03cf0e",
-            "output_bytes": 111,
-            "adjudication": null,
-            "error": null,
-            "provider_calls": 4,
-            "provider_calls_failed": 0,
-            "planning_calls": 1,
-            "tokens": 1763,
-            "model_cost_microusd": 5289,
-            "supervision": {
-              "calls": 0,
-              "proposals": 0,
-              "reviews": [],
-              "reviews_triggered": [],
-              "revisions_applied": 0,
-              "revisions_refused": 0,
-              "added_steps": [],
-              "tokens": 0,
-              "cost_microusd": 0,
-              "latency_ms": 0.0
-            },
-            "cost_microusd": 5289,
-            "cost_known": true,
-            "cost_is_estimate": false,
-            "elapsed_ms": 4.2,
-            "latency_source": "swarm_timing",
-            "phases_ms": {
-              "routing": null,
-              "planning": 1.0,
-              "recovery": null,
-              "execution": 1.8,
-              "verification": 0.1,
-              "synthesis": 0.0,
-              "supervision": 0.0,
-              "checkpoint": 0.9,
-              "waiting": 0.0
-            },
-            "graph": {
-              "topology": "fork_join",
-              "nodes": 3,
-              "node_statuses": {
-                "completed": 2,
-                "skipped": 1
-              }
-            }
-          }
-        ],
-        "anomaly": "truncated_step",
-        "supervision_calls": 0
-      },
-      {
-        "trial_key": "trial_v1_2b5c529b0f38dc5407f154781a24b9e864c24f9c637a4a83db1f99348104f726",
-        "split": "holdout",
-        "role": "reference",
-        "task_index": 3,
-        "gates": {
-          "acceptance.policy_unchanged": true,
-          "accounting.complete": true
-        },
-        "family": "trigger-fixtures",
-        "task_id": "library-app",
-        "task_sha256": "2a9299e18ad1e372cb5902a12410b4fa2a9bb59a024466f502dd0211aefe72e2",
-        "arm": "none",
+        "task_id": "port-expansion",
+        "task_sha256": "b8557c6b1f282df507efd1efe3434673e33d09cf326163dbf78481231c6ca622",
+        "arm": "triggered",
         "repetition": 1,
         "accepted": true,
         "attempt_allowance": 1,
         "failed_attempts": 0,
-        "cost_microusd": 5886,
-        "elapsed_ms": 6.1,
+        "cost_microusd": 7662,
+        "elapsed_ms": 9.9,
         "attempts": [
           {
             "attempt": 1,
-            "planted": null,
+            "planted": "failed_step",
             "outcome": "accepted",
             "decision": "accepted",
             "reasons": [
@@ -8613,57 +7914,73 @@
                 "outcome": "passed"
               }
             ],
-            "output_sha256": "6d084ae987b54f1af6c53321179ccee073e9c05199fe1d01f4c870d9b7769abb",
-            "output_bytes": 152,
+            "output_sha256": "7d1733a765302ad2c3a96cb4e9674064045b110a109eee54d366ccd7a717224f",
+            "output_bytes": 105,
             "adjudication": null,
             "error": null,
             "provider_calls": 5,
-            "provider_calls_failed": 0,
+            "provider_calls_failed": 1,
             "planning_calls": 1,
-            "tokens": 1962,
-            "model_cost_microusd": 5886,
+            "tokens": 1972,
+            "model_cost_microusd": 5916,
             "supervision": {
-              "calls": 0,
-              "proposals": 0,
-              "reviews": [],
-              "reviews_triggered": [],
-              "revisions_applied": 0,
+              "calls": 1,
+              "proposals": 1,
+              "reviews": [
+                {
+                  "after_node": "deliver",
+                  "with_evidence": true,
+                  "change": true
+                }
+              ],
+              "reviews_triggered": [
+                {
+                  "after_node": "deliver",
+                  "triggers": [
+                    "failed_or_skipped"
+                  ]
+                }
+              ],
+              "revisions_applied": 1,
               "revisions_refused": 0,
-              "added_steps": [],
-              "tokens": 0,
-              "cost_microusd": 0,
-              "latency_ms": 0.0
+              "added_steps": [
+                "revise"
+              ],
+              "tokens": 582,
+              "cost_microusd": 1746,
+              "latency_ms": 0.4
             },
-            "cost_microusd": 5886,
+            "cost_microusd": 7662,
             "cost_known": true,
             "cost_is_estimate": false,
-            "elapsed_ms": 6.1,
+            "elapsed_ms": 9.9,
             "latency_source": "swarm_timing",
             "phases_ms": {
               "routing": null,
-              "planning": 1.2,
+              "planning": 1.0,
               "recovery": null,
-              "execution": 2.2,
-              "verification": 0.9,
+              "execution": 3.1,
+              "verification": 0.2,
               "synthesis": 0.0,
-              "supervision": 0.0,
-              "checkpoint": 1.6,
-              "waiting": 0.0
+              "supervision": 0.4,
+              "checkpoint": 1.8,
+              "waiting": 1.5
             },
             "graph": {
               "topology": "fork_join",
               "nodes": 4,
               "node_statuses": {
-                "completed": 4
+                "completed": 3,
+                "skipped": 1
               }
             }
           }
         ],
-        "anomaly": null,
-        "supervision_calls": 0
+        "anomaly": "failed_step",
+        "supervision_calls": 1
       },
       {
-        "trial_key": "trial_v1_0bd862525f8f4e9fb20b3ab1f4aa5336486809f46bc2940c23955c111e464589",
+        "trial_key": "trial_v1_75d5faa9821f25dc35d7b45dcf27374d96f1c6c15ed561dfaa8ccd0fb669c429",
         "split": "holdout",
         "role": "reference",
         "task_index": 4,
@@ -8680,7 +7997,7 @@
         "attempt_allowance": 1,
         "failed_attempts": 1,
         "cost_microusd": 5196,
-        "elapsed_ms": 3.9,
+        "elapsed_ms": 5.4,
         "attempts": [
           {
             "attempt": 1,
@@ -8723,17 +8040,17 @@
             "cost_microusd": 5196,
             "cost_known": true,
             "cost_is_estimate": false,
-            "elapsed_ms": 3.9,
+            "elapsed_ms": 5.4,
             "latency_source": "swarm_timing",
             "phases_ms": {
               "routing": null,
-              "planning": 0.9,
+              "planning": 1.6,
               "recovery": null,
-              "execution": 1.8,
+              "execution": 2.2,
               "verification": 0.1,
               "synthesis": 0.0,
               "supervision": 0.0,
-              "checkpoint": 0.9,
+              "checkpoint": 1.1,
               "waiting": 0.0
             },
             "graph": {
@@ -8746,6 +8063,696 @@
           }
         ],
         "anomaly": "empty_output",
+        "supervision_calls": 0
+      },
+      {
+        "trial_key": "trial_v1_a02c43c9322ffb3fa0125b4af68f852092c3a16ac5a0eaeceab23b3e4a2df8ab",
+        "split": "holdout",
+        "role": "reference",
+        "task_index": 1,
+        "gates": {
+          "acceptance.policy_unchanged": true,
+          "accounting.complete": true
+        },
+        "family": "trigger-fixtures",
+        "task_id": "clinic-hours",
+        "task_sha256": "62537d629acd2cf0dc33649d28381fb27cefd4a275ef1573f63bfb9a63464948",
+        "arm": "none",
+        "repetition": 1,
+        "accepted": true,
+        "attempt_allowance": 1,
+        "failed_attempts": 0,
+        "cost_microusd": 5271,
+        "elapsed_ms": 4.6,
+        "attempts": [
+          {
+            "attempt": 1,
+            "planted": null,
+            "outcome": "accepted",
+            "decision": "accepted",
+            "reasons": [
+              "every final validator passed"
+            ],
+            "policy_sha256": "8084ccebb98a4ff92d43ecba84bc49693f13d258f9facc91369e28f029f54857",
+            "validators": [
+              {
+                "name": "smythe.text-spec",
+                "version": "1",
+                "config_sha256": "c90841d686afcbef0388656e9c5ac2f8eccbca23ca7d2634bf56966cce01a549",
+                "outcome": "passed"
+              }
+            ],
+            "output_sha256": "7f7c838f16c833fa2208bf3d8ac4a01541e0d32edbb877f9197ae26348b0aecc",
+            "output_bytes": 103,
+            "adjudication": null,
+            "error": null,
+            "provider_calls": 4,
+            "provider_calls_failed": 0,
+            "planning_calls": 1,
+            "tokens": 1757,
+            "model_cost_microusd": 5271,
+            "supervision": {
+              "calls": 0,
+              "proposals": 0,
+              "reviews": [],
+              "reviews_triggered": [],
+              "revisions_applied": 0,
+              "revisions_refused": 0,
+              "added_steps": [],
+              "tokens": 0,
+              "cost_microusd": 0,
+              "latency_ms": 0.0
+            },
+            "cost_microusd": 5271,
+            "cost_known": true,
+            "cost_is_estimate": false,
+            "elapsed_ms": 4.6,
+            "latency_source": "swarm_timing",
+            "phases_ms": {
+              "routing": null,
+              "planning": 0.9,
+              "recovery": null,
+              "execution": 2.1,
+              "verification": 0.2,
+              "synthesis": 0.0,
+              "supervision": 0.0,
+              "checkpoint": 1.2,
+              "waiting": 0.0
+            },
+            "graph": {
+              "topology": "fork_join",
+              "nodes": 3,
+              "node_statuses": {
+                "completed": 3
+              }
+            }
+          }
+        ],
+        "anomaly": null,
+        "supervision_calls": 0
+      },
+      {
+        "trial_key": "trial_v1_971e65b09201cc5f488c86a19049a5ac530c8ec5648b4e9491e12d02ab8e6364",
+        "split": "holdout",
+        "role": "reference",
+        "task_index": 2,
+        "gates": {
+          "acceptance.policy_unchanged": true,
+          "accounting.complete": true
+        },
+        "family": "trigger-fixtures",
+        "task_id": "warehouse-robots",
+        "task_sha256": "359e1fbb78fa62ca8de14fd7ef015b643ffc9c60fdaa2136491a2951d9e1faee",
+        "arm": "none",
+        "repetition": 1,
+        "accepted": true,
+        "attempt_allowance": 1,
+        "failed_attempts": 0,
+        "cost_microusd": 5289,
+        "elapsed_ms": 5.1,
+        "attempts": [
+          {
+            "attempt": 1,
+            "planted": null,
+            "outcome": "accepted",
+            "decision": "accepted",
+            "reasons": [
+              "every final validator passed"
+            ],
+            "policy_sha256": "8084ccebb98a4ff92d43ecba84bc49693f13d258f9facc91369e28f029f54857",
+            "validators": [
+              {
+                "name": "smythe.text-spec",
+                "version": "1",
+                "config_sha256": "c90841d686afcbef0388656e9c5ac2f8eccbca23ca7d2634bf56966cce01a549",
+                "outcome": "passed"
+              }
+            ],
+            "output_sha256": "22638ec6813ab2aac220621a87804ecdec6e4186f20d4e124cf8fe9b96dc15ca",
+            "output_bytes": 112,
+            "adjudication": null,
+            "error": null,
+            "provider_calls": 4,
+            "provider_calls_failed": 0,
+            "planning_calls": 1,
+            "tokens": 1763,
+            "model_cost_microusd": 5289,
+            "supervision": {
+              "calls": 0,
+              "proposals": 0,
+              "reviews": [],
+              "reviews_triggered": [],
+              "revisions_applied": 0,
+              "revisions_refused": 0,
+              "added_steps": [],
+              "tokens": 0,
+              "cost_microusd": 0,
+              "latency_ms": 0.0
+            },
+            "cost_microusd": 5289,
+            "cost_known": true,
+            "cost_is_estimate": false,
+            "elapsed_ms": 5.1,
+            "latency_source": "swarm_timing",
+            "phases_ms": {
+              "routing": null,
+              "planning": 1.2,
+              "recovery": null,
+              "execution": 2.1,
+              "verification": 0.2,
+              "synthesis": 0.0,
+              "supervision": 0.0,
+              "checkpoint": 1.3,
+              "waiting": 0.0
+            },
+            "graph": {
+              "topology": "fork_join",
+              "nodes": 3,
+              "node_statuses": {
+                "completed": 3
+              }
+            }
+          }
+        ],
+        "anomaly": null,
+        "supervision_calls": 0
+      },
+      {
+        "trial_key": "trial_v1_ee457fa60048dde6aa84bcd1c17cf9c93aac26d26efc48d088ebb763dbe0b1c0",
+        "split": "holdout",
+        "role": "reference",
+        "task_index": 8,
+        "gates": {
+          "acceptance.policy_unchanged": true,
+          "accounting.complete": true
+        },
+        "family": "trigger-fixtures",
+        "task_id": "payroll-migration",
+        "task_sha256": "540039f5a01b0ed8b2af1dc350b745a6009dfbf1a29c6671902da740802795fb",
+        "arm": "none",
+        "repetition": 1,
+        "accepted": false,
+        "attempt_allowance": 1,
+        "failed_attempts": 1,
+        "cost_microusd": 6900,
+        "elapsed_ms": 10.8,
+        "attempts": [
+          {
+            "attempt": 1,
+            "planted": "rejecting_gate",
+            "outcome": "rejected",
+            "decision": "rejected",
+            "reasons": [
+              "gate 'check' has a failing final verdict on 'deliver': FAIL - the Risks section names no mitigation"
+            ],
+            "policy_sha256": "8084ccebb98a4ff92d43ecba84bc49693f13d258f9facc91369e28f029f54857",
+            "validators": [
+              {
+                "name": "smythe.text-spec",
+                "version": "1",
+                "config_sha256": "c90841d686afcbef0388656e9c5ac2f8eccbca23ca7d2634bf56966cce01a549",
+                "outcome": "passed"
+              }
+            ],
+            "output_sha256": "65700057c4b1b7cbaa50851a86a9e8b77ad444a54ae4184b57fc4080728d505a",
+            "output_bytes": 103,
+            "adjudication": null,
+            "error": null,
+            "provider_calls": 7,
+            "provider_calls_failed": 0,
+            "planning_calls": 1,
+            "tokens": 2300,
+            "model_cost_microusd": 6900,
+            "supervision": {
+              "calls": 0,
+              "proposals": 0,
+              "reviews": [],
+              "reviews_triggered": [],
+              "revisions_applied": 0,
+              "revisions_refused": 0,
+              "added_steps": [],
+              "tokens": 0,
+              "cost_microusd": 0,
+              "latency_ms": 0.0
+            },
+            "cost_microusd": 6900,
+            "cost_known": true,
+            "cost_is_estimate": false,
+            "elapsed_ms": 10.8,
+            "latency_source": "swarm_timing",
+            "phases_ms": {
+              "routing": null,
+              "planning": 1.1,
+              "recovery": null,
+              "execution": 2.8,
+              "verification": 3.3,
+              "synthesis": 0.0,
+              "supervision": 0.0,
+              "checkpoint": 4.6,
+              "waiting": 0.0
+            },
+            "graph": {
+              "topology": "fork_join",
+              "nodes": 4,
+              "node_statuses": {
+                "completed": 4
+              }
+            }
+          }
+        ],
+        "anomaly": "rejecting_gate",
+        "supervision_calls": 0
+      },
+      {
+        "trial_key": "trial_v1_7f02d9ced0a6d8afb7af5fe5c0d1aa0e23f76e2bffc48d3a42aba95d44e24176",
+        "split": "holdout",
+        "role": "reference",
+        "task_index": 6,
+        "gates": {
+          "acceptance.policy_unchanged": true,
+          "accounting.complete": true
+        },
+        "family": "trigger-fixtures",
+        "task_id": "bike-share",
+        "task_sha256": "44a3356bfc73b673724e6d8cbccc2d3599d479a9384e8ae6e0b349abbb62fc71",
+        "arm": "none",
+        "repetition": 1,
+        "accepted": false,
+        "attempt_allowance": 1,
+        "failed_attempts": 1,
+        "cost_microusd": 5289,
+        "elapsed_ms": 3.7,
+        "attempts": [
+          {
+            "attempt": 1,
+            "planted": "truncated_step",
+            "outcome": "rejected",
+            "decision": "rejected",
+            "reasons": [
+              "final validator 'smythe.text-spec' rejected the output: section_missing: required section 'Risks' is missing"
+            ],
+            "policy_sha256": "8084ccebb98a4ff92d43ecba84bc49693f13d258f9facc91369e28f029f54857",
+            "validators": [
+              {
+                "name": "smythe.text-spec",
+                "version": "1",
+                "config_sha256": "c90841d686afcbef0388656e9c5ac2f8eccbca23ca7d2634bf56966cce01a549",
+                "outcome": "rejected"
+              }
+            ],
+            "output_sha256": "ed624979e0c97b11c4d1e88da26343a50e557211ebc2bde0676bbbb02e03cf0e",
+            "output_bytes": 111,
+            "adjudication": null,
+            "error": null,
+            "provider_calls": 4,
+            "provider_calls_failed": 0,
+            "planning_calls": 1,
+            "tokens": 1763,
+            "model_cost_microusd": 5289,
+            "supervision": {
+              "calls": 0,
+              "proposals": 0,
+              "reviews": [],
+              "reviews_triggered": [],
+              "revisions_applied": 0,
+              "revisions_refused": 0,
+              "added_steps": [],
+              "tokens": 0,
+              "cost_microusd": 0,
+              "latency_ms": 0.0
+            },
+            "cost_microusd": 5289,
+            "cost_known": true,
+            "cost_is_estimate": false,
+            "elapsed_ms": 3.7,
+            "latency_source": "swarm_timing",
+            "phases_ms": {
+              "routing": null,
+              "planning": 0.8,
+              "recovery": null,
+              "execution": 1.8,
+              "verification": 0.1,
+              "synthesis": 0.0,
+              "supervision": 0.0,
+              "checkpoint": 0.8,
+              "waiting": 0.0
+            },
+            "graph": {
+              "topology": "fork_join",
+              "nodes": 3,
+              "node_statuses": {
+                "completed": 2,
+                "skipped": 1
+              }
+            }
+          }
+        ],
+        "anomaly": "truncated_step",
+        "supervision_calls": 0
+      },
+      {
+        "trial_key": "trial_v1_aa885fe1a3356114b783a9abe2b2eb5eb8f43f40561d98c760262d51b23c0037",
+        "split": "holdout",
+        "role": "reference",
+        "task_index": 3,
+        "gates": {
+          "acceptance.policy_unchanged": true,
+          "accounting.complete": true
+        },
+        "family": "trigger-fixtures",
+        "task_id": "library-app",
+        "task_sha256": "2a9299e18ad1e372cb5902a12410b4fa2a9bb59a024466f502dd0211aefe72e2",
+        "arm": "none",
+        "repetition": 1,
+        "accepted": true,
+        "attempt_allowance": 1,
+        "failed_attempts": 0,
+        "cost_microusd": 5886,
+        "elapsed_ms": 4.9,
+        "attempts": [
+          {
+            "attempt": 1,
+            "planted": null,
+            "outcome": "accepted",
+            "decision": "accepted",
+            "reasons": [
+              "every final validator passed"
+            ],
+            "policy_sha256": "8084ccebb98a4ff92d43ecba84bc49693f13d258f9facc91369e28f029f54857",
+            "validators": [
+              {
+                "name": "smythe.text-spec",
+                "version": "1",
+                "config_sha256": "c90841d686afcbef0388656e9c5ac2f8eccbca23ca7d2634bf56966cce01a549",
+                "outcome": "passed"
+              }
+            ],
+            "output_sha256": "6d084ae987b54f1af6c53321179ccee073e9c05199fe1d01f4c870d9b7769abb",
+            "output_bytes": 152,
+            "adjudication": null,
+            "error": null,
+            "provider_calls": 5,
+            "provider_calls_failed": 0,
+            "planning_calls": 1,
+            "tokens": 1962,
+            "model_cost_microusd": 5886,
+            "supervision": {
+              "calls": 0,
+              "proposals": 0,
+              "reviews": [],
+              "reviews_triggered": [],
+              "revisions_applied": 0,
+              "revisions_refused": 0,
+              "added_steps": [],
+              "tokens": 0,
+              "cost_microusd": 0,
+              "latency_ms": 0.0
+            },
+            "cost_microusd": 5886,
+            "cost_known": true,
+            "cost_is_estimate": false,
+            "elapsed_ms": 4.9,
+            "latency_source": "swarm_timing",
+            "phases_ms": {
+              "routing": null,
+              "planning": 0.9,
+              "recovery": null,
+              "execution": 1.7,
+              "verification": 0.8,
+              "synthesis": 0.0,
+              "supervision": 0.0,
+              "checkpoint": 1.4,
+              "waiting": 0.0
+            },
+            "graph": {
+              "topology": "fork_join",
+              "nodes": 4,
+              "node_statuses": {
+                "completed": 4
+              }
+            }
+          }
+        ],
+        "anomaly": null,
+        "supervision_calls": 0
+      },
+      {
+        "trial_key": "trial_v1_3138768cd369f8ea9efe5d86eeec25b3ee5e94cbbc37ac9f177fa4b72e769000",
+        "split": "holdout",
+        "role": "reference",
+        "task_index": 7,
+        "gates": {
+          "acceptance.policy_unchanged": true,
+          "accounting.complete": true
+        },
+        "family": "trigger-fixtures",
+        "task_id": "coffee-sourcing",
+        "task_sha256": "798917a2f264880388e092b1dd0409386c1ffde760b8fe7fdbeb6119490e5156",
+        "arm": "none",
+        "repetition": 1,
+        "accepted": true,
+        "attempt_allowance": 1,
+        "failed_attempts": 0,
+        "cost_microusd": 6081,
+        "elapsed_ms": 5.1,
+        "attempts": [
+          {
+            "attempt": 1,
+            "planted": "contradicting_evidence",
+            "outcome": "accepted",
+            "decision": "accepted",
+            "reasons": [
+              "every final validator passed"
+            ],
+            "policy_sha256": "8084ccebb98a4ff92d43ecba84bc49693f13d258f9facc91369e28f029f54857",
+            "validators": [
+              {
+                "name": "smythe.text-spec",
+                "version": "1",
+                "config_sha256": "c90841d686afcbef0388656e9c5ac2f8eccbca23ca7d2634bf56966cce01a549",
+                "outcome": "passed"
+              }
+            ],
+            "output_sha256": "e3c7541887b823e68b9e60a0d6a5bd1e03798aca8dd4b910e9d1d9ffe69909ac",
+            "output_bytes": 109,
+            "adjudication": null,
+            "error": null,
+            "provider_calls": 4,
+            "provider_calls_failed": 0,
+            "planning_calls": 1,
+            "tokens": 2027,
+            "model_cost_microusd": 6081,
+            "supervision": {
+              "calls": 0,
+              "proposals": 0,
+              "reviews": [],
+              "reviews_triggered": [],
+              "revisions_applied": 0,
+              "revisions_refused": 0,
+              "added_steps": [],
+              "tokens": 0,
+              "cost_microusd": 0,
+              "latency_ms": 0.0
+            },
+            "cost_microusd": 6081,
+            "cost_known": true,
+            "cost_is_estimate": false,
+            "elapsed_ms": 5.1,
+            "latency_source": "swarm_timing",
+            "phases_ms": {
+              "routing": null,
+              "planning": 1.0,
+              "recovery": null,
+              "execution": 2.2,
+              "verification": 0.2,
+              "synthesis": 0.0,
+              "supervision": 0.0,
+              "checkpoint": 1.3,
+              "waiting": 0.0
+            },
+            "graph": {
+              "topology": "fork_join",
+              "nodes": 3,
+              "node_statuses": {
+                "completed": 3
+              }
+            }
+          }
+        ],
+        "anomaly": "contradicting_evidence",
+        "supervision_calls": 0
+      },
+      {
+        "trial_key": "trial_v1_d29d2b49be5742d3f70a1270fa4528f307407440f573268fb2f2451621c251d5",
+        "split": "holdout",
+        "role": "reference",
+        "task_index": 0,
+        "gates": {
+          "acceptance.policy_unchanged": true,
+          "accounting.complete": true
+        },
+        "family": "trigger-fixtures",
+        "task_id": "rail-pass",
+        "task_sha256": "71cb590a913dab2be3d275a1acad466b010409de0e900a0ca58729fb8662b7b5",
+        "arm": "none",
+        "repetition": 1,
+        "accepted": true,
+        "attempt_allowance": 1,
+        "failed_attempts": 0,
+        "cost_microusd": 5301,
+        "elapsed_ms": 5.1,
+        "attempts": [
+          {
+            "attempt": 1,
+            "planted": null,
+            "outcome": "accepted",
+            "decision": "accepted",
+            "reasons": [
+              "every final validator passed"
+            ],
+            "policy_sha256": "8084ccebb98a4ff92d43ecba84bc49693f13d258f9facc91369e28f029f54857",
+            "validators": [
+              {
+                "name": "smythe.text-spec",
+                "version": "1",
+                "config_sha256": "c90841d686afcbef0388656e9c5ac2f8eccbca23ca7d2634bf56966cce01a549",
+                "outcome": "passed"
+              }
+            ],
+            "output_sha256": "a76a9740e01d65855ceb301e0eb2d427f97b69a4e079d41c29e58714075eb7f1",
+            "output_bytes": 121,
+            "adjudication": null,
+            "error": null,
+            "provider_calls": 4,
+            "provider_calls_failed": 0,
+            "planning_calls": 1,
+            "tokens": 1767,
+            "model_cost_microusd": 5301,
+            "supervision": {
+              "calls": 0,
+              "proposals": 0,
+              "reviews": [],
+              "reviews_triggered": [],
+              "revisions_applied": 0,
+              "revisions_refused": 0,
+              "added_steps": [],
+              "tokens": 0,
+              "cost_microusd": 0,
+              "latency_ms": 0.0
+            },
+            "cost_microusd": 5301,
+            "cost_known": true,
+            "cost_is_estimate": false,
+            "elapsed_ms": 5.1,
+            "latency_source": "swarm_timing",
+            "phases_ms": {
+              "routing": null,
+              "planning": 1.1,
+              "recovery": null,
+              "execution": 2.2,
+              "verification": 0.2,
+              "synthesis": 0.0,
+              "supervision": 0.0,
+              "checkpoint": 1.3,
+              "waiting": 0.0
+            },
+            "graph": {
+              "topology": "fork_join",
+              "nodes": 3,
+              "node_statuses": {
+                "completed": 3
+              }
+            }
+          }
+        ],
+        "anomaly": null,
+        "supervision_calls": 0
+      },
+      {
+        "trial_key": "trial_v1_b9fdec2b9c3eff7642f3cdafe2d2dea1b9a017a790aa17bad4b93db51ea7a21e",
+        "split": "holdout",
+        "role": "reference",
+        "task_index": 5,
+        "gates": {
+          "acceptance.policy_unchanged": true,
+          "accounting.complete": true
+        },
+        "family": "trigger-fixtures",
+        "task_id": "port-expansion",
+        "task_sha256": "b8557c6b1f282df507efd1efe3434673e33d09cf326163dbf78481231c6ca622",
+        "arm": "none",
+        "repetition": 1,
+        "accepted": false,
+        "attempt_allowance": 1,
+        "failed_attempts": 1,
+        "cost_microusd": 5085,
+        "elapsed_ms": 6.8,
+        "attempts": [
+          {
+            "attempt": 1,
+            "planted": "failed_step",
+            "outcome": "rejected",
+            "decision": "rejected",
+            "reasons": [
+              "final validator 'smythe.text-spec' rejected the output: section_missing: required section 'Risks' is missing"
+            ],
+            "policy_sha256": "8084ccebb98a4ff92d43ecba84bc49693f13d258f9facc91369e28f029f54857",
+            "validators": [
+              {
+                "name": "smythe.text-spec",
+                "version": "1",
+                "config_sha256": "c90841d686afcbef0388656e9c5ac2f8eccbca23ca7d2634bf56966cce01a549",
+                "outcome": "rejected"
+              }
+            ],
+            "output_sha256": "81dfab3e826abf7245581532da012609f72807c99ed5be11a4785e0f0533d040",
+            "output_bytes": 106,
+            "adjudication": null,
+            "error": null,
+            "provider_calls": 4,
+            "provider_calls_failed": 1,
+            "planning_calls": 1,
+            "tokens": 1695,
+            "model_cost_microusd": 5085,
+            "supervision": {
+              "calls": 0,
+              "proposals": 0,
+              "reviews": [],
+              "reviews_triggered": [],
+              "revisions_applied": 0,
+              "revisions_refused": 0,
+              "added_steps": [],
+              "tokens": 0,
+              "cost_microusd": 0,
+              "latency_ms": 0.0
+            },
+            "cost_microusd": 5085,
+            "cost_known": true,
+            "cost_is_estimate": false,
+            "elapsed_ms": 6.8,
+            "latency_source": "swarm_timing",
+            "phases_ms": {
+              "routing": null,
+              "planning": 1.9,
+              "recovery": null,
+              "execution": 2.9,
+              "verification": 0.2,
+              "synthesis": 0.0,
+              "supervision": 0.0,
+              "checkpoint": 1.3,
+              "waiting": 0.0
+            },
+            "graph": {
+              "topology": "fork_join",
+              "nodes": 3,
+              "node_statuses": {
+                "completed": 2,
+                "skipped": 1
+              }
+            }
+          }
+        ],
+        "anomaly": "failed_step",
         "supervision_calls": 0
       }
     ]
@@ -8764,8 +8771,8 @@
       "module": "smythe/__init__.py"
     },
     "source_control": {
-      "revision": "5bd09628a81186eb9e5494bf7c4cd1b9268f2273",
-      "dirty": true,
+      "revision": "d634d937b6afecebd005a34322c26c70cf8a99f5",
+      "dirty": false,
       "untracked_files": 0
     }
   }

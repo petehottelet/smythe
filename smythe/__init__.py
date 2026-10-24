@@ -1,6 +1,7 @@
 """Smythe: task-based personalized agent swarms with dynamic execution topology."""
 
 from smythe._failures import RunControl, SecurityStop
+from smythe._run_inspection import review_run
 from smythe.acceptance import (
     AcceptanceDecision,
     AcceptancePolicy,
@@ -8,6 +9,7 @@ from smythe.acceptance import (
     ValidationSubject,
     Validator,
 )
+from smythe.agent_skills import AgentSkill, AgentSkillError, AgentSkillsProvider, parse_skill_md
 from smythe.budget import (
     BudgetEstimateRequired,
     BudgetReconciliationError,
@@ -21,9 +23,10 @@ from smythe.context import ContextSnapshot, ContextSource
 from smythe.design import DesignSystem, Finding, design_verifier, inspect_asset
 from smythe.distill import DistillationError, distill_template
 from smythe.evidence import ClaimPassage, ClaimRecord, SourceEvidence, SourceRecord
-from smythe.graph import FailurePolicy, Revision, RevisionError
+from smythe.graph import FailurePolicy, Revision, RevisionError, structure_sha256
 from smythe.lineage import ArtifactLineage, LineagePolicy
 from smythe.loader import load_graph
+from smythe.local_tools import CompositeToolRuntime, LocalTool, LocalToolRuntime, python_skill
 from smythe.mcp import MCPConfigError, MCPServerSpec, MCPSkillProvider, MCPToolRuntime
 from smythe.memory import PlannerMemory
 from smythe.planner import (
@@ -78,6 +81,10 @@ from smythe.supervisor import (
 from smythe.swarm import Swarm, SwarmResult
 from smythe.synthesizer import Synthesizer, SynthesisStrategy
 from smythe.task import Task
+from smythe.templates import (
+    TemplateCatalog, TemplateLimits, TemplateRecord, TemplateRecordError, TemplateValidationError,
+    distill_record, validate_template_record,
+)
 from smythe.verifier import (
     CallableVerifier,
     TokenVerifier,
@@ -106,6 +113,9 @@ from smythe.validators import JSONValidator, SourceEvidenceValidator, TextValida
 __all__ = [
     "AcceptanceDecision",
     "AcceptancePolicy",
+    "AgentSkill",
+    "AgentSkillError",
+    "AgentSkillsProvider",
     "AnthropicProvider",
     "AnthropicMessagesProvider",
     "ArchitectError",
@@ -124,6 +134,7 @@ __all__ = [
     "ClaimPassage",
     "ClaimRecord",
     "CompletionResult",
+    "CompositeToolRuntime",
     "ConstrainedArchitect",
     "ContextSnapshot",
     "ContextSource",
@@ -143,6 +154,8 @@ __all__ = [
     "LineagePolicy",
     "LLMArchitect",
     "LLMSupervisor",
+    "LocalTool",
+    "LocalToolRuntime",
     "MCPConfigError",
     "MCPServerSpec",
     "MCPSkillProvider",
@@ -204,6 +217,11 @@ __all__ = [
     "Synthesizer",
     "SynthesisStrategy",
     "Task",
+    "TemplateCatalog",
+    "TemplateLimits",
+    "TemplateRecord",
+    "TemplateRecordError",
+    "TemplateValidationError",
     "TerminationPolicy",
     "ToolCall",
     "ToolLoopLimitError",
@@ -226,9 +244,15 @@ __all__ = [
     "WhiteRabbit",
     "archive_heads",
     "design_verifier",
+    "distill_record",
     "distill_template",
     "inspect_asset",
     "lint_contributions",
     "load_graph",
+    "parse_skill_md",
+    "python_skill",
+    "review_run",
+    "structure_sha256",
+    "validate_template_record",
 ]
 __version__ = "0.9.1"

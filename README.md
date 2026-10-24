@@ -197,9 +197,11 @@ memo. Its saved graph, trace, and expected output make the workflow inspectable.
 | You need to… | Smythe provides |
 |---|---|
 | Adapt the workflow to the task | Generated graphs, approved templates, deterministic planning, [routing rules](docs/architecture.md#routing-rules) that send stable tasks to a single worker, and [evidence-triggered supervision](docs/supervisor.md#evidence-triggered-review) that revises pending work only when a stage or an anomaly calls for it |
+| Give agents skills and tools | [MCP servers](docs/mcp.md), [Agent Skills](docs/skills.md) directories that route work by capability tag and grant nothing, and [Python-backed skills](docs/skills.md#python-backed-skills): tools in your own code, offered only to the agents you name |
 | Control spending and parallel work | Request reservations and bounded concurrency |
 | Recover interrupted work | Checkpoints, native response replay, [recorded read steps](docs/workflow-accounting.md#recorded-read-steps), and durable job journals |
 | Check the deliverable | Output verification, opt-in strict acceptance of the exact output returned, [source-evidence checks](docs/source-evidence.md) that quotes and listed contradictions hold, and artifact receipts |
+| Keep accepted documents current | Opt-in [artifact lineage](docs/lineage.md) for durable runs: a read-only repair plan shows what a changed source, a changed validator or a damaged file affects, and applying it keeps the results that still stand |
 | Understand a run | Graph exports, traces, costs, inspection reports, and [read-only run inspection](docs/runs.md) that reports execution, acceptance and cost separately, with a research run's sources, reads, evidence and open questions |
 
 [Architecture](docs/architecture.md) · [Execution](docs/execution.md) ·
@@ -325,7 +327,12 @@ accepts today, with the test behind each cell. The
 [source-to-artifact example](examples/16_source_to_artifact.py) runs a
 durable research workflow offline and without keys, from bundled sources
 through an interruption and resume to an accepted document whose evidence
-`smythe runs inspect` reports.
+`smythe runs inspect` reports. In preview,
+[external actions](docs/actions.md) deliver a strict durable run's accepted
+output to another service under an approval your host verifies; the
+offline [governed-publication example](examples/19_governed_publication.py)
+loses a write's answer and reconciles it from the service's records without
+writing again.
 
 The [Noumenon screensaver](https://github.com/petehottelet/noumenon) renders
 Smythe's glyph catalog, with a web explorer and native Windows, macOS and Linux

@@ -270,6 +270,23 @@ def build_graph_from_model_output(
         ValueError: The plan breaks the schema or a limit.  The message
             is written to be fed back to the model on a retry.
     """
+    return _build_model_graph(data, max_nodes=max_nodes, max_depth=max_depth)
+
+
+def _build_model_graph(
+    data: object,
+    *,
+    max_nodes: int = MODEL_PLAN_MAX_NODES,
+    max_depth: int = MODEL_PLAN_MAX_DEPTH,
+    max_retries: int = MODEL_PLAN_MAX_RETRIES,
+    max_regenerations: int = MODEL_PLAN_MAX_REGENERATIONS,
+    max_gates: int = MODEL_PLAN_MAX_GATES,
+    min_timeout_s: float = MODEL_PLAN_MIN_TIMEOUT_S,
+) -> tuple[ExecutionGraph, Registry]:
+    """:func:`build_graph_from_model_output` with every limit given.
+
+    Template records are checked here under a developer's limits.
+    """
     if not isinstance(data, dict):
         raise ValueError("The plan must be a JSON object")
     _reject_unknown_keys(data, _MODEL_PLAN_KEYS, "The plan")
@@ -287,14 +304,15 @@ def build_graph_from_model_output(
     if len(nodes) > max_nodes:
         raise ValueError(f"The plan has {len(nodes)} nodes; the limit is {max_nodes}")
     for index, entry in enumerate(nodes):
-        _check_model_node(index, entry)
+        _check_model_node(index, entry, max_retries=max_retries,
+                          max_regenerations=max_regenerations, min_timeout_s=min_timeout_s)
 
     graph, registry = build_graph_from_dict(data)
     gates = [node for node in graph.nodes if node.verifies is not None]
-    if len(gates) > MODEL_PLAN_MAX_GATES:
+    if len(gates) > max_gates:
         raise ValueError(
             f"The plan has {len(gates)} gating nodes {[node.id for node in gates]}; "
-            f"the limit is {MODEL_PLAN_MAX_GATES}, on the node that produces the deliverable"
+            f"the limit is {max_gates}, on the node that produces the deliverable"
         )
     for gate in gates:
         if gate.verifies not in gate.depends_on:
@@ -330,7 +348,14 @@ def _check_bounded_int(value: object, name: str, node_id: str, ceiling: int) -> 
         )
 
 
-def _check_model_node(index: int, entry: object) -> None:
+def _check_model_node(
+    index: int,
+    entry: object,
+    *,
+    max_retries: int = MODEL_PLAN_MAX_RETRIES,
+    max_regenerations: int = MODEL_PLAN_MAX_REGENERATIONS,
+    min_timeout_s: float = MODEL_PLAN_MIN_TIMEOUT_S,
+) -> None:
     """Validate one generated node entry; raise ValueError when it is invalid."""
     if not isinstance(entry, dict):
         raise ValueError(
@@ -354,11 +379,10 @@ def _check_model_node(index: int, entry: object) -> None:
         if name in entry and not isinstance(entry[name], str):
             raise ValueError(f"'{name}' on node {node_id!r} must be a string")
     if "max_retries" in entry:
-        _check_bounded_int(entry["max_retries"], "max_retries", node_id, MODEL_PLAN_MAX_RETRIES)
+        _check_bounded_int(entry["max_retries"], "max_retries", node_id, max_retries)
     if "max_regenerations" in entry:
         _check_bounded_int(
-            entry["max_regenerations"], "max_regenerations", node_id,
-            MODEL_PLAN_MAX_REGENERATIONS,
+            entry["max_regenerations"], "max_regenerations", node_id, max_regenerations,
         )
     if "timeout_s" in entry:
         timeout_s = entry["timeout_s"]
@@ -367,10 +391,10 @@ def _check_model_node(index: int, entry: object) -> None:
                       and math.isfinite(timeout_s))
         except OverflowError:  # an integer too large to become a float
             finite = False
-        if not finite or timeout_s < MODEL_PLAN_MIN_TIMEOUT_S:
+        if not finite or timeout_s < min_timeout_s:
             raise ValueError(
                 f"'timeout_s' on node {node_id!r} must be a finite number of at least "
-                f"{MODEL_PLAN_MIN_TIMEOUT_S} seconds, got {timeout_s!r}"
+                f"{min_timeout_s} seconds, got {timeout_s!r}"
             )
 
     metadata = entry.get("metadata")

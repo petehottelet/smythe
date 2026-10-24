@@ -409,6 +409,7 @@ Tests:
   `tests/test_support_matrix.py::test_durable_run_rejects_component_before_any_call[token-verifier-subclass]`,
   `tests/test_support_matrix.py::test_durable_run_rejects_component_before_any_call[memory]`,
   `tests/test_support_matrix.py::test_durable_run_rejects_component_before_any_call[tool-runtime]`,
+  `tests/test_support_matrix.py::test_durable_run_rejects_component_before_any_call[local-tool-runtime]`,
   `tests/test_support_matrix.py::test_durable_run_rejects_component_before_any_call[checkpoint-store]`,
   `tests/test_workflow_acceptance.py::test_durable_runs_refuse_unregistered_verifier_code_before_any_call`,
   `tests/test_workflow_retry_policy.py::test_a_provider_whose_sdk_may_retry_is_refused_before_any_call`,
@@ -490,6 +491,48 @@ Tests:
   and `tests/test_lineage_records.py::test_a_completed_lineage_run_is_re_evaluated_only_under_its_policy`.
 - No budget and ignored options: `tests/test_support_matrix.py::test_durable_run_ignores_artifact_dir_and_tool_iterations_and_allows_no_budget`.
 
+## Skill sources
+
+A skill provider lends agents capability tags that route nodes to them; see
+[Skills](skills.md). No source grants a tool, changes an acceptance policy or
+raises a budget ceiling, and no source's instructions enter a prompt. Jobs
+operations have no agents, so no skill source applies to them. A
+[Python-backed skill](skills.md#python-backed-skills) is a tool you register
+for the agent ids you list, on ordinary runs only.
+
+| Skill source | Ordinary runs | Durable text workflows |
+|---|---|---|
+| `AgentSkillsProvider` | `MERGE`, `REPLACE` or `STATIC_ONLY` hydration from `SKILL.md` files read when the provider is built; invalid files, duplicate names and links out of a root are refused then | Through `Registry.static_snapshot()`; live hydration is rejected |
+| `MCPSkillProvider` | Hydration from allowlisted or prefetched MCP tool names | Rejected: agents with MCP servers are refused |
+| `OpenClawSkillProvider` and custom providers | Hydration; a provider that raises leaves static capabilities with a warning | Through `Registry.static_snapshot()`; live hydration is rejected |
+| Python-backed skills (`python_skill`, `LocalToolRuntime`) | Tools offered only to the agent ids listed, never by name or tag | Rejected with every `tool_runtime` |
+
+Tests:
+
+- `AgentSkillsProvider`: hydration `tests/test_agent_skills.py::test_merge_replace_and_static_only_hydration`
+  and `tests/test_agent_skills.py::test_discovery_lists_skill_refs_without_paths_or_instructions`;
+  refused `tests/test_agent_skills.py::test_invalid_skill_files_are_refused_with_a_clear_message`,
+  `tests/test_agent_skills.py::test_yaml_aliases_are_refused_before_they_expand`,
+  `tests/test_agent_skills.py::test_one_skill_name_in_two_roots_is_refused`
+  and `tests/test_agent_skills.py::test_a_skill_directory_that_resolves_outside_its_root_is_refused`;
+  authority `tests/test_agent_skills.py::test_a_skill_cannot_grant_tools_weaken_acceptance_or_raise_the_budget`
+  and `tests/test_agent_skills.py::test_instructions_never_reach_a_provider_prompt`.
+- `MCPSkillProvider`: `tests/test_mcp.py::test_skill_provider_static_allowlist_drives_assignment`
+  and `tests/test_mcp.py::test_skill_provider_prefetch_discovers_unlisted_servers`;
+  durable runs `tests/test_workflow_binding.py::test_registry_rejects_mcp_tools_before_binding`.
+- `OpenClawSkillProvider`: `tests/test_openclaw_adapter.py::test_openclaw_adapter_translates_skills`.
+- Custom providers: `tests/test_skills_registry.py::test_registry_hydrates_capabilities_merge_mode`
+  and `tests/test_skills_registry.py::test_skill_provider_failure_falls_back_to_static`.
+- Python-backed skills: `tests/test_local_tools.py::test_a_run_offers_tools_only_to_nodes_of_the_listed_agents`,
+  `tests/test_local_tools.py::test_a_generated_plan_agent_named_like_a_tool_bearing_agent_gets_no_tools[Developer]`,
+  `tests/test_local_tools.py::test_a_hydrated_tag_routes_a_node_to_a_tool_bearing_agent_but_never_adds_a_tool`
+  and `tests/test_local_tools.py::test_declared_allowed_tools_never_add_a_tool`; durable runs
+  `tests/test_support_matrix.py::test_durable_run_rejects_component_before_any_call[local-tool-runtime]`.
+- Durable runs: `tests/test_agent_skills.py::test_durable_runs_take_a_static_snapshot_and_refuse_live_hydration`,
+  `tests/test_workflow_binding.py::test_registry_never_invokes_external_hydration_during_preflight`,
+  `tests/test_agent_skills.py::test_static_snapshot_pins_effective_capabilities_in_a_detached_static_registry`
+  and `tests/test_agent_skills.py::test_static_snapshot_keeps_static_capabilities_when_the_provider_fails`.
+
 ## Jobs
 
 `jobs validate`, `jobs plan` and `jobs run` check every operation against its
@@ -529,6 +572,138 @@ Tests:
   `tests/test_jobs_runner.py::test_runs_refuse_validators_the_runner_has_not_registered`,
   `tests/test_jobs_runner.py::test_registered_validator_checks_the_published_bytes_and_is_recorded`,
   `tests/test_jobs_runner.py::test_validator_errors_are_indeterminate_and_never_unknown_outcomes`.
+
+## Lineage and repair
+
+[Artifact lineage](lineage.md) records how a durable run's accepted artifact
+was made, so an archive of such runs can be kept current when a source, tool
+or validator changes. Jobs repair an accepted output only within its own run.
+
+| Path | Lineage records | Repair |
+|---|---|---|
+| Durable text workflows | Supported with a `LineagePolicy` under a strict acceptance policy: each completed run records its published document, its decision, each node's inputs and each gate's verifier as ids, versions and digests | A read-only [repair plan](lineage.md#plan-a-repair) before anything runs; a recheck or a republication in place; successor runs that keep unaffected results, started under an explicit allowance; `reuse=False` to compute affected work again in full; and [source restriction](lineage.md#restrict-a-source) with an optional purge. A changed gate validator regenerates its gates and is never rechecked from their recorded verdicts, and a changed renderer regenerates the document in a successor. Results are reused only within one store and access scope, and a configured `supervisor` is refused |
+| Ordinary runs | Unsupported: `lineage` without a `run_store` raises `WorkflowBindingError` before any routing, planning or node call | Unsupported: `plan_repair()` and `repair()` raise `ValueError` without a `run_store` |
+| Jobs | Unsupported: Jobs write no lineage record. Each attempt's artifacts are recorded by SHA-256, and each operation's [input digest](jobs.md#operation-identity-and-input-digest) is computed from its stored plan | Within a run: an [integrity repair](jobs.md#repair-corrupted-accepted-outputs) regenerates a missing or changed accepted file, a [recheck](jobs.md#recheck-accepted-outputs) decides accepted files again under changed validators, and a read-only [preview](jobs.md#preview-repairs) shows what each operation calls for. Nothing is repaired automatically, and no run reuses another run's output, even for the same input digest |
+
+Tests:
+
+- Durable text workflows: recorded
+  `tests/test_workflow_lineage.py::test_lineage_lists_what_each_node_read_and_binds_the_document_and_decision`
+  and `tests/test_workflow_lineage.py::test_nodes_without_a_snapshot_are_undeclared_and_the_run_partial`;
+  decisions `tests/test_reuse_decisions.py::test_one_changed_source_regenerates_its_branch_and_reuses_the_sibling`,
+  `tests/test_reuse_decisions.py::test_same_bytes_under_a_new_version_regenerate_with_the_version_reason`
+  and `tests/test_reuse_decisions.py::test_another_scope_is_invisible_even_when_every_digest_matches`;
+  plans `tests/test_repair_plan.py::test_a_plan_over_three_runs_equals_the_evaluator_decisions`
+  and `tests/test_repair_plan.py::test_planning_a_read_only_store_changes_nothing_and_calls_nothing`;
+  in place `tests/test_workflow_repair.py::test_a_damaged_document_is_rendered_again_and_decided_again_without_new_research`
+  and `tests/test_workflow_repair.py::test_a_changed_validator_gets_a_new_decision_and_no_node_runs`;
+  gate validators `tests/test_reuse_decisions.py::test_a_changed_gate_validator_is_never_reused`,
+  `tests/test_workflow_repair.py::test_a_changed_gate_validator_is_not_rechecked_from_old_verdicts`
+  and `tests/test_workflow_repair.py::test_a_gated_document_is_not_published_again_under_another_gate_verifier`;
+  renderers `tests/test_workflow_repair.py::test_a_changed_renderer_regenerates_the_document_in_a_successor`
+  and `tests/test_workflow_repair.py::test_a_renderer_added_since_a_run_publishes_its_document_in_a_successor`;
+  successor runs `tests/test_workflow_reuse.py::test_a_successor_runs_only_what_a_changed_source_affects`,
+  `tests/test_workflow_reuse.py::test_a_successor_in_another_access_scope_is_refused`
+  and `tests/test_workflow_reuse.py::test_gates_and_the_nodes_they_judge_are_never_reused`;
+  applied `tests/test_workflow_repair.py::test_a_plan_is_applied_item_by_item_by_each_action`
+  and `tests/test_workflow_repair.py::test_with_reuse_off_a_repair_runs_every_affected_node_with_identical_bytes`;
+  refused with a supervisor
+  `tests/test_workflow_repair.py::test_a_repair_is_refused_before_anything_is_written_or_called[supervisor]`;
+  process loss `tests/test_workflow_repair_process_loss.py::test_a_killed_repair_leaves_its_predecessor_intact_and_resumes_without_repeating_work`;
+  restriction `tests/test_lineage_retention.py::test_a_restriction_marks_every_run_that_used_the_source_restricted`,
+  `tests/test_lineage_retention.py::test_purge_deletes_the_derived_documents_and_keeps_each_tombstone`,
+  `tests/test_lineage_retention.py::test_a_restriction_in_one_scope_leaves_identical_artifacts_in_another_current`,
+  `tests/test_lineage_retention.py::test_a_restriction_reaches_a_successor_in_progress`
+  and `tests/test_lineage_retention.py::test_a_restriction_reaches_a_reused_result_a_successor_already_saved`;
+  selective repair against a full recomputation
+  `tests/test_archive_maintenance.py::test_selective_repair_publishes_the_bytes_and_decisions_of_a_full_recomputation`
+  and `tests/test_archive_maintenance.py::test_selective_repair_does_strictly_less_work_than_full_recomputation`.
+- Ordinary runs: `tests/test_support_matrix.py::test_lineage_is_refused_without_a_durable_store_or_strict_policy_before_any_call`,
+  `tests/test_lineage_records.py::test_swarm_lineage_needs_a_durable_store_before_any_call`,
+  `tests/test_repair_plan.py::test_planning_needs_a_durable_store_and_a_lineage_policy`
+  and `tests/test_workflow_repair.py::test_a_repair_is_refused_before_anything_is_written_or_called[ordinary]`.
+- Jobs: integrity repair `tests/test_jobs_runner.py::test_integrity_repair_regenerates_a_corrupted_accepted_png`
+  and `tests/test_jobs_cli.py::test_reroll_repair_integrity_regenerates_a_deleted_accepted_file`;
+  recheck `tests/test_jobs_runner.py::test_a_validator_version_bump_needs_a_recheck_which_records_a_new_decision`
+  and `tests/test_jobs_cli.py::test_recheck_decides_accepted_files_again_under_a_newer_built_in_check`;
+  preview `tests/test_jobs_runner.py::test_a_repair_preview_matches_integrity_repair_eligibility`
+  and `tests/test_jobs_cli.py::test_reroll_dry_run_names_the_operations_a_changed_attachment_needs_a_new_plan_for`;
+  no reuse across runs `tests/test_jobs_runner.py::test_a_repair_preview_never_offers_another_runs_identical_output`;
+  input digest `tests/test_jobs_preflight.py::test_input_digest_leaves_operation_ids_plan_hash_and_approval_token_unchanged`.
+
+## External actions
+
+[External actions](actions.md), a preview, deliver a durable run's accepted
+output to another service through your connector once the run has
+completed. They are journal records outside every run's graph.
+
+| Path | External actions |
+|---|---|
+| Durable text workflows | Supported once the run has completed under a strict acceptance policy whose current decision is `accepted`, an operator's acceptance included. `ActionNotAuthorized` refuses an advisory run, a `rejected`, `needs_review` or `indeterminate` decision, an unfinished run, content other than the accepted output, and every action of a run that a security stop holds |
+| Ordinary runs | Unsupported: no journal holds the run, so `prepare_action()` raises `WorkflowNotFoundError` |
+| Jobs | Unsupported: manifest profiles take only the `offline`, `openai_image` and `gemini_image` providers, none of which writes to another service |
+
+A connector declares what its service guarantees in its `ConnectorProfile`
+(see [what a connector declares](actions.md#what-a-connector-declares)), and
+the runner does only what the declarations allow:
+
+| Declaration | With it | Without it |
+|---|---|---|
+| `lookup_by_key` | After a lost answer, looks the key up and reads a found receipt's object back | No lookup |
+| `visibility_bound_s` | An empty lookup shows the write was never made once the bound plus `timeout_s` has passed since the dispatch, while the key's window is open, assuming the request left within `timeout_s` of its claim | An empty lookup proves nothing |
+| `deduplicates`, `dedupe_window_s` | Without `lookup_by_key`, one same-key retry per reconciliation while the window is open, within `max_attempts`; with it, reconciliation looks the key up instead, since a lookup takes precedence | No retry |
+| `lookup_by_object` | Reads the object a receipt names and checks its bytes, key and version | No read confirms a receipt; an operator decides |
+| `compensation="new_action"` | A separately approved action can undo an effect | The action stays `compensation_required` with its exposure |
+
+The connector must be synchronous, must not retry on its own, and must
+present the profile the action was prepared with. An empty lookup's proof
+of absence assumes that each request leaves within `timeout_s` of its
+dispatch claim: only a deduplicating service protects against a worker that
+stalls between its claim and its request past its lease. When such a
+worker's late receipt shows a second commit, the action is listed as
+unresolved with a `second_effect`; once a late receipt shows any commit, no
+empty lookup reopens the action for dispatch.
+
+Tests:
+
+- Paths: accepted `tests/test_action_approvals.py::test_an_accepted_run_prepares_an_action_bound_to_its_published_document`,
+  `tests/test_action_approvals.py::test_a_run_without_a_renderer_binds_its_output`
+  and `tests/test_action_approvals.py::test_actions_can_be_prepared_only_after_an_operator_acceptance`;
+  refused `tests/test_action_approvals.py::test_only_an_accepted_run_can_prepare_actions`,
+  `tests/test_action_approvals.py::test_an_unfinished_run_cannot_prepare_actions`,
+  `tests/test_action_approvals.py::test_content_other_than_the_accepted_output_is_refused`
+  and `tests/test_action_runner.py::test_a_security_stop_refuses_the_dispatch`;
+  ordinary runs `tests/test_action_conformance.py::test_an_ordinary_run_has_no_journal_record_an_action_could_bind`;
+  Jobs `tests/test_support_matrix.py::test_jobs_manifest_accepts_only_image_provider_kinds`.
+- Declarations: lookup `tests/test_action_reconciliation.py::test_a_lost_acknowledgement_is_reconciled_from_a_lookup_and_a_read`;
+  visibility `tests/test_action_reconciliation.py::test_empty_lookups_before_a_visibility_bound_never_resubmit`
+  and `tests/test_action_reconciliation.py::test_past_the_visibility_bound_a_lookup_settles_the_outcome`;
+  key window `tests/test_action_reconciliation.py::test_an_expired_key_window_never_counts_an_empty_lookup_as_absence`
+  and `tests/test_action_reconciliation.py::test_no_retry_once_the_key_window_may_have_closed`;
+  deduplication `tests/test_action_reconciliation.py::test_a_deduplicating_service_gets_one_same_key_retry`;
+  neither lookup nor deduplication `tests/test_action_reconciliation.py::test_without_lookup_or_deduplication_the_outcome_stays_unresolved_at_once`;
+  reads `tests/test_action_runner.py::test_one_submission_then_an_independent_read_observes_the_intended_state`
+  and `tests/test_action_runner.py::test_a_connector_without_reads_leaves_the_result_to_reconciliation`;
+  compensation `tests/test_action_compensation.py::test_a_compensation_needs_its_own_approval_and_gets_its_own_attempt_and_receipt`
+  and `tests/test_action_compensation.py::test_a_connector_without_compensation_leaves_the_action_compensation_required_with_its_exposure`;
+  invalid declarations `tests/test_action_contract.py::test_profile_validation_rejects_invalid_declarations`;
+  connectors `tests/test_action_runner.py::test_a_runner_refuses_a_connector_that_retries_and_async_host_code`
+  and `tests/test_action_runner.py::test_a_connector_with_another_profile_is_refused`.
+- The swept combinations of declarations, with a visibility bound or none,
+  after a lost answer, a lost request or a request that arrives as
+  `timeout_s` ends:
+  `tests/test_action_conformance.py::test_no_second_effect_without_proven_absence_or_live_deduplication`.
+- A worker stalled past its lease before its request leaves: lookup only
+  `tests/test_action_reconciliation.py::test_a_late_receipt_that_contradicts_a_not_executed_finding_leaves_the_action_unresolved`
+  and `tests/test_runs_cli.py::test_a_second_effect_that_a_late_receipt_shows_exits_12`;
+  a later attempt's empty lookup `tests/test_action_reconciliation.py::test_a_late_commit_keeps_every_attempt_of_its_action_from_being_found_not_executed`;
+  deduplication `tests/test_action_reconciliation.py::test_a_deduplicating_service_answers_the_stalled_request_and_nothing_is_unresolved`.
+- Competing workers: `tests/test_action_conformance.py::test_two_threads_racing_to_dispatch_make_one_claim_and_one_effect`
+  and `tests/test_action_conformance.py::test_a_worker_in_another_process_and_a_local_worker_race_and_one_claims`.
+- Events out of order: `tests/test_action_conformance.py::test_receipts_and_notices_in_any_order_never_move_an_action_back`,
+  `tests/test_action_runner.py::test_a_late_receipt_after_a_newer_attempt_is_kept_and_the_state_does_not_regress`
+  and `tests/test_action_runner.py::test_forged_notices_never_complete_an_action`.
+- Process loss: `tests/test_action_process_loss.py::test_a_restarted_worker_reconciles_a_killed_dispatch_without_a_second_write`.
 
 [Documentation map](index.md) · [Architecture](architecture.md) ·
 [Roadmap](../ROADMAP.md)

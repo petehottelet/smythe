@@ -487,7 +487,7 @@ not followed. These checks preserve the recorded acceptance decision and do
 not repeat image decoding or quality evaluation. They feed each operation's
 [delivery eligibility](#delivery-eligibility).
 
-`list`, `inspect`, `status`, `attach`, and `export` open the existing Jobs database in
+`list`, `inspect`, `review`, `status`, `attach`, and `export` open the existing Jobs database in
 read-only mode, without provider initialization or schema migration. Missing,
 foreign, and unsupported databases fail closed. A live WAL reader sees one
 consistent committed ledger snapshot while the worker continues. `--out`
@@ -497,6 +497,120 @@ or SHM files as output destinations.
 Successful `list` and `inspect` commands return exit code 0 even when a run
 needs attention. Their JSON output retains the run's recorded status. The
 existing `status` and `export` commands retain their job-state exit codes.
+
+## Review what needs attention
+
+`jobs review` lists only what in one run needs an operator's decision, and the
+command that carries each decision out:
+
+```bash
+smythe jobs review RUN_ID
+smythe jobs review RUN_ID --limit 100 --offset 100 --json
+```
+
+Each item comes from a state the run already records:
+
+| Kind | Holds back | State | Resolve with |
+|---|---|---|---|
+| `budget_overrun` | admission | The run spent past its approved ceiling | Nothing in this run: a new plan and approval |
+| `invalid_accounting` | admission | An [unknown outcome](#resume-and-unknown-outcomes) whose provider reported cost or usage that cannot be accounted for; the run dispatches nothing more | `reroll --acknowledge-unknown`, after the adapter is repaired and the charge investigated |
+| `pause_requested` | admission | A [stop request](#stop-and-resume-safely), while admitted calls drain or once the run is `paused` | `resume` |
+| `worker_failed` | completion | The latest detached worker failed, was aborted or never started, and no live lease holds the run | `resume` |
+| `lease_expired` | completion | The run is recorded as `running`, but no live lease holds it | `resume` |
+| `unknown_outcome` | completion | A dispatched call whose outcome is unknown, with the exposure it keeps | [`adopt`](#adopt-published-bytes), or `reroll --acknowledge-unknown` |
+| `rejected`, `failed` | completion | An operation with an attempt left | [`reroll`](#selective-rerolls) |
+| `attempts_exhausted` | completion | A rejected or failed operation with no attempt left | Nothing in this run: a new plan and approval |
+| `artifact_integrity` | delivery | An accepted file of a succeeded operation is missing, changed, unreadable or unsafe | [`reroll --repair-integrity`](#repair-corrupted-accepted-outputs) for a missing or changed file; a person restores the others |
+| `delivery_ineligible` | delivery | A succeeded operation is not [eligible for delivery](#delivery-eligibility) for another reason | [`recheck`](#recheck-accepted-outputs) for a changed check; a person otherwise |
+
+`worker_failed` and `lease_expired` are the states for which `jobs attach`
+exits with code 7. A reroll or repair is offered only while an attempt is left
+and the run's budget has not overrun. `recheck` is offered when the plan names
+no registered validators, since the CLI registers none; otherwise the item
+names `JobRunner(store, validators=[...]).recheck()`.
+
+With `--json` the command prints one compact document:
+
+```text
+{
+  "review_version": 1,
+  "run_id": "...", "name": "...", "status": "needs_attention", "schema_version": 4,
+  "reviewed_at_ns": ...,
+  "operation_counts": {"succeeded": 3, "unknown_outcome": 1},
+  "cost": {"approved_microusd", "confirmed_microusd", "exposure_microusd",
+           "reserved_microusd", "cost_is_complete", "cost_contains_estimates", "unit"},
+  "page": {"limit": 50, "offset": 0, "total": 4, "returned": 4, "has_more": false},
+  "totals": {"budget_overrun": 0, "invalid_accounting": 0, "...": 0, "unknown_outcome": 1},
+  "items": [{
+    "item_id": "<64 hex characters>",
+    "kind": "unknown_outcome",
+    "blocks": "completion",
+    "subject": {"operation_key": "tile[3]", "operation_id": "op_...",
+                "attempt_id": "...", "attempt_number": 1, "call_id": "..."},
+    "observed": {"status": "unknown_outcome", "error_class": null,
+                 "excerpt": "process stopped after dispatch",
+                 "exposure_microusd": 100000, "attempts_remaining": 1},
+    "reasons": [],
+    "decision_needed": "The call may have completed and been charged. ...",
+    "resolve_with": [["jobs", "adopt", "RUN_ID", "tile[3]", "--reason", "REASON"],
+                     ["jobs", "reroll", "RUN_ID", "tile[3]", "--acknowledge-unknown",
+                      "--reason", "REASON"]]
+  }],
+  "artifact_integrity": {"counts": {"verified": 3}, "bytes_hashed": 312,
+                         "hash_byte_limit": 67108864}
+}
+```
+
+- **Items.** `subject` names an operation's key, ID, the attempt and call
+  the item is about, the run for items about the whole run, or a failed
+  worker's `launch_id`. `observed` holds the recorded `status`, an
+  `error_class` (a failed worker's error type, or
+  `invalid_provider_accounting`) and an `excerpt` of the stored error or stop
+  reason of at most 300 characters, with account identifiers redacted and
+  the manifest root, the store's directory and the home directory written as
+  `<manifest root>`, `<store directory>` and `~`; some kinds add the kept
+  `exposure_microusd`, `attempts_remaining`, the damaged `artifacts`, the
+  `eligibility_reasons` or the `pause_generation`. `artifact_integrity` and
+  `delivery_ineligible` items give `reasons` from the
+  [reuse decisions' vocabulary](lineage.md#reason-codes), as the
+  [repair preview](#preview-repairs) does.
+- **Commands.** Each `resolve_with` entry is the argument list of one
+  `smythe jobs` command, in the order to try; it parses as given, without
+  `--store`, and `REASON` stands for your own reason. An empty list means
+  this run has no command for it. The printed output shows each item with
+  its decision and commands, quoted for the local shell: by cmd.exe's rules
+  on Windows and POSIX shell rules elsewhere. Whenever it prints a command
+  line, the `--dry-run` hint for unhashed files included, it reminds you to
+  add `--store` if you used one.
+- **Stable identity.** `item_id` is the SHA-256 of the item's kind, run,
+  subject and the recorded state it depends on. It stays the same across
+  reviews until that state changes, as a reroll or a new attempt does, so a
+  review can be repeated at any time, for example after reconnecting to a
+  detached run, to see which decisions are still open.
+- **Order and pages.** Items that hold back admission come first, then
+  completion, then delivery; within each, items about the whole run come
+  before operations, by key. `--limit` (1–500, default 50) and `--offset`
+  page the operations; items about the whole run appear on every page,
+  `totals` counts each kind on this page, and `operation_counts` covers the
+  whole run. The printed header names the operations the page holds by
+  position, such as `operations 51-100 of 240`.
+- **Bounded reads.** The accepted files of the page's succeeded operations
+  are hashed, at most 64 MiB per review. A file past that limit is counted
+  as `not_checked` in `artifact_integrity` and is not an item;
+  `jobs reroll RUN_ID --dry-run` hashes every file.
+
+A review opens the database read-only. It never writes to the database or
+migrates it, so a schema-2 or schema-3 database keeps its schema; it never
+enables WAL and constructs no provider. On a database already in WAL mode,
+SQLite may create its `-wal` and `-shm` files for the read, as it does for
+`jobs inspect` and `jobs list`. A review also reads the latest detached
+launch's receipts beside the database. The packet holds no local paths, so
+it has no `manifest_root`; recorded acceptance flags and statuses are never
+changed. `review_version` versions the JSON, and later versions only add
+fields. In Python,
+`smythe.jobs.inspection.review_job(store, run_id, limit=50, offset=0,
+validators=None)` returns the same document; `validators` judge delivery
+eligibility as for `inspect_job`.
 
 ## Detached execution and attachment
 
@@ -969,7 +1083,7 @@ and output charge that one request can incur.
 
 | Code | Meaning |
 |---:|---|
-| 0 | command succeeded; `list` and `inspect` succeed regardless of recorded job status |
+| 0 | command succeeded; `list`, `inspect` and `review` succeed regardless of recorded job status |
 | 1 | job finished `failed`, `partial`, `needs_attention`, or `budget_overrun` |
 | 2 | invalid manifest, preflight input, or command value |
 | 3 | provider configuration or optional dependency failure |
@@ -977,9 +1091,16 @@ and output charge that one request can incur.
 | 5 | budget admission failure |
 | 6 | unknown run, invalid state transition, or refused adoption, repair or recheck |
 | 7 | local SQLite/filesystem failure, detached startup failure, or attachment detects a failed worker or expired lease |
-| 130 | detached startup interrupted, or attachment disconnected with Ctrl+C |
+| 130 | detached startup interrupted, attachment disconnected with Ctrl+C, or review interrupted |
 
 Use `--json` for one compact document on stdout, including structured errors.
+
+`jobs review` returns 0 whether or not anything needs a decision, 2 for an
+invalid `--limit` or `--offset`, 6 for an unknown run, 7 for a local SQLite or
+filesystem failure, and 130 when interrupted. An interrupted review prints
+no part of its packet: with `--json` it prints only the structured error. It
+has no exit code of its own for items that need a decision; read `totals` or
+`items` instead.
 
 ## Python API
 
@@ -1044,6 +1165,10 @@ runner = JobRunner(store, validators=validators)
   policy in the runtime. Repairs are too: the
   [repair preview](#preview-repairs) shows what each operation calls for,
   and nothing repairs an operation automatically.
+- Jobs write no [artifact lineage](lineage.md) record. Integrity repairs,
+  rechecks and the repair preview work within one run, and no run reuses
+  another run's accepted output, even for the same
+  [input digest](#operation-identity-and-input-digest).
 - Unknown provider outcomes require human investigation, then explicit
   duplicate acknowledgment or adoption of the bytes the attempt published.
 - Jobs do not read a response's `stop_reason`. A response that the provider

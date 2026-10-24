@@ -18,6 +18,7 @@ from smythe.acceptance import text_sha256
 from smythe.graph import ExecutionGraph, Node, Topology
 from smythe.provider_responses import OpenAIResponsesProvider
 from smythe.validation import ValidationReport, ValidatorIdentity, hard_finding
+from smythe.workflow import decision_history
 from test_workflow_acceptance import generation_key
 
 # A durable OfflineProvider echoes each step: "offline: <label>".
@@ -152,6 +153,88 @@ def test_killed_durable_run_resumes_its_decision_without_new_calls(tmp_path, mon
     assert operations(path, run_id) == {"synthesis": "applied", "acceptance": "applied"}
     assert after["status"] == "completed" and after["ok"]
     assert any(segment["interrupted"] for segment in result.timing["segments"])
+
+
+def fixed() -> AcceptancePolicy:
+    """The policy a completed run is re-evaluated under: it accepts the delivered output."""
+    return AcceptancePolicy(mode="strict", final_validators=[Mentions("summary")])
+
+
+# Child code that completes a rejected run, then re-evaluates it under fixed()
+# and holds once the new decision is committed, before the checkpoint that
+# would apply it, until the test kills the child.
+REEVALUATING_CHILD = r"""
+import sys
+import time
+from pathlib import Path
+
+from fakes import write_barrier
+from smythe import SQLiteWorkflowStore
+from test_workflow_process_loss import build, fixed, graph
+
+path, folder = Path(sys.argv[1]), Path(sys.argv[2])
+
+
+def hold(self, lease, revision, checkpoint, **kwargs):
+    write_barrier(folder / "stopped.json", {"run_id": lease.run_id})
+    time.sleep(600)
+
+
+with SQLiteWorkflowStore(path) as store:
+    run_id = build(store, "sources").execute(graph()).execution_id
+    SQLiteWorkflowStore.save_checkpoint = hold
+    build(store, "sources").reevaluate(run_id, acceptance=fixed())
+"""
+
+
+def acceptance_operations(store, run_id):
+    """Each acceptance operation's key and state; applied ones first, in order."""
+    return [(operation["operation_key"], operation["state"])
+            for operation in store.list_operations(run_id, "acceptance")]
+
+
+def test_killed_reevaluation_is_finished_once_without_validating_again(tmp_path, monkeypatch):
+    path = tmp_path / "runs.db"
+    process = launch_child(REEVALUATING_CHILD, path, tmp_path)
+    try:
+        run_id = wait_for_barrier(process, tmp_path / "stopped.json", timeout=60)["run_id"]
+        reaped = kill_and_reap(process)
+    finally:
+        kill_and_reap(process)
+    assert reaped.killed and reaped.returncode != 0
+
+    # The killed child still holds the lease; this process continues once it lapses.
+    with SQLiteWorkflowStore(path, clock_ns=ManualClock.after(120)) as store:
+        before = store.inspect_run(run_id)
+        ((own, applied), (stopped, committed)) = acceptance_operations(store, run_id)
+        assert (applied, committed) == ("applied", "completed")
+        assert stopped.startswith("acceptance/1/")
+
+        calls = []
+
+        async def complete(self, system, prompt, model):
+            calls.append(prompt)
+            raise AssertionError("A provider was called")
+
+        monkeypatch.setattr(OfflineProvider, "complete", complete)
+        Mentions.validated = []
+        # Resuming returns the decision the run made; it never finishes a re-evaluation.
+        resumed = build(store, "sources").resume(run_id)
+        assert resumed.acceptance.decision.value == "rejected"
+        assert acceptance_operations(store, run_id) == [(own, "applied"), (stopped, "completed")]
+        # The next re-evaluation under the same policy applies the committed decision.
+        result = build(store, "sources").reevaluate(run_id, acceptance=fixed())
+        history = decision_history(store, run_id)
+        final = acceptance_operations(store, run_id)
+        after = store.inspect_run(run_id)
+
+    # Nothing was validated again, and no second decision was written.
+    assert Mentions.validated == []
+    assert result.accepted and (result.output, result.rejected_output) == (DELIVERED, None)
+    assert [(item["sequence"], item["operation_key"]) for item in history] == [(0, own), (1, stopped)]
+    assert final == [(own, "applied"), (stopped, "applied")]
+    assert calls == [] and after["calls"] == before["calls"]
+    assert after["status"] == "completed" and after["ok"]
 
 
 # ---------------------------------------------------------------------------

@@ -6,6 +6,7 @@ import asyncio
 from collections.abc import Mapping
 from contextlib import asynccontextmanager
 from contextvars import ContextVar
+from dataclasses import replace
 from datetime import datetime, timezone
 import hashlib
 import json
@@ -48,7 +49,9 @@ from smythe.lineage import (
     LINEAGE_OPERATION, LINEAGE_RECORD_VERSION, LINEAGE_REUSE_KEY, ArtifactLineage, build_lineage,
     lineage_key, load_lineage, restricted_sources, snapshot_lineage_policy,
 )
-from smythe.lineage import _REPAIR, _plain
+from smythe.lineage import (
+    _REPAIR, _REUSE_OPERATION, _gate_verifier, _matching_digests, _plain,
+)
 from smythe.lineage import _id as _lineage_id
 from smythe.registry import Registry
 from smythe.provider import ProviderResponseError
@@ -158,7 +161,7 @@ _HISTORY_KEYS = ("execution_generation", "regenerations_used", "verification_rec
                  "cost_usd_unknown", "cost_usd_is_estimate", ADVISORY_VERDICT_KEY,
                  REJECTED_GENERATIONS_KEY, CONTEXT_SNAPSHOT_KEY, LINEAGE_REUSE_KEY)
 # The journal operation kind, and key prefix, of a result a successor run reuses.
-_REUSE = "reuse"
+_REUSE = _REUSE_OPERATION
 _PROVIDER_FIELDS = frozenset({"kind", "adapter_version", "decoder_version", "endpoint_scope",
                               "price_version", "supported_models", "config"})
 
@@ -378,7 +381,7 @@ def _synthesis_key(graph, *, scoped):
 
 def _decision_inputs(synthesis_key, policy_sha256, task_digest, output_sha256, strategy,
                      sources, used_fallback, sequence=0, tombstones=(), operator=None,
-                     publication=None, repair=None):
+                     publication=None, repair=None, gate_receipts=None):
     """Everything a decision binds; its hash keys the acceptance operation.
 
     A re-evaluation's decision also binds its *sequence*, so deciding the
@@ -390,7 +393,9 @@ def _decision_inputs(synthesis_key, policy_sha256, task_digest, output_sha256, s
     :func:`_operator_inputs`). A decision on a lineage run's republished
     document binds that *publication*'s sequence, so it is never one made
     for another publication of the same bytes, and a decision a repair plan
-    asked for binds its *repair* (see :func:`_repair_record`).
+    asked for binds its *repair* (see :func:`_repair_record`). A policy's
+    decision binds the digest of the final receipts of the gates it read
+    (*gate_receipts*, see :func:`_gate_receipts`).
     """
     inputs = {
         "synthesis": synthesis_key, "output_sha256": output_sha256,
@@ -408,7 +413,63 @@ def _decision_inputs(synthesis_key, policy_sha256, task_digest, output_sha256, s
         inputs["publication"] = publication
     if repair is not None:
         inputs["repair"] = repair
+    if gate_receipts is not None:
+        inputs["gate_receipts_sha256"] = gate_receipts
     return inputs
+
+
+# The fields of a gate's final record that its verdict is read from (see
+# smythe.verifier.gate_disposition), which a policy's decision binds.
+_GATE_RECEIPT_FIELDS = ("version", "state", "target_id", "target_generation",
+                        "judge_generation", "outcome", "passed")
+
+
+def _gate_receipts(graph):
+    """The SHA-256 of the final receipt of each gate in *graph*, which a policy's decision binds.
+
+    Each gate is named by its node id and status with the fields of the
+    record its final verdict is read from (``_GATE_RECEIPT_FIELDS``; see
+    :func:`~smythe.verifier.gate_disposition`): its version and state, the
+    target id and generation and the judge generation it is bound to, and
+    its ``outcome`` and ``passed``; or with None when it has no record.
+    Nothing changes a gate once the run completes, so its saved graph keeps
+    these receipts for as long as the run is kept.
+    """
+    receipts = []
+    for node in sorted(graph.nodes, key=lambda item: item.id):
+        if node.verifies:
+            record = node.metadata.get("verification_receipt" if node.max_regenerations > 0
+                                       else ADVISORY_VERDICT_KEY)
+            receipts.append({"node_id": node.id, "status": node.status.value, "receipt": {
+                key: record.get(key) for key in _GATE_RECEIPT_FIELDS
+            } if isinstance(record, dict) else None})
+    return _hash(receipts)
+
+
+def _gate_problems(history, graph):
+    """Why a completed run's decisions no longer bind its journal and saved *graph*.
+
+    *history* is the run's :func:`decision_history`, whichever decision is
+    current. Each decision's inputs must be a JSON object whose digest is
+    still its key, and each that binds gate receipts (:func:`_gate_receipts`)
+    must bind those of *graph*. A decision recorded before decisions bound
+    gate receipts binds none. One reason for each decision whose inputs are
+    unreadable or no longer match its key, and one when the gate receipts
+    differ; none when everything matches.
+    """
+    problems, digest, changed = [], None, False
+    for decision in history:
+        bound, sequence = decision["inputs"], decision["sequence"]
+        if type(bound) is not dict:
+            problems.append(f"the inputs of the journal's decision {sequence} are not a JSON object")
+        elif decision["operation_key"] != _decision_key(bound):
+            problems.append(f"the inputs of the journal's decision {sequence} do not match its key")
+        elif "gate_receipts_sha256" in bound:
+            digest = digest or _gate_receipts(graph)
+            changed = changed or bound["gate_receipts_sha256"] != digest
+    if changed:
+        problems.append("the saved gate verdicts are not those the run's decision bound")
+    return problems
 
 
 def _repair_record(plan_sha256, reason):
@@ -678,7 +739,10 @@ def _decision_problems(store, run_id, graph, output, record, *, task, policy_sha
     the source generations must be those it binds, and the record must be
     the journal's :func:`current_decision`, made under the run's policy
     (*policy_sha256*) or, for a re-evaluation, the policy it names, and under
-    tombstones the journal holds. With *removed*, a source the run delivered
+    tombstones the journal holds. Every decision's inputs must still match
+    its key, and the saved *graph*'s gates must hold the final receipts the
+    run's decisions bound (:func:`_gate_problems`), whichever decision is
+    current. With *removed*, a source the run delivered
     from that was removed after the decision
     (:meth:`WorkflowRuntime.remove_source`), and any tombstone that restricts
     a lineage run (:func:`_restriction_problems`), is a problem too. An empty list
@@ -686,8 +750,11 @@ def _decision_problems(store, run_id, graph, output, record, *, task, policy_sha
     will do.
     """
     problems = _delivery_problems(record, output, graph, task)
-    decision = current_decision(store, run_id)
-    holds = decision is not None and decision["record"].to_dict() == record.to_dict()
+    history = decision_history(store, run_id)
+    decision = history[-1] if history else None
+    # Unreadable inputs are reported by _gate_problems.
+    holds = (decision is not None and type(decision["inputs"]) is dict
+             and decision["record"].to_dict() == record.to_dict())
     considered = []
     if holds:
         sequence, bound = decision["sequence"], decision["inputs"]
@@ -695,11 +762,13 @@ def _decision_problems(store, run_id, graph, output, record, *, task, policy_sha
         considered = bound.get("tombstones", [])
         if type(considered) is not list or any(type(key) is not str for key in considered):
             considered, holds = [], False
+        # The gate receipts a decision binds are checked below.
         inputs = _decision_inputs(
             _synthesis_key(graph, scoped=True), deciding, task_sha256(task),
             record.output_sha256, record.strategy, record.sources, record.used_fallback,
             sequence=sequence, tombstones=considered, operator=_operator_inputs(record),
             publication=bound.get("publication"), repair=bound.get("repair"),
+            gate_receipts=bound.get("gate_receipts_sha256"),
         )
         # A decision binds each tombstone once, sorted; the journal keeps them all.
         holds = (holds and record.policy_sha256 == deciding and bound == inputs
@@ -710,6 +779,7 @@ def _decision_problems(store, run_id, graph, output, record, *, task, policy_sha
     if not holds:
         considered = []
         problems.append("the journal holds no applied decision matching the saved record")
+    problems += _gate_problems(history, graph)
     if removed:
         problems += _removal_problems(store, run_id, considered)
     return problems
@@ -1163,12 +1233,16 @@ class WorkflowRuntime:
                 recipe[name] = value
         return json_snapshot(recipe)
 
-    def _adopt_recipe(self, saved, *, reevaluating=False):
+    def _adopt_recipe(self, saved, *, reevaluating=False, reuse_switch=False):
         """Check a saved recipe against this runtime; bind its behavior versions.
 
         *reevaluating* tolerates a recipe whose acceptance policy and gate
         verifier differ: a re-evaluation decides under this runtime's policy
-        and reads the verdicts the run's gates recorded without judging again.
+        and reads the verdicts the run's gates recorded without judging again
+        (a lineage run's gates need their own gate verifier; see
+        :meth:`_gate_verifier_problems`).
+        *reuse_switch* also tolerates a lineage policy whose ``reuse``
+        differs, as a decision reuses nothing.
         """
         saved, current = dict(saved), dict(self.recipe)
         policy = saved.get("acceptance")
@@ -1178,6 +1252,10 @@ class WorkflowRuntime:
             for name in ("acceptance", "verifier", "validators"):
                 saved.pop(name, None)
                 current.pop(name, None)
+        if reuse_switch:
+            for recipe in (saved, current):
+                if isinstance(recipe.get("lineage"), dict):
+                    recipe["lineage"] = {**recipe["lineage"], "reuse": None}
         behavior = {}
         for name, (absent, _) in RECIPE_BEHAVIOR_FIELDS.items():
             current.pop(name, None)
@@ -1368,11 +1446,11 @@ class WorkflowRuntime:
         return sorted(set(ids))
 
     @asynccontextmanager
-    async def _session(self, run, *, reevaluating=False):
+    async def _session(self, run, *, reevaluating=False, reuse_switch=False):
         self.run, self.run_id = run, run["run_id"]
         if run["budget_nanousd"] != _nanousd(self.max_budget_usd):
             raise WorkflowConflictError("Workflow components or budget differ from the saved recipe")
-        self._adopt_recipe(run["config"], reevaluating=reevaluating)
+        self._adopt_recipe(run["config"], reevaluating=reevaluating, reuse_switch=reuse_switch)
         self.context_revision, self.context_sources, self._snapshot_ids = None, (), {}
         if self.run_policy_sha256 is not None:
             # The record a strict run's unfinished checkpoints carry.
@@ -1939,7 +2017,9 @@ class WorkflowRuntime:
         no text removed from the predecessor; and a graph this runtime's
         configuration can run (:meth:`_check_successor_graph`). The successor
         holds the predecessor's source tombstones from its first checkpoint,
-        so it never derives from withdrawn text again, even one it reads anew.
+        so it never derives from withdrawn text again, even one it reads anew,
+        and takes those journaled since whenever it resumes and before it
+        decides (:meth:`_inherit_tombstones`).
         Raises ``WorkflowBindingError`` for a request that breaks these rules,
         ``WorkflowStateError`` for predecessor records that refuse it, and
         ``ValueError``, as for any graph, for a node model the provider does
@@ -2112,10 +2192,16 @@ class WorkflowRuntime:
           ``load_source_evidence`` marks it ``removed`` and never returns it;
         - an unfinished run does not resume until :meth:`refresh_context`
           gives it other sources, which may not include the removed text;
+        - a read step whose response is the removed text is refused
+          (:class:`~smythe.workflow_tools.JournaledReadTool`), and its node
+          follows its failure policy;
         - a completed run's decision, made before the removal, no longer
           holds: resuming or inspecting the run gives ``indeterminate``, and
-          :meth:`reevaluate` decides again, under a source evidence
-          validator that holds the tombstone rather than the text;
+          :meth:`reevaluate` decides again. Only a policy with a source
+          evidence validator that holds the tombstone rather than the text
+          can decide it; any other policy's decision is ``indeterminate``,
+          and an operator can reject the output but accepts it only under
+          such a policy;
         - a lineage run whose record names the source is restricted instead
           (:func:`~smythe.lineage.restricted_sources`): no decision delivers
           its output again.
@@ -2190,18 +2276,28 @@ class WorkflowRuntime:
         (:func:`decision_history`). A re-evaluation stopped before that
         checkpoint is finished by the next one under the same policy, unless
         a source was removed from the run after it decided: the next one then
-        decides again, since a decision binds the run's tombstones.
+        decides again, since a decision binds the run's tombstones. Output
+        delivered from a removed source is decided ``indeterminate`` unless
+        the policy has a source evidence validator that holds its tombstone.
 
         The saved recipe may differ from this runtime's only in its acceptance
-        policy and gate verifier. Resuming the run still needs the policy its
-        recipe records, and returns the current decision.
+        policy, its gate verifier and its lineage policy's ``reuse``, since a
+        decision reuses nothing, so a repair under ``LineagePolicy(reuse=False)``
+        can recheck. A policy's decision on a lineage run with gates reads
+        their verdicts only under the gate verifier that gave them, so there
+        the gate verifier may not differ. Resuming the run still needs the
+        policies its recipe records, and returns the current decision.
 
         *operator*, an :class:`~smythe.acceptance.OperatorDecision`, records
         that operator's decision instead, with or without a policy on this
         runtime: a version 2 record that keeps what the current decision binds
         and names the operator, in a new ``acceptance`` operation whose inputs
         also bind the decision and operator. Only a current ``needs_review``
-        or ``indeterminate`` decision can be resolved; any other stands.
+        or ``indeterminate`` decision can be resolved; any other stands. An
+        operator can reject output delivered from a removed source, but
+        accepts it only on a runtime whose policy has a source evidence
+        validator that holds the source's tombstone, as a policy's decision
+        needs.
 
         On a run with a lineage policy, whose lineage must still match its
         journal, the new decision's lineage supersedes the run's record in the
@@ -2214,12 +2310,15 @@ class WorkflowRuntime:
         with *operator*; ``WorkflowStateError`` for a run whose recipe has no
         strict policy, or no lineage policy when given a plan, an unfinished
         run, unresolved accounting, a saved output, task, source generation,
-        record or lineage that no longer matches the journal, so changed
-        output is never accepted, a lineage run that a source tombstone
-        restricts (:func:`~smythe.lineage.restricted_sources`), a run with a
+        gate receipt, record or lineage that no longer matches the journal,
+        so changed output or verdicts are never accepted, a lineage run that
+        a source tombstone restricts
+        (:func:`~smythe.lineage.restricted_sources`), a policy's decision on a
+        lineage run whose gates another gate verifier judged, a run with a
         renderer whose published document is missing or changed
-        (:meth:`republish` publishes it again first), or a current decision an
-        operator cannot resolve;
+        (:meth:`republish` publishes it again first), a current decision an
+        operator cannot resolve, or an operator's acceptance of output
+        delivered from a removed source that no such validator holds;
         ``WorkflowConflictError`` for a recipe that differs in anything else;
         and whatever the operator's verifier raises, such as
         ``ApprovalRejected``, before anything is journaled.
@@ -2240,7 +2339,7 @@ class WorkflowRuntime:
             raise WorkflowStateError("Workflow has no lineage policy, so it records no repair plan")
         # A runtime without a policy writes the checkpoint version the recipe does.
         self.checkpoint_version = _checkpoint_version(run["config"])
-        async with self._session(run, reevaluating=True):
+        async with self._session(run, reevaluating=True, reuse_switch=True):
             state = self._restore()
             if state is None or state["status"] != "completed":
                 raise WorkflowStateError(
@@ -2259,6 +2358,9 @@ class WorkflowRuntime:
                     )
                 publication = current.publication
             if self.lineage is not None and (problems := self._lineage_problems()):
+                raise WorkflowStateError("Workflow cannot be re-evaluated: " + "; ".join(problems))
+            if operator is None and self.lineage is not None and (
+                    problems := self._gate_verifier_problems()):
                 raise WorkflowStateError("Workflow cannot be re-evaluated: " + "; ".join(problems))
             if operator is None:
                 decided = await self._decide(self._synthesis_key(), output, reevaluation=True,
@@ -2279,8 +2381,9 @@ class WorkflowRuntime:
 
         The output, task and source generations must be those the record
         binds, the record must be the journal's current decision (see
-        :func:`_decision_problems`), and the saved graph must still deliver
-        the sources it binds. A source removed after the decision is not a
+        :func:`_decision_problems`), the saved graph must still deliver the
+        sources it binds, and its gates must hold the final receipts the
+        run's decisions bound. A source removed after the decision is not a
         problem: it is why a run is decided again. Raises
         ``WorkflowStateError``, saying the run cannot be *action*, otherwise.
         """
@@ -2327,6 +2430,8 @@ class WorkflowRuntime:
         if state and state["status"] == "completed":
             self._check_completed()
             return self._result(state["output"], self._reverified(state["output"]))
+        # Text withdrawn from a successor's predecessor since it started is withdrawn from it.
+        self._inherit_tombstones()
         if self._context_version and self.context_revision is not None:
             # A removed source's text is never sent again, from a snapshot or the sources.
             self._refuse_removed(self.context_sources, "give the run other sources with "
@@ -2408,6 +2513,8 @@ class WorkflowRuntime:
                 # The published document is the output delivered and decided.
                 output, publication = await self._publish_output(key, output)
             await self._record_source_evidence(output)
+            # And so is text withdrawn from it while this run was in progress.
+            self._inherit_tombstones()
             acceptance = None if self.acceptance is None else await self._decide(key, output)
             if self.lineage is not None:
                 await self._record_lineage(key, publication)
@@ -2432,6 +2539,29 @@ class WorkflowRuntime:
             acceptance = self._held(acceptance, output, problems)
         return self._result(output, acceptance)
 
+    def _inherit_tombstones(self):
+        """Journal each tombstone a successor's predecessor holds now and the successor lacks.
+
+        The bound run is a successor when its graph's ``repair`` planning
+        record names a predecessor. A tombstone that a restriction made while
+        the successor was in progress journaled only in the predecessor is
+        journaled here too, keeping the predecessor's record, and the next
+        checkpoint applies it. Only the predecessor's tombstones are read.
+        Raises ``WorkflowStateError`` for a tombstone that cannot be read.
+        """
+        repair = (self.graph.planning or {}).get("repair")
+        if not isinstance(repair, dict):
+            return
+        predecessor = repair["predecessor"]["run_id"]
+        try:
+            records = load_source_tombstones(self.store, predecessor)
+        except ValueError as error:
+            raise WorkflowStateError(f"Run {predecessor!r} holds an invalid tombstone") from error
+        for record in records:
+            operation = _journal_tombstone(self.store, self.context.lease, record)
+            if operation["state"] != "applied":
+                self._pending_operations.add(operation["operation_id"])
+
     async def _seed_reuse(self):
         """Complete each node a successor reuses with its predecessor's result, before any node runs.
 
@@ -2439,9 +2569,13 @@ class WorkflowRuntime:
         inputs its ``lineage_reuse`` metadata holds and which the next
         checkpoint consumes. Only a new operation loads and checks the
         predecessor (:func:`_predecessor`, :func:`_reused`); a committed one
-        replays. Either way, the sources removed from this run are checked
-        too. Raises ``WorkflowStateError`` for a result its inputs do not
-        bind or that used a source removed from this run.
+        replays. Every reused node, including one an earlier checkpoint
+        already completed, is checked against the sources removed from this
+        run, which holds its predecessor's current tombstones
+        (:meth:`_inherit_tombstones`), so a restriction made since the reuse
+        refuses it before any node reads it. Raises ``WorkflowStateError``
+        for a result its inputs do not bind or that used a source removed
+        from this run.
         """
         loaded, removed = [], None
 
@@ -2453,10 +2587,17 @@ class WorkflowRuntime:
 
         for node in self.graph.nodes:
             inputs = node.metadata.get(LINEAGE_REUSE_KEY)
-            if inputs is None or node.status is NodeStatus.COMPLETED:
+            if inputs is None:
                 continue
-            result = await self._operation_result(f"{_REUSE}/{node.id}", _REUSE, inputs, reuse)
-            if not _reuse_matches(node.id, inputs, result):
+            key, completed = f"{_REUSE}/{node.id}", node.status is NodeStatus.COMPLETED
+            if completed:
+                # A checkpoint consumed its operation already; it is only read.
+                operation = self.store.load_operation(self.run_id, key)
+                result = (None if operation is None or operation["state"] == "started"
+                          else operation["result"])
+            else:
+                result = await self._operation_result(key, _REUSE, inputs, reuse)
+            if result is None or not _reuse_matches(node.id, inputs, result):
                 raise WorkflowStateError(
                     f"The saved reuse of node {node.id!r} does not match its inputs")
             if removed is None:
@@ -2466,7 +2607,8 @@ class WorkflowRuntime:
                 raise WorkflowStateError(
                     f"Node {node.id!r} cannot be reused: a source it used was removed from "
                     "this run")
-            node.status, node.result = NodeStatus.COMPLETED, result["text"]
+            if not completed:
+                node.status, node.result = NodeStatus.COMPLETED, result["text"]
 
     def _artifact_directory(self):
         """The bound run's own directory, ``<artifact_dir>/<run id>``."""
@@ -2630,10 +2772,12 @@ class WorkflowRuntime:
         decision must still hold (:meth:`_decided_output`), the current file
         must be missing or changed, and the saved synthesis must have the
         digest the run's current lineage records, which must still match its
-        journal. The synthesis is then rendered again and published as the
-        next ``publication`` operation, which names the publication it
-        republishes and *repair*, under that publication's own name, so no
-        file is replaced; the new bytes, usually the earlier ones, get a new
+        journal; the run's gates must have been judged by this runtime's gate
+        verifier (:meth:`_gate_verifier_problems`). The synthesis is then
+        rendered again and published as the next ``publication`` operation,
+        which names the publication it republishes and *repair*, under that
+        publication's own name, so no file is replaced; the new bytes,
+        usually the earlier ones, get a new
         decision under this runtime's policy that binds the publication and
         *repair*; and the new decision's lineage supersedes the run's record.
         One completed checkpoint applies all three. No node runs, nothing is
@@ -2674,7 +2818,7 @@ class WorkflowRuntime:
                     "The saved synthesis no longer has the digest its lineage records, so it is not "
                     "published again; a changed synthesis is made again in a successor run"
                 )
-            problems = self._lineage_problems()
+            problems = self._lineage_problems() + self._gate_verifier_problems()
             if problems:
                 raise WorkflowStateError("Workflow cannot be published again: " + "; ".join(problems))
             self._claim_artifact_directory()
@@ -2828,7 +2972,8 @@ class WorkflowRuntime:
         completed, or the one that decision superseded it with (see
         :meth:`_supersede_lineage`), naming the run's current publication and
         the record before it. It is assembled again from the records its
-        operation names and must have the saved record's digest.
+        operation names and must have the saved record's digest; a record
+        written before records named their gates' verifier matches without it.
         """
         applied = [item for item in self.store.list_operations(self.run_id, LINEAGE_OPERATION)
                    if item["applied_revision"] is not None]
@@ -2846,10 +2991,24 @@ class WorkflowRuntime:
                                                    else publication.sequence)
                      and (not sequence or inputs["supersedes"] == ArtifactLineage.from_dict(
                          applied[-2]["result"].get("lineage")).sha256)
-                     and saved.sha256 == self._lineage(inputs).sha256)
+                     and saved.sha256 in _matching_digests(self._lineage(inputs)))
         except (TypeError, ValueError, KeyError, IndexError, WorkflowError):
             holds = False
         return [] if holds else ["the run's lineage record does not match its journal"]
+
+    def _gate_verifier_problems(self):
+        """Why this runtime cannot decide the bound lineage run again from its gates' verdicts.
+
+        A new decision reads the verdicts the run's gates recorded and never
+        judges again, so it is made only under the gate verifier that gave
+        them: the one the run's recipe records. A run without gates has
+        none. One reason, or none.
+        """
+        if (not any(node.verifies for node in self.graph.nodes)
+                or _gate_verifier(self.run["config"]) == _gate_verifier(self.recipe)):
+            return []
+        return ["its gates were judged by another gate verifier than this one, so their recorded "
+                "verdicts are not read under it; a repair plan regenerates the run"]
 
     def _unusable_evidence_validators(self):
         """Why each source evidence validator of the strict policy cannot check this run, by identity.
@@ -2893,11 +3052,13 @@ class WorkflowRuntime:
         return unusable
 
     def _acceptance_inputs(self, synthesis_key, output_sha256, strategy, sources, used_fallback,
-                           sequence=0, tombstones=(), publication=None, repair=None):
+                           sequence=0, tombstones=(), publication=None, repair=None,
+                           gate_receipts=None):
         """Everything a decision binds; its hash keys the acceptance operation."""
         return _decision_inputs(synthesis_key, self.acceptance.sha256, self.undecided.task_sha256,
                                 output_sha256, strategy, sources, used_fallback, sequence,
-                                tombstones, publication=publication, repair=repair)
+                                tombstones, publication=publication, repair=repair,
+                                gate_receipts=gate_receipts)
 
     def _next_decision_sequence(self, inputs_at):
         """A re-evaluation's decision sequence: one past every decision the journal holds.
@@ -2916,6 +3077,36 @@ class WorkflowRuntime:
             return latest
         return latest + 1
 
+    def _unheld_tombstones(self):
+        """The tombstones of sources the run delivered from that this runtime's policy lacks.
+
+        The run delivers from its current source set. When a source in it
+        was removed (:meth:`remove_source`), only a source evidence validator
+        whose sources hold that source's tombstone, rather than its text, can
+        tell whether the output rests on the removed text. A runtime without
+        a policy holds none.
+        """
+        if not self._context_version:
+            return []
+        delivered = {(source.source_id, source.sha256) for source in self.context_sources}
+        held = {(record.source_id, record.sha256)
+                for validator in (self.acceptance.final_validators if self.acceptance else ())
+                if isinstance(validator, SourceEvidenceValidator)
+                for record in validator.sources if record.tombstone is not None}
+        return [record for record, _ in _tombstone_operations(self.store, self.run_id)
+                if (record.source_id, record.sha256) in delivered - held]
+
+    def _unheld_removals(self):
+        """Why this runtime's policy cannot decide output delivered from a removed source.
+
+        A policy without a source evidence validator that holds the source's
+        tombstone (:meth:`_unheld_tombstones`) decides ``indeterminate``. One
+        reason for each such source; empty when there is none.
+        """
+        return [f"source {record.source_id!r} that the run delivered from was removed "
+                f"({record.tombstone}); only a source evidence validator that holds its "
+                "tombstone can decide the run" for record in self._unheld_tombstones()]
+
     async def _decide(self, synthesis_key, output, *, reevaluation=False, publication=None,
                       repair=None):
         """Decide delivery acceptance for exactly *output* as a journal operation.
@@ -2926,6 +3117,10 @@ class WorkflowRuntime:
         read back and never made again. A *reevaluation* decides under the
         next decision sequence (see :meth:`reevaluate`), binding the
         republished *publication* and the *repair* it was made for, if any.
+        The decision binds the final receipts of the gates it reads
+        (:func:`_gate_receipts`). A decision on output delivered from a
+        removed source is ``indeterminate`` unless the policy can decide it
+        (:meth:`_unheld_removals`); the validators' outcomes are kept.
         """
         from smythe.swarm import _delivery_sources, _synthesis_strategy
 
@@ -2935,10 +3130,13 @@ class WorkflowRuntime:
         # The removals the decision is made under; only a run with context
         # assembly can have any.
         tombstones = _tombstone_keys(self.store, self.run_id) if self._context_version else []
+        # The verdicts the decision reads; nothing changes them once the run completes.
+        gates = _gate_receipts(self.graph)
 
         def inputs_at(sequence):
             return self._acceptance_inputs(synthesis_key, text_sha256(output), strategy, bound,
-                                           used_fallback, sequence, tombstones, publication, repair)
+                                           used_fallback, sequence, tombstones, publication, repair,
+                                           gates)
 
         sequence = self._next_decision_sequence(inputs_at) if reevaluation else 0
         inputs = inputs_at(sequence)
@@ -2949,6 +3147,10 @@ class WorkflowRuntime:
                 used_fallback=used_fallback, task=self.graph.task,
                 unusable=self._unusable_evidence_validators(),
             )
+            removals = self._unheld_removals()
+            if removals:
+                record = replace(record, decision=AcceptanceDecision.INDETERMINATE,
+                                 reasons=(*(() if record.accepted else record.reasons), *removals))
             return {"delivery_acceptance": record.to_dict()}
 
         self.decision_key = _decision_key(inputs)
@@ -2961,8 +3163,8 @@ class WorkflowRuntime:
                 or record.task_sha256 != self.undecided.task_sha256
                 or record.policy_sha256 != self.acceptance.sha256
                 or self._acceptance_inputs(synthesis_key, record.output_sha256, record.strategy,
-                                           record.sources, record.used_fallback,
-                                           sequence, tombstones, publication, repair) != inputs):
+                                           record.sources, record.used_fallback, sequence,
+                                           tombstones, publication, repair, gates) != inputs):
             raise WorkflowStateError("Saved delivery acceptance does not match its output")
         self.trace.on_acceptance(record)
         return record
@@ -2972,8 +3174,22 @@ class WorkflowRuntime:
 
         The assertion is verified first, so nothing is journaled for one the
         verifier refuses. An operator decision stopped before its checkpoint
-        is finished by the same decision again.
+        is finished by the same decision again. An operator may reject output
+        delivered from a removed source, but accepts it only under a policy
+        that could decide it (:meth:`_unheld_tombstones`); otherwise
+        ``WorkflowStateError`` is raised before the assertion is verified.
         """
+        if (operator.decision is AcceptanceDecision.ACCEPTED
+                and record.decision in (AcceptanceDecision.NEEDS_REVIEW,
+                                        AcceptanceDecision.INDETERMINATE)
+                and (unheld := self._unheld_tombstones())):
+            raise WorkflowStateError(
+                "An operator cannot accept output delivered from a removed source: " + "; ".join(
+                    f"source {item.source_id!r} that the run delivered from was removed "
+                    f"({item.tombstone})" for item in unheld)
+                + "; reject it, or accept it under a policy whose source evidence validator "
+                "holds the tombstone"
+            )
         sequence = current_decision(self.store, self.run_id)["sequence"]
         decided = _operator_record(operator, self.run_id, sequence, record, WorkflowStateError)
         # Like a policy's decision, it binds the removals it was made under.

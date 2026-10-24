@@ -309,8 +309,9 @@ A durable run takes a [run control](execution.md#security-stops) as ordinary
 runs do: `Swarm(run_store=store, run_control=control)`. The control is not
 part of the recipe. Once it is revoked, or a tool runtime raises
 `SecurityStop`, the run admits no node and sends no call, its synthesis is not
-called, and the nodes in flight are cancelled at once. A cancelled call that
-was already sent holds unknown exposure at its quoted ceiling, as after a
+called, and the nodes in flight are cancelled at once, with a supervisor
+review still pending. A cancelled call that was already sent, a review's
+included, holds unknown exposure at its quoted ceiling, as after a
 `HALT`. The run is then blocked in the journal before its failed checkpoint
 is saved: its status becomes `blocked`, its `blocked_reason` becomes
 `security_stop`, and a `security_stop` event records the reason code, never
@@ -532,13 +533,16 @@ journals the decision:
   `synthesis/<digest>`, a short digest of every node id and its generation,
   so each graph state has its own synthesis.
 - Resuming a completed run checks the saved output, task, source generations
-  and the journal's current decision against the record; a mismatch gives an
-  `indeterminate` record and moves the text to `rejected_output`.
+  and the journal's current decision against the record, and each gate's
+  saved final receipt against the digest the run's decisions bound; a
+  mismatch gives an `indeterminate` record and moves the text to
+  `rejected_output`.
 - Resuming never decides a completed run again, and resuming under another
   policy is refused. `Swarm(run_store=store).reevaluate(run_id,
   acceptance=policy)` is the explicit way to a new decision, for example
   under a fixed validator: it accepts a recipe that differs only in its
-  acceptance policy and gate verifier, runs no node and calls no provider,
+  acceptance policy and gate verifier (a lineage run's gates need the gate
+  verifier that judged them), runs no node and calls no provider,
   journals the decision as a new `acceptance` operation keyed
   `acceptance/<sequence>/<digest>`, and applies it with a new completed
   checkpoint. Calls, charges, the budget, revision and regeneration counters,
@@ -709,8 +713,9 @@ for its budget.
   for byte, so the nodes that run again are given exactly what a full
   recomputation would give them.
 - **Recovery.** A process lost after a reuse operation commits replays it on
-  resume without reading the predecessor; one lost before it commits checks
-  the predecessor again first. Refreshing an unfinished successor's sources
+  resume without reading the predecessor's results, though its tombstones
+  are read again (below); one lost before it commits checks the predecessor
+  again first. Refreshing an unfinished successor's sources
   runs its kept nodes again, like every other node, even when it was lost
   before it saved any of them; their reuse operations then stay unapplied.
   A kept result is never used once a source its record or source evidence
@@ -725,18 +730,21 @@ for its budget.
 - **Withdrawn text.** The successor's first checkpoint applies a copy of each
   of the predecessor's `source_tombstone` operations, so text
   [withdrawn](lineage.md#restrict-a-source) from the predecessor is withdrawn
-  from the successor too.
+  from the successor too. A tombstone the predecessor journals later is
+  copied when the successor resumes and again before it decides, so a
+  restriction made while it is in progress reaches it before it delivers.
 
 ## Restricted runs
 
 `smythe.lineage.restrict_source` journals a `source_tombstone` operation in
-each completed lineage run whose record names the withdrawn text, and, with
-`purge=True`, an `artifact_purge` operation keyed
-`artifact-purge/<publication sequence>` for each published file it deletes. A
-copy of the run's completed checkpoint applies them under the run's lease;
-they hold no calls, no cost and no source text, and the run's calls,
-balances and earlier checkpoints are unchanged
-([restrict a source](lineage.md#restrict-a-source)).
+each completed lineage run whose record names the withdrawn text, and in
+each successor in progress whose saved graph or `reuse` operations name a
+result of its predecessor derived from it, and, with `purge=True`, an
+`artifact_purge` operation keyed `artifact-purge/<publication sequence>` for
+each published file it deletes. A copy of the run's latest checkpoint
+applies them under the run's lease; they hold no calls, no cost and no
+source text, and the run's calls, balances and earlier checkpoints are
+unchanged ([restrict a source](lineage.md#restrict-a-source)).
 
 ## Recorded read steps
 
@@ -858,7 +866,16 @@ at their known cost as a rejected result, and the step raises `ReadToolError`
 with the status or failure name, never the response body. The node's failure policy decides what happens next:
 `RETRY` reads again as a new journaled call. Resuming re-enters the last
 rejected call of a free, `repeat_safe` read as a new invocation, so a halted
-step reads once more; other rejections replay.
+step reads once more; other rejections replay. A response whose text is that
+of a source [removed from the run](tasks.md#remove-a-source) is settled as
+rejected in the same way, with the removal as its reason, and a text
+accepted before the removal raises `ReadToolError` instead of replaying.
+The refusal compares the exact SHA-256 of the decoded text with the
+tombstone's, so text that differs from the removed source by any byte, even
+in whitespace or line endings, is not recognised as it. The refused response stays in the journal as the
+call's response evidence, as every read response does, and `load_evidence()`
+still returns it: a tombstone withholds text from use, it does not erase a
+record.
 
 ### Interrupted reads
 
@@ -892,7 +909,9 @@ token verification, gates judged by a
 declared with `LocalOnly(..., role="validator")`,
 [recorded read steps](#recorded-read-steps) of declared profiles, and
 [published documents](#published-documents) from `MarkdownRenderer` or a
-renderer declared with `LocalOnly(..., role="renderer")`. Every reachable router tier
+renderer declared with `LocalOnly(..., role="renderer")`, and opt-in
+[artifact lineage](lineage.md) with read-only repair plans and repairs that
+reuse unaffected results. Every reachable router tier
 and template is checked before routing can make a paid call. Provider
 instances are snapshotted per run.
 
@@ -930,7 +949,13 @@ release ([journal upgrades](#journal-upgrades)). From the command line,
 the run's state, its delivery decision, its
 [published document](#published-documents) and its next action through a
 read-only open; see
-[Inspect saved runs](runs.md). Explicit `load_replay()` and
+[Inspect saved runs](runs.md). `smythe runs --journal <path> review` lists
+only what in the newest runs needs a decision, such as a blocked run with
+the calls that hold its unknown exposure, a read sent without a saved
+response, a withheld decision or an action whose outcome is open, with the
+entry point that resolves each; see
+[Review what needs a decision](runs.md#review-what-needs-a-decision).
+Explicit `load_replay()` and
 `load_evidence()` calls expose sensitive saved text and raw provider and read responses;
 protect the database and its SQLite sidecar files accordingly. Since 0.8.1, a
 new database file is created readable and writable by its owner only (mode

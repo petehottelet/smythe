@@ -265,16 +265,18 @@ def _unb64(text: str) -> bytes:
     return base64.urlsafe_b64decode(text + "=" * (-len(text) % 4))
 
 
-_CLAIMS = frozenset({"iss", "sub", "tenant", "intent_sha256", "exp", "jti"})
+_CLAIMS = frozenset({"iss", "sub", "tenant", "subject_sha256", "exp", "jti"})
 
 
 class HmacApprovalHost:
     """A test ``ApprovalVerifier``: HMAC-signed assertions, revocation and expiry.
 
     ``issue`` signs an assertion that ``subject`` of ``tenant`` approves
-    exactly one intent digest until ``expires_at_ns``. ``verify`` accepts only
-    this host's own signature for that digest, before expiry, while neither
-    the assertion nor its subject is revoked. ``still_authorized`` holds while
+    exactly one digest until ``expires_at_ns``: an action's approval subject,
+    ``PreparedAction.approval_sha256``, or another digest such as an operator
+    decision's. ``verify`` accepts only this host's own signature for that
+    digest, before expiry, while neither the assertion nor its subject is
+    revoked. ``still_authorized`` holds while
     the subject is not revoked and the intent is in the principal's tenant.
     """
 
@@ -293,11 +295,11 @@ class HmacApprovalHost:
     def _sign(self, claims: str) -> str:
         return _b64(hmac.new(self.key, claims.encode("ascii"), hashlib.sha256).digest())
 
-    def issue(self, intent_sha256: str, *, subject: str, tenant: str, expires_at_ns: int) -> str:
+    def issue(self, subject_sha256: str, *, subject: str, tenant: str, expires_at_ns: int) -> str:
         if type(expires_at_ns) is not int:
             raise ValueError("An expiry is integer nanoseconds")
         claims = _b64(canonical_bytes({
-            "iss": self.issuer, "sub": subject, "tenant": tenant, "intent_sha256": intent_sha256,
+            "iss": self.issuer, "sub": subject, "tenant": tenant, "subject_sha256": subject_sha256,
             "exp": expires_at_ns, "jti": secrets.token_hex(16)}))
         return f"{claims}.{self._sign(claims)}"
 
@@ -316,14 +318,14 @@ class HmacApprovalHost:
             raise ApprovalRejected("The assertion is malformed")
         return data
 
-    def verify(self, assertion: str, intent_sha256: str, now_ns: int) -> Principal:
+    def verify(self, assertion: str, subject_sha256: str, now_ns: int) -> Principal:
         claims = self._claims(assertion)
         if type(now_ns) is not int:
             raise ApprovalRejected("The verification time must be integer nanoseconds")
         if claims["iss"] != self.issuer:
             raise ApprovalRejected("The assertion names another issuer")
-        if claims["intent_sha256"] != intent_sha256:
-            raise ApprovalRejected("The assertion approves another intent")
+        if claims["subject_sha256"] != subject_sha256:
+            raise ApprovalRejected("The assertion approves another digest")
         if now_ns >= claims["exp"]:
             raise ApprovalRejected("The assertion has expired")
         if claims["jti"] in self._revoked_assertions or claims["sub"] in self._revoked_subjects:

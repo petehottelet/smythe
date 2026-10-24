@@ -344,7 +344,7 @@ def test_hmac_host_verifies_only_its_own_assertion_for_the_exact_intent():
     principal = host.verify(assertion, digest, NOW)
     assert principal == Principal(host.issuer, "editor-7", "acme")
     assert host.still_authorized(principal, intent(), NOW)
-    with pytest.raises(ApprovalRejected, match="another intent"):
+    with pytest.raises(ApprovalRejected, match="approves another digest"):
         host.verify(assertion, intent(parameters={"title": "Changed"}).digest(), NOW)
     # Each host signs with its own random key, so the same claims from another
     # host are a forgery.

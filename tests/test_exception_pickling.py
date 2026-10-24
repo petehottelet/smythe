@@ -25,6 +25,7 @@ from smythe.provider import (
     ProviderAccountingCancelledError, ProviderAccountingError, ProviderResponseError,
 )
 from smythe.provider_responses import PreparedRequest, RawResponseEnvelope, ResponseQuoteError
+from smythe.templates import TemplateValidationError
 from smythe.workflow_provider import ProviderRequestRejectedError, WorkflowQuoteError
 
 
@@ -86,6 +87,10 @@ CUSTOM_CONSTRUCTED = {
     WorkflowQuoteError: lambda: WorkflowQuoteError("Managed quote failed", _ENVELOPE),
     ProviderRequestRejectedError: lambda: ProviderRequestRejectedError(
         "HTTP 429", status_code=429, envelope=_ENVELOPE, receipt={"cost_nanousd": "0"},
+    ),
+    TemplateValidationError: lambda: TemplateValidationError(
+        "template node 'draft' max_retries is 4, above the limit of 3", node="draft",
+        field="max_retries",
     ),
 }
 

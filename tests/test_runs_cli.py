@@ -28,6 +28,7 @@ from smythe import (
     LocalOnly,
     OfflineProvider,
     ReadProfile,
+    RoutingRule,
     SimpleArchitect,
     SourceEvidenceValidator,
     SQLiteWorkflowStore,
@@ -35,6 +36,7 @@ from smythe import (
     Task,
     ValidationReport,
     ValidatorIdentity,
+    WhiteRabbit,
 )
 import smythe.cli as cli
 from smythe.acceptance import text_sha256
@@ -52,6 +54,7 @@ from smythe.workflow_artifact import current_artifact
 import test_action_approvals as action_approvals
 from test_action_journal import rows as action_rows
 import test_action_operator as operator_actions
+import test_action_reconciliation as reconciliation
 import test_repair_plan as repair_plans
 from test_source_evidence import CLAIM, DROPPED, KEPT, STRONG
 from test_source_evidence import SOURCES as EVIDENCE_SOURCES
@@ -397,9 +400,10 @@ def test_list_reports_entries_it_cannot_open_and_continues(tmp_path, capsys):
     assert main(["runs", "--checkpoints", str(tmp_path), "--json", "list"]) == EXIT_OK
     rows = {row["run_id"]: row for row in output(capsys)["list"]["runs"]}
     assert sorted(rows) == sorted(["deep", "folder", run_id])
-    assert (rows[run_id]["state"], rows[run_id]["error"]) == ("completed", None)
+    assert (rows[run_id]["state"], rows[run_id]["error"], rows[run_id]["unresolved_actions"]) == (
+        "completed", None, 0)
     for unreadable in ("deep", "folder"):
-        assert rows[unreadable]["state"] is None
+        assert rows[unreadable]["state"] is None and rows[unreadable]["unresolved_actions"] is None
         assert f"Checkpoint {unreadable!r} is not readable" in rows[unreadable]["error"]
     assert main(["runs", "--checkpoints", str(tmp_path), "list"]) == EXIT_OK
     text = capsys.readouterr().out
@@ -854,9 +858,12 @@ def test_list_shows_durable_decisions(strict_journal, tmp_path, capsys, monkeypa
         ("accepted", "accepted"), ("rejected", "rejected"), ("needs_review", "needs_review"),
         ("indeterminate", "indeterminate"), ("legacy", None), ("gate-validator", None))}
     assert rows == expected | {planned: ("planned", "not_evaluated", None)}
+    # Runs without external actions have none unresolved.
+    assert {row["unresolved_actions"] for row in listed["runs"]} == {0}
     assert main(["runs", "--journal", str(path), "list"]) == EXIT_OK
     text = capsys.readouterr().out
-    assert f"{results['rejected'].execution_id}  completed  acceptance rejected  next review_output" in text
+    assert f"{results['rejected'].execution_id}  completed  acceptance rejected  next review_output\n" in text
+    assert "unresolved action" not in text
     assert journal_state(path) == before
 
 
@@ -1007,6 +1014,130 @@ def test_ordinary_runs_have_no_durable_research_blocks(tmp_path, capsys):
     assert value["lineage"] is None
     assert value["issues"] == [{"kind": "validator_rejected", "subject": "fixed-reject",
                                 "detail": value["delivery"]["reasons"][0]}]
+
+
+# ---------------------------------------------------------------------------
+# Routing decisions
+# ---------------------------------------------------------------------------
+
+
+ROUTED_GOAL = "Translate the confidential merger memo"
+TRANSLATE = RoutingRule("stable-transform", "single", "a stable transformation needs one worker",
+                        goal_any=("translate",))
+TIERS = ["single", "autonomous"]
+
+
+def routed_swarm(store, *rules) -> Swarm:
+    """A Swarm whose router applies *rules* before its offline classifier."""
+    router = WhiteRabbit(classifier_provider=OfflineProvider(), classifier_model="offline",
+                         autonomous=SimpleArchitect(), single=SimpleArchitect(), rules=rules)
+    if isinstance(store, SQLiteWorkflowStore):
+        return Swarm(model="offline", provider=OfflineProvider(), router=router, run_store=store,
+                     max_budget_usd=1)
+    return Swarm(model="offline", provider=OfflineProvider(), router=router, artifact_dir=None,
+                 checkpoint_store=store)
+
+
+def routed_run(tmp_path, kind: str, *rules) -> tuple[list[str], str, dict]:
+    """Run a routed task; the inspect arguments for its store, and the decision it saved."""
+    if kind == "checkpoints":
+        result = routed_swarm(FileCheckpointStore(tmp_path), *rules).execute(Task(ROUTED_GOAL))
+        return (["--checkpoints", str(tmp_path)],
+                result.execution_id, result.graph.planning["routing"])
+    path = tmp_path / "routed.db"
+    with SQLiteWorkflowStore(path) as store:
+        result = routed_swarm(store, *rules).execute(Task(ROUTED_GOAL))
+    return ["--journal", str(path)], result.execution_id, result.graph.planning["routing"]
+
+
+@pytest.mark.parametrize("kind", ["checkpoints", "journal"])
+def test_inspection_shows_the_rule_that_routed_a_run_and_never_its_task(
+        tmp_path, capsys, monkeypatch, kind):
+    store, run_id, saved = routed_run(tmp_path, kind, TRANSLATE)
+    no_side_effects(monkeypatch)
+
+    assert main(["runs", *store, "--json", "inspect", run_id]) == EXIT_OK
+    value = output(capsys)["inspect"]
+
+    assert value["routing"] == {
+        "readable": True, "tier": "single", "method": "rule", "rule": "stable-transform",
+        "reasons": ["the rule 'stable-transform' chose single",
+                    "a stable transformation needs one worker"],
+        "alternatives": TIERS, "policy_version": 2, "matched_token": None, "classifier": None,
+    }
+    assert value["routing"]["reasons"] == saved["reasons"]
+    assert main(["runs", *store, "inspect", run_id]) == EXIT_OK
+    text = capsys.readouterr().out
+    assert "Routing: tier single, chosen by rule stable-transform" in text
+    assert "merger memo" not in text and "merger memo" not in json.dumps(value)
+
+
+@pytest.mark.parametrize("kind", ["checkpoints", "journal"])
+def test_inspection_shows_the_classifier_s_routing_charge(tmp_path, capsys, kind):
+    store, run_id, saved = routed_run(tmp_path, kind)
+
+    assert main(["runs", *store, "--json", "inspect", run_id]) == EXIT_OK
+    routing = output(capsys)["inspect"]["routing"]
+
+    assert (routing["tier"], routing["method"], routing["rule"]) == (
+        saved["tier"], saved["method"], None)
+    assert routing["method"] in ("classifier", "fallback_unmatched")
+    assert routing["classifier"] == {"usage": saved["usage"], "call_ids": saved["call_ids"]}
+    main(["runs", *store, "inspect", run_id])
+    [line] = [line for line in capsys.readouterr().out.splitlines()
+              if line.startswith("Routing:")]
+    if kind == "checkpoints":
+        # An ordinary run records what the classifier call used.
+        usage = saved["usage"]
+        assert saved["call_ids"] == [] and usage is not None
+        assert (f"classifier call: {usage['prompt_tokens']} prompt and "
+                f"{usage['completion_tokens']} completion tokens") in line
+    else:
+        # A durable run's journal holds the charge, in the calls the decision names.
+        assert saved["usage"] is None and len(saved["call_ids"]) == 1
+        assert line.endswith("; classifier charge in 1 journal call")
+
+
+def test_a_durable_run_lost_before_its_first_checkpoint_shows_its_planned_routing(
+        tmp_path, capsys, monkeypatch):
+    from test_workflow_runtime import Crash, crash_checkpoints
+
+    path = tmp_path / "routed.db"
+    with SQLiteWorkflowStore(path) as store:
+        crash_checkpoints(monkeypatch, store, lambda state, _: state["status"] == "planned")
+        with pytest.raises(Crash):
+            routed_swarm(store, TRANSLATE).plan(Task(ROUTED_GOAL))
+        (run,) = store.list_runs()
+        # Only the planning operation holds the decision.
+        assert store.get_checkpoint(run["run_id"]) is None
+        assert store.load_operation(run["run_id"], "planning")["result"]["routing"]
+
+    main(["runs", "--journal", str(path), "--json", "inspect", run["run_id"]])
+    routing = output(capsys)["inspect"]["routing"]
+
+    assert (routing["tier"], routing["method"], routing["rule"]) == (
+        "single", "rule", "stable-transform")
+
+
+def test_a_run_without_a_router_shows_no_routing(tmp_path, capsys):
+    result = run(tmp_path)
+    code, value = inspect(capsys, tmp_path, result.execution_id)
+    assert code == EXIT_OK and value["routing"] is None
+    main(["runs", "--checkpoints", str(tmp_path), "inspect", result.execution_id])
+    assert "Routing" not in capsys.readouterr().out
+
+
+def test_a_routing_record_this_build_cannot_read_does_not_stop_inspection(tmp_path, capsys):
+    store, run_id, _ = routed_run(tmp_path, "checkpoints", TRANSLATE)
+    edit_checkpoint(tmp_path, run_id,
+                    lambda state: state["graph"]["planning"]["routing"].update(version=99))
+
+    code, value = inspect(capsys, tmp_path, run_id)
+
+    assert code == EXIT_OK and value["routing"]["readable"] is False
+    assert value["routing"]["tier"] is None
+    main(["runs", *store, "inspect", run_id])
+    assert "Routing: a decision this build cannot read" in capsys.readouterr().out
 
 
 # ---------------------------------------------------------------------------
@@ -1386,6 +1517,19 @@ def test_exit_code_12_is_new():
     assert (args.runs_command, args.target, args.reason, args.journal) == ("revoke-action", "abc", "why", "j.db")
 
 
+def test_the_actions_block_counts_attempts_in_words(capsys):
+    def entry(attempts):
+        return {"slot": "publish", "sequence": attempts + 1, "action_id": f"action-{attempts}",
+                "state": "dispatched", "attempts": [{}] * attempts, "confirmed_nanousd": 0, "unknown_nanousd": 0,
+                "duplicate_risk": False, "contradiction": None, "next_action": None, "approvals": [], "records": []}
+
+    cli._emit_actions({"unit": "nanoUSD", "confirmed_nanousd": 0, "reserved_nanousd": 0, "unknown_nanousd": 0,
+                       "unresolved": [], "items": [entry(0), entry(1), entry(2)]})
+
+    lines = capsys.readouterr().out.splitlines()
+    assert [line.split("; ")[1] for line in lines[1:]] == ["0 attempts", "1 attempt", "2 attempts"]
+
+
 def test_inspection_shows_external_actions_read_only_and_exits_12_while_one_is_unresolved(
         tmp_path, capsys, monkeypatch, scripted_replies):  # noqa: F811
     path, action, host, _ = action_journal(tmp_path, scripted_replies)
@@ -1438,16 +1582,20 @@ def test_inspection_shows_external_actions_read_only_and_exits_12_while_one_is_u
     assert main(["runs", "--journal", str(path), "inspect", action.run_id]) == EXIT_RUN_ACTION_UNRESOLVED
     text = capsys.readouterr().out
     assert f"External actions: 1; 0 confirmed, 0 reserved, {write} unknown nanoUSD; 1 unresolved" in text
-    assert (f"  Action publish/1 ({action.action_id}): outcome_unknown; 1 attempts; 0 confirmed, "
+    assert (f"  Action publish/1 ({action.action_id}): outcome_unknown; 1 attempt; 0 confirmed, "
             f"{write} unknown nanoUSD; next operator_review") in text
     assert (f"    Approval {approval['approval_id']}: editor-1 of acme ({host.issuer}); approved; "
             f"expires at {approval['expires_at_ns']} ns") in text
     assert "    Records: finding 1" in text
     for shown in (text, json.dumps(value)):
         assert not any(secret in shown for secret in secrets_of(path))
-    # Listing reports the run as before, with no new exit code.
+    # Listing exits as before, and counts the run's unresolved actions.
     assert main(["runs", "--journal", str(path), "--json", "list"]) == EXIT_OK
-    assert output(capsys)["list"]["runs"][0]["decision"] == "accepted"
+    (listed,) = output(capsys)["list"]["runs"]
+    assert (listed["decision"], listed["next_action"], listed["unresolved_actions"]) == ("accepted", "none", 1)
+    assert main(["runs", "--journal", str(path), "list"]) == EXIT_OK
+    assert (f"{action.run_id}  completed  acceptance accepted  next none  1 unresolved action\n"
+            in capsys.readouterr().out)
     assert journal_state(path) == before
 
 
@@ -1491,6 +1639,23 @@ def test_a_wrong_or_unverified_effect_exits_12_and_a_pending_readback_does_not(
     (entry,) = value["actions"]["items"]
     assert (entry["state"], entry["next_action"]) == (state, step)
     assert value["actions"]["unresolved"] == ([] if code == EXIT_OK else [action.action_id])
+    assert journal_state(path) == before
+
+
+def test_a_second_effect_that_a_late_receipt_shows_exits_12(tmp_path, capsys, scripted_replies):  # noqa: F811
+    path, action, _, _ = action_journal(tmp_path, scripted_replies, setup=reconciliation.second_effect)
+    before = journal_state(path)
+
+    exit_code, value = inspect_durable(capsys, path, action.run_id)
+
+    assert (exit_code, value["delivery"]["decision"]) == (EXIT_RUN_ACTION_UNRESOLVED, "accepted")
+    (entry,) = value["actions"]["items"]
+    assert (entry["state"], entry["contradiction"], entry["next_action"]) == ("observed", "second_effect", "compensate")
+    assert value["actions"]["unresolved"] == [action.action_id]
+    assert main(["runs", "--journal", str(path), "inspect", action.run_id]) == EXIT_RUN_ACTION_UNRESOLVED
+    assert (f"  Action publish/1 ({action.action_id}): observed; 2 attempts; {entry['confirmed_nanousd']} "
+            f"confirmed, {entry['unknown_nanousd']} unknown nanoUSD; second effect; next compensate"
+            in capsys.readouterr().out)
     assert journal_state(path) == before
 
 

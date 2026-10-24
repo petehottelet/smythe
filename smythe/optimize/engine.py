@@ -64,6 +64,25 @@ _MAX_RUNNER_CANDIDATES = 1_024
 _MAX_RUNNER_PARALLEL_CANDIDATES = 256
 _MAX_RUNNER_REPETITIONS = 10_000
 _MAX_RUNNER_TRIALS = 100_000
+# A campaign tunes a policy, never how it is judged, what it may spend, or
+# what it may do: no mutable field may equal one of these or lie under it.
+_RESERVED_PATH_ROOTS = frozenset(
+    {
+        "acceptance",
+        "validators",
+        "verifier",
+        "evaluator",
+        "harness",
+        "budget",
+        "spend",
+        "ceilings",
+        "capabilities",
+        "tools",
+        "permissions",
+        "authority",
+        "holdout",
+    }
+)
 
 
 class OptimizationError(RuntimeError):
@@ -234,7 +253,11 @@ class OptimizationResult:
 
 
 class OptimizationRunner:
-    """Run a bounded development/confirmation/holdout campaign in-process."""
+    """Run a bounded development/confirmation/holdout campaign in-process.
+
+    With ``single_change``, every challenger must differ from the incumbent
+    in exactly one policy path.
+    """
 
     def __init__(
         self,
@@ -249,6 +272,7 @@ class OptimizationRunner:
         lease_heartbeat_s: float | None = None,
         task_pools: Mapping[str, int] | None = None,
         max_holdout_draws: int | None = None,
+        single_change: bool = False,
     ) -> None:
         if not isinstance(contract, ExperimentContract):
             raise TypeError("contract must be an ExperimentContract")
@@ -291,6 +315,8 @@ class OptimizationRunner:
             or not 1 <= max_holdout_draws <= _MAX_SIGNED_63
         ):
             raise ValueError("max_holdout_draws must be a positive integer when provided")
+        if not isinstance(single_change, bool):
+            raise TypeError("single_change must be a boolean")
 
         self.contract = contract
         self.ledger = ledger
@@ -307,6 +333,7 @@ class OptimizationRunner:
         self.lease_heartbeat_s = float(interval)
         self.task_pools = {split: pools[split] for split in _SPLITS if split in pools}
         self.max_holdout_draws = max_holdout_draws
+        self.single_change = single_change
 
     async def run(
         self,
@@ -709,6 +736,16 @@ class OptimizationRunner:
             raise OptimizationError("a challenger cannot be the incumbent candidate")
         if incumbent.policy_hash in hashes:
             raise OptimizationError("a challenger cannot repeat the incumbent policy")
+        if self.single_change:
+            # References are never promoted, so they may differ more.
+            for candidate in challengers:
+                changed = _changed_paths(incumbent, candidate)
+                if len(changed) != 1:
+                    raise OptimizationError(
+                        f"single_change requires challenger {candidate.candidate_id} "
+                        "to differ from the incumbent in exactly one policy path; "
+                        "it changes " + ", ".join(changed)
+                    )
         reference_ids = [item.candidate_id for item in compared]
         reference_hashes = {item.policy_hash for item in compared}
         if len(set(reference_ids)) != len(compared) or len(reference_hashes) != len(compared):
@@ -771,6 +808,8 @@ class OptimizationRunner:
             plan_payload["task_pools"] = dict(self.task_pools)
         if self.max_holdout_draws is not None:
             plan_payload["max_holdout_draws"] = self.max_holdout_draws
+        if self.single_change:
+            plan_payload["single_change"] = True
         if compared:
             plan_payload["ordered_reference_ids"] = reference_ids
             plan_payload["reference_rule"] = reference_rule
@@ -804,9 +843,10 @@ class OptimizationRunner:
         ID, or changing the contract name, mutable fields or their rules,
         development or confirmation repetitions, base seed, or any candidate,
         parallelism, trial, wall-time, or spend cap cannot draw a second
-        holdout for the same policy in this ledger.  Neither can upgrading the
-        runner: holdouts used by earlier releases, which kept no separate
-        record, still count.  References are not checked: they are never
+        holdout for the same policy in this ledger, and neither can the
+        single-change setting.  Neither can upgrading the runner: holdouts
+        used by earlier releases, which kept no separate record, still
+        count.  References are not checked: they are never
         promoted, so their holdout trials are not use.
 
         With ``max_holdout_draws``, a new campaign is also refused, whatever
@@ -836,6 +876,20 @@ class OptimizationRunner:
                 )
 
     def _validate_executable_contract(self) -> None:
+        # Refused here rather than in contract parsing, so a stored contract
+        # still loads for inspection and holdout accounting.  Letter case is
+        # ignored: ``Budget`` names the same setting as ``budget``.
+        reserved = [
+            path
+            for path in self.contract.mutable_fields
+            if path.split(".", 1)[0].lower() in _RESERVED_PATH_ROOTS
+        ]
+        if reserved:
+            raise OptimizationError(
+                "executable optimization contracts must not make reserved "
+                "evaluation, spend or authority paths mutable; reserved="
+                + ", ".join(reserved)
+            )
         if not self.contract.required_gates:
             raise OptimizationError(
                 "executable optimization contracts must declare required_gates"
@@ -1592,6 +1646,19 @@ def _json_copy(value: Any) -> Any:
 
 def _unique_keys(values: Any) -> tuple[str, ...]:
     return tuple(dict.fromkeys(values))
+
+
+def _changed_paths(incumbent: Candidate, candidate: Candidate) -> list[str]:
+    """Sorted policy paths whose values differ or that only one policy sets."""
+
+    before, after = incumbent.policy, candidate.policy
+    return sorted(
+        path
+        for path in {*before, *after}
+        if path not in before
+        or path not in after
+        or canonical_json_bytes(before[path]) != canonical_json_bytes(after[path])
+    )
 
 
 def _metric_samples(

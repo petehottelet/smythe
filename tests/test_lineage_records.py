@@ -454,6 +454,42 @@ def test_reuse_names_the_same_store_predecessor(change):
         ArtifactLineage.from_dict(data)
 
 
+GATE_VALIDATOR = ValidatorIdentity.for_config("contains", "1", {"needle": "needle"})
+
+
+def gated_data() -> dict:
+    """A record whose gate judged the extraction under a gate validator."""
+    data = record_data()
+    data["nodes"].append(node("check", kind="gate", depends_on=["extract"],
+                              component={"name": "fact-check", "version": "1"}))
+    data["nodes"][-1]["inputs"]["verifier"] = {"name": "validator-v1",
+                                               "validators": [GATE_VALIDATOR.to_dict()]}
+    return data
+
+
+@pytest.mark.parametrize("change", [
+    pytest.param(set_at(("nodes", 3, "inputs", "verifier", "extra"), 1), id="unknown-key"),
+    pytest.param(lambda data: data["nodes"][3]["inputs"]["verifier"].pop("validators"),
+                 id="missing-validators"),
+    pytest.param(set_at(("nodes", 3, "inputs", "verifier", "name"), ""), id="empty-name"),
+    pytest.param(set_at(("nodes", 3, "inputs", "verifier", "validators"), [{"name": "x"}]),
+                 id="validator-identity"),
+    pytest.param(set_at(("nodes", 3, "inputs", "verifier"), None), id="null"),
+    pytest.param(set_at(("nodes", 3, "kind"), "model"), id="not-a-gate"),
+])
+def test_only_a_gate_names_the_verifier_that_judged_it(change):
+    other = ValidatorIdentity.for_config("another", "1")
+    data = gated_data()
+    data["nodes"][3]["inputs"]["verifier"]["validators"] = [
+        GATE_VALIDATOR.to_dict(), other.to_dict(), GATE_VALIDATOR.to_dict()]
+    # Its gate validators are kept as a sorted set, like the decision's.
+    assert ArtifactLineage.from_dict(data).nodes[3]["inputs"]["verifier"] == {
+        "name": "validator-v1", "validators": (other.to_dict(), GATE_VALIDATOR.to_dict())}
+    change(data)
+    with pytest.raises(ValueError):
+        ArtifactLineage.from_dict(data)
+
+
 def test_record_is_immutable_and_its_dict_is_detached():
     record = ArtifactLineage.from_dict(record_data())
     with pytest.raises(FrozenInstanceError):
@@ -638,3 +674,25 @@ def test_yaml_graphs_take_lineage_from_the_argument(store, tmp_path):
     result = asyncio.run(swarm.execute_async())
     assert result.accepted
     assert store.load_run(result.execution_id)["config"]["lineage"] == policy.to_dict()
+
+
+# ---------------------------------------------------------------------------
+# Re-evaluation and the reuse switch
+# ---------------------------------------------------------------------------
+
+
+def test_a_re_evaluation_ignores_only_the_lineage_reuse_switch(store, monkeypatch):
+    run_id = durable(store, acceptance=strict(), lineage=LineagePolicy()).execute(
+        Task("Report")).execution_id
+    no_provider_calls(monkeypatch)
+    for changed in (LineagePolicy(access_scope="tenant-b"),
+                    LineagePolicy(undeclared_coverage="regenerate")):
+        with pytest.raises(WorkflowConflictError, match="lineage"):
+            durable(store, acceptance=strict(), lineage=changed).reevaluate(run_id)
+    # A decision reuses nothing, so the rollback switch does not bind it.
+    again = durable(store, acceptance=strict(), lineage=LineagePolicy(reuse=False)).reevaluate(
+        run_id)
+    assert again.accepted
+    assert store.load_run(run_id)["config"]["lineage"] == LineagePolicy().to_dict()
+    with pytest.raises(WorkflowConflictError, match="lineage"):
+        durable(store, acceptance=strict(), lineage=LineagePolicy(reuse=False)).resume(run_id)

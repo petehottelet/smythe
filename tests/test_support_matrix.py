@@ -20,7 +20,8 @@ from fakes import RATE_LIMITED, MessagesTransport, NativeTransport
 from smythe import (
     AcceptancePolicy, AnthropicMessagesProvider, AnthropicProvider, Artifact,
     BudgetEstimateRequired, CallableVerifier, ChatMessage, CompletionResult, FailurePolicy,
-    FileCheckpointStore, GeminiProvider, LineagePolicy, LLMArchitect, OfflineProvider,
+    FileCheckpointStore, GeminiProvider, LineagePolicy, LLMArchitect, LocalTool, LocalToolRuntime,
+    OfflineProvider,
     OpenAIImageProvider, OpenAIProvider, OpenAIResponsesProvider, PlannerMemory, Provider,
     ProviderAccountingError, ProviderFeatures, ProviderResponseError, SimpleArchitect,
     SQLiteWorkflowStore, Swarm, SynthesisStrategy, Synthesizer, Task, TextValidator,
@@ -73,6 +74,10 @@ class StrictTokenVerifier(TokenVerifier):
 class UnusedTools(ToolRuntime):
     def open(self, agent):
         raise AssertionError("A tool session opened")
+
+
+def unused_handler(arguments):
+    raise AssertionError("A local tool ran")
 
 
 class NoTools(ToolSession):
@@ -193,6 +198,9 @@ def test_durable_run_rejects_provider_before_any_call(store, monkeypatch, make_p
                  id="store-subclass"),
     pytest.param("memory", lambda path: PlannerMemory(path / "history.jsonl"), None, id="memory"),
     pytest.param("tool_runtime", lambda path: UnusedTools(), None, id="tool-runtime"),
+    pytest.param("tool_runtime", lambda path: LocalToolRuntime(
+        [LocalTool(ToolSpec("notes.search", "Search.", {"type": "object"}), unused_handler, "1")],
+        agents={"writer": ["notes.search"]}), None, id="local-tool-runtime"),
     pytest.param("checkpoint_store", lambda path: FileCheckpointStore(path / "checkpoints"), None,
                  id="checkpoint-store"),
     pytest.param("verifier", lambda path: CallableVerifier(lambda *_: True), "CallableVerifier",

@@ -11,19 +11,21 @@ import sqlite3
 import pytest
 
 from fakes import Crash, crash_when
+import smythe.workflow
 from smythe import (
     AcceptanceDecision, AcceptancePolicy, CallableVerifier, FailurePolicy, LocalOnly,
     OfflineProvider, Revision, SimpleArchitect, SQLiteWorkflowStore, Swarm, Task,
     TokenVerifier, WhiteRabbit,
 )
+from smythe._run_inspection import inspect_journal
 from smythe.acceptance import task_sha256, text_sha256
 from smythe.graph import ExecutionGraph, Node, NodeStatus, Topology
 from smythe.prompts import PLANNING_SYSTEM_PROMPT
 from smythe.provider import CompletionResult
 from smythe.registry import Registry
 from smythe.validation import ValidationReport, ValidatorIdentity, hard_finding
-from smythe.verifier import TOKEN_VERIFIER_IDENTITY
-from smythe.workflow import _synthesis_key, current_decision, decision_history
+from smythe.verifier import ADVISORY_VERDICT_KEY, TOKEN_VERIFIER_IDENTITY
+from smythe.workflow import _decision_key, _synthesis_key, current_decision, decision_history
 from smythe.workflow_binding import WorkflowBindingError
 from smythe.workflow_store import WorkflowConflictError, WorkflowStateError, _canonical, _sha
 
@@ -764,6 +766,27 @@ def test_a_durable_gate_from_a_generated_plan_does_not_accept_on_its_own(store, 
     assert store.get_checkpoint(run_id)["checkpoint"]["status"] == "planned"
 
 
+def test_resuming_a_run_stopped_before_planning_refuses_a_plan_no_gate_could_accept(
+        store, replies, monkeypatch):
+    _, calls = replies
+    swarm = planner(store, replies, acceptance=strict())
+    # plan() creates the run, then stops before its planning operation begins.
+    stop = crash_when(monkeypatch, store, "begin_operation")
+    with pytest.raises(Crash):
+        swarm.plan(Task("Write the summary"))
+    stop.restore()
+    (run,) = store.list_runs()
+    run_id = run["run_id"]
+    assert store.get_checkpoint(run_id) is None
+
+    # Resuming would plan first; the plan could never be accepted, so nothing is called.
+    with pytest.raises(ValueError, match="architect that generates its gates"):
+        swarm.resume(run_id)
+    assert calls == [] and store.inspect_run(run_id)["call_count"] == 0
+    assert store.get_checkpoint(run_id) is None
+    assert store.load_operation(run_id, "planning") is None
+
+
 @pytest.mark.parametrize(("needle", "decision"), [("unchecked", "accepted"), ("needle", "rejected")])
 def test_a_durable_generated_plan_is_decided_by_its_final_validators(store, replies, needle,
                                                                       decision):
@@ -1179,6 +1202,190 @@ def test_reevaluation_reads_recorded_gate_verdicts_without_its_gate_validator(st
     draft, judge = result.graph.nodes
     assert draft.metadata["execution_generation"] == 1 and judge.metadata["regenerations_used"] == 1
     assert store.load_run(run_id)["config"]["verifier"] == "validator-v1"
+
+
+def passed_verdict(checkpoint):
+    """Rewrite the judge's final receipt as a passing verdict."""
+    receipt = checkpoint["graph"]["nodes"][1]["metadata"]["verification_receipt"]
+    receipt.update(outcome="passed", passed=True)
+
+
+def test_reevaluation_refuses_gate_verdicts_changed_after_the_decision(tmp_path, replies):
+    script, calls = replies
+    script["Draft"] = ["first", "second"]
+    path = tmp_path / "gates.db"
+    with SQLiteWorkflowStore(path) as store:
+        original = durable(store, verifier=contains(), acceptance=strict()).execute(gated())
+        (decision,) = decision_history(store, original.execution_id)
+    run_id = original.execution_id
+    assert original.acceptance.decision is AcceptanceDecision.REJECTED
+    receipt = original.graph.nodes[1].metadata["verification_receipt"]
+    assert (receipt["outcome"], receipt["passed"]) == ("rejected", False)
+
+    # Direct write access to the journal turns the failing verdict into a pass.
+    rewrite_checkpoint(path, run_id, passed_verdict)
+    sent, Contains.checked = list(calls), []
+    with SQLiteWorkflowStore(path) as store:
+        before, revision = operations(store, run_id), store.load_run(run_id)["revision"]
+        with pytest.raises(WorkflowStateError, match="cannot be re-evaluated: the saved gate "
+                                                     "verdicts are not those the run's decision bound"):
+            durable(store).reevaluate(run_id, acceptance=strict(on_exhausted="needs_review"))
+        assert operations(store, run_id) == before
+        assert store.load_run(run_id)["revision"] == revision
+        resumed = durable(store, verifier=contains(), acceptance=strict()).resume(run_id)
+    # Resume never delivers what the changed verdict would accept.
+    assert resumed.acceptance.decision is AcceptanceDecision.INDETERMINATE and not resumed.accepted
+    assert ("the saved gate verdicts are not those the run's decision bound"
+            in resumed.acceptance.reasons)
+    assert calls == sent and Contains.checked == []
+    # The run's own decision binds the gate's final receipt.
+    assert decision["sequence"] == 0 and "gate_receipts_sha256" in decision["inputs"]
+
+
+def test_a_changed_gate_verdict_is_refused_after_a_later_reevaluation_too(tmp_path, replies):
+    replies[0]["Draft"] = ["first", "second"]
+    path = tmp_path / "gates.db"
+    with SQLiteWorkflowStore(path) as store:
+        run_id = durable(store, verifier=contains(), acceptance=strict()).execute(
+            gated()).execution_id
+        later = durable(store).reevaluate(run_id, acceptance=strict(on_exhausted="needs_review"))
+        bound = [item["inputs"]["gate_receipts_sha256"] for item in decision_history(store, run_id)]
+    assert later.acceptance.decision is AcceptanceDecision.NEEDS_REVIEW
+    # The re-evaluation read the same verdicts and binds the same receipts.
+    assert len(bound) == 2 and bound[0] == bound[1]
+    rewrite_checkpoint(path, run_id, passed_verdict)
+    with SQLiteWorkflowStore(path) as store:
+        with pytest.raises(WorkflowStateError, match="the saved gate verdicts are not those"):
+            durable(store).reevaluate(run_id, acceptance=strict(on_exhausted="needs_review"))
+        assert [item["sequence"] for item in decision_history(store, run_id)] == [0, 1]
+
+
+def without_gate_receipts(path, run_id):
+    """Rewrite a run's own decision as one recorded before decisions bound gate receipts."""
+    with closing(sqlite3.connect(path)) as db, db:
+        key, text = db.execute(
+            "SELECT operation_key, inputs_json FROM workflow_operations WHERE run_id=? "
+            "AND kind='acceptance'", (run_id,)).fetchone()
+        inputs = json.loads(text)
+        del inputs["gate_receipts_sha256"]
+        text = _canonical(inputs)
+        db.execute("UPDATE workflow_operations SET operation_key=?, inputs_json=?, inputs_sha=? "
+                   "WHERE run_id=? AND operation_key=?",
+                   (_decision_key(inputs), text, _sha(text), run_id, key))
+
+
+def test_a_decision_recorded_without_gate_receipts_still_holds(tmp_path, replies):
+    replies[0]["Judge"] = ["PASS"]
+    path = tmp_path / "earlier.db"
+    with SQLiteWorkflowStore(path) as store:
+        original = durable(store, acceptance=strict()).execute(gated())
+    assert original.accepted
+    without_gate_receipts(path, original.execution_id)
+    with SQLiteWorkflowStore(path) as store:
+        assert "gate_receipts_sha256" not in current_decision(store, original.execution_id)["inputs"]
+        resumed = durable(store, acceptance=strict()).resume(original.execution_id)
+        again = durable(store).reevaluate(original.execution_id, acceptance=strict())
+    assert resumed.acceptance == original.acceptance and resumed.output == original.output
+    assert again.accepted and again.output == original.output
+
+
+def rewrite_decision_inputs(path, run_id, sequence, change):
+    """Change the inputs of a run's decision at *sequence* and rehash them, keeping its key."""
+    with closing(sqlite3.connect(path)) as db, db:
+        for key, text in db.execute(
+                "SELECT operation_key, inputs_json FROM workflow_operations WHERE run_id=? "
+                "AND kind='acceptance'", (run_id,)).fetchall():
+            inputs = json.loads(text)
+            if inputs.get("sequence", 0) == sequence:
+                change(inputs)
+                text = _canonical(inputs)
+                db.execute("UPDATE workflow_operations SET inputs_json=?, inputs_sha=? "
+                           "WHERE run_id=? AND operation_key=?", (text, _sha(text), run_id, key))
+
+
+def test_an_earlier_decision_whose_inputs_no_longer_match_its_key_is_named(tmp_path, replies):
+    path = tmp_path / "keys.db"
+    with SQLiteWorkflowStore(path) as store:
+        first = durable(store, acceptance=strict(Contains())).execute(single("Write the needle"))
+        again = durable(store).reevaluate(first.execution_id, acceptance=strict(Contains()))
+    run_id = first.execution_id
+    assert first.accepted and again.accepted
+    # Direct write access to the journal changes the run's own decision, which
+    # is no longer current, without its key; no gate is involved.
+    rewrite_decision_inputs(path, run_id, 0, lambda inputs: inputs.update(used_fallback=True))
+    reason = "the inputs of the journal's decision 0 do not match its key"
+    with SQLiteWorkflowStore(path) as store:
+        before, revision = operations(store, run_id), store.load_run(run_id)["revision"]
+        with pytest.raises(WorkflowStateError, match=f"cannot be re-evaluated: {reason}$"):
+            durable(store).reevaluate(run_id, acceptance=strict(Contains()))
+        assert operations(store, run_id) == before
+        assert store.load_run(run_id)["revision"] == revision
+        resumed = durable(store, acceptance=strict(Contains())).resume(run_id)
+        view = inspect_journal(store, run_id)
+    assert resumed.acceptance.decision is AcceptanceDecision.INDETERMINATE and not resumed.accepted
+    assert resumed.acceptance.reasons == (reason,)
+    assert view["delivery"]["reasons"] == [reason]
+
+
+@pytest.mark.parametrize("sequence,reasons", [
+    (0, ()),
+    (1, ("the journal holds no applied decision matching the saved record",)),
+], ids=["earlier", "current"])
+def test_a_decision_whose_inputs_are_not_an_object_is_indeterminate(store, replies, monkeypatch,
+                                                                    sequence, reasons):
+    first = durable(store, acceptance=strict(Contains())).execute(single("Write the needle"))
+    run_id = first.execution_id
+    durable(store).reevaluate(run_id, acceptance=strict(Contains()))
+    read = smythe.workflow.decision_history
+
+    def history(store, run_id):
+        # The journal itself refuses such inputs; a history read elsewhere may hold them.
+        decisions = read(store, run_id)
+        decisions[sequence]["inputs"] = sorted(decisions[sequence]["inputs"].items())
+        return decisions
+
+    monkeypatch.setattr(smythe.workflow, "decision_history", history)
+    resumed = durable(store, acceptance=strict(Contains())).resume(run_id)
+    view = inspect_journal(store, run_id)
+    expected = (*reasons, f"the inputs of the journal's decision {sequence} are not a JSON object")
+    assert resumed.acceptance.decision is AcceptanceDecision.INDETERMINATE and not resumed.accepted
+    assert resumed.acceptance.reasons == expected
+    assert view["delivery"]["reasons"] == list(expected)
+
+
+def judge_record(change):
+    """Change the gate's recorded advisory verdict, or the gate itself."""
+    def rewrite(checkpoint):
+        judge = checkpoint["graph"]["nodes"][1]
+        change(judge, judge["metadata"][ADVISORY_VERDICT_KEY])
+    return rewrite
+
+
+@pytest.mark.parametrize("change", [
+    lambda judge, record: record.update(target_id="elsewhere"),
+    lambda judge, record: record.update(judge_generation=1),
+    lambda judge, record: judge.update(status="failed"),
+], ids=["target-id", "judge-generation", "gate-status"])
+def test_a_changed_gate_binding_is_refused_after_the_decision(tmp_path, replies, change):
+    replies[0]["Judge"] = ["PASS"]
+    path = tmp_path / "advisory.db"
+    with SQLiteWorkflowStore(path) as store:
+        original = durable(store, acceptance=strict()).execute(gated(max_regenerations=0))
+    run_id = original.execution_id
+    assert original.accepted
+    assert original.graph.nodes[1].metadata[ADVISORY_VERDICT_KEY]["outcome"] == "passed"
+
+    # The passing verdict no longer judges the draft the decision read it on.
+    rewrite_checkpoint(path, run_id, judge_record(change))
+    reason = "the saved gate verdicts are not those the run's decision bound"
+    with SQLiteWorkflowStore(path) as store:
+        before = operations(store, run_id)
+        with pytest.raises(WorkflowStateError, match=f"cannot be re-evaluated: {reason}$"):
+            durable(store).reevaluate(run_id, acceptance=strict())
+        assert operations(store, run_id) == before
+        resumed = durable(store, acceptance=strict()).resume(run_id)
+    assert resumed.acceptance.decision is AcceptanceDecision.INDETERMINATE and not resumed.accepted
+    assert resumed.acceptance.reasons == (reason,)
 
 
 def test_durable_reevaluation_refuses_what_it_cannot_decide(store, replies):

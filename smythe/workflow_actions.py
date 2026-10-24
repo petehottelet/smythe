@@ -32,7 +32,7 @@ from uuid import uuid4
 from smythe._money import NANOUSD
 from smythe._redact import redact_account_identifiers
 from smythe.actions import (
-    _CLOSED, _DECISIONS, _FINISHED, _SECURITY_STOP, _SHOWN, ACTION_STATES, ActionIntent, ActionNotAuthorized,
+    _CLOSED, _DECISIONS, _FINISHED, _NOTICES, _SECURITY_STOP, _SHOWN, ACTION_STATES, ActionIntent, ActionNotAuthorized,
     ActionStateError, ApprovalRejected, ConnectorProfile, ConnectorReceipt, PreparedAction, Principal,
     _held_digest, _next_action, _receipt_of, _undeliverable, _window_open, action_key,
 )
@@ -630,6 +630,7 @@ def _record(store, permit, state, receipt=None, error=None):
                        (record_id, action["action_id"], payload, _sha(payload), store._clock_ns()))
             store._event(db, permit.run_id, "action_late_receipt", payload={
                 "action_id": action["action_id"], "attempt_id": permit.attempt_id, "record_id": record_id})
+            _contradict(store, db, action, attempt, record_id, receipt)
         elif state == "acknowledged":
             # Without a reported cost, only a write declared free has a known one.
             held = _amount(attempt["reserved"])
@@ -668,7 +669,9 @@ def record_receipt(store, permit, receipt):
     A permit from a superseded lease session, or for an attempt whose outcome
     is already recorded or recovered, changes nothing: its outcome is kept as
     a ``late_receipt`` record, then ``WorkflowLeaseError`` or
-    ``ActionStateError`` is raised.
+    ``ActionStateError`` is raised. A late receipt that shows a commit of an
+    attempt found not executed also appends a contradicting finding (see
+    :func:`_contradict`).
     """
     if not isinstance(receipt, ConnectorReceipt):
         raise WorkflowValidationError("Expected a ConnectorReceipt")
@@ -843,19 +846,30 @@ def keep_notice(store, key, payload):
     """Keep *payload* as an untrusted ``notice`` record of the action keyed *key*; return that action.
 
     A notice that names no action of the journal is not kept, and None is
-    returned. Keeping a notice changes no state.
+    returned. A notice with the payload digest of one the action keeps is not
+    kept again. An action keeps at most ``_NOTICES`` notices; for each further
+    one an ``action_notice_dropped`` event records its digest, not its body.
+    Keeping a notice changes no state.
     """
     payload_json = _canonical(payload)
     if store.store_version < 2:
         return None
+    digest = _sha(payload_json)
     with store._transaction() as db:
         row = db.execute("SELECT * FROM workflow_actions WHERE action_key=?", (key,)).fetchone()
         if row is None:
             return None
+        where = "FROM workflow_action_records WHERE action_id=? AND kind='notice'"
+        if db.execute(f"SELECT 1 {where} AND payload_sha=?", (row["action_id"], digest)).fetchone() is not None:
+            return _prepared(row)
+        if db.execute(f"SELECT count(*) {where}", (row["action_id"],)).fetchone()[0] >= _NOTICES:
+            store._event(db, row["run_id"], "action_notice_dropped",
+                         payload={"action_id": row["action_id"], "payload_sha256": digest})
+            return _prepared(row)
         record_id = uuid4().hex
         db.execute("""INSERT INTO workflow_action_records(record_id,action_id,kind,payload_json,payload_sha,
           trusted,created) VALUES (?,?,'notice',?,?,0,?)""",
-                   (record_id, row["action_id"], payload_json, _sha(payload_json), store._clock_ns()))
+                   (record_id, row["action_id"], payload_json, digest, store._clock_ns()))
         store._event(db, row["run_id"], "action_notice",
                      payload={"action_id": row["action_id"], "record_id": record_id})
         return _prepared(row)
@@ -864,6 +878,8 @@ def keep_notice(store, key, payload):
 # Reconciliation: lookups by key, same-key retries and findings on unknown outcomes.
 
 FINDINGS = ("not_executed", "unresolved")
+# The finding a late receipt appends when it shows a commit of an attempt found not executed.
+CONTRADICTED = "contradicted_absence"
 
 
 def _payloads(db, action_id, kind):
@@ -883,17 +899,114 @@ def _found(db, action_id):
     return found
 
 
-def _unsettled(db, action_id):
-    """IDs of the action's ``outcome_unknown`` attempts that no ``not_executed`` finding or decision settled.
+def _absent(db, action_id):
+    """The action's ``outcome_unknown`` attempts, oldest first, each with whether it was found not executed.
 
-    An operator's ``not_executed`` decision settles every attempt it found.
+    A ``not_executed`` finding names the attempt it settles, and an operator's
+    ``not_executed`` decision settles every attempt it found.
     """
     settled = {payload.get("attempt_id") for _, payload in _payloads(db, action_id, "finding")
                if payload.get("finding") == "not_executed"}
     found = _risk(db, action_id) or 0
     rows = db.execute("SELECT attempt_id,number FROM workflow_action_attempts WHERE action_id=? "
                       "AND state='outcome_unknown' ORDER BY number", (action_id,)).fetchall()
-    return [row[0] for row in rows if row[0] not in settled and row[1] > found]
+    return [(row[0], row[0] in settled or row[1] <= found) for row in rows]
+
+
+def _unsettled(db, action_id):
+    """IDs of the action's ``outcome_unknown`` attempts that nothing settled, oldest first.
+
+    A ``not_executed`` finding or decision settles an attempt until a late
+    receipt contradicts it (see :func:`_contradict`).
+    """
+    contradicted = _contradicted(db, action_id)
+    return [attempt_id for attempt_id, absent in _absent(db, action_id)
+            if not absent or attempt_id in contradicted]
+
+
+def _contradicted(db, action_id):
+    """IDs of the attempts found not executed whose commit a late receipt has shown since."""
+    return {payload.get("attempt_id") for _, payload in _payloads(db, action_id, "finding")
+            if payload.get("finding") == CONTRADICTED}
+
+
+def _late_commits(db, action_id):
+    """The receipt of each attempt's own commit that a late receipt shows, by attempt ID.
+
+    Only an acknowledged answer that the service did not deduplicate shows
+    one; the first such record of an attempt counts.
+    """
+    commits = {}
+    for _, payload in _payloads(db, action_id, "late_receipt"):
+        receipt = payload.get("receipt")
+        if (payload.get("outcome") == "acknowledged" and type(receipt) is dict
+                and receipt.get("deduplicated") is False):
+            commits.setdefault(payload.get("attempt_id"), receipt)
+    return commits
+
+
+def _late_numbers(db, action_id):
+    """The number of each attempt whose commit a late receipt shows, by attempt ID, oldest first.
+
+    Once there is one, a write under the action's key is known, so no
+    attempt of the action can be found not executed.
+    """
+    committed = _late_commits(db, action_id)
+    return {row[0]: row[1] for row in db.execute(
+        "SELECT attempt_id,number FROM workflow_action_attempts WHERE action_id=? ORDER BY number", (action_id,))
+        if row[0] in committed}
+
+
+def _contradiction(db, action_id, attempts):
+    """How late receipts contradicted the action's ``not_executed`` findings or decisions, or None.
+
+    ``second_effect`` once the action's receipts name more than one commit:
+    its attempts' own, late ones and those its lookups found, each a target
+    and version the service did not answer from an earlier commit. A receipt
+    without a version counts as its attempt's own commit. Otherwise
+    ``contradicted_absence``, while a ``contradicted_absence`` finding exists.
+    """
+    if not _contradicted(db, action_id):
+        return None
+    receipts = [(attempt["attempt_id"], _loads(attempt["receipt_json"], stored=True))
+                for attempt in attempts if attempt["receipt_json"] is not None]
+    receipts += [*_late_commits(db, action_id).items(), *_found(db, action_id).items()]
+    commits = {(_canonical(receipt.get("target")),
+                attempt_id if receipt.get("object_version") is None else receipt["object_version"])
+               for attempt_id, receipt in receipts if type(receipt) is dict and receipt.get("deduplicated") is False}
+    return "second_effect" if len(commits) > 1 else CONTRADICTED
+
+
+def _contradict(store, db, action, attempt, late_id, receipt):
+    """Append a contradicting finding when a late *receipt* shows a commit of an attempt found not executed.
+
+    *attempt* is the attempt row the late receipt record *late_id* answers.
+    The ``contradicted_absence`` finding is appended once per attempt, with
+    that record as its evidence, and earlier records stay as they were. The
+    attempt is no longer settled, so an action that is ``not_dispatched``
+    again becomes ``outcome_unknown``, releasing an attempt begun but not
+    claimed: nothing is dispatched until its outcome is settled.
+    """
+    action_id, attempt_id = action["action_id"], attempt["attempt_id"]
+    if (receipt is None or receipt.deduplicated or attempt_id in _contradicted(db, action_id)
+            or (attempt_id, True) not in _absent(db, action_id)):
+        return
+    count = db.execute("SELECT count(*) FROM workflow_action_attempts WHERE action_id=?",
+                       (action_id,)).fetchone()[0]
+    record_id = _append(store, db, action, "finding", {
+        "attempt_id": attempt_id, "finding": CONTRADICTED,
+        "reason": "a late receipt shows that this attempt, which was found not executed, took effect",
+        "evidence": [late_id], "attempts": count})
+    state = _row(db, action_id)["state"]
+    if state == "not_dispatched":
+        for begun in db.execute("SELECT * FROM workflow_action_attempts WHERE action_id=? AND state='prepared'",
+                                (action_id,)).fetchall():
+            _finish(store, db, begun, "released", error="a late receipt showed that an earlier attempt took effect")
+        state = "outcome_unknown"
+        db.execute("UPDATE workflow_actions SET state=?,updated=? WHERE action_id=?",
+                   (state, store._clock_ns(), action_id))
+    store._event(db, action["run_id"], "action_finding", payload={
+        "action_id": action_id, "record_id": record_id, "finding": CONTRADICTED, "state": state})
 
 
 def _risk(db, action_id):
@@ -950,8 +1063,10 @@ def reconcile_status(store, action_id):
     settled, oldest first; ``lookups`` and ``reads``, the number of lookup and readback
     records of each attempt; ``found``, the receipt a lookup found for an
     attempt; ``finding``, the payload of the latest finding, or None;
-    ``duplicate_risk``, as :func:`_risk` finds it; and ``shown``, the
-    readback records that showed the bound content (see :func:`_shown`).
+    ``duplicate_risk``, as :func:`_risk` finds it; ``shown``, the
+    readback records that showed the bound content (see :func:`_shown`);
+    ``committed``, the attempts a late receipt shows took effect; and
+    ``contradiction``, as :func:`_contradiction` finds it.
     Attempts and approvals are keyed by ID.
     """
     if store.store_version < 2:
@@ -988,6 +1103,7 @@ def _status(db, row):
                   for attempt_id, found in _found(db, action_id).items()},
         "finding": findings[-1][1] if findings else None,
         "duplicate_risk": _risk(db, action_id), "shown": _shown(db, action),
+        "committed": sorted(_late_commits(db, action_id)), "contradiction": _contradiction(db, action_id, attempts),
     }
 
 
@@ -1086,8 +1202,10 @@ def record_finding(store, lease, attempt_id, finding, reason, evidence=()):
     """Append what reconciliation found about an attempt as a ``finding`` record.
 
     ``not_executed`` says the attempt never took effect: it and its action
-    must be ``outcome_unknown``, and the action returns to ``not_dispatched``
-    under its unconsumed approval, while the attempt keeps its unknown
+    must be ``outcome_unknown``, and no late receipt may show a commit of any
+    of the action's attempts. The action returns to ``not_dispatched`` under
+    its unconsumed approval once no other attempt's outcome is unknown, and
+    stays ``outcome_unknown`` until then; the attempt keeps its unknown
     exposure. ``unresolved`` says that reconciliation can do no more and
     changes no state: the attempt must be ``outcome_unknown`` with its action,
     or acknowledged with its action ``dispatched``. The caller holds the run's
@@ -1107,6 +1225,11 @@ def record_finding(store, lease, attempt_id, finding, reason, evidence=()):
                 finding == "not_executed" or states != ("acknowledged", "dispatched")):
             raise ActionStateError(f"Attempt {attempt_id!r} is {attempt['state']} and its action {action['state']}; "
                                    f"no {finding} finding applies")
+        shown = _late_numbers(db, action["action_id"]) if finding == "not_executed" else {}
+        if shown:
+            which = "it" if attempt_id in shown else f"attempt {next(iter(shown.values()))}"
+            raise ActionStateError(f"Attempt {attempt_id!r} cannot be found not executed: a late receipt shows "
+                                   f"that {which} took effect")
         known = {row[0] for row in db.execute("SELECT record_id FROM workflow_action_records WHERE action_id=?",
                                               (action["action_id"],))}
         if not all(type(item) is str and item in known for item in evidence):
@@ -1122,7 +1245,10 @@ def record_finding(store, lease, attempt_id, finding, reason, evidence=()):
         record_id = _append(store, db, action, "finding", {
             "attempt_id": attempt_id, "finding": finding, "reason": _error(reason), "evidence": evidence,
             "attempts": count})
-        state = "not_dispatched" if finding == "not_executed" else action["state"]
+        state = action["state"]
+        if finding == "not_executed":
+            # Another attempt whose outcome is still unknown may have taken effect.
+            state = "outcome_unknown" if _unsettled(db, action["action_id"]) else "not_dispatched"
         db.execute("UPDATE workflow_actions SET state=?,updated=? WHERE action_id=?",
                    (state, store._clock_ns(), action["action_id"]))
         store._event(db, lease.run_id, "action_finding", payload={
@@ -1141,7 +1267,9 @@ def decide(store, action, attempts, decision, verified, evidence=None):
 
     The action must still have the state and the number of *attempts* that
     the decision's assertion bound, or ``WorkflowConflictError`` is raised,
-    and a security stop on its run raises ``ActionNotAuthorized``.
+    and a security stop on its run raises ``ActionNotAuthorized``. A
+    ``not_executed`` decision on an action with an attempt whose commit a late
+    receipt shows raises ``ActionStateError``.
     *evidence*, an ``ActionEvidence``, becomes an ``evidence`` record. The
     ``decision`` record holds *verified* (the principal, the verifier's
     identity, the digest the assertion approved and the note) with the
@@ -1161,6 +1289,10 @@ def decide(store, action, attempts, decision, verified, evidence=None):
         if store._run(db, row["run_id"])["blocked_reason"] == _SECURITY_STOP:
             raise ActionNotAuthorized(f"Action {action.action_id!r} cannot be decided: a security stop holds "
                                       "the run")
+        shown = list(_late_numbers(db, action.action_id).values())
+        if decision == "not_executed" and shown:
+            raise ActionStateError(f"Action {action.action_id!r} cannot be found not executed: a late receipt "
+                                   f"shows that attempt {shown[0]} took effect")
         cited = [] if evidence is None else [_append(store, db, row, "evidence", evidence.to_dict())]
         if decision == "adopt_observed":
             cited += _shown(db, action)
@@ -1176,9 +1308,11 @@ def decide(store, action, attempts, decision, verified, evidence=None):
 def inspect(store, run_id):
     """A run's actions as :func:`audit_actions` projects them, with what each needs next.
 
-    Each action adds ``duplicate_risk`` and ``next_action``; ``unresolved``
-    lists the actions that are ``outcome_unknown``, ``compensation_required``
-    or ``unresolved``, or ``dispatched`` with no read left to confirm them.
+    Each action adds ``duplicate_risk``, ``contradiction`` (see
+    :func:`_contradiction`) and ``next_action``; ``unresolved`` lists the
+    actions that are ``outcome_unknown``, ``compensation_required`` or
+    ``unresolved``, ``dispatched`` with no read left to confirm them, or
+    contradicted: with a second effect, or not yet settled by a read.
     One read transaction; a version 1 journal has no actions.
     """
     with store._transaction(write=False) as db:
@@ -1201,8 +1335,11 @@ def inspect(store, run_id):
                                  approvals, now, risk=risk)
                 except ActionNotAuthorized:
                     step = "approve" if risk is None else "approve_duplicate_risk"
-            item.update(duplicate_risk=risk is not None, next_action=step)
-            if item["state"] in _OPEN or item["state"] == "dispatched" and step != "readback":
+            contradiction = status["contradiction"]
+            item.update(duplicate_risk=risk is not None, contradiction=contradiction, next_action=step)
+            if (item["state"] in _OPEN or item["state"] == "dispatched" and step != "readback"
+                    or contradiction == "second_effect"
+                    or contradiction is not None and item["state"] not in ("observed", "reconciled")):
                 unresolved.append(item["action_id"])
     items = block.pop("items")
     return {**block, "unresolved": unresolved, "items": items}

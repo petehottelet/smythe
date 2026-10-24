@@ -70,7 +70,7 @@ def test_parser_defaults_and_inherited_output_options():
     assert (args.limit, args.offset, args.events_limit) == (50, 0, 100)
 
 
-@pytest.mark.parametrize("command", ["list", "inspect", "status", "export"])
+@pytest.mark.parametrize("command", ["list", "inspect", "status", "export", "review"])
 def test_read_commands_never_initialize_providers_or_change_store(job, capsys, monkeypatch, command):
     no_providers(monkeypatch)
     before = hashlib.sha256(job.path.read_bytes()).hexdigest()
@@ -86,7 +86,7 @@ def test_read_commands_never_initialize_providers_or_change_store(job, capsys, m
     assert job.path.stat().st_mtime_ns == modified
 
 
-@pytest.mark.parametrize("command", ["list", "inspect", "status", "export"])
+@pytest.mark.parametrize("command", ["list", "inspect", "status", "export", "review"])
 def test_missing_read_store_is_not_created(tmp_path, capsys, monkeypatch, command):
     no_providers(monkeypatch)
     path = tmp_path / "missing" / "jobs.sqlite3"

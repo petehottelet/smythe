@@ -109,6 +109,18 @@ def test_each_build_returns_independent_nodes():
     assert second[0].label != "changed"
 
 
+def test_agents_of_one_build_cannot_change_the_template():
+    graph, registry = _completed_graph()
+    template = distill_template(graph, name="t", registry=registry)
+    _, first = template.builder(Task(goal="a"))
+    for agent in first.list_agents():
+        agent.profile.capabilities.append("changed")
+    _, second = template.builder(Task(goal="b"))
+    assert sorted(agent.profile.capabilities for agent in second.list_agents()) == [
+        ["research"], ["review"],
+    ]
+
+
 def test_refuses_to_learn_from_an_unfinished_run():
     graph, registry = _completed_graph()
     graph.nodes[1].status = NodeStatus.FAILED
