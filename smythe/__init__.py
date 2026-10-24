@@ -83,7 +83,11 @@ from smythe.synthesizer import Synthesizer, SynthesisStrategy
 from smythe.task import Task
 from smythe.templates import (
     TemplateCatalog, TemplateLimits, TemplateRecord, TemplateRecordError, TemplateValidationError,
-    distill_record, validate_template_record,
+    distill_record, pinned_templates, template_target, validate_template_record,
+)
+from smythe.templates import (
+    ApplicabilityReport, TemplateApplicabilityError, TemplateEnvironment, candidate_from_graph,
+    check_applicability, repeated_structures,
 )
 from smythe.verifier import (
     CallableVerifier,
@@ -118,6 +122,7 @@ __all__ = [
     "AgentSkillsProvider",
     "AnthropicProvider",
     "AnthropicMessagesProvider",
+    "ApplicabilityReport",
     "ArchitectError",
     "Artifact",
     "ArtifactLineage",
@@ -217,7 +222,9 @@ __all__ = [
     "Synthesizer",
     "SynthesisStrategy",
     "Task",
+    "TemplateApplicabilityError",
     "TemplateCatalog",
+    "TemplateEnvironment",
     "TemplateLimits",
     "TemplateRecord",
     "TemplateRecordError",
@@ -243,6 +250,8 @@ __all__ = [
     "VerificationRecoveryError",
     "WhiteRabbit",
     "archive_heads",
+    "candidate_from_graph",
+    "check_applicability",
     "design_verifier",
     "distill_record",
     "distill_template",
@@ -250,9 +259,12 @@ __all__ = [
     "lint_contributions",
     "load_graph",
     "parse_skill_md",
+    "pinned_templates",
     "python_skill",
+    "repeated_structures",
     "review_run",
     "structure_sha256",
+    "template_target",
     "validate_template_record",
 ]
 __version__ = "0.9.1"

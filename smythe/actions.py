@@ -690,6 +690,8 @@ def _undeliverable(store: Any, run_id: str, content: ContentRef | None) -> str |
         return "the run has no recorded delivery acceptance"
     if not latest["record"].accepted:
         return f"the run's delivery acceptance is {latest['record'].decision.value}"
+    if type(latest["inputs"]) is not dict:
+        return f"the inputs of the journal's decision {latest['sequence']} are not a JSON object"
     considered = latest["inputs"].get("tombstones", [])
     if _removal_problems(store, run_id, considered if type(considered) is list else []):
         return "content unavailable: a source of the accepted output was removed from the run"

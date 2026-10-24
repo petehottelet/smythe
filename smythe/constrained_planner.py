@@ -20,13 +20,20 @@ from smythe.provider import REFUSED_STOP_REASONS, TRUNCATED_STOP_REASONS, Provid
 from smythe.registry import Registry
 from smythe.task import Task
 from smythe.workflow_binding import (
-    ComponentBinding, WorkflowBindingError, bind_component,
-    describe_component, provider_description, require_exact,
+    ComponentBinding, WorkflowBindingError, bind_component, describe_component,
+    local_component, provider_description, require_exact,
 )
 
 # The model's selections and params decide the composed graph's size. The
 # default admits eight templates the size of a default generated plan.
 DEFAULT_MAX_NODES = 64
+
+
+def _record_version(builder: object) -> str | None:
+    """The version a template record's builder builds; None for any other builder."""
+    # A durable run's builder is a bound declaration wrapping the record's builder.
+    version = getattr(local_component(builder), "template_version", None)
+    return version if type(version) is str else None
 
 
 @dataclass
@@ -242,7 +249,9 @@ class ConstrainedArchitect(Architect):
 
         Each template's nodes are prefixed to avoid ID collisions.
         Sequential templates are wired so the later template's roots
-        depend on the earlier template's leaf nodes.
+        depend on the earlier template's leaf nodes. Each selection of a
+        template built from a template record is listed, by name, selection
+        index and template version, in ``graph.planning["templates"]``.
         """
         if not selections:
             raise ValueError("No templates selected")
@@ -250,6 +259,7 @@ class ConstrainedArchitect(Architect):
         all_nodes: list[Node] = []
         merged_registry = Registry()
         prev_leaf_ids: list[str] = []
+        records: list[dict[str, Any]] = []
 
         for idx, sel in enumerate(selections):
             template_name = sel.get("template", "")
@@ -261,6 +271,9 @@ class ConstrainedArchitect(Architect):
                 )
 
             template = self._templates[template_name]
+            version = _record_version(template.builder)
+            if version is not None:
+                records.append({"name": template_name, "index": idx, "version": version})
             params = sel.get("params") or {}
 
             nodes, registry = template.builder(task, **params)
@@ -312,5 +325,8 @@ class ConstrainedArchitect(Architect):
             topology=[Topology.SERIAL],
             nodes=all_nodes,
         )
+        if records:
+            # On the graph, never in node metadata, whose keys steer how each node runs.
+            graph.planning = {"templates": records}
         graph.validate()
         return graph, merged_registry

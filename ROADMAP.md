@@ -283,6 +283,65 @@ is unchanged.
   identifiers or local paths, and a repository test fails on any tracked file
   that does.
 
+## Built for the next release: reviewable learning
+
+These are built and tested offline but not yet released. Each is opt-in:
+nothing is promoted or activated automatically, and no default changes. What
+these items still need is listed under [Then](#then-recorded-context-governed-actions-and-reuse).
+No template, skill or campaign can change acceptance, budgets, evaluator
+data or the tools agents are offered
+([what learning cannot change](docs/learning.md#what-learning-cannot-change)).
+
+- **Reviewable template lifecycle** — distilled graphs become
+  [versioned template records](docs/learning.md#template-records) in an
+  append-only catalog, validated as untrusted candidates that cannot grant
+  authority. Each record is compared with the parent it names, and every
+  version of a name after the first must name a stored one, so a later
+  version cannot weaken its parent's gates. Planner history keeps
+  verification and acceptance evidence and, opt-in, failed runs, and
+  structure that repeated accepted runs share becomes a
+  [candidate record](docs/learning.md#promote-repeated-accepted-structure).
+  An Autotune campaign
+  [evaluates a version](docs/optimize.md#evaluate-template-versions) against
+  its predecessor and a simpler reference arm on held-out task families; a
+  reviewed decision [activates it](docs/learning.md#activate-and-roll-back-templates)
+  for new runs, a rollback restores the previous version without changing
+  running work, and durable runs pin the exact versions they started with. A
+  record [builds its graph without a planning call](docs/learning.md#build-a-template-without-planning).
+  A menu the caller builds with the environment a run would use leaves out
+  a template once the tools, capabilities, skills, validators, models or
+  MCP allowlists it was proven with [change](docs/learning.md#applicability);
+  a menu built without one offers it as before. Records name no sources, so
+  a source change is not part of applicability. The offline
+  [template-lifecycle example](examples/21_template_lifecycle.py) records a
+  template, rejects a harmful candidate on held-out tasks, and rolls back the
+  same candidate after a fooled evaluator promotes it.
+- **Native Agent Skills support** —
+  [Agent Skills directories](docs/skills.md#agent-skills-directories) are
+  discovered directly, beside the OpenClaw and MCP skill providers, and lend
+  agents capability tags only: declared `allowed-tools` are recorded and
+  never granted, instructions never enter a prompt, and durable runs pin a
+  static snapshot of the tags.
+  [Python-backed skills](docs/skills.md#python-backed-skills) are developer
+  tools that a local tool runtime offers only to the agent ids you list, on
+  ordinary runs. Running a skill's bundled scripts, putting its instructions
+  into prompts and tools in durable text workflows are not covered.
+- **Bounded Autotune generalization** — no campaign or exploring proposer
+  may vary a [reserved path](docs/optimize.md#experiment-contracts-and-budgets)
+  such as acceptance, budgets, tools or the holdout, and a campaign can hold
+  each challenger to one change. The guide gives
+  [sample-size and repeated-comparison guidance](docs/optimize.md#choosing-sample-sizes)
+  from the paired promotion bound. The CLI
+  [reviews, activates, rolls back and retires](docs/optimize.md#review-and-change-targets-from-the-cli)
+  policies, and `smythe optimize history` gives a read-only
+  [cross-campaign report](docs/optimize.md#cross-campaign-target-report) of a
+  target's campaigns, decisions, activations and optimization cost, never
+  netted against inference savings. Trials can run as
+  [durable workflows](docs/optimize.md#durable-workflow-trials), and
+  [bounded exploration](docs/optimize.md#bounded-exploration) runs campaigns
+  on an out-of-process proposer's challengers under campaign, exposure and
+  proposer-spend caps.
+
 ## Completed benchmark evidence
 
 Every benchmark publication includes the [materials completion check](docs/current-materials.md#completion-check-for-every-benchmark-update): current glyph sheets, previews, exports, charts, links, and consistent documentation.
@@ -333,11 +392,11 @@ working without extra services.
 
 | Priority | Change | Acceptance criteria |
 |---|---|---|
-| P1 | Supported-configuration matrix | State which providers, verifiers, tools, memory, artifact types, accounting scopes and resume behaviors each execution path supports: ordinary runs, durable text workflows and Jobs. Back every supported cell with a named test. Unsupported combinations fail before any paid call, including planning. In progress: the [support matrix](docs/support-matrix.md) covers all three paths. Durable runs refuse unsupported providers and components, Jobs unsupported profiles and artifacts, and ordinary runs tool, image-input, model and price-ceiling mismatches that their providers declare, all before any call; an ordinary run refuses an image input that only a generated plan asks for after planning, before any node call. |
-| P1 | Strict final acceptance and complete deliverables | An opt-in policy checks the exact output returned, after synthesis and after any step a supervisor added. Every requested output part is required, so a terminal node that returns only its own increment fails. Exhausted regeneration, an unreadable verdict or a failed validator never produces an accepted result; the rejected output stays inspectable. Runs report execution, acceptance and cost separately. Advisory gates keep their current behavior. In progress: ordinary runs take a [strict policy](docs/verifier.md#strict-delivery-acceptance) that decides on the exact output returned, counts only gates the developer supplied, refuses before any call a graph whose output it could not decide, and refuses a supervisor revision that would leave the output unchecked. Complete-deliverable validators and durable workflows are not covered yet. |
-| P1 | Elapsed-time and outcome records | Record wall time separately from summed node time, split into routing, planning, queueing, execution, verification, synthesis and recovery, together with the acceptance result. Existing fields keep their meaning. |
-| P2 | Deterministic validators in durable workflows | Versioned, developer-registered local validators join `TokenVerifier` in durable text workflows. Each acceptance decision is stored with the output it judged. Resume revalidates when that record is missing, and a changed validator needs a new decision. |
-| P2 | Graph selection | Compare a strong single worker, fixed templates and generated plans on newly frozen held-out tasks, charging selection, planning, failed attempts and checks. Record why each run chose its tier. Current evidence is mixed: generated plans recorded lower wall time on the [task-shape suite](benchmarks/shape_suite.md) and higher mean wall time on [Astra's supplied-source tasks](benchmarks/astra_findings.md). In progress: a `WhiteRabbit` router records each [routing decision](docs/architecture.md#routing-decisions) on the planned graph, with the classifier's usage or, in durable runs, its journal calls. Declarative [routing rules](docs/architecture.md#routing-rules), evaluated on the submitted task before any classifier call, can send a task to a first-class single-worker tier, a template or a generated plan, and durable recipes record the rules and their policy version. The held-out comparison is not run yet. |
+| P1 | Supported-configuration matrix | State which providers, verifiers, tools, memory, artifact types, accounting scopes and resume behaviors each execution path supports: ordinary runs, durable text workflows and Jobs. Back every supported cell with a named test. Unsupported combinations fail before any paid call, including planning. In progress: the [support matrix](docs/support-matrix.md) covers all three paths. Durable runs refuse unsupported providers and components, Jobs unsupported profiles and artifacts, and ordinary runs tool, image-input, model and price-ceiling mismatches that their providers declare, all before any call; an ordinary run refuses an image input that only a generated plan asks for after planning, before any node call. It also states [who owns each execution responsibility](docs/support-matrix.md#who-owns-each-execution-responsibility) on each path. |
+| P1 | Strict final acceptance and complete deliverables | An opt-in policy checks the exact output returned, after synthesis and after any step a supervisor added. Every requested output part is required, so a terminal node that returns only its own increment fails. Exhausted regeneration, an unreadable verdict or a failed validator never produces an accepted result; the rejected output stays inspectable. Runs report execution, acceptance and cost separately. Advisory gates keep their current behavior. In progress: ordinary runs take a [strict policy](docs/verifier.md#strict-delivery-acceptance) that decides on the exact output returned, counts only gates the developer supplied, refuses before any call a graph whose output it could not decide, and refuses a supervisor revision that would leave the output unchecked. Versioned [final validators](docs/verifier.md#built-in-final-validators) check required sections, paths and JSON shape; durable workflows decide on the same policy and record each decision with the output it judged ([strict acceptance in durable workflows](docs/verifier.md#strict-acceptance-in-durable-workflows)); Jobs decide delivery eligibility with [registered validators](docs/jobs.md#registered-validators). |
+| P1 | Elapsed-time and outcome records | Record wall time separately from summed node time, split into routing, planning, queueing, execution, verification, synthesis and recovery, together with the acceptance result. Existing fields keep their meaning. In progress: [`SwarmResult.timing`](docs/execution.md#timing) reports elapsed time apart from summed node time, with time per phase and waiting time by reason, saved as [timing segments](docs/checkpoint-format.md#timing-segments) across resumes; `smythe runs inspect` shows it beside the acceptance result. Durable runs report lease sessions on the journal's clock and no phase totals. |
+| P2 | Deterministic validators in durable workflows | Versioned, developer-registered local validators join `TokenVerifier` in durable text workflows. Each acceptance decision is stored with the output it judged. Resume revalidates when that record is missing, and a changed validator needs a new decision. In progress: durable workflows take registered [gate validators](docs/verifier.md#gate-validators-in-durable-workflows) and final validators, store each decision with the output it judged, revalidate on resume when the decision is missing, refuse to resume under a changed validator, and decide again only through an explicit [re-evaluation](docs/verifier.md#re-evaluation) or an [operator decision](docs/verifier.md#operator-decisions). |
+| P2 | Graph selection | Compare a strong single worker, fixed templates and generated plans on newly frozen held-out tasks, charging selection, planning, failed attempts and checks. Record why each run chose its tier. Current evidence is mixed: generated plans recorded lower wall time on the [task-shape suite](benchmarks/shape_suite.md) and higher mean wall time on [Astra's supplied-source tasks](benchmarks/astra_findings.md). In progress: a `WhiteRabbit` router records each [routing decision](docs/architecture.md#routing-decisions) on the planned graph, with the classifier's usage or, in durable runs, its journal calls. Declarative [routing rules](docs/architecture.md#routing-rules), evaluated on the submitted task before any classifier call, can send a task to a first-class single-worker tier, a template or a generated plan, and durable recipes record the rules and their policy version. An offline [selector comparison](benchmarks/README.md#selector-comparison-offline-mechanics) runs the arms with fixture models and records mechanics only. The held-out comparison is not run yet. |
 | P2 | Broader complete-workflow cost evidence | Extend the completed Astra evidence to harder external tasks using the native ledger, declared prices, failed attempts and all optimization trials. |
 
 ### Then: recorded context, governed actions and reuse
@@ -439,31 +498,26 @@ connector or paid run.
 6. **Integrate asset policy with Jobs v1** — manifest-native production brand
    masters, OCR and perceptual brand validators, select-from-N curation, and
    deterministic export bundles built from accepted attempt pointers
-7. **Reviewable continual learning** — promote successful graph structures,
-   failure lessons, capability descriptions, and reusable procedures into
-   versioned supplemental state with diffs and rollback, extending
-   `PlannerMemory` and `distill_template` without mutating the base planner.
-   A candidate becomes active only after it beats its predecessor and a
-   simpler alternative on held-out tasks. In progress: distilled templates
-   are [versioned records](docs/learning.md#template-records) in an
-   append-only catalog, and a durable run pins an exact template version;
-   evaluation, activation and rollback are not built yet
-8. **Native Agent Skills support** — built for the next release.
-   [Agent Skills directories](docs/skills.md#agent-skills-directories) are
-   discovered directly, beside the OpenClaw and MCP skill providers, and lend
-   agents capability tags only: declared `allowed-tools` are recorded and
-   never granted, instructions never enter a prompt, and durable runs pin a
-   static snapshot of the tags.
-   [Python-backed skills](docs/skills.md#python-backed-skills) are developer
-   tools that a local tool runtime offers only to the agent ids you list, on
-   ordinary runs. Skills never grant tools or change acceptance criteria.
-   Running a skill's bundled scripts, putting its instructions into prompts
-   and tools in durable text workflows are not covered
-9. **Autotune generalization** — add calibrated sample-size and
-   repeated-comparison guidance, cross-campaign reports, process-
-   supervised evaluator isolation, and conservative live-evaluator adapters
-   after the offline campaign. Optimizers cannot change acceptance criteria,
-   spend ceilings, permissions or held-out data
+7. **Reviewable continual learning** — a candidate becomes active only after
+   it beats its predecessor and a simpler alternative on held-out tasks,
+   without mutating the base planner. The
+   [template lifecycle](#built-for-the-next-release-reviewable-learning) is
+   built and its mechanics are shown offline. Still open: promoting failure
+   lessons, capability descriptions and reusable procedures into versioned
+   supplemental state, since template records hold graph structure only and
+   failure rows are opt-in planner history; and a template version measured
+   better than its predecessor and a simpler alternative on held-out live
+   tasks, under decided thresholds and an approved evaluation budget. Offline
+   fixtures rank no template
+8. **Autotune generalization** — run evaluators in a separately supervised
+   process that can be stopped at a deadline, and add conservative
+   live-evaluator adapters with per-trial price ceilings after the offline
+   campaign. Optimizers cannot change acceptance criteria, spend ceilings,
+   permissions or held-out data. Reserved paths, sample-size guidance,
+   cross-campaign reports, registry commands and bounded exploration are
+   [built](#built-for-the-next-release-reviewable-learning). Statistical
+   comparison across campaigns and a correction for repeated comparisons are
+   not built
 
 ### Evidence and scale
 

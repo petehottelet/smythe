@@ -848,6 +848,30 @@ def test_strict_run_records_its_decision_and_only_a_digest_of_rejected_output(
         assert "rejected_output_sha256" not in row
 
 
+def test_strict_run_without_a_gate_records_its_acceptance_as_evidence(tmp_path):
+    path = tmp_path / "history.jsonl"
+    task = Task("Research signal under a strict policy without a gate")
+    graph = ExecutionGraph(topology=[Topology.SERIAL], task=task,
+                           nodes=[Node(id="draft", label="Draft the memo")])
+    policy = AcceptancePolicy(mode="strict", final_validators=[_Forbids("DEFECT")])
+    swarm = Swarm(model="m", provider=_Steps({"Draft": ["A clean draft."]}),
+                  memory=PlannerMemory(path), artifact_dir=None, acceptance=policy)
+
+    result = swarm.execute(graph)
+    [row] = _history_rows(path)
+    [outcome] = PlannerMemory(path).recall(task)
+
+    # No gate left a receipt and nothing was rejected: the acceptance record
+    # alone makes the run's evidence worth keeping.
+    assert "verification_receipt" not in result.graph.nodes[0].metadata
+    assert result.rejected_output is None
+    assert outcome.acceptance == result.acceptance.decision.value == "accepted"
+    assert outcome.execution_id == result.execution_id
+    assert outcome.structure_sha256 == structure_sha256(result.graph)
+    assert (outcome.verification, outcome.rejected_output_sha256) == (None, None)
+    assert set(row) == _PREVIOUS_KEYS | {"execution_id", "structure_sha256"}
+
+
 def test_strict_exhausted_gate_records_the_rejection_and_its_failing_verdict(tmp_path):
     path = tmp_path / "history.jsonl"
     task = Task("Research signal under a strict policy")
@@ -1135,7 +1159,7 @@ def fake_home(tmp_path, monkeypatch):
 def test_a_provider_error_excerpt_is_redacted_and_capped(tmp_path, fake_home, parallel):
     organization = "org-" + "A1b2" * 6
     key_file, bundle = fake_home / "keys" / "service.json", tmp_path / "certs" / "bundle.pem"
-    message = (f"Rate limit reached for {organization} using {key_file} and {bundle}"
+    message = (f"Rate limit reached for {organization} using {key_file} and {bundle}: limit 20"
                + " on requests per minute" * 20)
     path = tmp_path / "history.jsonl"
     task = Task("Research signal that is rate limited")
@@ -1150,7 +1174,7 @@ def test_a_provider_error_excerpt_is_redacted_and_capped(tmp_path, fake_home, pa
     assert (outcome.failure_category, outcome.failure_type) == ("transient", "RateLimitError")
     assert outcome.failure_excerpt.startswith(
         f"Rate limit reached for org-[redacted] using {os.path.join('~', 'keys', 'service.json')}"
-        " and <path> on requests per minute on requests"
+        " and <path>: limit 20 on requests per minute on requests"
     )
     assert len(outcome.failure_excerpt) == 200 and outcome.failure_excerpt.endswith("…")
     for private in (organization, str(fake_home), fake_home.as_posix(), str(tmp_path),
@@ -1188,7 +1212,8 @@ def test_path_redaction_replaces_the_home_folder_and_other_absolute_paths(fake_h
         "file:///srv/app/key.json",
     ):
         assert _redact.redact_paths(f"open '{absolute}' failed") == "open '<path>' failed"
-        assert _redact.redact_paths(f"open {absolute} failed") == "open <path> failed"
+        assert _redact.redact_paths(f"open {absolute}: failed") == "open <path>: failed"
+        assert _redact.redact_paths(f"open {absolute} failed") == "open <path>"
     for kept in ("see https://api.example.com/v1/models/list", "relative/dir/file.txt",
                  "./local/file.txt", "~/project/out.json", "ratio 1/2/3", "org-chart"):
         assert _redact.redact_paths(kept) == kept

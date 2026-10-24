@@ -33,7 +33,11 @@ TONE = ValidatorIdentity.for_config("memo-tone", "1", {"register": "plain"}).to_
 
 
 def source_record() -> TemplateRecord:
-    """The gated memo: a judge gates the writer's draft, which two validators check."""
+    """The gated memo: a judge gates the writer's draft, which two validators check.
+
+    It applies to memos but never to legal or medical work, and only under
+    the models and MCP allowlists its runs used.
+    """
     graph, registry = _completed_gated_graph()
     data = distill_record(graph, name="memo", registry=registry).to_dict()
     data["expected_outputs"] = [{"node": "draft", "description": "The approved memo",
@@ -43,6 +47,11 @@ def source_record() -> TemplateRecord:
         "tools": [{"name": "search", "version": "1",
                    "schema_sha256": sha256_hex({"type": "object"})}],
         "validators": [LENGTH]}
+    data["applicability"] = {"task_families": ["memo"], "keywords": [],
+                             "required_context_keys": [],
+                             "excluded_task_families": ["legal", "medical"]}
+    data["proven_with"] = {"models_sha256": sha256_hex(["gpt-6-astra"]),
+                           "mcp_allowlists_sha256": sha256_hex({})}
     # A run's recorded acceptance decision is evidence, not authority.
     data["source_runs"] = [{"execution_id": "run-1", "structure_sha256": sha256_hex("shape"),
                             "acceptance": "accepted"}]
@@ -86,6 +95,12 @@ def _retarget(data):
 
 def _remove_gate(data):
     del data["blueprint"][1]
+
+
+def _drop(section):
+    def change(data):
+        del data[section]
+    return change
 
 
 def _drop_outputs(data):
@@ -149,6 +164,11 @@ HARMFUL = {
                                   "prerequisites.tools"),
     "prerequisite-validator-removed": (_set(["prerequisites", "validators"], []), None,
                                        "prerequisites.validators"),
+    "proven-with-dropped": (_drop("proven_with"), None, "proven_with"),
+    "exclusion-dropped": (_set(["applicability", "excluded_task_families"], ["legal"]), None,
+                          "applicability.excluded_task_families"),
+    "applicability-dropped": (_drop("applicability"), None,
+                              "applicability.excluded_task_families"),
     "too-many-nodes": (_add(*(_node(f"extra-{index}") for index in range(7))), None, "blueprint"),
     "plan-id": (_add(_node("extra step")), "extra step", "id"),
     "reserved-id": (_add(_node("__synthesis__")), "__synthesis__", "id"),
@@ -253,6 +273,9 @@ def test_a_faithful_or_stronger_candidate_is_accepted(tmp_path):
     data["expected_outputs"].append({"node": "notes", "description": "Notes", "validators": []})
     data["prerequisites"]["tools"].append(
         {"name": "fetch", "version": "1", "schema_sha256": sha256_hex({})})
+    data["applicability"]["excluded_task_families"].append("tax")
+    # Proven under other models, it records theirs: proven_with is replaced, not dropped.
+    data["proven_with"]["models_sha256"] = sha256_hex(["gpt-6-astra", "gpt-6-astra-mini"])
 
     version = catalog.put(deepcopy(data))
 
@@ -276,6 +299,42 @@ def test_a_parent_the_catalog_does_not_hold_is_not_compared(tmp_path):
     assert catalog.get(catalog.put(data)).parent_version == source.template_version
     with pytest.raises(TemplateValidationError, match="no longer gates 'draft'"):
         validate_template_record(data, parent=source)
+
+
+def test_a_new_version_of_a_stored_template_must_name_its_parent(tmp_path):
+    """A later version is compared with a stored version of its name, so it cannot drop a gate."""
+    source = source_record()
+    other = TemplateRecord(name="notes", description="Notes", blueprint=[_node("notes")])
+    catalog = TemplateCatalog(tmp_path)
+    catalog.put(source)
+    catalog.put(other)  # The first version of a name needs no parent.
+    gateless = source.to_dict()
+    _remove_gate(gateless)
+    faithful = {**source.to_dict(), "description": "A shorter memo"}
+    before = listing(tmp_path)
+
+    for data in (gateless, faithful):
+        for parent_version, problem in ((None, "is not set"),
+                                        (sha256_hex("missing"), "not a version of template"),
+                                        (other.template_version, "not a version of template")):
+            candidate = dict(data, **({"parent_version": parent_version} if parent_version else {}))
+            for attempt in (lambda: catalog.put(deepcopy(candidate)),
+                            lambda: catalog.put(TemplateRecord.from_dict(deepcopy(candidate))),
+                            lambda: catalog.put(deepcopy(candidate), parent=source)):
+                with pytest.raises(TemplateValidationError, match=problem) as caught:
+                    attempt()
+                assert (caught.value.node, caught.value.field) == (None, "parent_version")
+                assert "'memo'" in str(caught.value)
+
+    assert listing(tmp_path) == before
+    assert catalog.versions("memo") == [source.template_version]
+    # Named, the gateless version is compared with its parent; a stored record is stored again.
+    with pytest.raises(TemplateValidationError, match="no longer gates 'draft'"):
+        catalog.put(dict(gateless, parent_version=source.template_version))
+    assert catalog.put(source) == source.template_version
+    assert listing(tmp_path) == before
+    version = catalog.put(dict(faithful, parent_version=source.template_version))
+    assert sorted(catalog.versions("memo")) == sorted([source.template_version, version])
 
 
 def test_a_candidate_compared_with_another_parent_is_refused():

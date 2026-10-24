@@ -10,7 +10,9 @@ change a target from the same view.
 A review records one reviewer's verdict on an Autotune campaign's terminal
 decision, and only an approving review of a promoted decision is activated.
 The registry is its own file and never writes an Autotune ledger. Its review
-records name ledger decisions by identity, never by path.
+records name ledger decisions by identity, never by path. It also keeps the
+append-only record of each bounded exploration: its proposer charges, the
+campaigns it started and why it stopped.
 """
 
 from __future__ import annotations
@@ -38,6 +40,7 @@ from smythe.optimize.ledger import (
     _deep_freeze_json,
     _json_text,
     _nonempty,
+    _safe_id,
 )
 
 
@@ -54,7 +57,13 @@ _TABLES = {
                 "payload_json", "created_at_ns"),
     "activations": ("target", "seq", "action", "policy_hash", "policy_json", "review_id",
                     "restores_seq", "reason", "actor_ref", "created_at_ns"),
+    # Written by bounded exploration; never read by activation.
+    "explorations": ("exploration_id", "settings_json", "created_at_ns"),
+    "exploration_events": ("exploration_id", "seq", "round", "kind", "microusd", "campaign_id",
+                           "detail", "created_at_ns"),
 }
+_EXPLORATION_KINDS = ("proposer_reserved", "proposer_settled", "proposer_unknown",
+                      "campaign_started", "campaign_ended", "stopped")
 _SCHEMA = """
     CREATE TABLE registry_meta (
         version INTEGER PRIMARY KEY,
@@ -89,7 +98,27 @@ _SCHEMA = """
         CHECK (action != 'activate' OR review_id IS NOT NULL),
         CHECK (action != 'retire' OR review_id IS NULL)
     );
-    CREATE INDEX reviews_by_decision ON reviews(decision_id)
+    CREATE INDEX reviews_by_decision ON reviews(decision_id);
+    CREATE TABLE explorations (
+        exploration_id TEXT PRIMARY KEY,
+        settings_json TEXT NOT NULL,
+        created_at_ns INTEGER NOT NULL
+    );
+    CREATE TABLE exploration_events (
+        exploration_id TEXT NOT NULL REFERENCES explorations(exploration_id),
+        seq INTEGER NOT NULL CHECK (typeof(seq) = 'integer' AND seq > 0),
+        round INTEGER NOT NULL CHECK (typeof(round) = 'integer' AND round > 0),
+        kind TEXT NOT NULL CHECK (kind IN ('proposer_reserved', 'proposer_settled',
+            'proposer_unknown', 'campaign_started', 'campaign_ended', 'stopped')),
+        microusd INTEGER CHECK (microusd IS NULL OR (typeof(microusd) = 'integer'
+                                                    AND microusd >= 0)),
+        campaign_id TEXT,
+        detail TEXT NOT NULL,
+        created_at_ns INTEGER NOT NULL,
+        UNIQUE (exploration_id, seq),
+        CHECK ((kind = 'stopped') = (microusd IS NULL)),
+        CHECK ((kind IN ('campaign_started', 'campaign_ended')) = (campaign_id IS NOT NULL))
+    )
 """
 
 
@@ -98,10 +127,10 @@ def _barrier() -> dict[str, str]:
 
     ``INSERT OR REPLACE`` deletes conflicting rows without firing DELETE
     triggers, so an insert must add a row and remove none. It names no
-    existing rowid, review or target seq, and rowids run 1, 2, 3 without
-    gaps: a row removed through any unique key, including an index a client
-    added, leaves the new rowid above the row count. An event also takes its
-    target's next seq.
+    existing rowid, review, exploration or seq, and rowids run 1, 2, 3
+    without gaps: a row removed through any unique key, including an index a
+    client added, leaves the new rowid above the row count. An event also
+    takes its target's or exploration's next seq.
     """
 
     refused = "RAISE(ABORT, 'Policy registry rows are append-only')"
@@ -109,6 +138,10 @@ def _barrier() -> dict[str, str]:
         "reviews": "EXISTS (SELECT 1 FROM reviews WHERE review_id = NEW.review_id) OR ",
         "activations": "NEW.seq IS NOT (SELECT coalesce(max(seq), 0) + 1 "
                        "FROM activations WHERE target = NEW.target) OR ",
+        "explorations": "EXISTS (SELECT 1 FROM explorations "
+                        "WHERE exploration_id = NEW.exploration_id) OR ",
+        "exploration_events": "NEW.seq IS NOT (SELECT coalesce(max(seq), 0) + 1 FROM "
+                              "exploration_events WHERE exploration_id = NEW.exploration_id) OR ",
     }
     triggers = {}
     for table in _TABLES:
@@ -284,6 +317,31 @@ def _decision_reference(ledger: ExperimentLedger, campaign_id: str) -> dict[str,
         reference[prefix + "candidate_id"] = candidate_id
         reference[prefix + "policy_hash"] = inventory[candidate_id]["policy_hash"]
         reference[prefix + "policy"] = inventory[candidate_id]["policy"]
+    return reference
+
+
+def _reviewable(
+    ledger: ExperimentLedger | str | os.PathLike[str], campaign_id: str, verdict: str
+) -> dict[str, Any]:
+    """The decision reference a *verdict* on *campaign_id* records, read without writing.
+
+    *ledger* is an open ledger or the path of a closed one. Raises
+    :class:`RegistryError` when the campaign cannot be reviewed or the
+    verdict approves a decision that was not promoted.
+    """
+
+    try:
+        if isinstance(ledger, ExperimentLedger):
+            reference = _decision_reference(ledger, campaign_id)
+        else:
+            # Its close repeats the quiescence check before anything is written.
+            with ExperimentLedger(ledger, read_only=True) as source:
+                reference = _decision_reference(source, campaign_id)
+    except ExperimentLedgerError as exc:
+        raise RegistryError(f"campaign {campaign_id!r} cannot be reviewed: {exc}") from exc
+    if verdict == "approve" and reference["promoted"] is not True:
+        raise RegistryError(f"decision {reference['decision_id']!r} was not promoted; "
+                            "only a promoted decision can be approved")
     return reference
 
 
@@ -683,18 +741,7 @@ class PolicyRegistry:
             raise ValueError("evidence_sha256 must be 64 lowercase hex characters")
         if note != "":
             note = _nonempty(note, "note", maximum=1024)
-        try:
-            if isinstance(ledger, ExperimentLedger):
-                reference = _decision_reference(ledger, campaign_id)
-            else:
-                # Its close repeats the quiescence check before anything is written.
-                with ExperimentLedger(ledger, read_only=True) as source:
-                    reference = _decision_reference(source, campaign_id)
-        except ExperimentLedgerError as exc:
-            raise RegistryError(f"campaign {campaign_id!r} cannot be reviewed: {exc}") from exc
-        if verdict == "approve" and reference["promoted"] is not True:
-            raise RegistryError(f"decision {reference['decision_id']!r} was not promoted; "
-                                "only a promoted decision can be approved")
+        reference = _reviewable(ledger, campaign_id, verdict)
         text = _json_text({**reference, "verdict": verdict, "reviewer": reviewer,
                            "evidence_sha256": evidence_sha256, "note": note})
         row = {"review_id": _review_id(text), "campaign_id": reference["campaign_id"],
@@ -777,6 +824,102 @@ class PolicyRegistry:
         (event,) = self._append(target, [("retire", None, None, None)],
                                 expected_seq=expected_seq, actor=actor, reason=reason)
         return event
+
+    def _start_exploration(self, exploration_id: str, settings: Mapping[str, Any]) -> None:
+        """Record a new exploration and its settings; an existing ID is refused."""
+
+        identifier = _safe_id(exploration_id, "exploration_id")
+        text = _json_text(settings)
+        with self._transaction() as cursor:
+            if cursor.execute("SELECT 1 FROM explorations WHERE exploration_id = ?",
+                              (identifier,)).fetchone() is not None:
+                raise RegistryError(f"exploration {identifier!r} already exists")
+            cursor.execute("INSERT INTO explorations VALUES (?, ?, ?)",
+                           (identifier, text, time.time_ns()))
+
+    def _record_exploration(
+        self, exploration_id: str, round_: int, kind: str, *, microusd: int | None = None,
+        campaign_id: str | None = None, detail: str = "",
+    ) -> None:
+        """Append an exploration's next event.
+
+        A proposer charge is settled or unknown only while one is reserved,
+        no other event is recorded meanwhile, and nothing follows ``stopped``.
+        """
+
+        if kind not in _EXPLORATION_KINDS:
+            raise ValueError(f"unknown exploration event {kind!r}")
+        _seq(round_, "round", minimum=1)
+        if microusd is not None:
+            _seq(microusd, "microusd", minimum=0)
+        with self._transaction() as cursor:
+            events = self._exploration_events(cursor, exploration_id)
+            charges = [event["kind"] for event in events if event["kind"].startswith("proposer_")]
+            reserved = charges[-1:] == ["proposer_reserved"]
+            if (events and events[-1]["kind"] == "stopped") or reserved != (
+                    kind in _EXPLORATION_KINDS[1:3]):
+                raise RegistryError(f"exploration {exploration_id!r} cannot record {kind} now")
+            cursor.execute(
+                "INSERT INTO exploration_events VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                (exploration_id, len(events) + 1, round_, kind, microusd, campaign_id,
+                 detail, time.time_ns()),
+            )
+
+    @staticmethod
+    def _exploration_events(
+        db: sqlite3.Connection | sqlite3.Cursor, exploration_id: str
+    ) -> list[dict[str, Any]]:
+        if db.execute("SELECT 1 FROM explorations WHERE exploration_id = ?",
+                      (exploration_id,)).fetchone() is None:
+            raise RegistryError(f"unknown exploration {exploration_id!r}")
+        events = [{key: row[key] for key in _TABLES["exploration_events"][1:]}
+                  for row in db.execute("SELECT * FROM exploration_events "
+                                        "WHERE exploration_id = ? ORDER BY seq", (exploration_id,))]
+        if [event["seq"] for event in events] != list(range(1, len(events) + 1)):
+            raise RegistryError(f"stored events of exploration {exploration_id!r} are inconsistent")
+        return events
+
+    def exploration(self, exploration_id: str) -> dict[str, Any]:
+        """Return a bounded exploration's settings, events and charges as JSON values.
+
+        ``proposer_cost`` sums proposer calls in micro-USD: ``reserved`` at
+        the ceiling of a call with no outcome recorded, ``settled`` as the
+        proposer declared, and ``unknown`` at the ceiling of a call that
+        failed. ``campaign_ids`` lists the campaigns it started, in order, and
+        ``stop_reason`` stays ``None`` until it stops. An unknown
+        ``exploration_id`` raises :class:`RegistryError`.
+        """
+
+        with self._lock:
+            events = self._exploration_events(self._connection, exploration_id)
+            row = self._connection.execute(
+                "SELECT * FROM explorations WHERE exploration_id = ?", (exploration_id,)
+            ).fetchone()
+        try:
+            settings = json.loads(row["settings_json"])
+            valid = _json_text(settings) == row["settings_json"]
+        except (TypeError, ValueError):
+            valid = False
+        if not valid:
+            raise RegistryError(f"stored settings of exploration {exploration_id!r} are invalid")
+        cost = dict.fromkeys(("reserved_microusd", "settled_microusd", "unknown_microusd"), 0)
+        for event in events:
+            if event["kind"] == "proposer_reserved":
+                cost["reserved_microusd"] = event["microusd"]
+            elif event["kind"] in _EXPLORATION_KINDS[1:3]:
+                cost["reserved_microusd"] = 0
+                cost[event["kind"].removeprefix("proposer_") + "_microusd"] += event["microusd"]
+        stopped = events[-1:] and events[-1]["kind"] == "stopped"
+        return {
+            "exploration_id": exploration_id,
+            "settings": settings,
+            "created_at_ns": row["created_at_ns"],
+            "events": events,
+            "campaign_ids": [event["campaign_id"] for event in events
+                             if event["kind"] == "campaign_started"],
+            "proposer_cost": {**cost, "total_exposure_microusd": sum(cost.values())},
+            "stop_reason": events[-1]["detail"] if stopped else None,
+        }
 
 
 __all__ = [

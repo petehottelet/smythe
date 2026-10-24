@@ -44,6 +44,7 @@ from smythe.actions import (
     revoke,
 )
 from smythe.cli import main
+import smythe.workflow
 from smythe.workflow_artifact import current_artifact
 from smythe.workflow_store import (
     WorkflowConflictError, WorkflowNotFoundError, WorkflowStateError, WorkflowValidationError,
@@ -579,6 +580,40 @@ def test_a_removed_source_makes_the_content_unavailable(
         prepare(store, result.execution_id, slot="announce")
     with pytest.raises(ActionNotAuthorized, match="content unavailable"):
         approved(store, host, action, clock)
+
+
+@pytest.mark.parametrize("decided_by", ["policy", "operator"])
+def test_a_decision_whose_inputs_are_not_an_object_authorizes_nothing(
+        store, tmp_path, replies, host, clock, monkeypatch, decided_by):  # noqa: F811
+    if decided_by == "policy":
+        run_id = completed(store, tmp_path, replies)
+    else:
+        run_id = completed(store, tmp_path, replies, renderer=None,
+                           acceptance=strict(Raises(), on_invalid="needs_review"))
+        swarm(store, tmp_path, renderer=None, acceptance=None).reevaluate(
+            run_id, operator=durable_operator(host, store, run_id))
+    action = prepare(store, run_id)
+    assertion = sign(host, action)
+    approved(store, host, action, clock, assertion)
+    sequence = smythe.workflow.current_decision(store, run_id)["sequence"]
+    assert sequence == (0 if decided_by == "policy" else 1)
+    read = smythe.workflow.decision_history
+
+    def history(store, run_id):
+        # The journal itself refuses such inputs; a history read elsewhere may hold them.
+        decisions = read(store, run_id)
+        decisions[-1]["inputs"] = sorted(decisions[-1]["inputs"].items())
+        return decisions
+
+    monkeypatch.setattr(smythe.workflow, "decision_history", history)
+    reason = f"the inputs of the journal's decision {sequence} are not a JSON object"
+    with pytest.raises(ActionNotAuthorized, match=reason):
+        check_authority(store, action.action_id, host)
+    with pytest.raises(ActionNotAuthorized, match=reason):
+        approved(store, host, action, clock, assertion)
+    with pytest.raises(ActionNotAuthorized, match=reason):
+        prepare(store, run_id, slot="announce")
+    assert [item["slot"] for item in actions_block(store, run_id)["items"]] == ["publish"]
 
 
 def test_an_approval_row_written_without_approve_never_authorizes(

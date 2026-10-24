@@ -672,7 +672,8 @@ def _edit_record(field_change):
 
 
 def _repoint(root, record):
-    other = TemplateRecord.from_dict({**record.to_dict(), "description": "Another memo"})
+    other = TemplateRecord.from_dict({**record.to_dict(), "description": "Another memo",
+                                      "parent_version": record.template_version})
     TemplateCatalog(root).put(other)
     (root / "versions" / record.template_version).write_bytes(other.record_sha256.encode())
 

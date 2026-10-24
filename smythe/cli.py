@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import hashlib
 import hmac
 import json
 import os
@@ -63,6 +64,7 @@ from smythe.optimize.ledger import (
     LedgerConflictError,
     TrialStateError,
 )
+from smythe.optimize.registry import RegistryError
 
 
 EXIT_OK = 0
@@ -93,6 +95,8 @@ MAX_OPTIMIZE_PARALLEL_CANDIDATES = 64
 MAX_OPTIMIZE_WALL_SECONDS = 86_400
 MAX_OPTIMIZE_BOOTSTRAP_RESAMPLES = 100_000
 MAX_OPTIMIZE_SIMULATED_OPERATIONS = 10_000_000
+# optimize commands that read or change the policy registry.
+_REGISTRY_COMMANDS = ("review", "activate", "rollback", "retire", "history")
 
 
 def _default_store() -> Path:
@@ -101,6 +105,10 @@ def _default_store() -> Path:
 
 def _default_optimize_ledger() -> Path:
     return Path.home() / ".smythe" / "optimize.sqlite3"
+
+
+def _default_policy_registry() -> Path:
+    return Path.home() / ".smythe" / "policy-registry.sqlite3"
 
 
 def _default_checkpoints() -> Path:
@@ -148,6 +156,26 @@ def _add_optimize_output_options(
         default=argparse.SUPPRESS if inherited else False,
         help="emit one compact JSON document on stdout",
     )
+
+
+def _add_registry_options(parser: argparse.ArgumentParser, *, ledger: bool = False,
+                          change: bool = False) -> None:
+    """A registry command's --registry, its --ledger if it reads one, and --json.
+
+    *change* adds the head the change expects and who makes it and why.
+    """
+    if change:
+        parser.add_argument("--expected-seq", type=int, required=True, metavar="SEQ",
+                            help="the target's head seq this change was decided from (0 for none)")
+        parser.add_argument("--actor", required=True, help="declared name of whoever makes the change")
+        parser.add_argument("--reason", required=True, help="reason recorded with the change")
+    parser.add_argument("--registry", default=str(_default_policy_registry()),
+                        help="SQLite policy registry (default: ~/.smythe/policy-registry.sqlite3)")
+    if ledger:
+        parser.add_argument("--ledger", default=argparse.SUPPRESS,
+                            help="SQLite optimization ledger (default: ~/.smythe/optimize.sqlite3)")
+    parser.add_argument("--json", action="store_true", default=argparse.SUPPRESS,
+                        help="emit one compact JSON document on stdout")
 
 
 def _add_runs_output_options(parser: argparse.ArgumentParser, *, inherited: bool) -> None:
@@ -379,6 +407,47 @@ def build_parser() -> argparse.ArgumentParser:
     inspect.add_argument("--out", default=None, metavar="HTML_PATH",
                          help="publish a new standalone report without replacing existing files")
     _add_optimize_output_options(inspect, inherited=True)
+
+    review_decision = optimize_commands.add_parser(
+        "review",
+        help="record a verdict on a campaign's terminal decision in the policy registry",
+    )
+    review_decision.add_argument("campaign_id")
+    review_decision.add_argument("--verdict", required=True, choices=("approve", "reject"))
+    review_decision.add_argument("--reviewer", required=True,
+                                 help="declared reviewer name; not authenticated")
+    review_decision.add_argument("--evidence", default=None, metavar="FILE",
+                                 help="file the reviewer examined; only its SHA-256 is recorded")
+    review_decision.add_argument("--note", default="", help="one line recorded with the review")
+    _add_registry_options(review_decision, ledger=True)
+
+    activation = optimize_commands.add_parser(
+        "activate",
+        help="put an approved review's policy in effect for a target; never edits configuration",
+    )
+    activation.add_argument("target")
+    activation.add_argument("review_id")
+    _add_registry_options(activation, change=True)
+
+    rollback = optimize_commands.add_parser(
+        "rollback", help="restore an earlier baseline or activate entry of a target as a new event",
+    )
+    rollback.add_argument("target")
+    rollback.add_argument("--to-seq", type=int, required=True, metavar="SEQ",
+                          help="the baseline or activate entry to restore")
+    _add_registry_options(rollback, change=True)
+
+    retire = optimize_commands.add_parser("retire", help="leave a target with no policy in effect")
+    retire.add_argument("target")
+    _add_registry_options(retire, change=True)
+
+    history = optimize_commands.add_parser(
+        "history",
+        help="report a target's activations and the decisions and cost of every campaign that "
+             "touched it, without changing the registry or ledger",
+    )
+    history.add_argument("target")
+    _add_registry_options(history, ledger=True)
 
     runs = root_commands.add_parser(
         "runs",
@@ -787,7 +856,7 @@ def _emit_job_inspection(value: dict[str, Any]) -> None:
     print(f"Cost complete: {'yes' if cost['cost_is_complete'] else 'no'}; "
           f"includes estimates: {'yes' if cost['cost_contains_estimates'] else 'no'}")
     page = value["pagination"]
-    print(f"Operation page: {page['returned']} of {page['total']} (offset {page['offset']}, limit {page['limit']})")
+    print(f"Operation page: {_operation_span(page)} (limit {page['limit']})")
     for operation in value["operations"]:
         print(f"Operation {_terminal_text(operation['operation_key'])} "
               f"({_terminal_text(operation['operation_id'])}): {_terminal_text(operation['status'])}; "
@@ -1214,10 +1283,88 @@ def _emit_run_inspection(value: dict[str, Any]) -> None:
     print(f"Next action: {action['action']}: {_terminal_text(action['detail'], limit=1000)}")
 
 
+def _policy_text(entry: dict[str, Any]) -> str:
+    """An event's or version's policy hash and canonical JSON, or that it sets none."""
+    if entry["policy_hash"] is None:
+        return "no policy in effect"
+    policy = json.dumps(entry["policy"], sort_keys=True, ensure_ascii=False)
+    return f"policy {entry['policy_hash']} {_terminal_text(policy, limit=1000)}"
+
+
+def _event_line(event: dict[str, Any]) -> str:
+    restores = "" if event["restores_seq"] is None else f" of seq {event['restores_seq']}"
+    review = f"; review {event['review_id']}" if event["review_id"] else ""
+    return (f"Seq {event['seq']}: {event['action']}{restores}, {_policy_text(event)}{review}; "
+            f"{_terminal_text(event['actor'])}: {_terminal_text(event['reason'])}")
+
+
+def _unknown_text(trials: int, microusd: int) -> str:
+    """Unknown outcomes by count, so one under a zero ceiling never reads as nothing."""
+    if not trials:
+        return "none"
+    return f"{trials} unknown trial{'' if trials == 1 else 's'} holding {_usd(microusd)}"
+
+
+def _cost_text(cost: dict[str, Any]) -> str:
+    return (f"confirmed {_usd(cost['confirmed_microusd'])}; reserved {_usd(cost['reserved_microusd'])}; "
+            f"total exposure {_usd(cost['total_exposure_microusd'])}")
+
+
+def _emit_registry(command: str, value: dict[str, Any]) -> None:
+    """Print a policy review, a target change or a target report at once."""
+    if command == "review":
+        incumbent = {"policy_hash": value["incumbent_policy_hash"], "policy": value["incumbent_policy"]}
+        lines = [f"Review: {value['review_id']}",
+                 f"Campaign: {_terminal_text(value['campaign_id'])}; decision {value['decision_id']} "
+                 f"({'promoted' if value['promoted'] else 'not promoted'})",
+                 f"Verdict: {value['verdict']} by {_terminal_text(value['reviewer'])}",
+                 f"Candidate {_policy_text(value)}", f"Incumbent {_policy_text(incumbent)}"]
+        if value["evidence_sha256"]:
+            lines.append(f"Evidence: sha256 {value['evidence_sha256']}")
+        if value["note"]:
+            lines.append(f"Note: {_terminal_text(value['note'])}")
+    elif command != "history":
+        lines = [f"Target: {value['target']}", *map(_event_line, value["events"]),
+                 "Configuration was not changed; new work resolves the policy in effect "
+                 "from the registry."]
+    else:
+        active, events = value["active"], value["history"]
+        lines = [f"Target: {value['target']}",
+                 "In effect: nothing" if active is None else
+                 f"In effect: seq {active['seq']}, {_policy_text(active)} from seq {active['source_seq']}",
+                 f"History: {len(events)} event{'' if len(events) == 1 else 's'}",
+                 *("  " + _event_line(event) for event in events),
+                 f"Campaigns touching the target: {len(value['campaigns'])}"]
+        for campaign in value["campaigns"]:
+            decision = campaign["decision"]
+            state = "no terminal decision" if decision is None else (
+                f"{'promoted' if decision['promoted'] else 'not promoted'}, verdict "
+                f"{decision['verdict'] or 'not recorded'}; decision {decision['decision_id']}")
+            lines += [f"Campaign {_terminal_text(campaign['campaign_id'])}: {state}",
+                      f"  Cost: {_cost_text(campaign['cost'])}",
+                      "  Unknown exposure: " + _unknown_text(
+                          campaign["unknown_trials"], campaign["cost"]["unknown_exposure_microusd"])]
+            lines += [f"  Review {review['review_id']}: {review['verdict']} by "
+                      f"{_terminal_text(review['reviewer'])}" for review in campaign["reviews"]]
+        total = value["optimization_cost"]
+        lines += [f"Optimization cost of these campaigns, not netted against inference savings: "
+                  f"{_cost_text(total)}",
+                  "Unknown exposure: " + _unknown_text(total["unknown_trials"],
+                                                       total["unknown_exposure_microusd"])]
+        elsewhere = value["campaigns_not_in_ledger"]
+        if elsewhere:
+            lines.append(f"Not in this ledger: {', '.join(map(_terminal_text, elsewhere))} "
+                         "(named by an activation; cost not included)")
+    print("\n".join(lines))
+
+
 def _emit(args: argparse.Namespace, command: str, value: Any) -> None:
     payload = {"ok": True, "command": command, command: value}
     if args.json:
         print(json.dumps(payload, ensure_ascii=False, separators=(",", ":")))
+        return
+    if args.root_command == "optimize" and command in _REGISTRY_COMMANDS:
+        _emit_registry(command, value)
         return
     if args.root_command == "runs":
         if command == "list":
@@ -1396,8 +1543,89 @@ async def _run_optimize_concurrency(args: argparse.Namespace) -> dict[str, Any]:
     return payload
 
 
+def _check_registry_arguments(args: argparse.Namespace) -> None:
+    """Refuse malformed registry input before any file is opened or created."""
+    from smythe.optimize.ledger import _nonempty, _safe_id
+    from smythe.optimize.registry import _seq, _target
+
+    command = args.optimize_command
+    if command == "review":
+        _safe_id(args.campaign_id, "campaign_id")
+        _nonempty(args.reviewer, "reviewer", maximum=128)
+        if args.note != "":
+            _nonempty(args.note, "note", maximum=1024)
+        return
+    _target(args.target)
+    if command != "history":
+        _seq(args.expected_seq, "expected-seq", minimum=0)
+        if command == "rollback":
+            _seq(args.to_seq, "to-seq", minimum=1)
+        _nonempty(args.actor, "actor", maximum=128)
+        _nonempty(args.reason, "reason", maximum=1024)
+
+
+def _evidence_sha256(path: str | None) -> str | None:
+    """The plain hex SHA-256 of an evidence file; an unreadable file is invalid input."""
+    if path is None:
+        return None
+    digest = hashlib.sha256()
+    try:
+        with open(path, "rb") as stream:
+            for block in iter(lambda: stream.read(1 << 20), b""):
+                digest.update(block)
+    except OSError as exc:
+        raise ValueError(f"cannot read evidence file {path!r}: {exc.strerror or exc}") from exc
+    return digest.hexdigest()
+
+
+def _dispatch_registry(args: argparse.Namespace) -> int:
+    """Record a review, change a target, or report one; history opens both files read-only."""
+    from smythe.optimize.inspection import collect_target_report
+    from smythe.optimize.registry import PolicyRegistry, _reviewable
+
+    command = args.optimize_command
+    _check_registry_arguments(args)
+    if command == "history":
+        with ExperimentLedger(args.ledger, read_only=True) as ledger, \
+                PolicyRegistry(args.registry, read_only=True) as registry:
+            value = collect_target_report(ledger, registry, args.target)
+    elif command == "review":
+        evidence = _evidence_sha256(args.evidence)
+        # Read-only like inspect; checked first so a missing ledger creates no registry.
+        if not Path(args.ledger).is_file():
+            raise FileNotFoundError(f"no optimization ledger at {args.ledger}")
+        if not Path(args.registry).exists():
+            # A review that would be refused must not leave a new, empty registry.
+            _reviewable(args.ledger, args.campaign_id, args.verdict)
+        with PolicyRegistry(args.registry) as registry:
+            value = registry.record_review(
+                args.ledger, args.campaign_id, reviewer=args.reviewer, verdict=args.verdict,
+                evidence_sha256=evidence, note=args.note,
+            ).to_dict()
+    else:
+        # A change acts on recorded reviews and history, so it never creates a registry.
+        if not Path(args.registry).is_file():
+            raise RegistryError(f"no policy registry at {args.registry}; a review creates one")
+        change = {"expected_seq": args.expected_seq, "actor": args.actor, "reason": args.reason}
+        with PolicyRegistry(args.registry) as registry:
+            if command == "activate":
+                event = registry.activate(args.target, args.review_id, **change)
+            elif command == "rollback":
+                event = registry.rollback(args.target, to_seq=args.to_seq, **change)
+            else:
+                event = registry.retire(args.target, **change)
+            # Compare-and-swap makes every event after the expected head this change's own,
+            # such as the baseline a first activation records.
+            events = registry.history(event.target)[args.expected_seq:event.seq]
+        value = {"target": event.target, "events": [item.to_dict() for item in events]}
+    _emit(args, command, value)
+    return EXIT_OK
+
+
 def _dispatch_optimize(args: argparse.Namespace) -> int:
     command = args.optimize_command
+    if command in _REGISTRY_COMMANDS:
+        return _dispatch_registry(args)
     if command == "inspect":
         destination = _optimization_report_destination(args.out, args.ledger) if args.out is not None else None
         with ExperimentLedger(args.ledger, read_only=True) as ledger:
@@ -1769,6 +1997,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         CampaignNotFoundError,
         LedgerConflictError,
         OptimizationNeedsAttention,
+        RegistryError,
         TrialStateError,
     ) as exc:
         _emit_error(args, command, exc)

@@ -114,10 +114,25 @@ A skill cannot:
   byte-identical with and without skills, and the planner's prompt differs
   only by the tags it lists. Only a Python-backed skill that you register
   sends its description to the model, as its tool's description, and only to
-  the agents you list.
+  the agents you list;
+- change an evaluator's data or an Autotune campaign. Discovery reads each
+  `SKILL.md` and nothing else, and a frontmatter key such as `acceptance`,
+  `budget` or `evaluator` is kept by name in `ignored_fields`, where it does
+  nothing.
 
 A tag can still route a node to an agent that already holds tools, so give
 tool-bearing agents only the skills you would trust with those tools.
+`tests/test_learning_boundaries.py` checks this boundary beside those of
+template records and Autotune campaigns: with a `SKILL.md` that declares
+tools and acceptance, budget and evaluator fields, node prompts, offered
+tools, the acceptance policy, the budget and the evaluator's files are
+byte-identical to a run without it. See
+[what learning cannot change](learning.md#what-learning-cannot-change).
+
+A [template record](learning.md#applicability) learned from runs that used a
+skill can list the skill's version as a prerequisite. Once that `SKILL.md`
+changes, `active_templates(..., environment=...)` leaves the template out
+until a candidate built from new runs is activated.
 
 ## Python-backed skills
 
@@ -147,8 +162,11 @@ characters, and is described by the skill's `description`; `input_schema`,
 nothing from the skill's directory: it never runs `scripts/` or imports from
 the directory, and the skill's declared `allowed-tools` grant nothing.
 `LocalTool(spec, handler, version, timeout_s=None)` makes a tool of any
-`ToolSpec` the same way. [Example 20](../examples/20_agent_skills.py) runs
-one offline.
+`ToolSpec` the same way. Providers receive a tool name with each `.`
+written `__` and read a call's name back the same way, so `LocalTool`
+refuses a name that contains `__`, or `_` right before `.`, which would
+read back as another name and could never be called.
+[Example 20](../examples/20_agent_skills.py) runs one offline.
 
 Who is offered a tool:
 
@@ -170,9 +188,12 @@ How a call runs:
   in a thread of its own, so it never blocks the event loop; an `async`
   handler runs on the loop.
 - An exception becomes an error result for the model, and so does a result
-  that is not text. `BudgetValidationError`, `ProviderResponseError`,
-  `WorkflowError` and `SecurityStop` stop the node instead, as they do from
-  any tool runtime.
+  that is not text. A handler that returns a coroutine instead of awaiting
+  it, such as a synchronous one that calls `async` code, gets an error
+  result saying so, and the coroutine is closed without running, so it never
+  warns that it was not awaited. `BudgetValidationError`,
+  `ProviderResponseError`, `WorkflowError` and `SecurityStop` stop the node
+  instead, as they do from any tool runtime.
 - With `timeout_s`, a call that has not returned in time becomes an error
   result. An `async` handler is cancelled. A thread cannot be: a synchronous
   handler keeps running until it returns, though the run does not wait for
@@ -188,10 +209,11 @@ How a call runs:
 
 `CompositeToolRuntime(runtime, MCPToolRuntime())` offers a node the tools of
 every runtime it merges, each call going to the runtime that offered the
-tool. A tool name may come from one runtime only: local runtimes that define
-the same name are refused when composed, and sessions that offer the same
-name raise `ValueError` when the node's session opens, before its first
-provider call.
+tool. A tool name may come from one runtime only, compared as a provider
+receives it, so `fs.read` and an MCP tool named `fs__read` are the same name:
+local runtimes that define the same name are refused when composed, and
+sessions that offer the same name raise `ValueError` when the node's session
+opens, before its first provider call.
 
 `runtime.describe()` lists each tool's `name`, `version` and `schema_sha256`,
 the SHA-256 of its input schema as canonical JSON, in the form a

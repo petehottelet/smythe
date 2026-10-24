@@ -36,7 +36,9 @@ from smythe._failures import SecurityStop
 from smythe.agent_skills import AgentSkill
 from smythe.budget import BudgetValidationError
 from smythe.provider import ProviderResponseError
-from smythe.tools import ToolCall, ToolResult, ToolRuntime, ToolSession, ToolSpec
+from smythe.tools import (
+    ToolCall, ToolResult, ToolRuntime, ToolSession, ToolSpec, display_name, wire_name,
+)
 from smythe.workflow_store import WorkflowError
 
 if TYPE_CHECKING:
@@ -80,7 +82,9 @@ class LocalTool:
     arguments come from the model: check them as you would any untrusted
     input. *version* is your name for what the handler does;
     ``schema_sha256`` is the SHA-256 of the input schema as canonical JSON.
-    The spec keeps its own copy of the schema.
+    The spec keeps its own copy of the schema. Providers receive a name with
+    each ``.`` written ``__``, so a name that contains ``__``, or ``_``
+    before ``.``, is refused: a call to it would read back as another name.
 
     With *timeout_s*, a call that has not returned in time becomes an error
     result. An ``async`` handler is cancelled then; a synchronous one cannot
@@ -98,6 +102,10 @@ class LocalTool:
         if not isinstance(self.spec, ToolSpec):
             raise TypeError(f"spec must be a ToolSpec, not {type(self.spec).__name__}")
         name, schema = self.spec.name, self.spec.input_schema
+        wire = wire_name(name)
+        if display_name(wire) != name:
+            raise ValueError(f"Tool {name!r} could never be called: its wire name {wire!r} "
+                             f"reads back as {display_name(wire)!r}")
         if not callable(self.handler):
             raise TypeError(f"Tool {name!r}: handler must be callable")
         if not isinstance(self.version, str) or not self.version.strip():
@@ -128,6 +136,14 @@ def _is_async(handler: Callable[..., Any]) -> bool:
         getattr(handler, "__call__", None))
 
 
+def _close(outcome: Any) -> bool:
+    """Close *outcome* if it is a coroutine no one will await, so it never warns; say if it was."""
+    if inspect.iscoroutine(outcome):
+        outcome.close()
+        return True
+    return False
+
+
 async def _in_thread(tool: LocalTool, arguments: dict[str, Any]) -> Any:
     """Run a synchronous handler in a daemon thread of its own and await its outcome.
 
@@ -141,6 +157,7 @@ async def _in_thread(tool: LocalTool, arguments: dict[str, Any]) -> Any:
 
     def settle(outcome: Any, error: BaseException | None) -> None:
         if future.done():  # The call timed out or was cancelled.
+            _close(outcome)
             return
         if error is None:
             future.set_result(outcome)
@@ -158,7 +175,7 @@ async def _in_thread(tool: LocalTool, arguments: dict[str, Any]) -> Any:
         try:
             loop.call_soon_threadsafe(settle, outcome, error)
         except RuntimeError:  # The loop closed while the handler ran.
-            pass
+            _close(outcome)
 
     threading.Thread(target=work, name=f"smythe-tool-{tool.name}", daemon=True).start()
     return await future
@@ -195,6 +212,10 @@ class LocalToolSession(ToolSession):
                 return self._result(tool_call, f"Tool {tool.name!r} did not finish within "
                                                f"{tool.timeout_s:g} seconds", True)
             return self._result(tool_call, str(error) or type(error).__name__, True)
+        if _close(text):
+            return self._result(tool_call, f"Tool {tool.name!r} returned a coroutine it never "
+                                           "awaited, not text; declare the handler with async "
+                                           "def and await the coroutine", True)
         if not isinstance(text, str):
             shown = type(text).__name__
             return self._result(tool_call, f"Tool {tool.name!r} returned {shown}, not text", True)
@@ -259,13 +280,22 @@ class LocalToolRuntime(ToolRuntime):
         return [self._tools[name].describe() for name in sorted(self._tools)]
 
 
+def _clash(first: str, second: str, repeated: str) -> str:
+    """Why two tools cannot be offered together: one name, or one name to a provider."""
+    if first == second:
+        return f"Tool name {first!r} {repeated}"
+    return f"Tool names {first!r} and {second!r} are both sent to a provider as {wire_name(first)!r}"
+
+
 def _unique(names: Iterable[str]) -> set[str]:
-    seen: set[str] = set()
+    """The names, refusing one whose wire name a name before it already has."""
+    seen: dict[str, str] = {}
     for name in names:
-        if name in seen:
-            raise ValueError(f"Tool name {name!r} is defined more than once")
-        seen.add(name)
-    return seen
+        wire = wire_name(name)
+        if wire in seen:
+            raise ValueError(_clash(seen[wire], name, "is defined more than once"))
+        seen[wire] = name
+    return set(seen.values())
 
 
 def _defined(runtime: ToolRuntime) -> list[str]:
@@ -281,11 +311,14 @@ class _CompositeSession(ToolSession):
     def __init__(self, sessions: list[ToolSession]) -> None:
         self._tools: list[ToolSpec] = []
         self._routes: dict[str, ToolSession] = {}
+        offered: dict[str, str] = {}  # Each wire name a provider receives, and its tool's name.
         for session in sessions:
             for spec in session.tools:
-                if spec.name in self._routes:
-                    raise ValueError(
-                        f"Tool name {spec.name!r} is offered by more than one tool runtime")
+                wire = wire_name(spec.name)
+                if wire in offered:
+                    raise ValueError(_clash(offered[wire], spec.name,
+                                            "is offered by more than one tool runtime"))
+                offered[wire] = spec.name
                 self._routes[spec.name] = session
                 self._tools.append(spec)
 
@@ -308,10 +341,11 @@ class CompositeToolRuntime(ToolRuntime):
 
     Each runtime opens its own session for the node's agent. The node is
     offered all of their tools, and each call goes to the session that
-    offered it. A tool name may come from one runtime only: local runtimes
-    that define the same name are refused here, and sessions that offer the
-    same name raise ``ValueError`` when they open, before the node's first
-    provider call.
+    offered it. A tool name may come from one runtime only, compared as a
+    provider receives it, so ``fs.read`` and ``fs__read`` are one name:
+    local runtimes that define the same name are refused here, and sessions
+    that offer the same name raise ``ValueError`` when they open, before the
+    node's first provider call.
     """
 
     def __init__(self, *runtimes: ToolRuntime) -> None:
@@ -323,6 +357,11 @@ class CompositeToolRuntime(ToolRuntime):
                                 f"not {type(runtime).__name__}")
         self._runtimes = runtimes
         _unique(_defined(self))
+
+    @property
+    def runtimes(self) -> tuple[ToolRuntime, ...]:
+        """The tool runtimes this one merges, in the order they were given."""
+        return self._runtimes
 
     def open(self, agent: Agent | None):
         return self._open(agent)

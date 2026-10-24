@@ -7,10 +7,15 @@ that ran into a template that `ConstrainedArchitect` can offer as a menu item,
 so a proven shape is selected instead of planned again.
 
 This page covers the evidence planner history keeps, failed runs,
-distillation, template records, their versions, their validation as
-untrusted candidates, and the template catalog. A record is data: building a
-template from it, storing it and pinning it in a durable run never changes
-the base planner, and nothing is promoted or activated automatically.
+distillation, template records, their versions, promoting structure that
+accepted runs repeat to a candidate record, validation of records as
+untrusted candidates, the template catalog, building a template without a
+planning call, activating, rolling back and pinning template versions,
+when a template stops applying because what its runs relied on changed, a
+template's lifecycle from record to rollback, and what learning cannot
+change. A record is data: building a template from it, storing it,
+activating it and pinning it in a durable run never changes the base
+planner, and nothing is promoted or activated automatically.
 
 ## Evidence in planner history
 
@@ -43,7 +48,8 @@ rejected output, also records:
   topology, cost, summed node time and outcome.
 
 The execution id, structure digest and acceptance decision are what a
-template record's [`source_runs`](#template-records) name.
+template record's [`source_runs`](#template-records) name, and what
+[promotion](#promote-repeated-accepted-structure) counts.
 [Durable runs](support-matrix.md#durable-text-workflow-components) still
 refuse `PlannerMemory`.
 
@@ -70,6 +76,32 @@ A failure row records:
 
 - Other errors keep no message, because it can quote task text or local
   data. No row holds a provider's raw response.
+- The row keeps the same task fields a success row keeps, the goal and
+  context with the constraints and done-when criteria, and each node's
+  label, as they were given. Only `failure_excerpt` is redacted, so a path or
+  identifier in the task text stays in the history file, as it does for a
+  run that finishes.
+- The home folder is found in any spelling of its separators, including the
+  doubled backslashes of a repr or JSON text, and the names below it stay.
+  Elsewhere two backslashes start a network path after any character, as
+  in the compiler flag `-I\\server\share\include`, so a relative path in a
+  repr, whose separators it doubles, is redacted too. A path that starts a
+  quoted string is removed up to the closing quote, spaces included, as
+  Python's own error messages quote paths; a quote mark with a letter or a
+  digit after it, as in `O'Brien`, is part of a name when one of the next
+  few quote marks of its kind can close the string. Unquoted, the rest of
+  a name with a space cannot be told from the words after it, so they are
+  removed with the path, in preference to keeping part of it, up to the end
+  of the line, a quote, a URL, or an HTTP method and its route:
+  `open D:\data\my report failed` becomes `open <path>`. A word that ends
+  in a colon or a semicolon ends the path and keeps its mark, so
+  `open D:\data\my report: access denied` becomes
+  `open <path>: access denied`. A comma or a backtick does not end a path,
+  because names hold them. URL paths, including one after a bracketed IPv6
+  host such as `http://[::1]/v1/models`, and routes after an HTTP method
+  written as a word of its own, such as `POST /v1/chat/completions`, are
+  kept, while `OUTPUT /srv/app/key.json` becomes `OUTPUT <path>`, as does a
+  path after a log tag, such as `[worker-1]/srv/app/key.json`.
 - The row also records the run's `execution_id`, `structure_sha256`, any
   gate `verification` entries, its cost and timing so far, and `acceptance`
   `not_evaluated`. A resumed run records `resumed` true.
@@ -100,7 +132,8 @@ require_success=True)` returns a `SubGraphTemplate`:
 ```python
 from smythe import ConstrainedArchitect, distill_template
 
-template = distill_template(result.graph, name="diligence-review", registry=swarm.registry)
+# agents is the Registry the run's Swarm(registry=agents) used.
+template = distill_template(result.graph, name="diligence-review", registry=agents)
 architect = ConstrainedArchitect(provider=provider, templates=[template])
 ```
 
@@ -148,6 +181,7 @@ A record's JSON form:
   "prerequisites": {"capabilities", "skills": [{"name", "version"}],
                     "tools": [{"name", "version", "schema_sha256"}],
                     "validators": [validator identities]},
+  "proven_with": {"models_sha256", "mcp_allowlists_sha256"},
   "expected_outputs": [{"node", "description", "validators"}],
   "failure_examples": [{"category", "evidence_sha256"}],
   "tests": [{"name", "sha256"}],
@@ -164,10 +198,13 @@ A record's JSON form:
   configuration or filesystem paths: no key holds them, and every unknown
   key is refused. Free text, the description, labels and personas, is copied
   verbatim from the graph and its agents, so it can still hold a path or the
-  source task's subject; the [review](#review) flags both. `prerequisites` names what a template expects to find,
-  such as a tool by name, version and schema digest; it grants nothing.
-  Validators appear as `ValidatorIdentity` data (name, version and
-  configuration digest), never as code or configuration.
+  source task's subject; the [review](#review) flags both. `prerequisites`
+  names what a template expects to find, such as a tool by name, version
+  and schema digest; it grants nothing. Validators appear as
+  `ValidatorIdentity` data (name, version and configuration digest), never
+  as code or configuration. `proven_with` holds only the digests of the
+  model ids and MCP allowlists that a candidate's runs used, to tell when
+  they [change](#applicability).
 - **Optional sections.** Everything after `blueprint` is optional and is
   omitted when empty, never written as null or an empty list. Lists inside
   `applicability` and `prerequisites` are sets: they are sorted and hold each
@@ -193,16 +230,18 @@ A record has two SHA-256 digests of canonical JSON (sorted keys, no
 whitespace, UTF-8):
 
 - `template_version` covers what decides what the template builds: the type,
-  version, name, description, blueprint, applicability, prerequisites and
-  expected outputs. Any change to a gate, policy, edge, label, persona or
-  applicability gives a new version. Key order does not change it, and
-  neither do `failure_examples`, `tests`, `source_runs`, `parent_version` or
-  `review`.
+  version, name, description, blueprint, applicability, prerequisites,
+  `proven_with` and expected outputs. Any change to a gate, policy, edge,
+  label, persona or applicability gives a new version. Key order does not
+  change it, and neither do `failure_examples`, `tests`, `source_runs`,
+  `parent_version` or `review`.
 - `record_sha256` covers the whole record. Records are equal, and hash
   alike, exactly when their `record_sha256` is equal, so a timeout of `90`
   and one of `90.0` make different records.
 
-`parent_version` names the template version a record was derived from.
+`parent_version` names the template version a record was derived from. The
+[catalog](#the-template-catalog) requires it of every version of a name after
+the first.
 
 ### Structure digests
 
@@ -239,6 +278,69 @@ a reviewer:
 Each list is omitted when it is empty. The review only flags text: it is
 not changed, and each build points labels at the new task as before. The
 review is not part of `template_version`.
+
+## Promote repeated accepted structure
+
+A shape whose runs keep being accepted can become a candidate template, so
+it is selected instead of planned again.
+`repeated_structures(memory, *, min_accepted)` reads planner history and
+returns each [structure digest](#structure-digests) that at least
+`min_accepted` accepted runs share, with the first row of each such run.
+History holds no graphs, so build the candidate from a graph of that
+structure, such as one run's `result.graph`:
+
+```python
+from smythe import (
+    PlannerMemory, TemplateCatalog, candidate_from_graph, repeated_structures, structure_sha256,
+)
+
+memory = PlannerMemory()
+if structure_sha256(result.graph) in repeated_structures(memory, min_accepted=3):
+    record = candidate_from_graph(result.graph, rows=memory.iter_outcomes(), name="memo-review",
+                                  min_accepted=3, registry=agents)
+    version = TemplateCatalog("templates").put(record)
+```
+
+- **Accepted, not successful.** A run counts only when its row records
+  `acceptance` `accepted`, which a
+  [strict acceptance policy](verifier.md#strict-delivery-acceptance) decides,
+  an `execution_id` and a `structure_sha256`, and no `failure_category`.
+  `success` never counts, so a completed run whose output was rejected, or
+  that no policy evaluated, does not. Each execution id counts once.
+- **Source runs.** `candidate_from_graph(graph, *, rows, name,
+  min_accepted=1, description=None, registry=None, require_success=True,
+  source_task=None, environment=None)` distills `graph` as `distill_record`
+  does, keeps its [review](#review), and lists each accepted run of the
+  graph's structure in `rows` as a source run. With fewer than
+  `min_accepted` such runs it raises `DistillationError`. Given the
+  `environment` the runs used, it also records what they relied on, so a
+  menu built with the environment a later run would use leaves the
+  template out once that changes (see [applicability](#applicability)).
+- **Failure examples.** Each other row of that structure that has a
+  `failure_category`, or whose `acceptance` is `rejected`, `needs_review` or
+  `indeterminate`, becomes a failure example: that category, or else the
+  decision, and `evidence_sha256`, the SHA-256 of the row's `execution_id`,
+  `structure_sha256`, `acceptance`, `verification`,
+  `rejected_output_sha256`, `failure_category` and `failure_type` as
+  canonical JSON, each when set. A completed run that no policy evaluated
+  is not an example. No text from a row is kept, neither its goal nor a
+  failure excerpt. Rows with equal evidence give one example, and the
+  latest 16 are kept.
+- **A candidate only.** Nothing is stored or activated. The catalog
+  [validates](#validate-a-candidate-record) a candidate when it stores it,
+  and a version is put in effect only through a
+  [reviewed decision](#activate-and-roll-back-templates). A candidate names
+  no parent, so it is stored only as the first version of its name; to store
+  it as a later version, name a stored version it follows:
+  `catalog.put(dataclasses.replace(record, parent_version=version))`. It is
+  [validated](#validate-a-candidate-record) against that version and must
+  keep, among other things, every prerequisite that version lists, so a
+  candidate learned after one of them changed is
+  [stored under a new name](#the-template-catalog) instead.
+
+`PlannerMemory.iter_outcomes()` returns the history rows, oldest first. It
+reads the file once, when it is called, never writes it, and skips the rows
+recall skips.
 
 ## Validate a candidate record
 
@@ -288,8 +390,15 @@ candidate is refused when:
   `failure_policy` `skip`, under which a failing judge or target is passed
   over and the run continues without a verdict; and no validator of an
   expected output and no prerequisite of the parent may be removed. A
-  prerequisite at another version counts as removed. A candidate's
-  `parent_version`, when set, must be the parent's version.
+  prerequisite at another version counts as removed. The parent's
+  `proven_with` may not be dropped, which would let the template
+  [apply](#applicability) under any models and MCP allowlists, though a
+  candidate proven elsewhere may record other digests; and every task
+  family in the parent's `excluded_task_families` must stay excluded. The
+  other `applicability` fields, `task_families`, `keywords` and
+  `required_context_keys`, are not compared, and no library code acts on
+  them. A candidate's `parent_version`, when set, must be the parent's
+  version.
 
 Validation checks structure and authority, not instructions: a label or
 persona that tells a judge to pass everything is for a reviewer to catch.
@@ -316,17 +425,40 @@ template = catalog.get(version).to_template()
 catalog.versions("diligence-review")  # every stored version of that name
 ```
 
-- `put(record, *, parent=None, limits=None)` [validates](#validate-a-candidate-record)
-  the record, a `TemplateRecord` or its JSON data, under `limits` and
-  against `parent` or, without one, against the record the catalog holds
-  for the candidate's `parent_version`, when it holds one. A refused record
-  raises `TemplateValidationError` and writes nothing. `put` returns the
-  record's template version. Storing a record the catalog already holds
-  writes no record or version file. A catalog holds
-  one record per version: a different record for a stored version, for
-  example one with other source runs, raises `TemplateRecordError` and the
-  stored record is kept. Two processes that store the same record at once
-  both succeed.
+- `put(record, *, parent=None, limits=None)`
+  [validates](#validate-a-candidate-record) the record, a `TemplateRecord`
+  or its JSON data, under `limits` and against `parent` or, without one,
+  against the record the catalog holds for the candidate's
+  `parent_version`, when it holds one. A refused record raises
+  `TemplateValidationError` and writes nothing. `put` returns the record's
+  template version. Storing a record the catalog already holds writes no
+  record or version file. A catalog holds one record per version: a
+  different record for a stored version, for example one with other source
+  runs, raises `TemplateRecordError` and the stored record is kept. Two
+  processes that store the same record at once both succeed.
+- Every new version of a name the catalog already holds versions of must
+  name one of them as its `parent_version`, and is validated against it, so
+  a later version cannot drop a gate by naming no parent, or by naming a
+  version of another template. Otherwise `put` raises
+  `TemplateValidationError` with `field` `"parent_version"` and writes
+  nothing. Only the first version of a name may name no parent, or one the
+  catalog does not hold.
+- A later version must keep every prerequisite of the version it names, and
+  a prerequisite at another version counts as removed. A candidate learned
+  after a capability, skill, tool or validator it relied on was removed or
+  changed, such as a skill whose `SKILL.md` digest changed, no longer lists
+  that prerequisite as it was, so it can follow only a stored version that
+  lists none of the prerequisites it dropped or changed. When every stored
+  version of the name lists one of them, the candidate cannot be stored
+  under that name: `put` refuses it with `field` `"parent_version"` when it
+  names no parent, and with the prerequisite's field, such as
+  `"prerequisites.skills"`, when it names a stored version. Store it under
+  a new name instead, whose target `planner.template.<new name>` is
+  activated through its own reviewed decision; the old name's version stays
+  in effect until its target is
+  [retired](optimize.md#resolve-roll-back-and-retire). A candidate whose
+  runs differ only in their model ids or MCP allowlists records other
+  `proven_with` digests and can follow its predecessor.
 - `layout.json` records the catalog's file layout
   (`smythe.templates.TEMPLATE_CATALOG_LAYOUT`, now 1), so a later layout
   change is detected rather than misread. A catalog without the file was
@@ -369,13 +501,328 @@ architect = ConstrainedArchitect(provider, [template], model="gpt-6-astra")
 The run's recipe records the identity and version, so it pins the exact
 template. Resuming the run with a template of another version raises
 `WorkflowConflictError`; resume with the record the catalog holds for the
-saved version instead.
+saved version instead, which [`pinned_templates`](#resume-a-pinned-run)
+rebuilds.
+
+## Build a template without planning
+
+A template that suits every task a run receives needs no selection call.
+`record.as_architect()` returns a `TemplateArchitect`
+(`smythe.templates.TemplateArchitect`), a `DeterministicArchitect` that
+builds the record's graph in local code:
+
+```python
+from smythe import Swarm
+
+swarm = Swarm(model="gpt-6-astra", architect=catalog.get(version).as_architect())
+```
+
+- Each plan is the graph a `ConstrainedArchitect` composes when its model
+  selects the template once: node ids prefixed `<name>-0-`, labels pointed
+  at the task, a new registry of the record's agents, and
+  `graph.planning["templates"]` naming the record's version. Planning makes
+  no provider call.
+- A [strict acceptance policy](verifier.md#strict-delivery-acceptance)
+  counts its gates as gates you supplied, as it does those of a
+  `ConstrainedArchitect`'s templates.
+- A durable run takes `record.as_architect().local_only()`, a
+  `LocalOnly(role="architect")` declaration with identity `template:<name>`
+  and the record's `template_version`, so the recipe pins the exact
+  template, and resuming with another version raises
+  `WorkflowConflictError`. Resume with the record the catalog holds for the
+  saved version.
+
+## Activate and roll back templates
+
+The catalog keeps every version, and the
+[policy registry](optimize.md#policy-registry) records which one new runs
+use. A template's target is `planner.template.<name>`, which
+`template_target(name)` returns, and its policy maps the target to a
+template version:
+
+```text
+{"planner.template.report": "<template version>"}
+```
+
+A template whose name is not one dotted segment, a letter followed by up to
+63 letters, digits, `-` or `_`, has no target: `template_target` raises
+`ValueError`.
+
+A version is put in effect only through a reviewed Autotune decision. The
+campaign's contract makes the target its mutable field, with the template
+versions as string choices, such as `MutableFieldRule("string",
+choices=(v1, v2))`, and its evaluator builds each candidate's template from
+the catalog. An approving review of a promoted decision is then activated
+for the target, and the first activation records the incumbent version as
+the target's baseline:
+
+```python
+from smythe import ConstrainedArchitect, TemplateCatalog, template_target
+from smythe.optimize import PolicyRegistry
+
+catalog = TemplateCatalog("templates")
+target = template_target("report")  # "planner.template.report"
+with PolicyRegistry("policy-registry.sqlite3") as registry:
+    review = registry.record_review("optimize.sqlite3", campaign_id,
+                                    reviewer="report-owner", verdict="approve")
+    registry.activate(target, review.review_id, expected_seq=0,
+                      actor="release-operator", reason="approved for new reports")
+    architect = ConstrainedArchitect(provider, catalog.active_templates(registry, ["report"]))
+```
+
+- `catalog.active_templates(registry, names)` returns `record.to_template()`
+  for the version of each name in effect, in the order of `names`, for an
+  ordinary run. It reads the registry, which may be opened read-only, and
+  never writes it. A `ConstrainedArchitect` copies its menu when it is
+  built, so an architect keeps offering the versions it was built with;
+  build a new one, for example for each run, to offer the versions in effect.
+- `catalog.active_local_templates(registry, names)` returns the same
+  templates with `record.local_only()` as their builders, for a
+  [durable run](#durable-runs), whose recipe then pins those versions.
+- A retired template has no version in effect and is left out. A name whose
+  target has no history, and a version the catalog does not hold, raise
+  `KeyError`. A policy that holds anything besides the target's version, or
+  that names a version of another template, raises `TemplateRecordError`.
+
+A rollback appends an event that restores an earlier version (see
+[resolve, roll back and retire](optimize.md#resolve-roll-back-and-retire)):
+
+```python
+with PolicyRegistry("policy-registry.sqlite3") as registry:
+    registry.rollback(target, to_seq=1, expected_seq=len(registry.history(target)),
+                      actor="release-operator", reason="v2 drops the conclusions")
+```
+
+New architects and new durable runs then resolve the restored version, and
+the history keeps the baseline, activation and rollback events. A rollback
+writes only the registry. The catalog, the Autotune ledger, durable
+journals, architects already built and running work are unchanged, and the
+ledger's decisions and trials stay readable through a read-only open.
+
+The installed CLI records the same review and makes the same changes for a
+template's target:
+
+```bash
+smythe optimize review CAMPAIGN_ID --verdict approve --reviewer report-owner \
+    --ledger optimize.sqlite3 --registry policy-registry.sqlite3
+smythe optimize activate planner.template.report REVIEW_ID --expected-seq 0 \
+    --actor release-operator --reason "approved for new reports" \
+    --registry policy-registry.sqlite3
+smythe optimize rollback planner.template.report --to-seq 1 --expected-seq 2 \
+    --actor release-operator --reason "v2 drops the conclusions" \
+    --registry policy-registry.sqlite3
+```
+
+`retire` and `history` work the same way; see
+[review and change targets from the CLI](optimize.md#review-and-change-targets-from-the-cli)
+for every command, its options and its exit codes.
+
+### Resume a pinned run
+
+A durable run keeps the versions its recipe pinned, whatever is activated or
+rolled back later. Resuming it with a template of another version, such as
+the one now in effect, raises `WorkflowConflictError` and changes nothing.
+`pinned_templates(config, catalog)` rebuilds the pinned versions:
+
+```python
+from smythe import ConstrainedArchitect, Swarm, pinned_templates
+
+config = store.load_run(run_id)["config"]
+architect = ConstrainedArchitect(provider, pinned_templates(config, catalog), model="gpt-6-astra")
+swarm = Swarm(model="gpt-6-astra", provider=provider, run_store=store, architect=architect)
+result = swarm.resume(run_id)
+```
+
+`config` is the saved recipe, whose architect is a `ConstrainedArchitect`,
+or that architect's description within it, such as a router tier's
+`config["components"]["router"]["constrained"]`. Each template keeps the
+recipe's name and description, and its builder is `record.local_only()` for
+the recorded version, so the rebuilt recipe matches the saved one, and so
+does its `config_sha256`, and the run finishes on the versions it started
+with. A version the catalog does not hold raises `KeyError`. A template
+whose builder is not a record's declaration, such as one written in code,
+raises `TemplateRecordError`.
+
+### Which versions a plan used
+
+When a `ConstrainedArchitect` composes a plan from templates built from
+records, by `to_template()`, `local_only()` or `distill_template`, the
+graph's `planning["templates"]` lists each such selection as
+`{"name", "index", "version"}`: the template's menu name, its position among
+the selections, which also prefixes its node ids, and its template version.
+Templates written in code add nothing, so their plans keep `planning` as
+before, and node metadata never carries a version. Like the
+[routing decision](architecture.md#routing-decisions), the record is
+informational: checkpoints and durable plans save it with the graph.
+
+## Applicability
+
+A template learned from accepted runs relied on what those runs used: tools
+at their versions and input schemas, capabilities agents offered, skills at
+their digests, acceptance validators, models and MCP server allowlists.
+When one of them changes, that evidence no longer covers the template.
+`TemplateEnvironment.capture(*, registry=None, skill_provider=None,
+tool_runtime=None, validators=(), models=())` snapshots what a run would use
+now:
+
+| Part | Captured from |
+|---|---|
+| `capabilities` | each registry agent's effective capabilities |
+| `skills` | each skill with a version that `skill_provider`, by default the registry's own (`Registry.skill_provider`), lists for an agent, at every version an agent lists it at: for an [Agent Skill](skills.md#agent-skills-directories), the `sha256:` digest of its `SKILL.md` |
+| `tools` | `describe()` of a `LocalToolRuntime`, or of each one a `CompositeToolRuntime` holds (`CompositeToolRuntime.runtimes`): name, version and `schema_sha256` |
+| `mcp_allowlists` | the `allowed_tools` of each MCP server on an agent's profile, merged by server name; `None`, every tool, wins |
+| `validators` | acceptance validators or their identities, such as `AcceptancePolicy.validator_identities` |
+| `models` | the model ids a run would use |
+
+`TemplateEnvironment(...)` takes the same parts directly, with one version
+or several for each skill, and every part is read-only. `skills` maps each
+skill's name to its sorted versions, so a skill that two agents list at
+different versions keeps both. Given the environment its runs used,
+`candidate_from_graph(..., environment=environment)` records what the
+candidate relied on: as `prerequisites`, the capabilities that nodes without
+an agent profile require and an agent offered, every skill at each of its
+versions, and every tool and validator; as `proven_with`, the SHA-256 of the
+sorted model ids and of the MCP allowlists as canonical JSON, never the ids
+or servers themselves.
+
+A skill provider that raises for an agent does not stop the snapshot, just
+as `Registry` falls back to the agent's static capabilities. `capture`
+leaves out that agent's skills, logs a warning on the `smythe.templates`
+logger naming the agent, and sets the environment's `skills_complete` to
+false. `check_applicability` then refuses every record whose prerequisites
+name a skill, and `candidate_from_graph` raises `ValueError` rather than
+record a candidate that could lack a skill it relied on.
+
+`check_applicability(record, environment)` returns an
+`ApplicabilityReport(valid, reasons, details)`. `reasons` are the sorted
+codes of `smythe.templates.APPLICABILITY_REASONS` behind any problem, each
+once, and `details` one sentence per problem:
+
+| Reason | When |
+|---|---|
+| `capability_removed` | no agent offers a prerequisite capability |
+| `skill_removed`, `skill_changed` | a prerequisite skill is missing, or not listed at exactly the versions the record names |
+| `skills_unreadable` | the record's prerequisites name a skill, and the skill provider could not list every agent's skills |
+| `tool_removed`, `tool_changed` | a prerequisite tool is missing, or has another version or input schema digest |
+| `validator_set_changed` | a validator identity that the prerequisites or an expected output name is not in use: removed, or at another version or configuration |
+| `model_changed` | the run's model ids are not those `proven_with` records |
+| `mcp_allowlist_changed` | the run's MCP allowlists are not those `proven_with` records |
+
+Prerequisites are what a template needs, so an environment that adds a
+capability, skill, tool or validator leaves it applicable. A skill the
+record names must be listed at exactly its versions, so another version of
+it beside the recorded one is a change, and `proven_with` must match
+exactly. A record with no prerequisites, no `proven_with` and no validators
+named in its expected outputs applies anywhere.
+
+Pass `environment=` to `active_templates` or `active_local_templates` to
+offer only the versions in effect that still apply:
+
+```python
+from smythe import TemplateEnvironment
+
+environment = TemplateEnvironment.capture(
+    registry=agents, tool_runtime=tool_runtime,
+    validators=policy.validator_identities, models=["gpt-6-astra"])
+templates = catalog.active_templates(registry, ["memo-review"], environment=environment)
+```
+
+A version that does not apply is left out, and a warning on the
+`smythe.templates` logger names it and gives the details. With
+`strict=True` it raises `TemplateApplicabilityError` instead, whose `name`,
+`version` and `report` say which version and why. Nothing is deactivated:
+the policy registry, the catalog and durable runs that pinned the version
+are unchanged, and [`pinned_templates`](#resume-a-pinned-run) still rebuilds
+it to resume them. To offer the template again, build a candidate from runs
+in the new environment and activate it through a reviewed decision. After a
+model or MCP allowlist change, the candidate can be stored as a later
+version of the name. After a prerequisite capability, skill, tool or
+validator was removed or changed, it no longer lists that prerequisite as
+it was, so it cannot follow a version that does; when every stored version
+of the name does, it is stored and activated under a
+[new name](#the-template-catalog).
+
+## A template's lifecycle
+
+Each step above is a separate, explicit operation.
+[`examples/21_template_lifecycle.py`](../examples/21_template_lifecycle.py)
+runs them in order, offline and without keys:
+
+1. **Record.** Strict runs record their acceptance decision and structure
+   digest in planner history. `repeated_structures` finds a structure that
+   accepted runs repeat, and `candidate_from_graph` distills it into a record
+   that names those runs.
+2. **Validate and store.** `TemplateCatalog.put` validates each candidate,
+   whether distilled, written by hand or proposed by a model, against its
+   parent before it stores it. A candidate whose step grants itself a tool is
+   refused and writes nothing.
+3. **Evaluate.** An [Autotune campaign](optimize.md#evaluate-template-versions)
+   makes the template's target its mutable field. The version in effect, or
+   the predecessor, is the incumbent and the candidate the challenger, and a
+   simpler arm, such as a single worker, is a
+   [reference](optimize.md#reference-arms) under `must_not_be_worse`. A task
+   family that only the holdout holds tests what development and confirmation
+   did not.
+4. **Review and activate.** A reviewer approves a promoted decision, and
+   activation puts the candidate in effect for new runs. A decision that was
+   not promoted cannot be approved.
+5. **Roll back.** A rollback puts the previous version back in effect for new
+   runs and writes only the registry. Running work keeps its versions.
+
+Validation and evaluation catch different things. Validation reads structure
+and authority: in the example, a candidate that drops its Timeline step
+passes, because its parent declares no check that needs one. Its campaign
+rejects it, since it is better on the briefings of development and
+confirmation and `worse` on the incident reviews held out. Evaluation is in
+turn only as good as its held-out tasks: a second evaluator whose holdout
+holds only briefings promotes the same candidate. Once a reviewer approves it
+and it is activated, the next incident review is rejected for its missing
+section, and a rollback restores the predecessor. A review approves a
+decision, not a template, so check what the evaluator held out before
+approving one.
+
+The example's fixtures show the mechanics only. Its evaluator is
+deterministic, so each decision rests on three identical pairs; read
+[choosing sample sizes](optimize.md#choosing-sample-sizes) before sizing a
+real campaign.
+
+## What learning cannot change
+
+Template records, Agent Skills and Autotune campaigns change what new work
+is built from, and none of them can change how work is judged, what it may
+spend or what it may do:
+
+| What learns | What it can change | What it cannot change |
+|---|---|---|
+| A template record | The structure and instructions a plan is built from | The tools, MCP servers, models or environment agents get, acceptance, budgets or evaluation: no record holds them, and a candidate that checks less than its parent is [refused](#validate-a-candidate-record) |
+| An Agent Skill | A capability tag that routes work to an agent | The tools an agent is offered, acceptance, the budget, prompts or evaluator data, whatever its `SKILL.md` declares ([skills](skills.md#what-a-skill-can-and-cannot-change)) |
+| An Autotune campaign | A policy under its target | A [reserved path](optimize.md#experiment-contracts-and-budgets), such as acceptance, validators, the evaluator, budgets, tools or the holdout, whether its contract or an exploring proposer names it |
+
+`tests/test_learning_boundaries.py` checks the three in one place: after
+each refused or harmless attempt, the evaluator's data and identity, the
+acceptance policy, the budget and the tools each agent is offered are
+byte-identical to what they were before, as are the ledger, catalog and
+skill files involved.
 
 ## Limits
 
 - Validation compares a candidate with one parent, not with the whole
-  lineage, and a record whose parent the catalog does not hold is checked
-  against the limits only. It does not read the instructions in labels and
-  personas.
-- A catalog has no activation, review or rollback state. Choosing which
-  version a planner offers is the caller's decision.
+  lineage, and does not read the instructions in labels and personas. The
+  first version of a name has no stored parent and is checked against the
+  limits only, and the catalog takes no lock, so two processes that each
+  store a version of a new name at the same time can both store it without
+  a parent.
+- The catalog has no activation, review or rollback state; the policy
+  registry holds it. An architect offers the templates it was given, so
+  only a menu built by `active_templates` or `active_local_templates`
+  follows the registry. Reviews are declared, not authenticated.
+- Applicability compares a record with the environment you capture, not
+  with what a run does. Nothing re-evaluates a template whose environment
+  changed; that takes new runs and a new candidate. A later version cannot
+  leave out a prerequisite of the version it follows or record it at
+  another version, so once a prerequisite of each stored version of a name
+  has changed, a new candidate takes a new name and target.
+- A promotion is only as good as the evaluator behind it: an evaluator whose
+  held-out tasks miss what a candidate breaks promotes it. Template
+  campaigns have run only on offline fixtures, so no template version has
+  been shown to do better than its predecessor on real tasks.

@@ -26,6 +26,12 @@ GATED = {"06_mcp_github.py", "07_mcp_saas.py"}
 NEEDS_MCP = {"05_mcp_filesystem.py"}
 HAS_MCP = importlib.util.find_spec("mcp") is not None
 
+# Seconds each example may take. Example 18 builds a four-item durable
+# archive, repairs it and recomputes it in full, syncing every journal write
+# to disk, so it outlasts the default where disk syncs are slow.
+TIMEOUT_S = 120
+SLOW_TIMEOUT_S = {"18_archive_maintenance.py": 600}
+
 
 def _offline_env() -> dict[str, str]:
     env = dict(os.environ)
@@ -47,7 +53,7 @@ def test_example_runs_offline(script):
         env=_offline_env(),
         capture_output=True,
         text=True,
-        timeout=120,
+        timeout=SLOW_TIMEOUT_S.get(script.name, TIMEOUT_S),
     )
     assert proc.returncode == 0, (
         f"{script.name} failed (exit {proc.returncode}):\n"
@@ -59,3 +65,9 @@ def test_example_runs_offline(script):
 
 def test_examples_were_discovered():
     assert len(EXAMPLE_SCRIPTS) >= 4
+
+
+def test_slow_examples_exist():
+    # A renamed example must not keep a stale, longer limit.
+    assert {path.name for path in EXAMPLE_SCRIPTS} >= set(SLOW_TIMEOUT_S)
+

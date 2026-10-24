@@ -7,8 +7,10 @@ Smythe has three execution paths:
   See [durable text workflows](workflow-accounting.md).
 - **Jobs**: manifest-declared artifact operations. See [Jobs](jobs.md).
 
-This page lists what each path accepts. Each supported cell names a test
-that exercises it, and each refusal names a test that shows when it happens.
+This page lists what each path accepts and
+[who owns each execution responsibility](#who-owns-each-execution-responsibility)
+on it. Each supported cell names a test that exercises it, and each refusal
+names a test that shows when it happens.
 `tests/test_support_matrix_docs.py` checks that every cited test exists.
 
 ## Providers on ordinary runs
@@ -357,6 +359,169 @@ Tests:
   `tests/test_failure_classes.py::test_both_executors_retry_skip_and_stop_on_the_same_failures_as_before`
   and `tests/test_failure_classes.py::test_regeneration_settlement_stops_on_the_same_failures_as_before`.
 
+## Who owns each execution responsibility
+
+For each execution path, the table names who owns each responsibility of
+running work: a component of the process that runs it, the store that
+records it, an operator, or nothing. A cell that starts with None names a
+responsibility that nothing on the path owns, and says what follows. Every
+path runs on one machine: SQLite stores and checkpoint directories are not
+coordinated across hosts, and no optional backend or worker adapter exists.
+
+| Responsibility | Ordinary runs | Durable text workflows | Jobs |
+|---|---|---|---|
+| Admission and scheduling | The executor in the running process: one node at a time, or up to `max_concurrency` ready nodes with `parallel=True`, within a `CapacityPolicy`'s limits for the provider type and model each node is routed to. Nothing about admission is saved: a resumed run follows the resuming `Swarm` | The executor in the process that holds the run's lease, at the concurrency the recipe recorded; the journal admits each call against the run's budget when it is made. `capacity_policy` is refused | The `JobRunner` that holds the run's lease, up to the manifest's `max_concurrency` within the approved budget. A pause request or a budget overrun closes admission |
+| Logical and attempt identity | A node's id and its `execution_generation`. Attempts are numbered on trace spans and, under `persist_attempts`, counted for each generation in the checkpoint. A provider call has no identity of its own | Each call's key: phase, node or component scope, generation, invocation, attempt and turn. A key's request cannot change. An external action sends one key with every attempt | An operation id that the approved plan fixes, and numbered attempts of it. A reroll, or an attempt after recovery, takes the operation's next attempt number |
+| Permission to dispatch | The in-process `Sentinel`: the async executor reserves each node's estimate before its call, and a reservation the budget cannot hold stops admission. No record claims a dispatch; a sent call left unanswered is kept only as unknown exposure, with `retain_uncertain_dispatch` or after a security stop | The journal: one transaction reserves the call's quoted ceiling against the run's budget, and another grants its one dispatch claim under the run's lease. A claimed call is never released. An external action's attempt is reserved and claimed the same way | The store: an attempt reserves its call's inclusive ceiling and records the call as prepared, then as dispatched, in writes that the run's lease fences |
+| Calling again | The executor, by the node failure policy or a `RetryPolicy`. A model profile's fallback changes the provider of the next attempt, not who makes it | The executor, under the node failure policy or a `RetryPolicy` whose attempts it counts from the journal | An operator, by a reroll. Jobs never call again on their own |
+| Settling cost and its unit | The in-process `Sentinel`, in float USD. Checkpoints save each node's cost, and resume restores it | The journal, in integer nanoUSD, from each call's saved response. A known charge replaces its reservation once | The store, in integer micro-USD, against each profile's inclusive per-call ceiling |
+| Keeping results for recovery | The `checkpoint_store`: a full snapshot after planning, after each finished node by default and when the run ends. None without one | The journal: each response's bytes are committed before they are decoded, and replayed until a checkpoint consumes them | The store and the run's artifact directory: each accepted attempt's files with their SHA-256, which resume checks again |
+| Stop and cancellation | The executor: a failure cancels the calls in flight, or drains them under a `TerminationPolicy`. A `RunControl` revocation cancels them at once, during a supervisor review too, and its saved stop refuses resume. Unless `retain_uncertain_dispatch` or a security stop keeps it as unknown cost, a cancelled call releases its reservation; a native provider's call keeps its unresolved bill | The executor in the process that holds the lease: a failure that stops the run, such as a `HALT` node's, cancels the nodes in flight, and each sent call it cancels holds unknown exposure that blocks the run. A drain sends no request that was not already sent. A security stop blocks the run in the journal, and `store.security_stop()` needs no lease | An operator: `jobs stop` saves a pause that closes admission while dispatched calls finish. A call still waiting at the stop's drain deadline, or at the end of `max_wall_seconds`, becomes an unknown outcome |
+| Waits and timers | The executor's clock in the running process: retry backoff, `Retry-After`, capacity spacing and a retry deadline, which starts again on resume | The executor's clock for retry backoff, a retry deadline that starts again on resume, and a drain deadline; the journal keeps no `Retry-After`. The run's lease lasts 60 seconds, and a heartbeat on the run's event loop renews it every 15 seconds, so blocking the loop for more than about 45 seconds can let it lapse. The run then fails with `WorkflowLeaseError`, and resuming it continues; a call dispatched without a saved response keeps its unknown exposure | The worker's clock: `call_timeout_s`, `max_wall_seconds` for each start, resume or reroll, a stop's drain deadline, and the heartbeat that renews the run's lease |
+| Ownership and stale writers | None: a checkpoint has no lease, so two processes that resume one execution id both run its pending nodes, and the snapshot written last wins | The journal's run lease, whose epoch rises with each new owner. A resume while another process holds a live lease raises `WorkflowLeaseError` before any call, a former owner can only add late evidence for its own dispatch, and an action claims its dispatch under the run's lease | The store's run lease, whose epoch rises with each new owner and is checked inside every worker write. A takeover fences the former worker's dispatch, settlement and late responses |
+| Recovery after process loss | The resuming `Swarm`, from the last checkpoint. Unfinished nodes run again, so a call that was in flight when the process died is sent again. `persist_attempts` keeps a node's attempts within its allowance | The next process to hold the lease. A call reserved and never dispatched is sent on resume under its reservation, or released once its node can no longer send it. A dispatched call without a saved response holds unknown exposure, blocks the run and is never sent again, except a free read declared safe to send again. A saved response settles and replays | The next process to hold the lease. A prepared call returns to pending. A dispatched call becomes an unknown outcome that only an operator resolves, by adopting its published bytes or by an acknowledged reroll |
+| Observing without controlling | `smythe runs inspect`, `list` and `review` read checkpoints without writing them. Nothing they report says whether a process is still running the run | `smythe runs inspect`, `list` and `review` open the journal read-only, take no lease and work while a worker holds the run, as does `plan_repair()`. `runs revoke-action` is the one control | `smythe jobs attach`, `status`, `list`, `inspect` and `review` read the store without providers or recovery, and leave the worker running. `jobs stop` saves a pause request without signaling the worker |
+| Upgrading with work in flight | None: nothing stops a process of an earlier release from writing a checkpoint after the upgrade. This release resumes checkpoint versions 1 to 5, and writes version 5 only for state that earlier readers must refuse | Opening a version 1 journal for writing upgrades it in one transaction. A live lease from an earlier release refuses the upgrade with `WorkflowLeaseError`, and read-only opens never upgrade | The writable store upgrades earlier databases to schema version 4. An unexpired lease from an earlier release blocks the upgrade, and read-only inspection never migrates |
+
+Who calls again after a failure, and after which failures, is listed
+[above](#paths-accounting-and-retries-by-provider). No path keeps a timer
+across process loss: each wait is measured in the process that runs the
+work and ends with it, and after a crash nothing resumes the work until a
+caller, an operator or an OS scheduler resumes it.
+
+To upgrade Smythe while work is in flight:
+
+1. Stop each Jobs worker with `smythe jobs stop RUN_ID`, and wait until
+   `smythe jobs status RUN_ID` shows its run `paused` or finished.
+   `--drain-timeout-s` bounds the wait, and a call still waiting at its
+   deadline becomes an unknown outcome. Stop a worker of an earlier release
+   with that release's own controls
+   ([stop and resume safely](jobs.md#stop-and-resume-safely),
+   [Jobs database upgrades](jobs.md#jobs-database-upgrades)).
+2. Let each durable run's process end, by finishing or failing, so that it
+   releases the run's lease. A durable run has no pause: interrupting one
+   while a call is in flight leaves that call as unknown exposure. A killed
+   process's lease lapses 60 seconds after its last renewal.
+3. Let ordinary runs end too, since nothing fences their checkpoints.
+4. Back up each workflow journal, Jobs database and checkpoint directory
+   while no process has it open ([journal upgrades](workflow-accounting.md#journal-upgrades)).
+5. Upgrade Smythe, then resume: `smythe jobs resume RUN_ID` for Jobs, and
+   `swarm.resume(...)` with the run id of a durable run or the execution id of
+   an ordinary run.
+
+Tests:
+
+- Admission and scheduling: ordinary runs `tests/test_async_executor.py::test_max_concurrency_caps_in_flight_calls`,
+  `tests/test_capacity_admission.py::test_in_flight_calls_per_model_never_exceed_the_limit_while_the_global_cap_is_higher`,
+  `tests/test_capacity_admission.py::test_a_profiled_node_takes_the_limit_of_its_profile_s_provider_and_model`
+  and `tests/test_capacity_admission.py::test_a_resumed_swarm_sends_its_calls_and_merge_through_a_limiter`;
+  durable text workflows `tests/test_workflow_runtime.py::test_changed_handoff_binding_rejected_before_calls[concurrency]`,
+  `tests/test_workflow_store.py::test_atomic_parallel_reservations_do_not_oversubscribe`
+  and `tests/test_capacity_admission.py::test_executors_and_swarm_check_the_policy_and_durable_runs_refuse_it`;
+  Jobs `tests/test_jobs_runner.py::test_runner_executes_bounded_offline_job_and_persists_artifacts`,
+  `tests/test_jobs_pause.py::test_pause_refuses_new_admission_and_preserves_safe_retry_allowance`
+  and `tests/test_jobs_store.py::test_budget_overrun_is_derived_latched_and_blocks_every_admission`.
+- Logical and attempt identity: ordinary runs `tests/test_async_executor.py::test_retry_attempts_record_their_index_outcome_and_backoff_wait`,
+  `tests/test_attempt_allowance.py::test_a_persisted_run_saves_its_policy_and_attempts_as_version_5`
+  and `tests/test_attempt_allowance.py::test_a_regenerated_node_gets_a_fresh_allowance`;
+  durable text workflows `tests/test_workflow_executor.py::test_attempt_and_turn_are_explicit_and_restart_at_each_attempt`,
+  `tests/test_workflow_executor.py::test_worker_verifier_and_regenerated_calls_use_current_phase_and_generation`,
+  `tests/test_workflow_store.py::test_same_logical_call_cannot_change_binding`
+  and `tests/test_action_contract.py::test_action_key_is_pinned_and_stable`;
+  Jobs `tests/test_jobs_preflight.py::test_input_digest_leaves_operation_ids_plan_hash_and_approval_token_unchanged`,
+  `tests/test_jobs_store.py::test_recovery_restores_running_attempt_that_never_prepared_a_call`
+  and `tests/test_jobs_runner.py::test_reroll_records_its_reason_on_the_new_attempt`.
+- Permission to dispatch: ordinary runs `tests/test_budget.py::test_budget_reserve_prevents_overspend`,
+  `tests/test_async_executor.py::test_partial_reservation_rollback_on_budget_exceeded`
+  and `tests/test_async_executor.py::test_provider_cost_hint_drives_reservations`;
+  durable text workflows `tests/test_workflow_store.py::test_atomic_parallel_reservations_do_not_oversubscribe`,
+  `tests/test_workflow_store.py::test_dispatch_claim_is_exclusive_even_with_same_request_and_lease`,
+  `tests/test_workflow_store.py::test_release_before_dispatch_preserves_quote_but_never_releases_dispatched`
+  and `tests/test_action_journal.py::test_an_attempt_reserves_claims_and_records_its_receipt`;
+  Jobs `tests/test_jobs_store.py::test_prepared_call_recovery_is_safe_and_restores_attempt_allowance`,
+  `tests/test_jobs_store.py::test_recovery_marks_dispatched_call_unknown_and_never_pending`
+  and `tests/test_jobs_lease_fencing.py::test_takeover_fences_every_old_worker_write_without_side_effects`.
+- Calling again: ordinary runs `tests/test_retry_policy.py::test_a_provider_whose_sdk_may_retry_is_refused_before_any_call`
+  and `tests/test_profile_fallback.py::test_after_a_rate_limit_the_next_attempt_calls_the_fallback_profile`;
+  durable text workflows `tests/test_workflow_retry_policy.py::test_a_rate_limited_node_is_capped_and_resume_makes_no_call_beyond_the_cap`;
+  Jobs `tests/test_jobs_runner.py::test_selective_reroll_replaces_only_rejected_operation`.
+- Settling cost and its unit: ordinary runs `tests/test_budget.py::test_budget_tracks_cost`
+  and `tests/test_checkpoint.py::test_resume_restores_budget_accounting`;
+  durable text workflows `tests/test_workflow_store.py::test_exact_charge_receipt_replay_and_inspection_are_separate`
+  and `tests/test_workflow_store.py::test_known_overrun_commits_full_charge_before_closing_admission`;
+  Jobs `tests/test_jobs_store.py::test_complete_call_persists_artifact_and_cost`
+  and `tests/test_jobs_models.py::test_money_normalizes_to_exact_microdollars`.
+- Keeping results for recovery: ordinary runs `tests/test_checkpoint.py::test_crash_then_resume_completes_without_rerunning_finished_nodes`
+  and `tests/test_checkpoint.py::test_checkpoint_interval_batches_node_updates_but_forces_terminal_save`;
+  durable text workflows `tests/test_workflow_runtime.py::test_raw_worker_result_replays_after_lost_graph_checkpoint`
+  and `tests/test_workflow_executor.py::test_actual_sqlite_facade_replays_completed_call_after_checkpoint_lag`;
+  Jobs `tests/test_jobs_store.py::test_complete_call_persists_artifact_and_cost`
+  and `tests/test_jobs_runner.py::test_resume_rechecks_accepted_bytes_and_reports_a_corrupted_file`.
+- Stop and cancellation: ordinary runs `tests/test_async_executor.py::test_halt_cancels_and_awaits_siblings_without_starting_queue`,
+  `tests/test_drain_policy.py::test_a_sibling_in_flight_finishes_during_the_drain_and_is_saved`,
+  `tests/test_security_stop.py::test_a_revoke_while_calls_are_in_flight_cancels_them_without_a_drain`,
+  `tests/test_security_stop.py::test_a_revoke_during_a_supervisor_review_cancels_the_calls_in_flight_at_once`,
+  `tests/test_security_stop.py::test_ordinary_resume_is_refused_while_the_stop_is_saved`,
+  `tests/test_uncertain_dispatch.py::test_a_cancelled_in_flight_sibling_keeps_its_exposure_under_the_option`
+  and `tests/test_uncertain_dispatch.py::test_a_native_unknown_bill_stays_terminal_with_its_live_reservation`;
+  durable text workflows `tests/test_workflow_drain.py::test_a_sibling_unanswered_when_the_run_stops_keeps_unknown_exposure_and_blocks_it`,
+  `tests/test_workflow_drain.py::test_a_sibling_still_counting_its_input_when_the_run_stops_sends_no_request`,
+  `tests/test_security_stop.py::test_a_durable_stop_blocks_the_run_keeps_its_exposure_and_refuses_resume`
+  and `tests/test_security_stop.py::test_the_store_stop_is_lease_free_first_wins_and_survives_every_latch`;
+  Jobs `tests/test_jobs_pause.py::test_runner_drains_admitted_calls_and_resume_preserves_accepted_artifacts`,
+  `tests/test_jobs_pause.py::test_calls_still_awaiting_a_provider_at_the_drain_deadline_become_unknown_at_their_ceiling`
+  and `tests/test_jobs_runner.py::test_whole_run_deadline_cancels_dispatched_call_conservatively`.
+- Waits and timers: ordinary runs `tests/test_retry_policy.py::test_a_rate_limit_is_retried_after_exactly_its_retry_after`,
+  `tests/test_capacity_admission.py::test_calls_start_min_interval_apart_on_a_manual_clock`
+  and `tests/test_attempt_allowance.py::test_a_resumed_node_is_still_bound_by_its_retry_deadline`;
+  durable text workflows `tests/test_workflow_retry_policy.py::test_a_journaled_rejection_waits_its_backoff_not_retry_after`,
+  `tests/test_support_matrix.py::test_a_durable_run_holds_a_60_second_lease_that_its_event_loop_renews_every_15_seconds`
+  and `tests/test_support_matrix.py::test_a_durable_run_whose_lease_lapses_during_a_stall_fails_and_resumes_without_calling_again`;
+  Jobs `tests/test_jobs_runner.py::test_never_returning_provider_hits_call_deadline_and_becomes_unknown`,
+  `tests/test_jobs_runner.py::test_whole_run_deadline_before_dispatch_leaves_work_pending`
+  and `tests/test_jobs_runner.py::test_runner_lease_heartbeat_blocks_concurrent_resume`.
+- Ownership and stale writers: ordinary runs `tests/test_support_matrix.py::test_ordinary_checkpoints_do_not_fence_a_second_resumer`
+  and `tests/test_checkpoint_atomic.py::test_independent_stores_publish_complete_snapshots_without_shared_temporary_files`;
+  durable text workflows `tests/test_support_matrix.py::test_a_durable_resume_waits_for_another_owners_live_lease_before_any_call`,
+  `tests/test_workflow_store.py::test_expired_owner_can_append_exact_late_evidence_but_cannot_settle`,
+  `tests/test_workflow_provider.py::test_late_response_after_lease_loss_is_saved_without_acceptance`,
+  `tests/test_action_journal.py::test_a_superseded_lease_session_cannot_claim_or_record`
+  and `tests/test_action_conformance.py::test_two_threads_racing_to_dispatch_make_one_claim_and_one_effect`;
+  Jobs `tests/test_jobs_lease_fencing.py::test_takeover_fences_every_old_worker_write_without_side_effects`,
+  `tests/test_jobs_lease_fencing.py::test_runner_takeover_fences_dispatch_and_late_response`
+  and `tests/test_jobs_store.py::test_run_lease_excludes_other_store_and_gates_recovery`.
+- Recovery after process loss: ordinary runs `tests/test_checkpoint.py::test_crash_then_resume_completes_without_rerunning_finished_nodes`,
+  `tests/test_durability_benchmark.py::test_hard_kill_and_resume_duplicates_at_most_one_wave`
+  and `tests/test_attempt_allowance.py::test_a_killed_run_resumes_within_its_allowance`;
+  durable text workflows `tests/test_workflow_reservation_recovery.py::test_reserved_call_of_the_current_generation_is_dispatched_on_resume`,
+  `tests/test_workflow_reservation_recovery.py::test_kill_before_a_regeneration_leaves_only_never_dispatched_calls_releasable`,
+  `tests/test_workflow_store.py::test_crash_boundary_recovery_never_repeats_claim`,
+  `tests/test_workflow_read_tool.py::test_a_lost_read_response_is_read_again_only_when_free_and_repeat_safe`
+  and `tests/test_workflow_process_loss.py::test_killed_durable_run_resumes_its_decision_without_new_calls`;
+  Jobs `tests/test_jobs_store.py::test_prepared_call_recovery_is_safe_and_restores_attempt_allowance`,
+  `tests/test_jobs_store.py::test_recovery_marks_dispatched_call_unknown_and_never_pending`,
+  `tests/test_jobs_runner.py::test_adoption_accepts_published_bytes_without_a_call_and_keeps_the_exposure`,
+  `tests/test_jobs_store.py::test_unknown_requires_explicit_acknowledgement_before_reroll`
+  and `tests/test_jobs_scale_benchmark.py::test_real_hard_kill_resume_and_explicit_reroll_preserve_accepted_operations`.
+- Observing without controlling: ordinary runs `tests/test_runs_cli.py::test_legacy_checkpoint_shows_acceptance_as_not_recorded`
+  and `tests/test_runs_review.py::test_runs_that_need_nothing_give_an_empty_packet`;
+  durable text workflows `tests/test_runs_cli.py::test_reading_a_wal_journal_leaves_its_database_file_unchanged`,
+  `tests/test_runs_cli.py::test_revoke_action_is_a_fail_safe_control_and_an_abandoned_action_stays_unresolved`
+  and `tests/test_repair_plan.py::test_a_run_in_progress_needs_review_and_its_lease_is_left_alone`;
+  Jobs `tests/test_jobs_operator.py::test_attachment_is_read_only_provider_free_and_bounded`,
+  `tests/test_jobs_operator.py::test_interrupting_attachment_preserves_lease_and_all_saved_state`,
+  `tests/test_jobs_inspection_cli.py::test_read_commands_never_initialize_providers_or_change_store`
+  and `tests/test_jobs_operator.py::test_stop_persists_request_without_constructing_or_signaling_a_worker`.
+- Upgrading with work in flight: ordinary runs `tests/test_task_propagation.py::test_legacy_top_level_task_hydrates_graph_before_resume_shortcuts`,
+  `tests/test_checkpoint.py::test_ordinary_runs_still_write_version_4_without_a_record`
+  and `tests/test_attempt_allowance.py::test_a_reader_of_versions_1_to_4_refuses_the_allowance`;
+  durable text workflows `tests/test_workflow_store_migration.py::test_live_lease_from_an_earlier_release_refuses_migration`,
+  `tests/test_workflow_store_migration.py::test_writable_open_migrates_and_keeps_every_record_identity_and_balance`
+  and `tests/test_workflow_store_migration.py::test_read_only_open_reads_a_v1_journal_without_migrating`;
+  Jobs `tests/test_jobs_lease_fencing.py::test_v2_migration_rejects_live_legacy_lease_then_preserves_history`,
+  `tests/test_jobs_pause.py::test_v3_reader_capability_follows_upgrade_and_live_v3_lease_blocks_it`
+  and `tests/test_jobs_lease_fencing.py::test_read_only_v2_inspection_does_not_migrate_bytes`.
+
 ## Durable text workflow components
 
 A durable run checks its provider and components each time `plan()`,
@@ -532,6 +697,43 @@ Tests:
   `tests/test_workflow_binding.py::test_registry_never_invokes_external_hydration_during_preflight`,
   `tests/test_agent_skills.py::test_static_snapshot_pins_effective_capabilities_in_a_detached_static_registry`
   and `tests/test_agent_skills.py::test_static_snapshot_keeps_static_capabilities_when_the_provider_fails`.
+- With template records and Autotune campaigns:
+  `tests/test_learning_boundaries.py::test_a_skill_md_lends_a_tag_and_changes_no_tool_acceptance_budget_or_evaluator_data`.
+
+## Templates and policy versions
+
+[Template records](learning.md#template-records) hold the structure a plan is
+built from, and the [policy registry](optimize.md#policy-registry) records
+which version new runs use. A template version is put in effect only by a
+reviewed Autotune decision, and a rollback writes only the registry. No
+template record, skill or campaign changes acceptance, budgets, evaluator
+data or the tools agents are offered
+([what learning cannot change](learning.md#what-learning-cannot-change)).
+
+| Path | Template versions | Planner history |
+|---|---|---|
+| Ordinary runs | `record.to_template()` in a `ConstrainedArchitect`, `record.as_architect()`, or `TemplateCatalog.active_templates()` for the versions in effect; an architect keeps the versions it was built with | `PlannerMemory` records verification and acceptance evidence and, with `record_failures=True`, failed runs; `candidate_from_graph()` builds candidates from its rows |
+| Durable text workflows | `record.local_only()`, `record.as_architect().local_only()` or `active_local_templates()`, whose versions the recipe pins; `pinned_templates()` rebuilds them to resume, and another version raises `WorkflowConflictError` | Rejected: `memory` raises `WorkflowBindingError` before any call |
+| Jobs | Unsupported: manifests have no planner, so no template version applies | Unsupported: manifests have no memory field |
+
+Autotune trials can also run one durable text workflow each through
+`workflow_trial_evaluator` ([durable workflow trials](optimize.md#durable-workflow-trials)).
+
+Tests:
+
+- Ordinary runs: `tests/test_template_lifecycle.py::test_active_templates_build_the_version_in_effect_for_each_name`,
+  `tests/test_template_promotion.py::test_as_architect_builds_what_selecting_the_template_builds_without_a_call`
+  and `tests/test_template_promotion.py::test_accepted_runs_of_one_structure_yield_a_candidate`.
+- Durable text workflows: `tests/test_template_records.py::test_local_only_pins_the_record_version_in_a_durable_recipe`,
+  `tests/test_template_promotion.py::test_as_architect_pins_the_template_identity_and_version_in_durable_runs`,
+  `tests/test_template_lifecycle.py::test_pinned_templates_rebuild_the_saved_menu_exactly`
+  and `tests/test_support_matrix.py::test_durable_run_rejects_component_before_any_call[memory]`.
+- Jobs: `tests/test_support_matrix.py::test_jobs_manifest_has_no_validator_tool_or_memory_fields`.
+- Rollback while work is in progress: `tests/test_template_lifecycle.py::test_a_rolled_back_version_leaves_running_work_and_earlier_architects_on_theirs`.
+- Workflow trials: `tests/test_optimize_workflow_eval.py::test_offline_durable_trials_complete_at_zero_cost`.
+- What learning cannot change: `tests/test_learning_boundaries.py::test_a_campaign_refuses_a_reserved_mutable_path_and_changes_nothing`,
+  `tests/test_learning_boundaries.py::test_an_exploring_proposer_cannot_set_a_reserved_path`
+  and `tests/test_learning_boundaries.py::test_a_template_record_cannot_grant_authority_or_weaken_its_parent`.
 
 ## Jobs
 

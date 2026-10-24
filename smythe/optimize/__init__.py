@@ -25,6 +25,14 @@ from smythe.optimize.engine import (
     TrialContext,
     TrialOutcome,
 )
+from smythe.optimize.exploration import (
+    ExplorationBudget,
+    ExplorationResult,
+    ProposerError,
+    SubprocessProposer,
+    explore,
+    proposer_view,
+)
 from smythe.optimize.ledger import (
     CampaignLease,
     CampaignLeaseError,
@@ -58,6 +66,8 @@ __all__ = [
     "EvaluatorManifest",
     "ExperimentLedger",
     "ExperimentContract",
+    "ExplorationBudget",
+    "ExplorationResult",
     "HoldoutAlreadyUsedError",
     "MetricObjective",
     "MutableFieldRule",
@@ -72,15 +82,19 @@ __all__ = [
     "PolicyReview",
     "PromotionAssessment",
     "PromotionDecision",
+    "ProposerError",
     "RegistryConflictError",
     "RegistryError",
+    "SubprocessProposer",
     "TrialContext",
     "TrialOutcome",
     "TrialRecord",
     "TrialStatus",
     "assess_promotion",
     "canonical_json_bytes",
+    "explore",
     "normalize_gate_name",
+    "proposer_view",
     "sha256_prefixed",
     "simulate_concurrency",
 ]

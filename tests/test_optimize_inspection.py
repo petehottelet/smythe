@@ -1,4 +1,8 @@
-"""Report collection preserves durable evidence and never reruns evaluations."""
+"""Report collection preserves durable evidence and never reruns evaluations.
+
+Target reports sum each campaign's own snapshot cost across every campaign
+that sets the target, keeping unknown outcomes apart.
+"""
 
 from contextlib import closing
 import hashlib
@@ -8,8 +12,10 @@ import sqlite3
 import pytest
 
 from smythe.optimize.contracts import Candidate, ExperimentContract, MetricObjective, ObjectiveDirection
-from smythe.optimize.inspection import collect_optimization_report
+from smythe.optimize.inspection import collect_optimization_report, collect_target_report
+from smythe.optimize import registry as registry_module
 from smythe.optimize.ledger import ExperimentLedger, ExperimentLedgerError, PromotionDecision
+from smythe.optimize.registry import PolicyRegistry
 
 
 PLAN = "sha256:" + "a" * 64
@@ -18,29 +24,34 @@ CAMPAIGN = "report-campaign"
 
 
 def make_ledger(path, *, states=("completed", "prepared", "dispatched", "unknown"),
-                decision=False, cost=137, ceiling=1000, budget=10000, label="recorded policy"):
-    """Create only local ledger records, using no evaluator or provider."""
+                decision=False, cost=137, ceiling=1000, budget=10000, label="recorded policy",
+                campaign=CAMPAIGN, field="label", verdict=None):
+    """Create only local ledger records, using no evaluator or provider.
+
+    Each call adds one campaign whose candidates set *field*; a recorded
+    *verdict* joins the decision's assessment.
+    """
     contract = ExperimentContract(
         name="report_fixture", objectives=(MetricObjective("quality", ObjectiveDirection.MAXIMIZE, primary=True),),
-        mutable_fields=("label",), development_repetitions=1,
+        mutable_fields=(field,), development_repetitions=1,
         confirmation_repetitions=3, holdout_repetitions=3, max_candidates=2,
         max_parallel_candidates=2, max_trials=20, max_wall_seconds=600,
         max_budget_microusd=budget, per_trial_reservation_microusd=ceiling,
         confidence=.95, min_improvement=.25, base_seed=100,
     )
-    incumbent = Candidate(contract=contract, policy={"label": label}, hypothesis=label)
-    challenger = Candidate(contract=contract, policy={"label": "challenger " + label},
+    incumbent = Candidate(contract=contract, policy={field: label}, hypothesis=label)
+    challenger = Candidate(contract=contract, policy={field: "challenger " + label},
                            hypothesis=label, parent=incumbent)
     keys = []
     with ExperimentLedger(path, durability="normal") as ledger:
         ledger.create_campaign(contract, incumbent.candidate_id, (incumbent, challenger),
-                               plan_hash=PLAN, campaign_id=CAMPAIGN)
-        lease = ledger.acquire_campaign_lease(CAMPAIGN, "fixture", ttl_s=3600)
+                               plan_hash=PLAN, campaign_id=campaign)
+        lease = ledger.acquire_campaign_lease(campaign, "fixture", ttl_s=3600)
         try:
             for index, state in enumerate(states):
                 candidate = (incumbent, challenger)[index % 2]
                 role = "incumbent" if index % 2 == 0 else "challenger"
-                key = ledger.prepare_trial(CAMPAIGN, candidate.candidate_id, "development",
+                key = ledger.prepare_trial(campaign, candidate.candidate_id, "development",
                                            role + ".plan_" + "a" * 64, 100 + index // 2,
                                            lease=lease, evaluator_hash=EVALUATOR, ceiling_microusd=ceiling)
                 keys.append(key)
@@ -54,12 +65,13 @@ def make_ledger(path, *, states=("completed", "prepared", "dispatched", "unknown
                     ledger.mark_trial_unknown(key, "outcome not recorded", lease=lease)
             if decision:
                 ledger.append_decision(PromotionDecision(
-                    campaign_id=CAMPAIGN, candidate_id=challenger.candidate_id,
+                    campaign_id=campaign, candidate_id=challenger.candidate_id,
                     promoted=False, reason="No challenger passed development gates",
                     trial_keys=tuple(keys), assessment={
                         "optimization_plan_hash": PLAN,
-                        "holdout_seed_commitment": ledger.get_holdout_seed_commitment(CAMPAIGN),
+                        "holdout_seed_commitment": ledger.get_holdout_seed_commitment(campaign),
                         "stage": "development", "development_scores": [],
+                        **({} if verdict is None else {"verdict": verdict}),
                     },
                 ), lease=lease)
         finally:
@@ -285,3 +297,209 @@ def test_decisions_recorded_under_the_bootstrap_rule_still_validate_inspect_and_
     html = render_optimization_report(report)
     assert html.count("Percentile bootstrap lower bound (earlier rule") == 2
     assert "Paired Student-t" not in html
+
+
+# Campaign listing and target reports
+
+TARGET = "label"
+COST_FIELDS = ("confirmed_microusd", "reserved_microusd", "unknown_exposure_microusd",
+               "total_exposure_microusd")
+
+
+def make_campaigns(path):
+    """Three campaigns that set the target and one that sets another field."""
+    make_ledger(path, campaign="first")
+    make_ledger(path, campaign="second", states=("completed", "completed"), decision=True, cost=250,
+                verdict="inconclusive")
+    # An unknown outcome under a zero ceiling holds no micro-USD but is still unresolved.
+    make_ledger(path, campaign="zero-ceiling", states=("unknown",), ceiling=0, budget=0)
+    make_ledger(path, campaign="elsewhere", states=("completed", "unknown"), field="other", cost=999)
+
+
+def empty_registry(path):
+    PolicyRegistry(path).close()
+    return path
+
+
+def target_report(path, registry_path, target=TARGET):
+    with ExperimentLedger(path, read_only=True) as ledger, \
+            PolicyRegistry(registry_path, read_only=True) as registry:
+        return collect_target_report(ledger, registry, target)
+
+
+def test_list_campaigns_returns_each_campaign_oldest_first_without_writing(tmp_path):
+    path = tmp_path / "campaigns.db"
+    with ExperimentLedger(path) as ledger:
+        assert ledger.list_campaigns() == []
+    make_campaigns(path)
+    before = path.read_bytes(), logical_dump(path)
+    with ExperimentLedger(path, read_only=True) as ledger:
+        listed = ledger.list_campaigns()
+        assert listed == [ledger.open_campaign(item["campaign_id"]) for item in listed]
+    assert {item["campaign_id"] for item in listed} == {"first", "second", "zero-ceiling", "elsewhere"}
+    order = [(item["created_at_ns"], item["campaign_id"]) for item in listed]
+    assert order == sorted(order)
+    # Only the public commitment is listed, never the holdout secret.
+    assert all(set(item) == set(listed[0]) and "holdout_nonce" not in item for item in listed)
+    assert (path.read_bytes(), logical_dump(path)) == before
+
+
+def test_list_campaigns_refuses_a_campaign_whose_sealed_inventory_drifted(tmp_path):
+    path = tmp_path / "campaigns.db"
+    make_campaigns(path)
+    mutate(path, "UPDATE candidates SET candidate_json = replace(candidate_json, 'challenger', 'other') "
+                 "WHERE campaign_id = 'second'")
+    with ExperimentLedger(path, read_only=True) as ledger:
+        with pytest.raises(ExperimentLedgerError, match="differs from its sealed inventory"):
+            ledger.list_campaigns()
+
+
+def test_target_cost_is_the_exact_sum_of_its_campaigns_snapshot_costs(tmp_path):
+    path, registry_path = tmp_path / "campaigns.db", empty_registry(tmp_path / "registry.db")
+    make_campaigns(path)
+    before = path.read_bytes(), registry_path.read_bytes()
+    report = target_report(path, registry_path)
+    with ExperimentLedger(path, read_only=True) as ledger:
+        snapshots = {name: ledger.snapshot(name) for name in ("first", "second", "zero-ceiling")}
+    assert (path.read_bytes(), registry_path.read_bytes()) == before
+
+    campaigns = {item["campaign_id"]: item for item in report["campaigns"]}
+    # 'elsewhere' sets another field, so neither it nor its cost is in the report.
+    assert set(campaigns) == set(snapshots)
+    for name, snapshot in snapshots.items():
+        assert campaigns[name]["cost"] == snapshot["cost"]
+        assert campaigns[name]["unknown_trials"] == snapshot["trial_counts"].get("unknown", 0)
+        assert campaigns[name]["trial_counts"] == snapshot["trial_counts"]
+    totals = report["optimization_cost"]
+    for field in COST_FIELDS:
+        assert totals[field] == sum(snapshot["cost"][field] for snapshot in snapshots.values())
+    assert totals == {"campaigns": 3, "confirmed_microusd": 137 + 2 * 250, "reserved_microusd": 2000,
+                      "unknown_exposure_microusd": 1000, "total_exposure_microusd": 3637,
+                      "unknown_trials": 2}
+    # The zero-ceiling unknown outcome adds nothing to the micro-USD but stays counted.
+    assert campaigns["zero-ceiling"]["cost"]["unknown_exposure_microusd"] == 0
+    assert campaigns["zero-ceiling"]["unknown_trials"] == 1
+
+    assert campaigns["first"]["decision"] is None
+    decision = campaigns["second"]["decision"]
+    recorded = snapshots["second"]["decisions"][0]
+    assert decision == {
+        "decision_id": recorded["decision_id"], "candidate_id": recorded["candidate_id"],
+        "policy_hash": next(item["policy_hash"] for item in snapshots["second"]["candidates"]
+                            if item["candidate_id"] == recorded["candidate_id"]),
+        "promoted": False, "verdict": "inconclusive", "reason": recorded["reason"],
+        "created_at_ns": recorded["created_at_ns"],
+    }
+    assert campaigns["second"]["plan_hash"] == PLAN
+    assert campaigns["second"]["holdout_commitment"] == (
+        snapshots["second"]["campaign"]["holdout_seed_commitment"])
+    assert all(item["reviews"] == [] for item in campaigns.values())
+    assert (report["target"], report["active"], report["history"], report["campaigns_not_in_ledger"]) == (
+        TARGET, None, [], [])
+    payload = {key: value for key, value in report.items() if key != "evidence_sha256"}
+    assert report["evidence_sha256"] == hashlib.sha256(json.dumps(
+        payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False, allow_nan=False,
+    ).encode()).hexdigest()
+    assert report == target_report(path, registry_path)
+
+
+def test_target_cost_across_campaigns_is_not_bounded_by_a_sqlite_integer(tmp_path):
+    path, registry_path = tmp_path / "large.db", empty_registry(tmp_path / "registry.db")
+    for campaign in ("first", "second"):
+        make_ledger(path, campaign=campaign, states=("completed",) * 3, cost=9_000_000_000_000_000_000,
+                    ceiling=1_000_000_000_000_000_000, budget=9_000_000_000_000_000_000)
+    totals = target_report(path, registry_path)["optimization_cost"]
+    assert totals["confirmed_microusd"] == 54_000_000_000_000_000_000
+    assert totals["total_exposure_microusd"] == 54_000_000_000_000_000_000
+
+
+def test_a_target_touched_by_no_campaign_reports_none_and_no_cost(tmp_path):
+    path, registry_path = tmp_path / "campaigns.db", empty_registry(tmp_path / "registry.db")
+    make_campaigns(path)
+    # A path above or beside the policy's field is not the target or under it.
+    for target in ("labels", "label.inner", "unknown.target"):
+        report = target_report(path, registry_path, target)
+        assert report["campaigns"] == []
+        assert report["optimization_cost"] == {"campaigns": 0, **dict.fromkeys(COST_FIELDS, 0),
+                                               "unknown_trials": 0}
+
+
+def test_a_target_matches_a_policy_path_by_whole_segments(tmp_path):
+    path, registry_path = tmp_path / "campaigns.db", empty_registry(tmp_path / "registry.db")
+    make_ledger(path, campaign="nested", field="labels.x")
+    # 'label' is a prefix of the path's first segment, not a segment of it.
+    assert target_report(path, registry_path, "label")["campaigns"] == []
+    for target in ("labels", "labels.x"):
+        report = target_report(path, registry_path, target)
+        assert [item["campaign_id"] for item in report["campaigns"]] == ["nested"]
+
+
+def test_a_campaign_lists_only_the_reviews_sealed_to_it(tmp_path, monkeypatch):
+    path, other = tmp_path / "campaigns.db", tmp_path / "other.db"
+    registry_path = tmp_path / "registry.db"
+    for ledger_path in (path, other):
+        make_ledger(ledger_path, campaign="second", states=("completed", "completed"), decision=True)
+    with ExperimentLedger(path, read_only=True) as ledger, \
+            ExperimentLedger(other, read_only=True) as elsewhere:
+        commitment = ledger.get_holdout_seed_commitment("second")
+        # A campaign of the same ID in another ledger has its own holdout commitment.
+        assert elsewhere.get_holdout_seed_commitment("second") != commitment
+
+    original = registry_module._decision_reference
+    with PolicyRegistry(registry_path) as registry:
+        own = registry.record_review(path, "second", reviewer="owner", verdict="reject")
+        registry.record_review(other, "second", reviewer="owner", verdict="reject")
+        # Reviews that name the campaign but differ in one other part of its seal.
+        for field, value in (("plan_hash", "sha256:" + "f" * 64),
+                             ("holdout_commitment", "sha256:" + "0" * 64)):
+            monkeypatch.setattr(registry_module, "_decision_reference",
+                                lambda ledger, campaign_id, field=field, value=value: {
+                                    **original(ledger, campaign_id), field: value})
+            registry.record_review(path, "second", reviewer="owner", verdict="reject", note=field)
+        monkeypatch.setattr(registry_module, "_decision_reference", original)
+        assert len(registry.reviews("second")) == 4
+
+    (campaign,) = target_report(path, registry_path)["campaigns"]
+    assert (campaign["plan_hash"], campaign["holdout_commitment"]) == (PLAN, commitment)
+    assert [review["review_id"] for review in campaign["reviews"]] == [own.review_id]
+
+
+def test_an_unrecorded_verdict_is_none_and_an_invalid_one_stops_the_report(tmp_path):
+    registry_path = empty_registry(tmp_path / "registry.db")
+    older = tmp_path / "older.db"
+    make_ledger(older, states=("completed", "completed"), decision=True)
+    (campaign,) = target_report(older, registry_path)["campaigns"]
+    assert campaign["decision"]["verdict"] is None
+    invalid = tmp_path / "invalid.db"
+    make_ledger(invalid, states=("completed", "completed"), decision=True, verdict="better")
+    before = invalid.read_bytes()
+    with pytest.raises(ExperimentLedgerError, match="Invalid retained Autotune report evidence") as caught:
+        target_report(invalid, registry_path)
+    assert "verdict" in str(caught.value.__cause__)
+    assert invalid.read_bytes() == before
+
+
+def test_a_target_report_needs_read_only_stores_and_a_dotted_target(tmp_path):
+    path, registry_path = tmp_path / "campaigns.db", empty_registry(tmp_path / "registry.db")
+    make_ledger(path)
+    with ExperimentLedger(path, read_only=True) as reader, PolicyRegistry(registry_path) as writer:
+        with pytest.raises(ValueError, match="read-only policy registry"):
+            collect_target_report(reader, writer, TARGET)
+    with ExperimentLedger(path) as writer, PolicyRegistry(registry_path, read_only=True) as reader:
+        with pytest.raises(ValueError, match="read-only ledger"):
+            collect_target_report(writer, reader, TARGET)
+    with ExperimentLedger(path, read_only=True) as ledger, \
+            PolicyRegistry(registry_path, read_only=True) as registry:
+        for target in ("", "../label", "label.", None):
+            with pytest.raises(ValueError, match="target must be a dotted policy name"):
+                collect_target_report(ledger, registry, target)
+
+
+def test_a_corrupt_campaign_that_touches_the_target_is_a_ledger_error(tmp_path):
+    path, registry_path = tmp_path / "campaigns.db", empty_registry(tmp_path / "registry.db")
+    make_campaigns(path)
+    mutate(path, "UPDATE promotion_decisions SET decision_id = 'wrong'")
+    before = path.read_bytes()
+    with pytest.raises(ExperimentLedgerError, match="does not match its payload"):
+        target_report(path, registry_path)
+    assert path.read_bytes() == before

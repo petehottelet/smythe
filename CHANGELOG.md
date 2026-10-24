@@ -690,6 +690,32 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   and a read-only open requires a closed, checkpointed file. The ledger
   schema and `smythe optimize inspect --json` output are unchanged. See
   [policy registry](docs/optimize.md#policy-registry).
+- Policy registry commands in the CLI. `smythe optimize review CAMPAIGN_ID
+  --verdict approve|reject --reviewer NAME` records a review of a campaign's
+  terminal decision, with `--evidence FILE` recorded only as the file's
+  SHA-256 in `evidence_sha256`. `smythe optimize activate TARGET REVIEW_ID`,
+  `rollback TARGET --to-seq SEQ` and `retire TARGET` each name the head they
+  expect with `--expected-seq` and record an `--actor` and `--reason`; they
+  print the target and each appended event's seq and policy, need an
+  existing registry and never edit configuration. `smythe optimize history
+  TARGET` opens the ledger and registry read-only and reports the target's
+  activations and every campaign whose candidates set the target, with its
+  decision and recorded three-way verdict, reviews and cost; confirmed,
+  reserved and unknown micro-USD are summed exactly across those campaigns
+  as optimization cost, never netted against inference savings, and unknown
+  trials are counted so a zero-ceiling unknown outcome still shows.
+  Campaigns an activation names that the ledger does not hold are listed.
+  `collect_target_report(ledger, registry, target)` in
+  `smythe.optimize.inspection` returns the same report, and
+  `ExperimentLedger.list_campaigns()` lists every campaign read-only. Each
+  command takes `--registry` (default `~/.smythe/policy-registry.sqlite3`)
+  and `--json`; invalid input exits with code 2 before any file is opened,
+  and a refused review or change or a stale `--expected-seq` exits with
+  code 8, records nothing and creates no registry. The ledger schema,
+  campaign report version 1 and `smythe optimize inspect --json` output are
+  unchanged. See
+  [review and change targets from the CLI](docs/optimize.md#review-and-change-targets-from-the-cli)
+  and [cross-campaign target report](docs/optimize.md#cross-campaign-target-report).
 - `smythe.optimize.workflow_eval.workflow_trial_evaluator(runtime_factory,
   task_for, measure)` runs each Autotune trial as one durable text workflow.
   The run's budget is the trial's ceiling, its id derives from the trial key
@@ -704,6 +730,32 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   acceptance policy, leaves its run in the journal with nothing spent.
   Nothing is retried, and a trial's run is never run again. See
   [durable workflow trials](docs/optimize.md#durable-workflow-trials).
+- Bounded exploration. `smythe.optimize.explore(runner, registry, proposer,
+  incumbent, budget)` runs one `OptimizationRunner` campaign per round on a
+  proposer program's challengers against a fixed incumbent, and never reviews
+  or activates anything. `ExplorationBudget` stops it at the first promotion,
+  after `max_non_promotions` consecutive campaigns that did not promote, at
+  `max_campaigns`, or before a campaign whose full required reservation would
+  bring the exploration's campaign exposure over
+  `max_total_exposure_microusd` or a proposer call whose ceiling would pass
+  `max_proposer_microusd`; `ExplorationResult` names the stop.
+  `SubprocessProposer(argv, ceiling_microusd=..., timeout_s=...)` exchanges
+  one JSON object each way over standard input and output, and kills the
+  program at its deadline. Of the caller's environment the program inherits
+  only what a process needs to start, such as `PATH`, `SYSTEMROOT`, `TEMP`,
+  `HOME`, `LANG` and a Python interpreter's `PYTHONPATH`, so no credential
+  reaches it whatever its name, plus the variables `env=` passes; it never
+  receives the ledger or its path. It sees
+  `proposer_view(ledger, campaign_ids)`: contracts, candidates, development
+  and confirmation evidence, and only whether the holdout passed. Proposals
+  that set a reserved path, leave the contract's allowlist or rules, break
+  `single_change` or a cap, or repeat a campaign or a used holdout are
+  refused before the ledger is written. Each proposer charge is reserved at
+  the ceiling before the program starts, settled as it declares, or left
+  unknown at the ceiling when it fails or is killed, in new append-only
+  exploration tables of the policy registry's schema version 1, which
+  `PolicyRegistry.exploration()` reports. No model-backed proposer ships. See
+  [bounded exploration](docs/optimize.md#bounded-exploration).
 - Recorded read steps in durable text workflows. A `ReadProfile` declares one
   versioned read: an HTTP `GET` of a URL whose path or query placeholders take
   a step's checked input, a decoder and its version, whether a read can be
@@ -1642,6 +1694,31 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   experimental and off by default, and its overhead times are
   machine-specific. See
   [policy ablations](benchmarks/README.md#policy-ablations-offline-mechanics).
+- An offline template evaluation harness, `benchmarks/template_eval.py`. A
+  template version is an Autotune policy for its registry target,
+  `planner.template.report`: an arm is a `ConstrainedArchitect` over the
+  catalog record of the version the policy names, with an `OfflineProvider`
+  scripting its selection, or `single_agent`, a `SimpleArchitect`. The
+  predecessor version is the incumbent, the candidate the challenger, and
+  `single_agent` a sealed reference arm under `must_not_be_worse`. One trial
+  is one pass over a split's tasks from a task pack generated in Python and
+  pinned by SHA-256; the holdout pack holds a task family development and
+  confirmation do not, and only a holdout trial loads it. A strict acceptance
+  policy per family judges every arm. Trials record accepted and attempted
+  tasks, attributable micro-USD cost and planned nodes, and gate on an
+  unchanged policy, complete accounting, no template on an excluded family
+  and a nonzero accepted count. The evaluator manifest binds the harness
+  file's digest, each split's pinned pack and acceptance policies, the
+  validator identities and the fixture price, and cost per accepted outcome
+  is reported as a ratio of sums, apart from the campaign's own spend.
+  Fixture campaigns promote a version that recovers planted step failures and
+  decline one that drops a section only the held-out family needs (verdict
+  `worse`), one that loses to the single worker and one applied to an
+  excluded family. The harness is repository-only and not packaged. The
+  committed record, `benchmarks/results/template_eval_offline.json`, is
+  labeled offline mechanics, not claimable, with zero API calls: fixtures
+  rank no template, activate nothing and change no default. See
+  [template evaluation](benchmarks/README.md#template-evaluation-offline-mechanics).
 - `jobs review RUN_ID [--limit N] [--offset N]` lists only what in a Jobs
   run needs an operator's decision, and the command that carries each
   decision out. Items come from states the run already records: a budget
@@ -1741,16 +1818,20 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   before its exception propagates, with `failure_category` (its failure
   class), `failure_type` (the exception's class name) and, for provider and
   service errors only, a `failure_excerpt` of at most 200 characters with
-  account identifiers redacted, the home folder written `~` and other
-  absolute paths `<path>`. `success` keeps its meaning, and planning prompts
-  keep their format and show each failure row's outcome as `failure`, even
-  for a run whose nodes all completed before synthesis failed. Interrupts,
-  exits and cancellation are never recorded, and a history write that fails
-  is logged without replacing the run's exception.
+  account identifiers redacted, the home folder written `~` in any spelling
+  of its separators, including a repr's doubled backslashes, and other
+  absolute paths `<path>`, whole when quoted and, unquoted, with the words
+  after them up to the end of the line, a quote, a URL, an HTTP route or a
+  word ending in a colon or semicolon, since the rest of a name with a space
+  cannot be told from them. URL paths and routes after an HTTP method
+  written as a word of its own stay. `success` keeps its meaning, and
+  planning prompts keep their format and show each failure row's outcome as
+  `failure`, even for a run whose nodes all completed before synthesis
+  failed. Interrupts, exits and cancellation are never recorded, and a
+  history write that fails is logged without replacing the run's exception.
   `PlannerMemory.record_failure()` writes such a row directly. The default
   `PlannerMemory`, and memory objects that implement only `record()`, record
   nothing on failure. See [failed runs](docs/learning.md#failed-runs).
-  results or history. See [learning from runs](docs/learning.md).
 - Template records are validated as untrusted candidates.
   `validate_template_record(record, *, parent=None, limits=None)` checks a
   `TemplateRecord` or its JSON data and raises `TemplateValidationError`,
@@ -1762,13 +1843,84 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   the generated-plan limits, or the developer's `TemplateLimits`, including
   a gate that does not depend on the node it verifies; and, compared with a
   parent, for a dropped or retargeted gate, lowered `max_regenerations`, a
-  gate or target relaxed to `skip`, or a removed expected-output validator
-  or prerequisite. `TemplateCatalog.put(record, *, parent=None,
-  limits=None)` validates first, by default against the stored record of
-  the candidate's `parent_version`, writes nothing for a refused record, and
-  also accepts a record's JSON data. `distill_template` and templates built
-  in code are not validated. See
+  gate or target relaxed to `skip`, a removed expected-output validator or
+  prerequisite, a dropped `proven_with`, or a task family the parent's
+  applicability excludes that it no longer excludes.
+  `TemplateCatalog.put(record, *, parent=None, limits=None)` validates
+  first, by default against the stored record of the candidate's
+  `parent_version`, writes nothing for a refused record, and also accepts a
+  record's JSON data. A new version of a name the catalog
+  already holds must name one of its stored versions as `parent_version`,
+  so it is always compared with a stored parent; only a name's first
+  version may name none. A prerequisite at another version counts as
+  removed, so a candidate learned after a prerequisite of each stored
+  version of its name changed is stored under a new name.
+  `distill_template` and templates built in code are not validated. See
   [validate a candidate record](docs/learning.md#validate-a-candidate-record).
+- Template versions are activated and rolled back through the policy
+  registry. A template's target is `planner.template.<name>`
+  (`template_target(name)`), whose policy maps it to a template version, so
+  a reviewed Autotune decision activates a version and a rollback restores
+  the previous one. `TemplateCatalog.active_templates(registry, names)`
+  builds the version of each name in effect for ordinary runs, leaving out
+  a retired template, and `active_local_templates(registry, names)` declares
+  them with `record.local_only()` for durable runs, whose recipes pin them.
+  A `ConstrainedArchitect` keeps the menu it was built with, and a rollback
+  writes only the registry, so running work keeps its versions.
+  `pinned_templates(config, catalog)` rebuilds the versions a saved durable
+  recipe pinned, leaving the recipe unchanged, to resume the run; resuming
+  with another version still raises `WorkflowConflictError`. A plan composed
+  from templates built from records, including `distill_template`'s, lists
+  each such selection's name, index and template version in
+  `graph.planning["templates"]`, never in node metadata; templates written
+  in code record nothing. See
+  [activate and roll back templates](docs/learning.md#activate-and-roll-back-templates).
+- Candidate templates from repeated accepted structure.
+  `repeated_structures(memory, *, min_accepted)` groups planner history by
+  graph structure digest and returns the structures that at least
+  `min_accepted` runs whose output was accepted share, counting each
+  execution id once; `success` alone never counts, so a completed run whose
+  output was rejected does not. `candidate_from_graph(graph, *, rows, name,
+  min_accepted=1, ...)` distills the graph into a `TemplateRecord` whose
+  source runs are those accepted runs and whose failure examples keep, for
+  each failed, rejected, `needs_review` or `indeterminate` run of the
+  structure, only a category and an evidence digest, never text, and raises
+  `DistillationError` below `min_accepted`. Nothing is stored or activated.
+  `PlannerMemory.iter_outcomes()` reads each valid history row, oldest
+  first, without writing. See
+  [promote repeated accepted structure](docs/learning.md#promote-repeated-accepted-structure).
+- Deterministic templates. `TemplateRecord.as_architect()` returns a
+  `TemplateArchitect`, a `DeterministicArchitect` that builds the record's
+  graph for every task with no planning call: the graph a
+  `ConstrainedArchitect` composes when it selects the template once, with
+  the same node ids and `graph.planning["templates"]` entry. Its
+  `local_only()` declares it for durable runs as `LocalOnly(role="architect")`
+  with identity `template:<name>` and the template version, so the recipe
+  pins the exact template. See
+  [build a template without planning](docs/learning.md#build-a-template-without-planning).
+- Template applicability. `TemplateEnvironment.capture(registry=...,
+  tool_runtime=..., validators=..., models=...)` snapshots the agents'
+  effective capabilities, every version each skill is listed at, such as
+  Agent Skills digests, from `Registry.skill_provider` by default,
+  `LocalToolRuntime.describe()`, including each runtime in
+  `CompositeToolRuntime.runtimes`, MCP server allowlists, acceptance
+  validator identities and model ids. A skill provider that raises for an
+  agent is logged and sets the snapshot's `skills_complete` to false.
+  `candidate_from_graph(..., environment=...)` records what the candidate
+  relied on as prerequisites and in a new optional `proven_with` section,
+  part of the template version, that holds only digests of the model ids
+  and MCP allowlists, and refuses a snapshot whose skills could not all be
+  read. `check_applicability(record, environment)` returns an
+  `ApplicabilityReport(valid, reasons, details)` with the reason codes
+  `capability_removed`, `skill_removed`, `skill_changed` (a skill not
+  listed at exactly the recorded versions), `skills_unreadable` (a record
+  that names a skill, in a snapshot whose skills could not all be read),
+  `tool_removed`, `tool_changed`, `validator_set_changed`, `model_changed`
+  and `mcp_allowlist_changed`. `TemplateCatalog.active_templates()` and
+  `active_local_templates()` take `environment=` to leave out a version in
+  effect that no longer applies, logging why, or with `strict=True` raise
+  `TemplateApplicabilityError`; nothing is deactivated, and pinned durable
+  runs are unchanged. See [applicability](docs/learning.md#applicability).
 - Agent Skills directories as a skill source.
   `AgentSkillsProvider({agent_id: [root, ...]})` reads each
   `<root>/<name>/SKILL.md` when it is built and lists each skill as a
@@ -1801,13 +1953,61 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   exception, a result that is not text or an expired `timeout_s` returns to
   the model as an error result, while `BudgetValidationError`,
   `ProviderResponseError`, `WorkflowError` and `SecurityStop` stop the node.
+  A handler that returns a coroutine instead of awaiting it gets an error
+  result, and the coroutine is closed unrun, so it never warns.
   Result text is cut to 65,536 characters by default, and `describe()` lists
   each tool's name, version and input-schema digest in the form template
-  records use. `CompositeToolRuntime(*runtimes)` merges local and MCP tool
-  sessions and refuses a tool name that two of them offer. Local tools serve
+  records use. A tool name that contains `__`, or `_` before `.`, is refused,
+  since a provider would read a call to it back as another name.
+  `CompositeToolRuntime(*runtimes)` merges local and MCP tool sessions and
+  refuses a tool name that two of them offer, comparing names as a provider
+  receives them, so `fs.read` and `fs__read` clash. Local tools serve
   ordinary runs; durable text workflows still refuse every `tool_runtime`.
   See [Python-backed skills](docs/skills.md#python-backed-skills) and
   [`examples/20_agent_skills.py`](examples/20_agent_skills.py).
+- [`examples/21_template_lifecycle.py`](examples/21_template_lifecycle.py)
+  runs a template's lifecycle offline and without keys, with an evaluator it
+  defines. Three accepted runs in planner history become a candidate record,
+  validated and stored as the predecessor, and a record that would grant
+  itself a tool is refused. An Autotune campaign compares a candidate that
+  drops a step with its predecessor and a single-worker reference arm and
+  rejects it on held-out incident reviews, and the policy registry refuses
+  to approve that decision. An evaluator that holds out only briefings
+  promotes the same candidate, which is reviewed and activated; the next
+  incident review is rejected, and a rollback restores the predecessor for
+  new runs without changing the ledger, the catalog or an architect already
+  built. `tests/test_examples_smoke.py` runs the example.
+  `tests/test_learning_boundaries.py` checks in one place that no Autotune
+  campaign or exploring proposer varies a reserved path, no template record
+  grants authority or weakens its parent, and no `SKILL.md` changes the
+  tools agents are offered, acceptance, the budget or evaluator data, each
+  of which stays byte-identical. See
+  [a template's lifecycle](docs/learning.md#a-templates-lifecycle) and
+  [what learning cannot change](docs/learning.md#what-learning-cannot-change).
+- Sample-size and repeated-comparison guidance for Autotune, from the paired
+  Student-t promotion bound: the smallest observed improvement each number
+  of pairs can promote, the pairs a stage needs to pass a given true
+  improvement, and how repeated campaigns, and proposers that see
+  confirmation results, raise the chance of promoting a challenger with no
+  real effect. An evaluator that returns the same metrics on every seed
+  promotes with three pairs and a zero-width interval. See
+  [choosing sample sizes](docs/optimize.md#choosing-sample-sizes).
+- A [support matrix section](docs/support-matrix.md#who-owns-each-execution-responsibility)
+  states who owns each execution responsibility on ordinary runs, durable
+  text workflows and Jobs: admission and scheduling, logical and attempt
+  identity, permission to dispatch, calling again, settling cost, keeping
+  results for recovery, stopping, waits and timers, ownership and stale
+  writers, recovery after process loss, observation and upgrades, with the
+  test behind each cell and a procedure for upgrading with work in flight.
+  Ordinary checkpoints have no ownership fence: two processes that resume
+  one execution id both run its pending nodes, and the snapshot written last
+  wins. A durable run's lease lasts 60 seconds and its event loop renews it
+  every 15 seconds; a resume while another process holds the lease raises
+  `WorkflowLeaseError` before any call, and a run whose lease lapses while
+  its event loop is blocked fails with `WorkflowLeaseError` and resumes
+  without sending a saved request again. `tests/test_support_matrix.py` pins
+  these behaviors, and a repository test checks the section's rows, columns
+  and cited tests.
 
 ### Changed
 
@@ -1893,6 +2093,11 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   `run_created` event records how many earlier runs used the token and the
   five most recent run IDs under `approval_reuse`.
   Token derivation, plan hashes and the Jobs schema are unchanged.
+- `jobs inspect` text output names the operations its page holds by
+  position, as `jobs review` does:
+  `Operation page: operations 1-2 of 3 (limit 2)`. It used to print the
+  counts as `2 of 3 (offset 0, limit 2)`, which read as page numbers. The
+  JSON output is unchanged.
 - `ValidationReport` raises `TypeError` when it is constructed with a finding
   that is not a `ValidationFinding`, and keeps its findings as a tuple. It
   used to accept any value, failing only when `passed`, `hard_findings` or
@@ -1926,8 +2131,16 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
   depends on itself, on a blank id or on a node the graph does not contain;
   dependencies that form a cycle; a timeout that is not a positive finite
   number; a negative or non-integer `max_retries` or `max_regenerations`; a
-  label or metadata `role` that is not text; and text without a UTF-8 form.
-  See [distill a template](docs/learning.md#distill-a-template).
+  label or metadata `role` that is not text; text without a UTF-8 form; and
+  an integer timeout too large to be a float. A plan a `ConstrainedArchitect`
+  composes from its templates records them under `graph.planning["templates"]`,
+  so such checkpoints gain that key. See
+  [distill a template](docs/learning.md#distill-a-template).
+- `benchmarks/run_optimizer.py` and `benchmarks/run_banner_optimizer.py` are
+  labeled diagnostic. They keep a change whose mean judge score beats the
+  incumbent's by a fixed margin, with no paired bound, sealed holdout or
+  review, so a change they keep is not a promotion and supports no claim. See
+  [prompt-policy optimizer loops](benchmarks/README.md#prompt-policy-optimizer-loops-diagnostic).
 
 ### Fixed
 

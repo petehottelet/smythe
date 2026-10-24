@@ -433,6 +433,19 @@ The SQLite journal uses WAL, full synchronization, fenced leases, and checkpoint
 revisions. Heartbeats renew ownership during calls. A former owner can append
 immutable late evidence for its exact dispatch, but cannot advance the run.
 Recovery settles available late evidence before admitting new work.
+
+A run's lease lasts 60 seconds, and a heartbeat on the run's event loop
+renews it every 15 seconds. A process that ends without releasing the lease,
+such as one that was killed, keeps the run until it lapses: resuming sooner
+raises `WorkflowLeaseError` before any call, and resuming once it has lapsed
+continues the run. Blocking the event loop for more than about 45 seconds can
+also let the lease lapse; the run then fails with `WorkflowLeaseError`.
+Resuming it settles a response saved during the stall instead of sending its
+request again; a call dispatched without a saved response keeps its unknown
+exposure, as after any process loss. See
+[who owns each execution responsibility](support-matrix.md#who-owns-each-execution-responsibility)
+for how ownership compares across the three execution paths.
+
 Each plan, execute or resume entry audits the whole journal once when it
 starts. A checkpoint saved during the run reads only the calls it consumes
 and, once a node has been regenerated, the keys of settled and reserved calls;
@@ -863,19 +876,23 @@ A read makes one request per journaled call and never retries inside it. A
 free read whose response is not a usable 200, such as another status, a
 refused limit or a lost connection, and any read whose decoder fails, settle
 at their known cost as a rejected result, and the step raises `ReadToolError`
-with the status or failure name, never the response body. The node's failure policy decides what happens next:
-`RETRY` reads again as a new journaled call. Resuming re-enters the last
-rejected call of a free, `repeat_safe` read as a new invocation, so a halted
-step reads once more; other rejections replay. A response whose text is that
-of a source [removed from the run](tasks.md#remove-a-source) is settled as
-rejected in the same way, with the removal as its reason, and a text
-accepted before the removal raises `ReadToolError` instead of replaying.
-The refusal compares the exact SHA-256 of the decoded text with the
-tombstone's, so text that differs from the removed source by any byte, even
-in whitespace or line endings, is not recognised as it. The refused response stays in the journal as the
-call's response evidence, as every read response does, and `load_evidence()`
-still returns it: a tombstone withholds text from use, it does not erase a
-record.
+with the status or failure name, never the response body. The node's failure
+policy decides what happens next: `RETRY` reads again as a new journaled
+call. Resuming re-enters the last rejected call of a free, `repeat_safe`
+read as a new invocation, so a halted step reads once more; other rejections
+replay. A response whose text is that of a source
+[removed from the run](tasks.md#remove-a-source) is settled as rejected in
+the same way, with the removal as its reason, and a text accepted before the
+removal raises `ReadToolError` instead of replaying.
+
+The refusal compares the SHA-256 of the decoded text with the tombstone's
+digest. With the default decoder, which reads the body as UTF-8, a response
+that differs from the removed text by any byte, even in whitespace or line
+endings, is not recognised; a custom decoder that normalizes text can map
+other bytes to the removed text, which is then refused. The refused response
+stays in the journal as the call's response evidence, as every read response
+does, and `load_evidence()` still returns it: a tombstone withholds text from
+use, it does not erase a record.
 
 ### Interrupted reads
 

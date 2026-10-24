@@ -28,8 +28,9 @@ ambiguous after a connection failure.
 | `smythe.optimize.ledger` | Durable campaign, candidate, trial-event, cost-exposure, and decision history |
 | `smythe.optimize.engine` | Bounded development, confirmation, and holdout orchestration with conservative recovery |
 | `smythe.optimize.workflow_eval` | A trial evaluator that runs one durable text workflow per trial and reports its exact cost |
-| `smythe.optimize.inspection` and `smythe.optimize.report` | Read-only evidence collection and standalone HTML reports |
-| `smythe.optimize.registry` | Append-only reviews of terminal decisions and history of the policy version in effect for each target, with activation, rollback and retirement |
+| `smythe.optimize.inspection` and `smythe.optimize.report` | Read-only evidence collection, standalone HTML reports, and cross-campaign target reports |
+| `smythe.optimize.registry` | Append-only reviews of terminal decisions and history of the policy version in effect for each target, with activation, rollback and retirement, also from the CLI |
+| `smythe.optimize.exploration` | Bounded exploration: campaigns in rounds on an out-of-process proposer's challengers, under campaign, exposure and proposer-spend caps, with a holdout-redacted view of earlier evidence |
 
 These modules are deliberately separable from proposal generation. A human,
 an agent, or a deterministic grid can propose candidates, but every candidate
@@ -96,13 +97,15 @@ named `acceptance`, `validators`, `verifier`, `evaluator`, `harness`,
 `budget`, `spend`, `ceilings`, `capabilities`, `tools`, `permissions`,
 `authority`, or `holdout`, or any path under one, such as `acceptance.mode`,
 in any letter case. It raises `OptimizationError` naming those fields before
-it reads or writes the ledger. Only whole segments match: `toolbar.layout` is
-not under `tools`. Contract parsing does not apply this rule, so a stored
-contract that declares such a field still loads for inspection and holdout
-accounting, but a campaign stored under it no longer runs or resumes. The rule
-reads field names only; the evaluator decides what each policy value controls,
-so it must not apply a differently named field to acceptance, spend, tools, or
-held-out data.
+it reads or writes the ledger. The rule reads only a path's first segment,
+and only as a whole segment: `toolbar.layout` is not under `tools`, and
+`swarm.acceptance.mode` is not refused, since its first segment is `swarm`.
+Contract parsing does not apply this rule, so a stored contract that declares
+such a field still loads for inspection and holdout accounting, but a campaign
+stored under it no longer runs or resumes. The rule reads field names only;
+the evaluator decides what each policy value controls, so it must not apply a
+differently named field, such as `swarm.acceptance.mode`, to acceptance,
+spend, tools, or held-out data.
 
 `OptimizationRunner(..., single_change=True)` holds each challenger to one
 targeted change: it must differ from the incumbent in exactly one policy path,
@@ -206,7 +209,8 @@ expansion. Resuming the same ledger reproduces the holdout, while a fresh
 ledger gets an independent holdout. Three pairs are only a
 structural minimum, not a claim of useful statistical power. Choose repetition
 counts from measured evaluator variance, and use a larger sample when the
-expected improvement is small.
+expected improvement is small; [choosing sample sizes](#choosing-sample-sizes)
+gives the numbers.
 
 A challenger policy gets one sealed holdout per holdout identity in a ledger.
 The holdout identity covers what defines the holdout evaluation and its
@@ -268,6 +272,83 @@ many challengers therefore favors one that was lucky in development, and the
 independent one-time holdout is an important guard against that selection
 bias.
 
+### Choosing sample sizes
+
+The promotion bound decides how much evidence a stage needs. With `n` pairs
+whose improvements have mean `d` and standard deviation `s`, a stage passes
+only when `d - t * s / sqrt(n)` exceeds `min_improvement`, so the observed
+`(d - min_improvement) / s` must exceed `t / sqrt(n)`. At the default
+confidence of 0.95:
+
+| Pairs | `t` | Smallest observed `(d - min_improvement) / s` that passes |
+|---:|---:|---:|
+| 3 | 4.303 | 2.48 |
+| 5 | 2.776 | 1.24 |
+| 10 | 2.262 | 0.72 |
+| 20 | 2.093 | 0.47 |
+| 30 | 2.045 | 0.37 |
+| 50 | 2.010 | 0.28 |
+| 100 | 1.984 | 0.20 |
+
+A challenger whose true improvement is just that size passes about half the
+time. To size a split, estimate `s`, the standard deviation of paired
+improvements, from a pilot on the same evaluator: for example, the
+confirmation trials of an earlier campaign, or the incumbent paired with
+itself on development seeds. For the improvement `D` you expect, the pairs one
+stage needs, when paired improvements are roughly normal, are:
+
+| True `(D - min_improvement) / s` | Pairs to pass with chance 0.8 | Pairs to pass with chance 0.9 |
+|---:|---:|---:|
+| 2.0 | 5 | 5 |
+| 1.5 | 6 | 7 |
+| 1.0 | 10 | 13 |
+| 0.75 | 16 | 21 |
+| 0.5 | 34 | 44 |
+| 0.3 | 90 | 119 |
+| 0.2 | 199 | 265 |
+
+Promotion needs confirmation and the holdout to pass on independent seeds, so
+their chances multiply: 0.9 at each stage gives about 0.81. Set
+`confirmation_repetitions` and `holdout_repetitions` from the 0.9 column, and
+set `min_improvement` to the smallest change worth putting in effect rather
+than zero. A trial that covers several tasks, such as one pass over a task
+pack, usually varies less than a single task, so it needs fewer pairs. These
+tables are for confidence 0.95; a higher confidence needs more pairs.
+
+**Zero variance.** An evaluator that returns the same metrics on every seed,
+such as a deterministic fixture or a cached judgment, gives identical paired
+improvements. Their spread is zero, so the bound equals their mean, and any
+mean above `min_improvement` passes with the minimum three pairs and a
+zero-width interval. That describes the evaluator, not measured precision:
+check that seeds and tasks vary what it measures before relying on such a
+decision. The evaluator in
+[`examples/21_template_lifecycle.py`](../examples/21_template_lifecycle.py)
+is like this, and each of its decisions rests on three identical pairs.
+
+**Repeated comparisons.** At the default confidence each confirmation or
+holdout test passes a challenger with no real effect about 2.5% of the time,
+and nothing corrects for how many such tests are run:
+
+- Development screens every challenger without an interval and passes the
+  best one on, and only that one is tested at the contract confidence. The
+  screening itself has no correction.
+- Development and confirmation seeds, and the tasks they draw, are the same
+  in every campaign under one contract. A proposer that has seen earlier
+  confirmation results, as an [exploration's](#what-the-proposer-sees) has,
+  can fit them, which leaves the holdout as the only independent test.
+  Across `m` campaigns of challengers with no real effect, the chance that at
+  least one is promoted is then up to `1 - 0.975^m`: about 12% for five
+  campaigns, 22% for ten and 40% for twenty. With both stages independent,
+  it is about 0.06% per campaign.
+- Each [reference arm](#reference-arms) is compared at the contract
+  confidence, with no correction across references.
+
+To keep the chance of any such promotion across `m` planned campaigns near
+2.5%, set `confidence` to `1 - 0.05 / m` (0.99 for five, 0.995 for ten) and
+size the splits for it; cap the campaigns that draw from a finite held-out
+pack with [`max_holdout_draws`](#finite-task-pools); and review each promoted
+decision before [activating it](#review-and-activate-a-decision).
+
 ### Reference arms
 
 One campaign can compare its challenger with more than one baseline. Pass
@@ -328,6 +409,31 @@ releases count reference holdout trials as holdout use, which is stricter, and
 refuse a decision with references when they validate it, as
 `smythe optimize inspect --out` does; export reports for such campaigns with a
 release that supports reference arms.
+
+### Evaluate template versions
+
+A template version is a policy for its registry target,
+`planner.template.<name>`, so a campaign can compare a candidate version with
+the version it would replace, as the incumbent, and with a simpler
+alternative as a reference. The repository's
+[template evaluation harness](../benchmarks/README.md#template-evaluation-offline-mechanics),
+`benchmarks/template_eval.py`, runs such campaigns with a single worker as a
+`must_not_be_worse` reference. One trial is one pass over a split's task
+pack, each pack is pinned by SHA-256 in the evaluator manifest, the holdout
+pack holds a task family the other splits do not, and a gate fails a version
+that is applied to a family it must not touch. The harness is offline and
+repository-only, not part of the installed package: its fixtures establish
+the mechanics only, and no number it records is a product or benchmark
+claim.
+
+[`examples/21_template_lifecycle.py`](../examples/21_template_lifecycle.py)
+runs the whole lifecycle offline with an evaluator it defines: a candidate
+that is better on development and confirmation briefings and `worse` on
+held-out incident reviews is rejected, and the registry refuses to approve that
+decision. A second evaluator whose holdout holds only briefings promotes the
+same candidate, which a review approves and an activation puts in effect,
+until a rollback restores its predecessor. See
+[a template's lifecycle](learning.md#a-templates-lifecycle).
 
 ## Deterministic offline concurrency campaign
 
@@ -438,7 +544,9 @@ so a holdout an earlier release used stays used.
 campaign, a plan that conflicts with a saved campaign, a used holdout, work that
 needs attention) and for local SQLite or filesystem failures, and with code 9
 when a declared limit (wall time, trials, candidates or spend) stops or refuses
-it. With `--json`, `error.type`
+it. Invalid input exits with code 2. The policy registry commands use the same
+codes; see [review and change targets from the CLI](#review-and-change-targets-from-the-cli).
+With `--json`, `error.type`
 names the exact error, such as `HoldoutAlreadyUsedError`.
 
 Inspect a campaign without mutating the ledger:
@@ -812,6 +920,7 @@ read the SQLite file, or an operator who can attach a debugger can recover the
 secret and is therefore inside the trusted computing base. Run an untrusted
 proposal agent in a separate process or service with only the proposer-facing
 inputs; do not hand it the ledger path or execute it in the runner process.
+[Bounded exploration](#bounded-exploration) runs its proposer this way.
 
 `asyncio` can time out a cooperative async evaluator, but cannot forcibly stop
 synchronous Python that blocks the event-loop thread. The reference simulator
@@ -939,6 +1048,9 @@ A promoted decision is a statistical result, not a change to what runs.
 that changed: review, activation and rollback are separate, explicit
 operations, each with its own record. The registry never edits application
 configuration; callers resolve the active version when they build new work.
+A template target, `planner.template.<name>`, holds a template version that
+new constrained plans build; see
+[activate and roll back templates](learning.md#activate-and-roll-back-templates).
 
 The registry is its own SQLite file, `~/.smythe/policy-registry.sqlite3` by
 default, with schema version 1. It never writes an Autotune ledger: the ledger
@@ -946,7 +1058,9 @@ schema (version 4), its writer barrier, `snapshot()` and
 `smythe optimize inspect --json` are unchanged, and a writable open refuses a
 database that already holds other tables, such as a ledger. Review records
 refer to a ledger campaign by its ID, plan hash and holdout commitment and to
-its decision by ID and payload digest, never by file path.
+its decision by ID and payload digest, never by file path. The registry also
+keeps the [records of bounded explorations](#exploration-records), which
+activation never reads.
 
 Each target has one active pointer and an append-only history numbered 1, 2,
 3, and so on:
@@ -1114,24 +1228,296 @@ file, and repeats that check and the file fingerprint check immediately after
 opening and at close, like ledger inspection. A read-only registry refuses
 `record_review`, `activate`, `rollback` and `retire`.
 
+### Review and change targets from the CLI
+
+The same operations run from the installed CLI. This sequence reviews the
+offline concurrency campaign, activates its policy for the `max_concurrency`
+target, reports the target, then rolls back and retires it:
+
+```bash
+smythe optimize review CAMPAIGN_ID --verdict approve --reviewer capacity-owner \
+    --evidence holdout-review.txt --note "gain holds on the holdout"
+smythe optimize activate max_concurrency REVIEW_ID --expected-seq 0 \
+    --actor release-operator --reason "approved for new runs"
+smythe optimize history max_concurrency
+smythe optimize rollback max_concurrency --to-seq 1 --expected-seq 2 \
+    --actor release-operator --reason "back to serial"
+smythe optimize retire max_concurrency --expected-seq 3 \
+    --actor release-operator --reason "paused"
+```
+
+Every command takes `--registry PATH` (default
+`~/.smythe/policy-registry.sqlite3`) and `--json`; `review` and `history` also
+read `--ledger PATH` (default `~/.smythe/optimize.sqlite3`).
+
+`review CAMPAIGN_ID --verdict approve|reject --reviewer NAME` records a review
+with `record_review()` and prints its ID. It opens the ledger read-only, so
+the ledger must be closed and checkpointed. It creates a missing registry
+only for a review it records: the ledger and the campaign's decision are
+checked first, so a review of an unknown campaign, of one without a terminal
+decision, or approving a decision that was not promoted leaves no file.
+`--evidence FILE` records the plain hex SHA-256 of the file's bytes as
+`evidence_sha256`; neither its path nor its content is stored. `--note` adds
+one line. The reviewer is declared, not authenticated.
+
+`activate TARGET REVIEW_ID`, `rollback TARGET --to-seq SEQ` and
+`retire TARGET` call the matching `PolicyRegistry` methods. Each needs
+`--expected-seq`, the head the operator decided from (0 for a target without
+events; `history` shows it), and an `--actor` and `--reason` to record. They
+act only on an existing registry and never create one. Each prints the target
+and every event it appended, with its seq and policy, so a first activation
+also shows the baseline it recorded. No command edits application
+configuration: new work resolves the policy in effect from the registry.
+
+| Exit code | Meaning |
+|---|---|
+| 0 | The review or change was recorded, or the report was produced |
+| 2 | Invalid input: a malformed target, seq, campaign ID, name, reason or note, a verdict other than `approve` or `reject`, or an unreadable evidence file; checked before any file is opened or created |
+| 8 | A refused change (`RegistryError`, such as approving a decision that was not promoted, a review whose incumbent is not in effect, restoring the entry already in effect, or no registry), a stale `--expected-seq` (`RegistryConflictError`), a missing campaign, ledger or registry, or a file a writer still holds open |
+
+A command that exits with 2 or 8 records nothing and creates no registry.
+
+### Cross-campaign target report
+
+`smythe optimize history TARGET` reports everything recorded about one target
+across campaigns. It opens the ledger and the registry read-only and changes
+neither file; both must be closed and checkpointed, as for `inspect`.
+`collect_target_report(ledger, registry, target)` in
+`smythe.optimize.inspection` returns the same report from two read-only
+stores:
+
+- `active`, the `ActiveVersion` in effect or `null`, and `history`, every
+  event of the target;
+- `campaigns`: each ledger campaign whose sealed candidates set the target or
+  a path under it, oldest first, with its plan hash, holdout commitment,
+  incumbent policy hash, trial counts, `cost` (exactly its snapshot's `cost`),
+  `unknown_trials`, its terminal `decision` or `null`, and its `reviews`;
+- `campaigns_not_in_ledger`: campaigns whose reviews the target's activations
+  name but that this ledger does not hold, so their cost is missing;
+- `optimization_cost`: confirmed, reserved, unknown-exposure and
+  total-exposure micro-USD summed as exact integers over those campaigns,
+  with the number of `campaigns` and `unknown_trials`; and
+- `target_report_version` 1 and `evidence_sha256`, the SHA-256 of the
+  report's canonical JSON.
+
+A decision lists its ID, candidate and policy hash, `promoted`, its reason,
+and the three-way `verdict` it recorded, or `null` for a decision recorded
+before verdicts were saved. A review is listed under a campaign only when its
+campaign ID, plan hash and holdout commitment all match, so a campaign of the
+same ID in another ledger is never mixed in.
+
+`optimization_cost` is what evaluating candidates cost: confirmed cost of
+completed trials, reservations that prepared and dispatched trials still hold,
+and the full ceilings of unknown outcomes. It is never netted against
+inference savings, which the report does not estimate. Unknown exposure is
+shown apart from spend with its count of unknown trials, so an unknown outcome
+under a zero ceiling is still reported. The report validates each campaign's
+decision inventory; inconsistent evidence, or a recorded verdict that is not
+one of the three, stops it with `ExperimentLedgerError` (exit code 8).
+`ExperimentLedger.list_campaigns()` lists every campaign, oldest first, as
+`open_campaign()` returns it, without writing or returning holdout secrets.
+
+## Bounded exploration
+
+`explore()` in `smythe.optimize.exploration` runs campaigns in rounds on
+challengers that a proposer program suggests. Each round sends the proposer
+the evidence of the exploration's earlier campaigns, runs its proposals as one
+`OptimizationRunner` campaign against a fixed incumbent, and records the round
+in the [policy registry](#policy-registry). It never reviews or activates
+anything: a promoted decision waits for
+[review](#review-and-activate-a-decision) like any other.
+
+```python
+import asyncio
+
+from smythe.optimize import (
+    ExplorationBudget, OptimizationRunner, PolicyRegistry, SubprocessProposer, explore,
+)
+
+runner = OptimizationRunner(contract, ledger, evaluate,
+                            evaluator_hash=manifest.evaluator_hash, single_change=True)
+proposer = SubprocessProposer(["propose-challengers"], ceiling_microusd=0, timeout_s=60)
+budget = ExplorationBudget(max_campaigns=5, max_total_exposure_microusd=2_000_000,
+                           max_proposer_microusd=0, max_non_promotions=3)
+with PolicyRegistry("policy-registry.sqlite3") as registry:
+    result = asyncio.run(explore(runner, registry, proposer, incumbent, budget))
+print(result.stop_reason, [campaign.campaign_id for campaign in result.campaigns])
+```
+
+The runner must not name a `campaign_id`: each round is a new campaign with
+its automatic ID. The incumbent stays the same for the whole exploration.
+
+### Stop conditions
+
+`ExplorationBudget(max_campaigns, max_total_exposure_microusd,
+max_proposer_microusd, max_non_promotions=None)` bounds the loop, which ends
+with one of these `stop_reason` values:
+
+| `stop_reason` | When |
+|---|---|
+| `promoted` | A campaign promoted its challenger; the first promotion ends the exploration |
+| `max_non_promotions` | That many consecutive campaigns did not promote |
+| `max_campaigns` | The exploration already ran that many campaigns |
+| `max_total_exposure` | The exposure of the exploration's campaigns plus the next campaign's full required reservation would exceed `max_total_exposure_microusd` |
+| `max_proposer_spend` | Proposer charges plus the next call's ceiling would exceed `max_proposer_microusd` |
+| `proposer_finished` | The proposer proposed no challengers |
+| `proposer_failed` | The proposer could not start, was killed at its deadline, exited with another status, sent no valid reply, or declared more than its ceiling |
+| `proposal_refused` | A proposal broke a [bound](#proposal-bounds) |
+
+A campaign's exposure is its ledger `total_exposure_microusd`: confirmed cost,
+reservations and unknown exposure. Its required reservation is its planned
+trials times the contract's `per_trial_reservation_microusd`, as the runner
+plans them. Before calling the proposer the loop checks the smallest
+campaign, with one challenger, against the exposure cap, and once the
+proposals are known it checks the actual plan, before the campaign is
+created.
+
+`ExplorationResult` holds the `exploration_id`, the `stop_reason`, a `detail`
+sentence, each campaign's `OptimizationResult` under `campaigns`,
+`campaign_exposure_microusd`, and the proposer's settled and unknown
+micro-USD. A campaign that raises, such as `OptimizationNeedsAttention` after
+an unknown trial outcome, stops the exploration as `interrupted`, and the
+exception propagates; so does cancellation. An interrupted exploration is not
+resumed: a new exploration has a budget of its own.
+
+Each campaign's holdout decides on its own. Exploration adds no correction
+for testing many challengers across rounds, which is one more reason a
+promotion it finds still needs review; see
+[repeated comparisons](#choosing-sample-sizes).
+
+### The proposer protocol
+
+`SubprocessProposer(argv, *, ceiling_microusd, timeout_s, cwd=None, env=None)` starts
+`argv` once per round, writes one JSON request to its standard input and reads
+one JSON object from its standard output. The request holds:
+
+- `protocol` (`"smythe.exploration.v1"`), the `round` number and the call's
+  `ceiling_microusd`;
+- the `contract`, the `incumbent` candidate, `max_challengers` (the
+  contract's `max_candidates` less one) and the runner's `single_change`
+  setting; and
+- `evidence`, the [proposer view](#what-the-proposer-sees) of the
+  exploration's earlier campaigns.
+
+The reply is
+`{"proposals": [{"policy": {...}, "hypothesis": "..."}], "spent_microusd": 0}`:
+each proposal's policy patch and hypothesis, and what the call spent in whole
+micro-USD. An empty `proposals` list ends the exploration. The program must
+reply and exit with status 0 within `timeout_s` seconds; at the deadline it is
+killed, even if it has not read its request. Name the program's executable
+itself: a launcher killed at the deadline, such as a virtual environment's
+`python.exe` on Windows, can leave the program it started running. A reply may
+be at most 1 MiB, and standard error is discarded.
+
+Of the caller's environment the program inherits only the variables a process
+needs to start, those of them that are set:
+
+- on every platform `PATH`, `TEMP`, `TMP`, `TMPDIR`, `HOME`, `USER`,
+  `LOGNAME`, `TZ`, `LANG`, `LANGUAGE` and every `LC_*` variable;
+- for shared libraries, `LD_LIBRARY_PATH` and `DYLD_LIBRARY_PATH`;
+- on Windows `SYSTEMROOT`, `SYSTEMDRIVE`, `WINDIR`, `COMSPEC`, `PATHEXT`,
+  `USERPROFILE`, `USERNAME`, `HOMEDRIVE`, `HOMEPATH`, `APPDATA` and
+  `LOCALAPPDATA`; and
+- for a Python interpreter, `PYTHONHOME`, `PYTHONPATH`, `PYTHONPLATLIBDIR`,
+  `PYTHONUSERBASE`, `PYTHONNOUSERSITE`, `PYTHONSAFEPATH`, `PYTHONIOENCODING`
+  and `PYTHONUTF8`.
+
+No other variable reaches it, however it is named, so provider keys,
+organization and project IDs, tokens and `SMYTHE_MCP_URL` stay out. `env`
+maps the names of variables to add to their values, such as a key the
+program itself needs, and replaces an inherited variable of the same name;
+`explore()` records none of them. The program never receives the ledger or
+its path; give it a `cwd` that does not hold the ledger. Smythe ships no
+model-backed proposer.
+
+Before each call the registry records a reservation at the proposer's
+ceiling, and the reply's `spent_microusd` settles it. A proposer that could
+not start, was killed, exited with another status, or sent no whole
+`spent_microusd` leaves its charge unknown at the ceiling. A declaration above
+the ceiling is settled as declared. Either stops the exploration as
+`proposer_failed`. A call cancelled with the exploration is killed, and its
+charge is left unknown.
+
+### Proposal bounds
+
+Each proposal becomes a `Candidate` whose parent is the incumbent, and the
+round's plan is checked before the ledger is written. A proposal is refused
+when it sets a [reserved path](#experiment-contracts-and-budgets) in any
+letter case, a path outside the contract's allowlist or a value its rule
+refuses, repeats the incumbent's policy, changes more than one path under
+`single_change`, or brings the plan over the contract's candidate, trial or
+budget caps. A round whose plan repeats an existing campaign, or re-tests a
+policy whose holdout was [already used](#confirmation-and-holdout-protocol),
+is refused too. Explorations run no [reference arms](#reference-arms).
+
+### What the proposer sees
+
+`proposer_view(ledger, campaign_ids)` returns the evidence that `explore()`
+sends, as plain JSON. For each campaign it lists the ID, plan hash, contract,
+incumbent and sealed candidates; the development and confirmation trials,
+each with its candidate, role, seed, status, metrics and gates; and the
+terminal decision's candidate, `promoted`, development scores, confirmation
+assessment and the references' confirmation assessments, with `holdout` only
+`"passed"`, `"failed"` or `"not_run"`. It leaves out holdout trials, seeds,
+trial keys, metrics and assessments, the decision's reason once the holdout
+ran, the holdout commitment, trial errors, costs and times, and every path.
+Each campaign's decision inventory is validated first.
+
+### Exploration records
+
+Each exploration is recorded in the policy registry under its
+`exploration_id`, `exploration_<hex>` unless `explore()` is given one, with
+its settings. A given ID is 1 to 128 letters, digits, dots, hyphens and
+underscores beginning with a letter or digit, and is recorded without
+surrounding whitespace; an invalid one is refused before anything is
+recorded. The settings are the budget, contract hash, evaluator hash,
+incumbent candidate ID and proposer ceiling. Its events, numbered 1, 2, 3 in
+order, are `proposer_reserved`, `proposer_settled` and `proposer_unknown`
+with their micro-USD; `campaign_started` with the campaign ID and its required
+reservation; `campaign_ended` with the campaign's exposure and `promoted` or
+`not_promoted`; and one final `stopped` naming its reason. Nothing follows a
+stop, and a charge is settled or left unknown only while it is reserved.
+`PolicyRegistry.exploration(exploration_id)` returns the settings, the events,
+the `campaign_ids`, the `stop_reason`, and `proposer_cost`: reserved, settled,
+unknown and total-exposure micro-USD. The exploration tables are part of
+registry schema version 1 and have the same append-only triggers and
+writer-version barrier as reviews and activations.
+
 ## Current boundaries
 
 The following pieces remain future work:
 
-- proposal interfaces for human or agent-generated candidates beyond the
-  current deterministic concurrency grid;
-- CLI adapters for general or provider-backed evaluators with conservative
-  per-trial price ceilings;
-- calibrated sample-size guidance and a multiple-comparison correction across
-  development challengers; and
-- cross-campaign comparison, and authenticated reviewers for the
-  [policy registry](#policy-registry).
+- a model- or agent-backed proposer: [bounded exploration](#bounded-exploration)
+  ships the loop, its bounds and the subprocess protocol, and the installed
+  concurrency campaign still uses its deterministic grid;
+- conservative live-evaluator adapters, for the CLI or for general
+  provider-backed evaluators, with per-trial price ceilings: the
+  [durable workflow trial adapter](#durable-workflow-trials) is tested
+  offline only;
+- evaluators run in a separately supervised process that can be stopped at
+  a deadline;
+- a multiple-comparison correction across development challengers or
+  campaigns, in place of the
+  [guidance on repeated comparisons](#choosing-sample-sizes); and
+- statistical comparison across campaigns, beyond the
+  [cross-campaign target report](#cross-campaign-target-report), and
+  authenticated reviewers for the [policy registry](#policy-registry).
 
 The runner bounds what a campaign may vary:
 [reserved fields](#experiment-contracts-and-budgets) such as acceptance,
-spend, and tool settings cannot be mutable, and `single_change` limits each
-challenger to one changed field. It does not sandbox evaluator code, which
-runs in the runner's process and decides what each policy value controls.
+spend, and tool settings cannot be mutable, whether a contract or an
+exploring proposer names them, and `single_change` limits each challenger to
+one changed field. It does not sandbox evaluator code, which runs in the
+runner's process and decides what each policy value controls. Template
+records and Agent Skills keep the same boundary; see
+[what learning cannot change](learning.md#what-learning-cannot-change).
+
+The repository's earlier prompt-policy loops, `benchmarks/run_optimizer.py`
+and `benchmarks/run_banner_optimizer.py`, keep a change whose mean judge
+score beats the incumbent's by a fixed margin, with no paired bound, sealed
+holdout, reference arm or review. They are diagnostic: a change they keep is
+not a promotion and supports no claim
+([evidence status](../benchmarks/README.md#prompt-policy-optimizer-loops-diagnostic)).
 
 The installed concurrency campaign is intentionally offline. Custom in-process
 evaluators can use `OptimizationRunner`. A live evaluator must supply its own

@@ -248,6 +248,39 @@ def test_human_output_escapes_stored_terminal_controls(capsys):
     assert "\x1b" not in human and "unsafe\\u001b[2J\\u000aname" in human
 
 
+def test_human_inspection_names_the_operations_a_page_holds_by_position(job, capsys):
+    from smythe.cli import _emit_job_inspection
+
+    def header(*, returned, total, offset=0, limit=50):
+        _emit_job_inspection({
+            "run_id": "run", "name": "job", "status": "completed", "counts": {},
+            "cost": {"approved_microusd": 0, "confirmed_microusd": 0, "exposure_microusd": 0,
+                     "reserved_microusd": 0, "cost_is_complete": True,
+                     "cost_contains_estimates": False},
+            "pagination": {"returned": returned, "total": total, "offset": offset, "limit": limit,
+                           "has_more": offset + returned < total},
+            "event_pagination": {"returned": 0, "total": 0}, "operations": [], "attempts": [],
+            "calls": [], "artifacts": [],
+        })
+        lines = capsys.readouterr().out.splitlines()
+        return [line for line in lines if line.startswith(("Operation page", "More operations"))]
+
+    # Counts are positions in the run's operations, never page numbers.
+    assert header(returned=1, total=1) == ["Operation page: operation 1 of 1 (limit 50)"]
+    assert header(returned=2, total=3, limit=2) == [
+        "Operation page: operations 1-2 of 3 (limit 2)", "More operations: use --offset 2"]
+    assert header(returned=1, total=3, offset=2, limit=2) == [
+        "Operation page: operation 3 of 3 (limit 2)"]
+    assert header(returned=0, total=3, offset=5) == [
+        "Operation page: none of 3 operations at offset 5 (limit 50)"]
+
+    for arguments, shown in ((["--limit", "1"], "operation 1 of 1 (limit 1)"),
+                             (["--offset", "1"], "none of 1 operations at offset 1 (limit 50)")):
+        assert main(["jobs", "inspect", job.run["run_id"], *arguments,
+                     "--store", str(job.path)]) == EXIT_OK
+        assert f"Operation page: {shown}" in capsys.readouterr().out.splitlines()
+
+
 def test_human_errors_escape_terminal_controls(job, capsys):
     assert main(["jobs", "inspect", job.run["run_id"], "--operation", "bad\x1b[2J",
                  "--store", str(job.path)]) == EXIT_INVALID_INPUT

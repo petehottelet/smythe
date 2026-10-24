@@ -202,6 +202,7 @@ memo. Its saved graph, trace, and expected output make the workflow inspectable.
 | Recover interrupted work | Checkpoints, native response replay, [recorded read steps](docs/workflow-accounting.md#recorded-read-steps), and durable job journals |
 | Check the deliverable | Output verification, opt-in strict acceptance of the exact output returned, [source-evidence checks](docs/source-evidence.md) that quotes and listed contradictions hold, and artifact receipts |
 | Keep accepted documents current | Opt-in [artifact lineage](docs/lineage.md) for durable runs: a read-only repair plan shows what a changed source, a changed validator or a damaged file affects, and applying it keeps the results that still stand |
+| Reuse what worked | Versioned [template records](docs/learning.md) learned from accepted runs, evaluated against their predecessor and a single worker in [Autotune](docs/optimize.md) campaigns, put in effect only by a reviewed decision and rolled back without touching running work; learning never changes acceptance, budgets or tools |
 | Understand a run | Graph exports, traces, costs, inspection reports, and [read-only run inspection](docs/runs.md) that reports execution, acceptance and cost separately, with a research run's sources, reads, evidence and open questions |
 
 [Architecture](docs/architecture.md) · [Execution](docs/execution.md) ·
@@ -323,7 +324,8 @@ matrix of supported configurations, and broader external-task benchmarks,
 including separately controlled Astra scheduler and framework studies.
 See the [roadmap](ROADMAP.md) for status and acceptance criteria.
 The [support matrix](docs/support-matrix.md) shows what each execution path
-accepts today, with the test behind each cell. The
+accepts today and what owns each execution responsibility on it, with the test
+behind each cell. The
 [source-to-artifact example](examples/16_source_to_artifact.py) runs a
 durable research workflow offline and without keys, from bundled sources
 through an interruption and resume to an accepted document whose evidence
@@ -332,7 +334,10 @@ through an interruption and resume to an accepted document whose evidence
 output to another service under an approval your host verifies; the
 offline [governed-publication example](examples/19_governed_publication.py)
 loses a write's answer and reconciles it from the service's records without
-writing again.
+writing again. The offline
+[template-lifecycle example](examples/21_template_lifecycle.py) records a
+template from accepted runs, rejects a harmful candidate on held-out tasks,
+and rolls back a version that a fooled evaluator promoted.
 
 The [Noumenon screensaver](https://github.com/petehottelet/noumenon) renders
 Smythe's glyph catalog, with a web explorer and native Windows, macOS and Linux

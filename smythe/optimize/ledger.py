@@ -1377,6 +1377,27 @@ class ExperimentLedger:
 
     create_or_open_campaign = create_campaign
 
+    def list_campaigns(self) -> list[dict[str, Any]]:
+        """Return every campaign, oldest first, as :meth:`open_campaign` returns it.
+
+        Each campaign's holdout commitment and sealed inventory are validated
+        as on open. The query writes nothing, so a read-only ledger serves it,
+        and it returns no holdout secret.
+        """
+
+        with self._lock:
+            cursor = self._connection.cursor()
+            try:
+                campaigns = []
+                for row in cursor.execute(
+                    "SELECT * FROM campaigns ORDER BY created_at_ns, campaign_id"
+                ).fetchall():
+                    self._validated_campaign_inventory(cursor, row)
+                    campaigns.append(self._campaign_dict(row))
+                return campaigns
+            finally:
+                cursor.close()
+
     @classmethod
     def _campaign_dict(cls, row: sqlite3.Row) -> dict[str, Any]:
         _, commitment = cls._validated_holdout_values(row)

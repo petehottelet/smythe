@@ -476,7 +476,30 @@ repeat the source goal and text that holds a rooted or home path. A
 stores only a record that `validate_template_record` accepts as an untrusted
 candidate: no key that grants authority, the generated-plan limits, and no
 weaker gate than its parent's. `record.local_only()` pins an exact version
-in a durable run's recipe. See [learning from runs](learning.md).
+in a durable run's recipe. A reviewed Autotune decision activates a template
+version under the [policy registry](optimize.md#policy-registry) target
+`planner.template.<name>`: `TemplateCatalog.active_templates()` builds the
+versions in effect for new runs, a rollback changes only new runs, and
+`pinned_templates()` rebuilds the versions a durable recipe pinned.
+`repeated_structures` finds the structure digests that repeated accepted runs
+in planner history share, and `candidate_from_graph` builds a
+[candidate record](learning.md#promote-repeated-accepted-structure) from a
+graph of one, keeping failure examples as digests only; nothing activates it
+automatically. `record.as_architect()` builds a record's graph with no
+planning call, and its `local_only()` form pins the version in a durable
+run. `check_applicability` reports when the tools, capabilities, skills,
+validators, models or MCP allowlists a record was proven with have changed,
+and `active_templates(..., environment=...)` then leaves that version out;
+see [applicability](learning.md#applicability) and
+[learning from runs](learning.md).
+
+Evaluation, promotion and rollback stay separate operations: an Autotune
+campaign compares a candidate version with its predecessor and a simpler
+reference arm on held-out tasks, a reviewed decision activates it, and a
+rollback restores the previous version for new runs.
+[`examples/21_template_lifecycle.py`](../examples/21_template_lifecycle.py)
+runs that lifecycle offline; see
+[a template's lifecycle](learning.md#a-templates-lifecycle).
 
 This keeps learning reviewable: execution history informs future choices, and
 promoted graph structure becomes an explicit template rather than an invisible
@@ -517,6 +540,10 @@ prompt mutation.
   delivered output it could not decide, and counts a passed gate toward
   acceptance only when the developer supplied it.
 - A verifier may reset only its target and downstream dependents.
+- Learning chooses what new work is built from, never how it is judged. A
+  template record, an Agent Skill or an Autotune campaign cannot change
+  acceptance, budgets, evaluator data or the tools an agent is offered
+  ([what learning cannot change](learning.md#what-learning-cannot-change)).
 - A resumed run keeps completed results, recorded spend, and consumed control allowances.
 
 The [cost guardrails](budgets.md) reject malformed usage and block unresolved

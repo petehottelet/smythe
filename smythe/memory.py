@@ -7,6 +7,7 @@ import math
 import os
 import re
 import threading
+from collections.abc import Iterator
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -187,6 +188,69 @@ class ExecutionOutcome:
     failure_category: str | None = None
     failure_type: str | None = None
     failure_excerpt: str | None = None
+
+
+def _outcome(line: str) -> ExecutionOutcome | None:
+    """The outcome a history line holds, or None for a blank or malformed line."""
+    line = line.strip()
+    if not line:
+        return None
+    try:
+        data = json.loads(line)
+        outcome = ExecutionOutcome(**{
+            key: data[key] for key in ExecutionOutcome.__dataclass_fields__ if key in data
+        })
+        if not isinstance(outcome.task_goal, str):
+            return None
+        if not isinstance(outcome.task_context, dict):
+            return None
+        if any(
+            not isinstance(values, list)
+            or any(not isinstance(value, str) for value in values)
+            for values in (outcome.task_constraints, outcome.task_done_when, outcome.topology)
+        ):
+            return None
+        if type(outcome.success) is not bool:
+            return None
+        if any(
+            type(value) not in (int, float) or not math.isfinite(value) or value < 0
+            for value in (outcome.total_cost_usd, outcome.total_duration_ms)
+        ):
+            return None
+        if outcome.elapsed_ms is not None and not _is_duration(outcome.elapsed_ms):
+            return None
+        if any(value is not None and type(value) is not bool for value in (
+            outcome.latency_complete, outcome.resumed,
+            outcome.cost_is_complete, outcome.cost_contains_estimates,
+        )):
+            return None
+        if outcome.acceptance is not None and (
+            type(outcome.acceptance) is not str
+            or outcome.acceptance not in _ACCEPTANCE_VALUES
+        ):
+            return None
+        if outcome.execution_id is not None and not _is_name(outcome.execution_id):
+            return None
+        if any(value is not None and not _is_digest(value) for value in (
+            outcome.rejected_output_sha256, outcome.structure_sha256,
+        )):
+            return None
+        if outcome.verification is not None and (
+            not isinstance(outcome.verification, list)
+            or not all(_is_gate_entry(entry) for entry in outcome.verification)
+        ):
+            return None
+        if any(value is not None and not valid(value) for value, valid in (
+            (outcome.failure_category, _is_failure_class),
+            (outcome.failure_type, _is_type_name),
+            (outcome.failure_excerpt, _is_excerpt),
+        )):
+            return None
+    except (ValueError, TypeError, KeyError, OverflowError):
+        # JSON integer limits and unformattable huge integers are
+        # malformed history rows, not reasons to abort planning.
+        return None
+    return outcome
 
 
 def _row(saved_task: Any, graph: Any, trace: Any, costs: Any, timing: Any,
@@ -383,73 +447,8 @@ class PlannerMemory:
         if not query_words:
             return []
 
-        with self._lock:
-            if not self._path.exists():
-                return []
-            lines = self._path.read_text(encoding="utf-8").splitlines()
-
         scored: list[tuple[float, ExecutionOutcome]] = []
-        for line in lines:
-            line = line.strip()
-            if not line:
-                continue
-            try:
-                data = json.loads(line)
-                outcome = ExecutionOutcome(**{
-                    k_: data[k_]
-                    for k_ in ExecutionOutcome.__dataclass_fields__
-                    if k_ in data
-                })
-                if not isinstance(outcome.task_goal, str):
-                    continue
-                if not isinstance(outcome.task_context, dict):
-                    continue
-                if any(
-                    not isinstance(values, list)
-                    or any(not isinstance(value, str) for value in values)
-                    for values in (outcome.task_constraints, outcome.task_done_when, outcome.topology)
-                ):
-                    continue
-                if type(outcome.success) is not bool:
-                    continue
-                if any(
-                    type(value) not in (int, float) or not math.isfinite(value) or value < 0
-                    for value in (outcome.total_cost_usd, outcome.total_duration_ms)
-                ):
-                    continue
-                if outcome.elapsed_ms is not None and not _is_duration(outcome.elapsed_ms):
-                    continue
-                if any(value is not None and type(value) is not bool for value in (
-                    outcome.latency_complete, outcome.resumed,
-                    outcome.cost_is_complete, outcome.cost_contains_estimates,
-                )):
-                    continue
-                if outcome.acceptance is not None and (
-                    type(outcome.acceptance) is not str
-                    or outcome.acceptance not in _ACCEPTANCE_VALUES
-                ):
-                    continue
-                if outcome.execution_id is not None and not _is_name(outcome.execution_id):
-                    continue
-                if any(value is not None and not _is_digest(value) for value in (
-                    outcome.rejected_output_sha256, outcome.structure_sha256,
-                )):
-                    continue
-                if outcome.verification is not None and (
-                    not isinstance(outcome.verification, list)
-                    or not all(_is_gate_entry(entry) for entry in outcome.verification)
-                ):
-                    continue
-                if any(value is not None and not valid(value) for value, valid in (
-                    (outcome.failure_category, _is_failure_class),
-                    (outcome.failure_type, _is_type_name),
-                    (outcome.failure_excerpt, _is_excerpt),
-                )):
-                    continue
-            except (ValueError, TypeError, KeyError, OverflowError):
-                # JSON integer limits and unformattable huge integers are
-                # malformed history rows, not reasons to abort planning.
-                continue
+        for outcome in self.iter_outcomes():
             stored_words = self._tokenize(
                 " ".join([
                     outcome.task_goal, *outcome.task_constraints, *outcome.task_done_when,
@@ -462,6 +461,19 @@ class PlannerMemory:
 
         scored.sort(key=lambda x: x[0], reverse=True)
         return [outcome for _, outcome in scored[:k]]
+
+    def iter_outcomes(self) -> Iterator[ExecutionOutcome]:
+        """Every outcome in the history file, oldest first.
+
+        The file is read once, when this is called, and never written. A
+        row that :meth:`recall` skips, such as a malformed one, is skipped
+        here too.
+        """
+        with self._lock:
+            if not self._path.exists():
+                return iter(())
+            lines = self._path.read_text(encoding="utf-8").splitlines()
+        return (outcome for outcome in map(_outcome, lines) if outcome is not None)
 
     def clear(self) -> None:
         """Remove all stored history."""
