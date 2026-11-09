@@ -17,6 +17,7 @@ publishing benchmark updates.
 
 | Campaign | Status | Current result |
 |---|---|---|
+| [Rust Noumenon preview](rust_noumenon_results.md) | **Diagnostic native preview** | All 54 matched compiler trials pass with byte-exact SVG parity; six native catalogs pass independent Python gates; full-workflow clocks use different renderers and validation scopes |
 | [V2 SVG catalog workflow](svg_v2_results.md) | **Claimable local workflow** | 256 glyphs in 8.06 s median; 2.20× same-backend c1 speed; all 36 matched 192/256 workflows pass, with sampled memory |
 | [Fable 5.1 extension](results/fable_20260914_pilot/README.md) | **Pilots and Code study complete; native main awaits human review** | 12 native pilot workflows cost $1.40473. The separate [ten-task Code Workflow cohort](results/fable_code_20260914/README.md) cost $3.77506525; its pilot and five diagnostic main attempts are retained separately. Human pilot ratings gate 100 native main workflows. |
 | [Original SVG workflow](svg_glyph_benchmark.md) | **Historical v1 timing**; visual acceptance superseded | 192 original glyphs in 4.03 s median including full validation and assembly; 2.95× process-c1 speed; all 30 workflows accepted |

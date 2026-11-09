@@ -10,6 +10,16 @@ superseded campaigns remain available as diagnostic history.
 
 Status: pre-1.0. Minor versions may break APIs (see [CHANGELOG.md](CHANGELOG.md) for the versioning policy).
 
+## Rust preview (unreleased)
+
+The [native Noumenon path](docs/rust.md) preserves the 192 authored glyphs and
+256-glyph extension, with validated graphs, bounded CPU execution, raster gates,
+catalog export and resumable batches. The
+[54-trial compiler comparison](benchmarks/rust_noumenon_results.md) remains diagnostic.
+Python retains the complete public API and durable provider semantics. Next parity
+milestones are the provider journal and accounting, tool execution and artifact
+lineage, then WhiteRabbit planning, Supervisor revisions and Jobs integration.
+
 ## Shipped (v0.2 line)
 
 - ✅ Durable, resumable execution — per-node checkpointing, `swarm.resume()`, pluggable stores ([docs](docs/checkpoint-format.md))
@@ -609,7 +619,7 @@ The original-glyph generation benchmark stays in Smythe.
 ## Out of scope (deliberately)
 
 - A hosted SaaS or agent marketplace — the OSS core comes first
-- Rewriting in Rust/Go — Python is the right language for this audience
+- A Go rewrite
 - Infrastructure Smythe should integrate rather than build: a general
   workflow engine, event broker, compute scheduler, vector or graph database,
   or credential platform. Local use never requires a cluster

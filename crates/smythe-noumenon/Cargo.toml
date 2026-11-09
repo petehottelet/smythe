@@ -1,0 +1,25 @@
+[package]
+name = "smythe-noumenon"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Smythe's native Noumenon contour pipeline"
+publish = false
+
+[[bin]]
+name = "smythe"
+path = "src/main.rs"
+
+[dependencies]
+smythe-core = { path = "../smythe-core" }
+anyhow.workspace = true
+clap.workspace = true
+geo.workspace = true
+rayon.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+tiny-skia.workspace = true
+fs2.workspace = true

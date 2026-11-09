@@ -24,7 +24,15 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
 
 ## [Unreleased]
 
-No unreleased changes.
+- Add an optional Rust workspace with `smythe-core` and `smythe-noumenon`:
+  validated execution graphs, bounded local providers, integer cost reservations
+  and the native `smythe noumenon` command.
+- Compile the existing Noumenon contours into identical SVGs; add versioned native
+  raster gates, distinctness checks, catalog and atlas exports, immutable batch
+  checkpoints and interrupted-process recovery.
+- Add a frozen Rust/Python compilation comparison, independent Python validation
+  of native catalogs, and Linux/Windows CI for the native preview. Python remains
+  the complete framework; the native preview has no paid provider integrations.
 
 ## [0.10.0] - 2026-10-24
 

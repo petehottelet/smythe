@@ -1,5 +1,18 @@
 # Smythe examples
 
+The unreleased [Rust preview](../docs/rust.md) has a separate offline Noumenon
+command, built from this checkout with Rust 1.91 or later:
+
+```bash
+cargo run --release --bin smythe -- noumenon --glyphs 256 --workers 8 --out smythe_artifacts/native-glyphs
+```
+
+This generates the existing authored SVGs and validates and exports a catalog.
+Use the same command with `--resume` to recover that directory. It does not
+replace the Python examples or install a second Python entry point. See the
+[comparison results](../benchmarks/rust_noumenon_results.md) for the diagnostic
+Rust/Python timings and independent output checks.
+
 Examples 01–05, 08–21 and the acquisition-diligence example run offline
 out of the box. A built-in `DemoProvider` returns deterministic responses so
 you can inspect planning, fan-out, budgets, recovery, and synthesis without an

@@ -11,6 +11,7 @@ Historical 0.7.0 artifacts remain unchanged.
 | Build and test the library from source | Use the source distribution and its explicit library test profile |
 | Reproduce benchmarks | Clone the repository or download its GitHub source archive |
 | Build the Noumenon screensaver | Clone the [Noumenon repository](https://github.com/petehottelet/noumenon) |
+| Build the unreleased Rust glyph pipeline | Clone this repository and follow the [Rust guide](rust.md); the Cargo workspace is separate from Python packages |
 | Audit another project with Repo Doctor | Use the [repodoctor repository](https://github.com/petehottelet/repodoctor) |
 
 The wheel contains Smythe, its typing marker, license and package metadata.

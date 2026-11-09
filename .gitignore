@@ -47,3 +47,6 @@ Thumbs.db
 /docs/data/distribution-review-*.json
 /docs/windows-defender-*.md
 .claude/
+
+# Rust compiler and benchmark output.
+target/
