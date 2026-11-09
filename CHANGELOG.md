@@ -24,6 +24,13 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
 
 ## [Unreleased]
 
+- Add a shared native local engine with a SQLite journal, immutable output blobs,
+  readiness-driven scheduling, decimal-string nanoUSD, replayable settlement and
+  run controls. Ordinary graphs and Noumenon compilation use the same engine.
+- Split the Rust alpha into core, library, CLI, Noumenon and native tooling crates;
+  add `run`, `inspect` and `control`, and replace `fs2` with standard file locking.
+- Add a native diagnostic runner that rejects uncommitted trees and hashes
+  committed Git blob contents independently of checkout line endings.
 - Add an optional Rust workspace with `smythe-core` and `smythe-noumenon`:
   validated execution graphs, bounded local providers, integer cost reservations
   and the native `smythe noumenon` command.

@@ -8,12 +8,8 @@ repository.workspace = true
 description = "Smythe's native Noumenon contour pipeline"
 publish = false
 
-[[bin]]
-name = "smythe"
-path = "src/main.rs"
-
 [dependencies]
-smythe-core = { path = "../smythe-core" }
+smythe = { path = "../smythe" }
 anyhow.workspace = true
 clap.workspace = true
 geo.workspace = true
@@ -22,4 +18,3 @@ serde.workspace = true
 serde_json.workspace = true
 sha2.workspace = true
 tiny-skia.workspace = true
-fs2.workspace = true

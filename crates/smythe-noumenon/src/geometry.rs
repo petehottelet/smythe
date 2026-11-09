@@ -34,6 +34,38 @@ pub fn source_sha() -> String {
 pub fn implementation_sources() -> std::collections::BTreeMap<&'static str, String> {
     [
         (
+            "crates/smythe-noumenon/src/measurements.rs",
+            include_bytes!("measurements.rs").as_slice(),
+        ),
+        (
+            "crates/smythe-core/src/money.rs",
+            include_bytes!("../../smythe-core/src/money.rs").as_slice(),
+        ),
+        (
+            "crates/smythe-core/src/journal.rs",
+            include_bytes!("../../smythe-core/src/journal.rs").as_slice(),
+        ),
+        (
+            "crates/smythe/Cargo.toml",
+            include_bytes!("../../smythe/Cargo.toml").as_slice(),
+        ),
+        (
+            "crates/smythe/src/lib.rs",
+            include_bytes!("../../smythe/src/lib.rs").as_slice(),
+        ),
+        (
+            "crates/smythe/src/runtime.rs",
+            include_bytes!("../../smythe/src/runtime.rs").as_slice(),
+        ),
+        (
+            "crates/smythe/src/store.rs",
+            include_bytes!("../../smythe/src/store.rs").as_slice(),
+        ),
+        (
+            "crates/smythe-cli/Cargo.toml",
+            include_bytes!("../../smythe-cli/Cargo.toml").as_slice(),
+        ),
+        (
             "Cargo.toml",
             include_bytes!("../../../Cargo.toml").as_slice(),
         ),
@@ -58,8 +90,8 @@ pub fn implementation_sources() -> std::collections::BTreeMap<&'static str, Stri
             include_bytes!("lib.rs").as_slice(),
         ),
         (
-            "crates/smythe-noumenon/src/main.rs",
-            include_bytes!("main.rs").as_slice(),
+            "crates/smythe-cli/src/main.rs",
+            include_bytes!("../../smythe-cli/src/main.rs").as_slice(),
         ),
         (
             "crates/smythe-noumenon/src/geometry.rs",

@@ -47,14 +47,16 @@ fn killed_process_reuses_committed_batch_and_finishes_catalog() {
     assert!(result.status.success(), "resume failed");
     let report: serde_json::Value = serde_json::from_slice(&result.stdout).unwrap();
     assert_eq!(report["reused_glyphs"], 16);
-    assert_eq!(report["provider_calls"], 16);
+    assert_eq!(report["provider_calls"], 0); // All compilation receipts preceded publication.
     assert_eq!(report["compared_pairs"], 496);
     assert_eq!(
         fs::read(out.join("receipts/batch-000.json")).unwrap(),
         committed
     );
-    let reference: Vec<String> =
-        serde_json::from_str(include_str!("fixtures/python_svg_sha256.json")).unwrap();
+    let reference: Vec<String> = serde_json::from_str(include_str!(
+        "../../smythe-noumenon/tests/fixtures/python_svg_sha256.json"
+    ))
+    .unwrap();
     for (i, expected) in reference.iter().enumerate().take(32) {
         assert_eq!(
             &smythe_noumenon::geometry::sha(

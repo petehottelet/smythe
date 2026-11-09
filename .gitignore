@@ -50,3 +50,4 @@ Thumbs.db
 
 # Rust compiler and benchmark output.
 target/
+.smythe/

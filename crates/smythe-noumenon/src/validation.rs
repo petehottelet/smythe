@@ -1,5 +1,5 @@
 //! Native, versioned raster and acceptance gates. Pixel hashes are specific to
-//! tiny-skia; the Python/Pillow rasterizer remains an independent parity oracle.
+//! tiny-skia. Analytic fixtures qualify native measurements independently.
 use crate::geometry::{Glyph, sha};
 use anyhow::{Result, anyhow, ensure};
 use rayon::prelude::*;
@@ -8,7 +8,7 @@ use std::collections::VecDeque;
 use tiny_skia::{Color, FillRule, Paint, PathBuilder, Pixmap, Transform};
 
 pub const RASTER_VERSION: &str = "tiny-skia-0.11-fill-v1";
-pub const GATE_VERSION: &str = "noumenon-native-topology-v1";
+pub const GATE_VERSION: &str = "noumenon-native-topology-style-v1";
 
 pub fn render(glyph: &Glyph, size: usize) -> Result<Pixmap> {
     ensure!([16, 32, 64, 128].contains(&size), "unsupported raster size");
@@ -52,6 +52,7 @@ pub struct Measurement {
     pub components: usize,
     pub holes: usize,
     pub threshold_topology_stable: bool,
+    pub style: Option<crate::measurements::Style>,
 }
 
 fn topology(mask: &[bool], size: usize, ink: bool) -> usize {
@@ -92,7 +93,11 @@ fn topology(mask: &[bool], size: usize, ink: bool) -> usize {
     count
 }
 
-pub fn measure(pixels: &Pixmap) -> Measurement {
+pub fn measure(pixels: &Pixmap) -> Result<Measurement> {
+    ensure!(
+        pixels.width() == pixels.height(),
+        "measurement raster must be square"
+    );
     let size = pixels.width() as usize;
     let mask: Vec<_> = pixels.data().chunks_exact(4).map(|p| p[0] < 128).collect();
     let components = topology(&mask, size, true);
@@ -105,14 +110,19 @@ pub fn measure(pixels: &Pixmap) -> Measurement {
             .collect();
         topology(&mask, size, true) == components && topology(&mask, size, false) == holes
     });
-    Measurement {
+    Ok(Measurement {
+        style: if mask.iter().any(|&p| p) {
+            Some(crate::measurements::measure(&mask, size)?)
+        } else {
+            None
+        },
         size,
         pixel_sha256: sha(pixels.data()),
         ink_pixels: mask.iter().filter(|&&p| p).count(),
         components,
         holes,
         threshold_topology_stable: stable,
-    }
+    })
 }
 
 pub struct Verifier;
@@ -120,10 +130,10 @@ impl Verifier {
     pub fn validate(&self, glyph: &Glyph) -> Result<(Vec<Measurement>, Pixmap)> {
         let mut measurements = vec![];
         for size in [16, 32, 64] {
-            measurements.push(measure(&render(glyph, size)?));
+            measurements.push(measure(&render(glyph, size)?)?);
         }
         let pixels = render(glyph, 128)?;
-        let baseline = measure(&pixels);
+        let baseline = measure(&pixels)?;
         ensure!(
             baseline.threshold_topology_stable,
             "128px threshold topology changed"

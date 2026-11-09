@@ -6,7 +6,7 @@ verification, trace, artifact, and recovery controls.
 
 ## Start here
 
-- [Rust preview](rust.md) — native Noumenon compilation, validation, export and recovery; current scope, comparison commands and [diagnostic results](../benchmarks/rust_noumenon_results.md)
+- [Rust alpha](rust.md) — journaled local graphs, run controls, Noumenon recovery and native benchmark provenance; [original preview results](../benchmarks/rust_noumenon_results.md)
 - [README](../README.md) — product overview, measured evidence, and quickstart
 - [Architecture](architecture.md) — the two core abstractions and component boundaries
 - [Support matrix](support-matrix.md) — which providers, verifiers, tools, stores and Jobs profiles each execution path accepts, and who owns each execution responsibility on each path, from admission, dispatch and cost to cancellation, leases, recovery and upgrades with work in flight, with the test behind each cell

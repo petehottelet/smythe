@@ -1,18 +1,17 @@
 use crate::geometry::{self, Glyph, Recipe, sha};
 use crate::validation::{self, Measurement, Verifier};
 use anyhow::{Context, Result, ensure};
-use fs2::FileExt;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
-use smythe_core::{CompletionResult, ExecutionGraph, Node, Provider, Swarm, Task, Topology};
+use smythe::{CompletionResult, ExecutionGraph, Node, Provider, Swarm, Task, Topology};
 use std::fs::{self, OpenOptions};
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Instant;
 
-pub const PROTOCOL: &str = "noumenon-rust-v1";
+pub const PROTOCOL: &str = "noumenon-rust-journal-v1";
 static TEMP_ID: AtomicU64 = AtomicU64::new(0);
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, clap::ValueEnum)]
@@ -100,6 +99,9 @@ struct ContourProvider<'a> {
 }
 impl Provider for ContourProvider<'_> {
     type Output = Glyph;
+    fn binding(&self) -> String {
+        format!("noumenon-contours-v1:{}", geometry::source_sha())
+    }
     fn cost_bound_nanousd(&self, _: &Task) -> Result<u64> {
         Ok(0)
     }
@@ -166,8 +168,7 @@ pub fn run(options: &Options) -> Result<Value> {
         .create(true)
         .truncate(false)
         .open(out.join(".lock"))?;
-    lock.try_lock_exclusive()
-        .context("another process owns this run")?;
+    lock.try_lock().context("another process owns this run")?;
     let binding_path = out.join("run.json");
     if options.resume {
         let saved: Binding = serde_json::from_slice(&fs::read(&binding_path)?)?;
@@ -231,6 +232,23 @@ pub fn run(options: &Options) -> Result<Value> {
         .enumerate()
         .filter_map(|(i, r)| r.is_none().then_some(i))
         .collect();
+    let reused = options.glyphs - pending.len();
+    let compilation_started = Instant::now();
+    let swarm = Swarm::new(options.workers, 0)?;
+    let journal = smythe::store::Store::open(out.join(".smythe"))?;
+    let complete_graph = graph(&(0..options.glyphs).collect::<Vec<_>>());
+    let engine_resume = !journal.history("noumenon-compile")?.is_empty();
+    ensure!(
+        engine_resume || pending.len() == options.glyphs,
+        "published receipts require their compilation journal"
+    );
+    let mut execution = swarm.execute_in(
+        &complete_graph,
+        &ContourProvider { recipes: &all },
+        &journal,
+        "noumenon-compile",
+        engine_resume,
+    )?;
     if options.resume && out.join("report.json").exists() {
         ensure!(pending.is_empty(), "completed run has missing receipts");
         let saved: Value = serde_json::from_slice(&fs::read(out.join("report.json"))?)?;
@@ -257,10 +275,12 @@ pub fn run(options: &Options) -> Result<Value> {
             json!({"status":"passed","replayed":true,"provider_calls":0,"reused_glyphs":options.glyphs,"saved_report":saved}),
         );
     }
-    let reused = options.glyphs - pending.len();
-    let compilation_started = Instant::now();
-    let swarm = Swarm::new(options.workers, 0)?;
-    let execution = swarm.execute(&graph(&pending), &ContourProvider { recipes: &all })?;
+    execution.outputs = execution
+        .outputs
+        .into_iter()
+        .enumerate()
+        .filter_map(|(i, g)| pending.binary_search(&i).is_ok().then_some(g))
+        .collect();
     let compilation_wall_s = compilation_started.elapsed().as_secs_f64();
     drop(swarm);
     let validation_started = Instant::now();
@@ -384,7 +404,7 @@ pub fn run(options: &Options) -> Result<Value> {
     let report = json!({"protocol":PROTOCOL,"status":"passed","mode":options.mode,"glyphs":records.len(),
         "workers":options.workers,"provider_calls":execution.trace.spans.len(),"reused_glyphs":reused,
         "trace":execution.trace,
-        "api_calls":0,"cost_nanousd":execution.total_cost_nanousd,"compilation_wall_s":compilation_wall_s,
+        "api_calls":0,"cost_nanousd":smythe::NanoUsd(execution.total_cost_nanousd),"compilation_wall_s":compilation_wall_s,
         "validation_and_receipts_wall_s":validation_wall_s,"export_wall_s":export_wall_s,
         "end_to_end_wall_s":started.elapsed().as_secs_f64(),"artifacts":artifacts,
         "source_sha256":binding.source_sha256,"raster_version":binding.raster_version,"gate_version":binding.gate_version,
@@ -450,7 +470,7 @@ mod tests {
             .write(true)
             .open(o.out.join(".lock"))
             .unwrap();
-        lock.try_lock_exclusive().unwrap();
+        lock.try_lock().unwrap();
         assert!(run(&o).is_err());
         drop(lock);
         let path = o.out.join("receipts/batch-000.json");
@@ -458,6 +478,32 @@ mod tests {
         batch.receipts[0].glyph.recipe = "changed".into();
         fs::write(path, json_bytes(&batch).unwrap()).unwrap();
         assert!(run(&o).is_err());
+        fs::remove_dir_all(o.out).unwrap();
+    }
+    #[test]
+    fn completed_resume_refuses_missing_or_corrupt_compilation_evidence() {
+        let mut o = options();
+        o.mode = Mode::Compile;
+        run(&o).unwrap();
+        o.resume = true;
+        let blob = fs::read_dir(o.out.join(".smythe/blobs"))
+            .unwrap()
+            .next()
+            .unwrap()
+            .unwrap()
+            .path();
+        let original = fs::read(&blob).unwrap();
+        fs::write(&blob, b"corrupt").unwrap();
+        assert!(run(&o).unwrap_err().to_string().contains("blob checksum"));
+        fs::write(&blob, original).unwrap();
+        assert_eq!(run(&o).unwrap()["provider_calls"], 0);
+        fs::remove_file(o.out.join(".smythe/journal.sqlite3")).unwrap();
+        assert!(
+            run(&o)
+                .unwrap_err()
+                .to_string()
+                .contains("compilation journal")
+        );
         fs::remove_dir_all(o.out).unwrap();
     }
 }

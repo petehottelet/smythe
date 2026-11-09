@@ -43,10 +43,11 @@ median with eight process workers, 2.20× faster than one worker, with no API ca
 
 ## Quickstart
 
-An unreleased [Rust preview](docs/rust.md) now runs the authored Noumenon glyph
-pipeline locally, preserving the SVG names and artwork. Python remains the
-complete framework. The [Rust comparison results](benchmarks/rust_noumenon_results.md)
-keeps compiler parity separate from renderer and full-workflow diagnostics.
+The unreleased [Rust alpha](docs/rust.md) runs local execution graphs and the
+authored Noumenon glyph pipeline through a shared journaled engine, preserving
+the SVG names and artwork. Python remains the complete framework. The
+[earlier Rust comparison](benchmarks/rust_noumenon_results.md) describes the
+original preview; new native campaigns require a committed, clean source tree.
 
 Python 3.11+:
 

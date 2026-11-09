@@ -10,15 +10,16 @@ superseded campaigns remain available as diagnostic history.
 
 Status: pre-1.0. Minor versions may break APIs (see [CHANGELOG.md](CHANGELOG.md) for the versioning policy).
 
-## Rust preview (unreleased)
+## Rust alpha (unreleased)
 
-The [native Noumenon path](docs/rust.md) preserves the 192 authored glyphs and
-256-glyph extension, with validated graphs, bounded CPU execution, raster gates,
-catalog export and resumable batches. The
-[54-trial compiler comparison](benchmarks/rust_noumenon_results.md) remains diagnostic.
-Python retains the complete public API and durable provider semantics. Next parity
-milestones are the provider journal and accounting, tool execution and artifact
-lineage, then WhiteRabbit planning, Supervisor revisions and Jobs integration.
+The [native engine](docs/rust.md) runs ordinary local graphs and Noumenon through
+the same journaled state machine, with readiness-driven CPU scheduling, exact
+money, immutable outputs and local recovery. The 192/256 glyph artwork is retained.
+The [54-trial compiler comparison](benchmarks/rust_noumenon_results.md) remains
+diagnostic evidence for the original preview. Native campaigns now require clean,
+committed sources. Next are complete native measurements and simulation seams,
+followed by remote accounting, providers, tools, planning, supervision and Jobs.
+The existing Python line remains available during native development.
 
 ## Shipped (v0.2 line)
 

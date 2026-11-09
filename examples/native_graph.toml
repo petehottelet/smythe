@@ -1,0 +1,14 @@
+topology = ["fork_join"]
+
+[[nodes]]
+id = "research"
+[nodes.task]
+goal = "Collect the supplied facts"
+input = "A local demonstration with no external services"
+
+[[nodes]]
+id = "summarize"
+depends_on = ["research"]
+[nodes.task]
+goal = "Summarize the accepted research output"
+input = "Keep the dependency evidence"

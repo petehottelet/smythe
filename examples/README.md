@@ -1,6 +1,6 @@
 # Smythe examples
 
-The unreleased [Rust preview](../docs/rust.md) has a separate offline Noumenon
+The unreleased [Rust alpha](../docs/rust.md) has a separate offline Noumenon
 command, built from this checkout with Rust 1.91 or later:
 
 ```bash
@@ -11,7 +11,9 @@ This generates the existing authored SVGs and validates and exports a catalog.
 Use the same command with `--resume` to recover that directory. It does not
 replace the Python examples or install a second Python entry point. See the
 [comparison results](../benchmarks/rust_noumenon_results.md) for the diagnostic
-Rust/Python timings and independent output checks.
+Rust/Python timings and independent output checks for the original preview.
+Ordinary native runs use [native_graph.toml](native_graph.toml) with
+`cargo run --release --bin smythe -- run --graph examples/native_graph.toml`.
 
 Examples 01–05, 08–21 and the acquisition-diligence example run offline
 out of the box. A built-in `DemoProvider` returns deterministic responses so
