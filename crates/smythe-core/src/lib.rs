@@ -4,8 +4,10 @@ use anyhow::{Result, anyhow, ensure};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet, VecDeque};
 
+pub mod errors;
 pub mod journal;
 pub mod money;
+pub use errors::EngineError;
 pub use money::{NanoUsd, Sentinel};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

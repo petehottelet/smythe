@@ -1,9 +1,13 @@
 //! Single-worker SQLite journal and immutable, content-addressed output storage.
+use crate::seams::{Sources, StorageBoundary};
 use anyhow::{Context, Result, anyhow, ensure};
 use rusqlite::{Connection, OptionalExtension, params};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
-use smythe_core::journal::{Control, Event, JOURNAL_SCHEMA, Projection, Record};
+use smythe_core::{
+    EngineError,
+    journal::{Control, Event, JOURNAL_SCHEMA, Projection, Record},
+};
 use std::{
     collections::{BTreeMap, HashSet},
     fs::{self, File, OpenOptions},
@@ -34,6 +38,7 @@ pub struct Store {
     worker: Arc<Worker>,
     root: Option<PathBuf>,
     owners: Arc<Mutex<HashSet<String>>>,
+    sources: Sources,
 }
 pub struct Lease {
     _file: Option<File>,
@@ -80,7 +85,7 @@ fn records(conn: &Connection, id: &str) -> Result<Vec<Record>> {
         ensure!(digest(&payload) == hash, "journal checksum differs");
         let record: Record = serde_json::from_slice(&payload)?;
         ensure!(
-            i64::try_from(record.sequence)? == sequence,
+            i64::try_from(record.sequence)? == sequence && record.run_id == id,
             "journal sequence differs"
         );
         result.push(record);
@@ -94,7 +99,8 @@ fn append_many(
     id: &str,
     expected: Option<u64>,
     generation: u64,
-    events: Vec<Event>,
+    events: Vec<(Event, u64)>,
+    sources: &Sources,
 ) -> Result<Projection> {
     let tx = conn.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
     let latest: i64 = tx.query_row(
@@ -110,57 +116,73 @@ fn append_many(
     };
     ensure!(
         expected.is_none_or(|n| n == sequence),
-        "journal changed; reload before admitting work"
+        EngineError::JournalChanged
     );
     ensure!(!events.is_empty(), "empty journal transaction");
-    for event in events {
-        let sequence = state
-            .as_ref()
-            .map_or(0, |s| s.sequence)
-            .checked_add(1)
-            .context("sequence overflow")?;
-        let record = Record {
-            schema: JOURNAL_SCHEMA,
-            sequence,
-            generation,
-            event,
-        };
-        if let Some(current) = state.as_mut() {
-            current.apply(&record)?;
-        } else {
-            state = Some(Projection::replay(std::slice::from_ref(&record))?);
-        }
+    let transaction_start = sequence.checked_add(1).context("sequence overflow")?;
+    let recorded_at = sources.clock.unix_ms();
+    let batch = events
+        .into_iter()
+        .enumerate()
+        .map(|(offset, (event, occurred_at))| {
+            Ok(Record::new(
+                id,
+                transaction_start
+                    .checked_add(u64::try_from(offset)?)
+                    .context("sequence overflow")?,
+                generation,
+                transaction_start,
+                event,
+                occurred_at,
+                recorded_at,
+            ))
+        })
+        .collect::<Result<Vec<_>>>()?;
+    if let Some(current) = state.as_mut() {
+        current.apply_batch(&batch)?;
+    } else {
+        state = Some(Projection::replay(&batch)?);
+    }
+    for record in batch {
         let payload = serde_json::to_vec(&record)?;
         tx.execute(
             "INSERT INTO events(run_id,sequence,payload,digest) VALUES(?,?,?,?)",
-            params![id, i64::try_from(sequence)?, payload, digest(&payload)],
+            params![
+                id,
+                i64::try_from(record.sequence)?,
+                payload,
+                digest(&payload)
+            ],
         )?;
     }
     let state = state.context("missing journal projection")?;
+    sources.storage.observe(StorageBoundary::BeforeCommit {
+        first: transaction_start,
+        last: state.sequence,
+    })?;
     tx.commit()?;
+    sources.storage.observe(StorageBoundary::AfterCommit {
+        first: transaction_start,
+        last: state.sequence,
+    })?;
     cache.insert(id.to_owned(), state.clone());
     Ok(state)
 }
 
-fn append(
-    conn: &mut Connection,
-    cache: &mut Cache,
-    id: &str,
-    expected: Option<u64>,
-    generation: u64,
-    event: Event,
-) -> Result<Projection> {
-    append_many(conn, cache, id, expected, generation, vec![event])
-}
-
 impl Store {
     pub fn memory() -> Result<Self> {
-        Self::start(None)
+        Self::memory_with_sources(Sources::default())
     }
     pub fn open(root: impl AsRef<Path>) -> Result<Self> {
-        Self::start(Some(root.as_ref().to_owned()))
+        Self::open_with_sources(root, Sources::default())
     }
-    fn start(root: Option<PathBuf>) -> Result<Self> {
+    pub fn memory_with_sources(sources: Sources) -> Result<Self> {
+        Self::start(None, sources)
+    }
+    pub fn open_with_sources(root: impl AsRef<Path>, sources: Sources) -> Result<Self> {
+        Self::start(Some(root.as_ref().to_owned()), sources)
+    }
+    fn start(root: Option<PathBuf>, sources: Sources) -> Result<Self> {
         let (sender, receiver) = mpsc::sync_channel::<Operation>(32);
         let (ready_tx, ready_rx) = mpsc::sync_channel(1);
         let directory = root.clone();
@@ -173,8 +195,10 @@ impl Store {
                 } else {Connection::open_in_memory()?};
                 c.busy_timeout(std::time::Duration::from_secs(5))?;
                 let version:i64=c.pragma_query_value(None,"user_version",|r|r.get(0))?;
-                ensure!((0..=1).contains(&version),"unsupported journal schema");
-                c.execute_batch("PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL; PRAGMA trusted_schema=OFF; CREATE TABLE IF NOT EXISTS events(run_id TEXT NOT NULL, sequence INTEGER NOT NULL, payload BLOB NOT NULL, digest TEXT NOT NULL, PRIMARY KEY(run_id,sequence)); CREATE TABLE IF NOT EXISTS blobs(digest TEXT PRIMARY KEY,bytes BLOB NOT NULL); PRAGMA user_version=1;")?;
+                ensure!(version == 0 || version == i64::from(JOURNAL_SCHEMA),
+                    "unsupported journal schema; alpha schema 1 requires a new run");
+                c.execute_batch("PRAGMA journal_mode=WAL; PRAGMA synchronous=NORMAL; PRAGMA trusted_schema=OFF; CREATE TABLE IF NOT EXISTS events(run_id TEXT NOT NULL, sequence INTEGER NOT NULL, payload BLOB NOT NULL, digest TEXT NOT NULL, PRIMARY KEY(run_id,sequence)); CREATE TABLE IF NOT EXISTS blobs(digest TEXT PRIMARY KEY,bytes BLOB NOT NULL);")?;
+                c.pragma_update(None, "user_version", JOURNAL_SCHEMA)?;
                 Ok(c)
             })();
             match connection {
@@ -190,6 +214,7 @@ impl Store {
             }),
             root,
             owners: Arc::new(Mutex::new(HashSet::new())),
+            sources,
         })
     }
     fn call<T: Send + 'static>(
@@ -243,9 +268,7 @@ impl Store {
         generation: u64,
         event: Event,
     ) -> Result<Projection> {
-        validate_id(id)?;
-        let id = id.to_owned();
-        self.call(move |c, cache| append(c, cache, &id, Some(expected), generation, event))
+        self.append_batch(id, expected, generation, vec![event])
     }
     pub fn append_batch(
         &self,
@@ -254,29 +277,57 @@ impl Store {
         generation: u64,
         events: Vec<Event>,
     ) -> Result<Projection> {
+        let now = self.sources.clock.unix_ms();
+        self.append_observed_batch(
+            id,
+            expected,
+            generation,
+            events.into_iter().map(|event| (event, now)).collect(),
+        )
+    }
+    /// Occurrence times come from the producer; observation is stamped by the store worker.
+    pub fn append_observed_batch(
+        &self,
+        id: &str,
+        expected: u64,
+        generation: u64,
+        events: Vec<(Event, u64)>,
+    ) -> Result<Projection> {
         validate_id(id)?;
         let id = id.to_owned();
+        let sources = self.sources.clone();
         self.call(move |conn, cache| {
-            append_many(conn, cache, &id, Some(expected), generation, events)
+            append_many(
+                conn,
+                cache,
+                &id,
+                Some(expected),
+                generation,
+                events,
+                &sources,
+            )
         })
     }
     pub fn control(&self, id: &str, control: Control) -> Result<Projection> {
         validate_id(id)?;
         let id = id.to_owned();
+        let sources = self.sources.clone();
+        let occurred_at = sources.clock.unix_ms();
         self.call(move |c, cache| {
             // Retry a racing coordinator append, never overwrite its revision.
             for _ in 0..16 {
                 let p = Projection::replay(&records(c, &id)?)?;
-                match append(
+                match append_many(
                     c,
                     cache,
                     &id,
                     Some(p.sequence),
                     p.generation,
-                    Event::Control { control },
+                    vec![(Event::Control { control }, occurred_at)],
+                    &sources,
                 ) {
                     Ok(next) => return Ok(next),
-                    Err(e) if e.to_string().contains("journal changed") => continue,
+                    Err(e) if EngineError::JournalChanged.matches(&e) => continue,
                     Err(e) => return Err(e),
                 }
             }
@@ -318,16 +369,18 @@ impl Store {
                 ensure!(fs::read(&path)? == bytes, "existing blob differs");
                 return Ok(hash);
             }
-            let temporary = root
-                .join("blobs")
-                .join(format!("{}.pending", uuid::Uuid::now_v7()));
+            let temporary_id = self.sources.ids.next_id();
+            validate_id(&temporary_id)?;
+            let temporary = root.join("blobs").join(format!("{temporary_id}.pending"));
             let mut file = OpenOptions::new()
                 .create_new(true)
                 .write(true)
                 .open(&temporary)?;
             file.write_all(bytes)?;
-            file.sync_all()?;
+            // write_all and immutable publication precede the SQL reference.
+            // The process-crash contract does not promise survival of OS/power loss.
             drop(file);
+            self.sources.storage.observe(StorageBoundary::BlobWritten)?;
             let result = fs::hard_link(&temporary, &path);
             fs::remove_file(&temporary)?;
             if let Err(error) = result {
@@ -336,6 +389,9 @@ impl Store {
                 }
                 ensure!(fs::read(&path)? == bytes, "existing blob differs");
             }
+            self.sources
+                .storage
+                .observe(StorageBoundary::BlobPublished)?;
         } else {
             let key = hash.clone();
             let bytes = bytes.to_vec();

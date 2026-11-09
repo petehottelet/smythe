@@ -25,10 +25,10 @@ def test_current_readme_has_absolute_release_docs_and_raw_images_without_source_
     assert path.read_bytes() == before
     assert 'src="https://raw.githubusercontent.com/petehottelet/smythe/v0.7.0/assets/wordmark.svg"' in output
     assert "https://github.com/petehottelet/smythe/blob/v0.7.0/docs/index.md" in output
-    assert "https://github.com/petehottelet/smythe/tree/v0.7.0/examples/acquisition_diligence/" in output
+    assert "https://github.com/petehottelet/smythe/blob/v0.7.0/examples/native_graph.toml" in output
     assert "https://github.com/petehottelet/smythe/blob/v0.7.0/ROADMAP.md" in output
     assert 'href="#quickstart"' in output
-    assert "https://developers.openai.com/api/docs/models/gpt-6-astra" in output
+    assert "https://github.com/petehottelet/noumenon" in output
     assert HOOK.render_pypi_readme(output, "0.7.0") == output
 
 

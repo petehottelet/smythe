@@ -1,3 +1,4 @@
+#![allow(clippy::disallowed_methods)] // Report timing only.
 use crate::geometry::{self, Glyph, Recipe, sha};
 use crate::validation::{self, Measurement, Verifier};
 use anyhow::{Context, Result, ensure};
@@ -11,7 +12,9 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Instant;
 
-pub const PROTOCOL: &str = "noumenon-rust-journal-v1";
+pub const PROTOCOL: &str = "noumenon-rust-journal-v2";
+/// Bump when compilation/output semantics change, independently of source provenance.
+pub const COMPILER_VERSION: &str = "noumenon-contours-v1";
 static TEMP_ID: AtomicU64 = AtomicU64::new(0);
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, clap::ValueEnum)]
@@ -34,11 +37,25 @@ pub struct Options {
 struct Binding {
     protocol: String,
     source_sha256: String,
-    implementation_sha256: String,
+    compiler_version: String,
     glyphs: usize,
     mode: Mode,
     raster_version: String,
     gate_version: String,
+}
+
+impl Binding {
+    fn for_options(options: &Options) -> Self {
+        Self {
+            protocol: PROTOCOL.into(),
+            source_sha256: geometry::source_sha(),
+            compiler_version: COMPILER_VERSION.into(),
+            glyphs: options.glyphs,
+            mode: options.mode,
+            raster_version: validation::RASTER_VERSION.into(),
+            gate_version: validation::GATE_VERSION.into(),
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize)]
@@ -99,8 +116,11 @@ struct ContourProvider<'a> {
 }
 impl Provider for ContourProvider<'_> {
     type Output = Glyph;
+    fn effect(&self) -> smythe::Effect {
+        smythe::Effect::Pure
+    }
     fn binding(&self) -> String {
-        format!("noumenon-contours-v1:{}", geometry::source_sha())
+        format!("{COMPILER_VERSION}:{}", geometry::source_sha())
     }
     fn cost_bound_nanousd(&self, _: &Task) -> Result<u64> {
         Ok(0)
@@ -145,15 +165,7 @@ pub fn run(options: &Options) -> Result<Value> {
         "workers must be 1 through 64"
     );
     let all = geometry::recipes()?;
-    let binding = Binding {
-        protocol: PROTOCOL.into(),
-        source_sha256: geometry::source_sha(),
-        implementation_sha256: sha(&serde_json::to_vec(&geometry::implementation_sources())?),
-        glyphs: options.glyphs,
-        mode: options.mode,
-        raster_version: validation::RASTER_VERSION.into(),
-        gate_version: validation::GATE_VERSION.into(),
-    };
+    let binding = Binding::for_options(options);
     let started = Instant::now();
     let out = &options.out;
     if options.resume {
@@ -249,6 +261,20 @@ pub fn run(options: &Options) -> Result<Value> {
         "noumenon-compile",
         engine_resume,
     )?;
+    // Accepted compilation blobs may exist before any validation batch is published.
+    // Check them too, before exporting or accepting saved validation evidence.
+    for (i, glyph) in execution.outputs.iter().enumerate() {
+        ensure!(
+            *glyph == geometry::compile(i, &all[i])?,
+            "compilation output differs from authored contours"
+        );
+        if let Some(receipt) = &records[i] {
+            ensure!(
+                receipt.glyph == *glyph,
+                "compilation and validation evidence disagree"
+            );
+        }
+    }
     if options.resume && out.join("report.json").exists() {
         ensure!(pending.is_empty(), "completed run has missing receipts");
         let saved: Value = serde_json::from_slice(&fs::read(out.join("report.json"))?)?;
@@ -407,7 +433,7 @@ pub fn run(options: &Options) -> Result<Value> {
         "api_calls":0,"cost_nanousd":smythe::NanoUsd(execution.total_cost_nanousd),"compilation_wall_s":compilation_wall_s,
         "validation_and_receipts_wall_s":validation_wall_s,"export_wall_s":export_wall_s,
         "end_to_end_wall_s":started.elapsed().as_secs_f64(),"artifacts":artifacts,
-        "source_sha256":binding.source_sha256,"raster_version":binding.raster_version,"gate_version":binding.gate_version,
+        "source_sha256":binding.source_sha256,"compiler_version":binding.compiler_version,"raster_version":binding.raster_version,"gate_version":binding.gate_version,
         "compared_pairs":distinctness.map(|d|d.compared_pairs),"claimable":false,"checkpoint_batch_size":CHECKPOINT_BATCH,
         "distinctness_wall_s":distinctness_wall_s,
         "implementation_sources":geometry::implementation_sources(),"optimized":!cfg!(debug_assertions)});
@@ -430,6 +456,134 @@ mod tests {
             resume: false,
             mode: Mode::Full,
         }
+    }
+    fn compilation_checkpoint(options: &Options, changed: bool) {
+        struct SavedCompiler<'a> {
+            inner: ContourProvider<'a>,
+            changed: bool,
+        }
+        impl Provider for SavedCompiler<'_> {
+            type Output = Glyph;
+            fn effect(&self) -> smythe::Effect {
+                smythe::Effect::Pure
+            }
+            fn binding(&self) -> String {
+                self.inner.binding()
+            }
+            fn cost_bound_nanousd(&self, _: &Task) -> Result<u64> {
+                Ok(0)
+            }
+            fn complete(&self, task: &Task, deps: &[&Glyph]) -> Result<CompletionResult<Glyph>> {
+                let mut result = self.inner.complete(task, deps)?;
+                if self.changed {
+                    result.output.recipe = "old-compiler-result".into();
+                }
+                Ok(result)
+            }
+        }
+        fs::create_dir(&options.out).unwrap();
+        publish(
+            &options.out.join("run.json"),
+            &json_bytes(&Binding::for_options(options)).unwrap(),
+        )
+        .unwrap();
+        let recipes = geometry::recipes().unwrap();
+        let provider = SavedCompiler {
+            inner: ContourProvider { recipes: &recipes },
+            changed,
+        };
+        let store = smythe::store::Store::open(options.out.join(".smythe")).unwrap();
+        Swarm::new(2, 0)
+            .unwrap()
+            .execute_in(
+                &graph(&(0..options.glyphs).collect::<Vec<_>>()),
+                &provider,
+                &store,
+                "noumenon-compile",
+                false,
+            )
+            .unwrap();
+        assert!(!options.out.join("receipts").exists());
+    }
+
+    #[test]
+    fn recovery_checks_compilation_outputs_before_any_batch_exists() {
+        for changed in [false, true] {
+            let mut o = options();
+            o.mode = Mode::Compile;
+            compilation_checkpoint(&o, changed);
+            o.resume = true;
+            let result = run(&o);
+            if changed {
+                assert!(
+                    result
+                        .unwrap_err()
+                        .to_string()
+                        .contains("compilation output differs")
+                );
+                assert!(!o.out.join("catalog.json").exists());
+            } else {
+                assert_eq!(result.unwrap()["provider_calls"], 0);
+                assert!(o.out.join("catalog.json").exists());
+            }
+            fs::remove_dir_all(o.out).unwrap();
+        }
+    }
+
+    #[test]
+    fn resume_binds_semantics_and_keeps_source_provenance_informational() {
+        let mut o = options();
+        o.mode = Mode::Compile;
+        run(&o).unwrap();
+        let binding: Value =
+            serde_json::from_slice(&fs::read(o.out.join("run.json")).unwrap()).unwrap();
+        assert!(binding.get("implementation_sha256").is_none());
+        // Simulate a report written by a build with unrelated CLI source bytes.
+        let path = o.out.join("report.json");
+        let mut report: Value = serde_json::from_slice(&fs::read(&path).unwrap()).unwrap();
+        report["implementation_sources"]["crates/smythe-cli/src/main.rs"] =
+            "unrelated-source-digest".into();
+        fs::write(&path, json_bytes(&report).unwrap()).unwrap();
+        o.resume = true;
+        assert_eq!(run(&o).unwrap()["provider_calls"], 0);
+        let mut changed = binding;
+        changed["compiler_version"] = "different-semantics".into();
+        fs::write(o.out.join("run.json"), json_bytes(&changed).unwrap()).unwrap();
+        assert!(run(&o).unwrap_err().to_string().contains("recipe differs"));
+        fs::remove_dir_all(o.out).unwrap();
+    }
+
+    #[test]
+    #[ignore = "release-mode performance gate; explicitly run in native CI"]
+    fn release_compile_256_has_bounded_journal_cost() {
+        assert!(!cfg!(debug_assertions), "run this gate with --release");
+        let mut o = options();
+        o.glyphs = 256;
+        o.workers = 8;
+        o.mode = Mode::Compile;
+        let report = run(&o).unwrap();
+        let store = smythe::store::Store::open(o.out.join(".smythe")).unwrap();
+        let records = store.history("noumenon-compile").unwrap();
+        let transactions = records
+            .iter()
+            .map(|r| r.transaction_start)
+            .collect::<std::collections::BTreeSet<_>>()
+            .len();
+        assert_eq!(records.len(), 1283);
+        // Even an adversarial completion schedule must group the initial eight admissions.
+        assert!(transactions <= 508, "admissions were not grouped");
+        let seconds = report["compilation_wall_s"].as_f64().unwrap();
+        let limit = if cfg!(windows) { 30.0 } else { 15.0 };
+        assert!(
+            seconds < limit,
+            "256-glyph disk compilation took {seconds:.3}s (limit {limit}s)"
+        );
+        println!(
+            "{}",
+            json!({"compile_seconds":seconds,"events":records.len(),"transactions":transactions,"claimable":false})
+        );
+        drop(store);
+        fs::remove_dir_all(o.out).unwrap();
     }
     #[test]
     fn completed_resume_checks_hashes_without_dispatch() {

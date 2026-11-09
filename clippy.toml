@@ -1,0 +1,9 @@
+disallowed-methods = [
+    { path = "std::time::Instant::now", reason = "Use the injected clock" },
+    { path = "std::time::SystemTime::now", reason = "Use the injected clock" },
+    { path = "uuid::Uuid::now_v7", reason = "Use the injected identity source" },
+    { path = "uuid::Uuid::new_v4", reason = "Use the injected identity source", allow-invalid = true },
+    { path = "rand::thread_rng", reason = "Use a recorded deterministic seed", allow-invalid = true },
+    { path = "rand::rng", reason = "Use a recorded deterministic seed", allow-invalid = true },
+    { path = "rand::random", reason = "Use a recorded deterministic seed", allow-invalid = true },
+]

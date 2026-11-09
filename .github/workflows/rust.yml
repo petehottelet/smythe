@@ -2,7 +2,7 @@ name: Rust alpha
 
 on:
   push:
-    branches: [main]
+    branches: [main, 'feature/rust-*']
   pull_request:
     branches: [main]
   workflow_dispatch:
@@ -25,6 +25,8 @@ jobs:
       - run: cargo +1.91.0 clippy --workspace --all-targets --locked --offline -- -D warnings
       - run: cargo +1.91.0 test --workspace --locked --offline
       - run: cargo +1.91.0 build --release --locked --offline
+      - name: Bound native compilation overhead
+        run: cargo +1.91.0 test --release --locked --offline -p smythe-noumenon release_compile_256_has_bounded_journal_cost -- --ignored --nocapture
       - name: Validate all native glyphs
         run: cargo run --release --locked --offline --bin smythe -- noumenon --glyphs 256 --workers 8 --out smythe_artifacts/rust-smoke
       - name: Verify completed recovery

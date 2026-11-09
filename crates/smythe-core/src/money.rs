@@ -1,4 +1,5 @@
 //! Exact nano-USD values and identity-bound reservations.
+use crate::EngineError;
 use anyhow::{Result, anyhow, ensure};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::collections::BTreeMap;
@@ -72,7 +73,7 @@ impl Sentinel {
         );
         ensure!(
             self.exposure()?.checked_add(amount)? <= self.ceiling,
-            "budget exhausted before dispatch"
+            EngineError::BudgetExhausted
         );
         self.reservations.insert(key.to_owned(), amount);
         Ok(())

@@ -1,4 +1,4 @@
-"""The README's offline quickstart runs as written after `pip install smythe`."""
+"""The retained Python quickstart runs as written after `pip install smythe`."""
 
 import os
 import re
@@ -10,7 +10,7 @@ ROOT = Path(__file__).parents[1]
 
 
 def _offline_quickstart() -> str:
-    readme = ROOT.joinpath("README.md").read_text(encoding="utf-8")
+    readme = ROOT.joinpath("docs/python-quickstart.md").read_text(encoding="utf-8")
     section = readme.split("## Quickstart", 1)[1].split("### With a real model", 1)[0]
     # The first install line is the bare package: no provider extra, no pin.
     assert "```bash\npip install smythe\n```" in section

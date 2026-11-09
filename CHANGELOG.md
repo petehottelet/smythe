@@ -24,6 +24,20 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
 
 ## [Unreleased]
 
+- Version the Rust source preview as 0.2.0 and run native CI on Rust feature
+  branches. Keep historical Python measurements labeled separately from native results.
+- Reduce native journal overhead with WAL NORMAL synchronization, worker-side
+  blob publication, and grouped admissions and completions while preserving
+  dispatch and acceptance ordering. Retain known costs on output publication failures.
+- Add explicit provider effects, typed admission errors, schema-2 event identities
+  and timestamps, injected clocks and storage boundaries, and concurrent
+  process-crash recovery tests. Older alpha journals require fresh run directories.
+- Bind Noumenon resume to semantic versions and revalidate compilation outputs
+  even before batch receipts exist. Keep source hashes as provenance, remove
+  unused Tokio dependencies, and add a release compilation regression gate.
+- Make the README's quickstart, capability table, badges, and project status
+  describe the Rust alpha. Retain Python quickstarts in a separate guide and
+  distinguish historical benchmark evidence from the journaled native engine.
 - Refuse the journaled runtime in the historical Rust/Python comparison harness,
   whose compilation clock excludes the new journal's durability work.
 - Add a shared native local engine with a SQLite journal, immutable output blobs,

@@ -1,19 +1,34 @@
 # Smythe examples
 
-The unreleased [Rust alpha](../docs/rust.md) has a separate offline Noumenon
-command, built from this checkout with Rust 1.91 or later:
+## Rust alpha examples
+
+The `0.2.0` Rust preview runs local graphs and the authored Noumenon
+pipeline without Python or API keys. Build from this checkout with Rust 1.91
+or later and a C build toolchain for bundled SQLite; see the
+[source-build quickstart](../README.md#quickstart).
 
 ```bash
-cargo run --release --bin smythe -- noumenon --glyphs 256 --workers 8 --out smythe_artifacts/native-glyphs
+cargo run --release --locked --offline --bin smythe -- noumenon --glyphs 256 --workers 8 --out smythe_artifacts/native-glyphs
 ```
 
 This generates the existing authored SVGs and validates and exports a catalog.
-Use the same command with `--resume` to recover that directory. It does not
-replace the Python examples or install a second Python entry point. See the
+Use the same command with `--resume` to recover that directory. See the
 [comparison results](../benchmarks/rust_noumenon_results.md) for the diagnostic
 Rust/Python timings and independent output checks for the original preview.
-Ordinary native runs use [native_graph.toml](native_graph.toml) with
-`cargo run --release --bin smythe -- run --graph examples/native_graph.toml`.
+Ordinary native runs use [native_graph.toml](native_graph.toml). The
+[run, inspect, and resume example](../README.md#run-inspect-and-resume-a-graph)
+shows the complete command sequence; the [native guide](../docs/rust.md)
+documents controls and recovery limits.
+
+Use fresh directories for the schema-2 native journal. Earlier alpha journals
+are refused; see [format compatibility](../docs/rust.md#journal-and-recovery).
+
+## Python examples
+
+The following examples target the Python 0.10 line. Start with the
+[Python quickstart](../docs/python-quickstart.md) for planning, execution, and
+recovery. Model providers, tools, MCP, supervision, and Jobs are not yet ported
+to the Rust alpha.
 
 Examples 01–05, 08–21 and the acquisition-diligence example run offline
 out of the box. A built-in `DemoProvider` returns deterministic responses so
@@ -118,7 +133,7 @@ savings.
 |---|---|
 | [Packages and typing](../docs/distribution.md) | Build and test a slim source package and verify typed sync/async consumers against an installed wheel. |
 | [Current materials](../docs/current-materials.md) | Revised 192/256 contact sheets, detail sheets, animation, still image, native source exports, and each benchmark's evidence status. |
-| [GPT-6 Astra and Claude Fable 5.1 quickstarts](../README.md#with-a-real-model) | Generate, inspect, and execute a text-only task graph through native Responses or native Claude Messages, with a $50 run allowance, concurrency eight, and planning included in the SQLite ledger. |
+| [GPT-6 Astra and Claude Fable 5.1 quickstarts](../docs/python-quickstart.md#with-a-real-model) | Generate, inspect, and execute a Python text-only task graph through native Responses or native Claude Messages, with a $50 run allowance, concurrency eight, and planning included in the SQLite ledger. |
 | [Native Astra/Sol Responses](../docs/openai-responses.md) | Smythe counts and quotes an exact request before generation, records native token prices, and retains function-tool continuation and failed-response receipts. |
 | [Astra campaign preparation](../benchmarks/astra_benchmark_plan.md#prepared-experiment) | Validate 13 original task/source packs and reproduce the 12-pilot/200-main schedule locally, with no API calls. Factual checks remain separate from quality scoring. |
 | [Glyph contour study](../benchmarks/noumenon/catalog/README.md) | Inspect all 192 v2 glyphs, their small-size sheets, and individual SVGs. Current previews and native source exports use v2. [Matched 192/256 workflow measurements](../benchmarks/svg_v2_results.md) cover compilation, validation and export; the live catalog remains 192. |

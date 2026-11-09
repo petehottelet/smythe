@@ -46,7 +46,7 @@ def test_comparison_refuses_misleading_evidence(damage):
 
 
 @pytest.mark.parametrize("resume", [False, True])
-@pytest.mark.parametrize("protocol", ["noumenon-rust-v1", "noumenon-rust-journal-v1", None])
+@pytest.mark.parametrize("protocol", ["noumenon-rust-v1", "noumenon-rust-journal-v1", "noumenon-rust-journal-v2", None])
 def test_historical_comparison_refuses_a_different_timing_contract(tmp_path, monkeypatch, resume, protocol):
     source = tmp_path / "source.rs"
     source.write_bytes(b"fixture")

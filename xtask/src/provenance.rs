@@ -43,6 +43,7 @@ fn validate_status(status: &[u8], flags: &[u8]) -> Result<()> {
 fn source_path(path: &str) -> bool {
     path == "Cargo.toml"
         || path == "Cargo.lock"
+        || path == "clippy.toml"
         || path.starts_with("crates/")
         || path.starts_with("xtask/")
         || path == "benchmarks/noumenon/glyph_contours_v2.json"

@@ -19,6 +19,4 @@ serde_json.workspace = true
 smythe = { path = "../smythe" }
 smythe-noumenon = { path = "../smythe-noumenon" }
 clap.workspace = true
-tokio.workspace = true
 toml.workspace = true
-uuid.workspace = true

@@ -1,11 +1,26 @@
 //! Replayable local execution transitions. No I/O or runtime dependencies.
-use crate::{ExecutionGraph, NanoUsd, Sentinel};
+use crate::{EngineError, ExecutionGraph, NanoUsd, Sentinel};
 use anyhow::{Result, anyhow, ensure};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::BTreeMap;
 
-pub const JOURNAL_SCHEMA: u32 = 1;
+pub const JOURNAL_SCHEMA: u32 = 2;
+
+/// Pure work has no external effects, and failures have no charge.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Effect {
+    Pure,
+    External,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Phase {
+    Run,
+    Execution,
+}
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -33,6 +48,7 @@ pub enum Event {
         node: String,
         attempt: u64,
         bound: NanoUsd,
+        effect: Effect,
     },
     Dispatched {
         node: String,
@@ -77,7 +93,76 @@ pub struct Record {
     pub schema: u32,
     pub sequence: u64,
     pub generation: u64,
+    pub run_id: String,
+    pub event_id: String,
+    pub node: Option<String>,
+    pub attempt: Option<u64>,
+    pub phase: Phase,
+    /// First sequence in the atomic append that contains this event.
+    pub transaction_start: u64,
+    /// UTC milliseconds since Unix epoch. Sequence, not wall time, orders events.
+    pub occurred_at_unix_ms: u64,
+    pub recorded_at_unix_ms: u64,
     pub event: Event,
+}
+
+impl Event {
+    pub fn identity(&self) -> (Option<&str>, Option<u64>, Phase) {
+        match self {
+            Self::Admitted { node, attempt, .. }
+            | Self::Dispatched { node, attempt }
+            | Self::Received { node, attempt, .. }
+            | Self::Settled { node, attempt }
+            | Self::Accepted { node, attempt }
+            | Self::Rejected { node, attempt, .. }
+            | Self::Failed { node, attempt, .. }
+            | Self::LocalReplay { node, attempt } => (Some(node), Some(*attempt), Phase::Execution),
+            _ => (None, None, Phase::Run),
+        }
+    }
+}
+
+impl Record {
+    pub fn new(
+        run_id: &str,
+        sequence: u64,
+        generation: u64,
+        transaction_start: u64,
+        event: Event,
+        occurred_at_unix_ms: u64,
+        recorded_at_unix_ms: u64,
+    ) -> Self {
+        let (node, attempt, phase) = event.identity();
+        Self {
+            schema: JOURNAL_SCHEMA,
+            sequence,
+            generation,
+            run_id: run_id.into(),
+            event_id: format!("{run_id}/{sequence}"),
+            node: node.map(str::to_owned),
+            attempt,
+            phase,
+            transaction_start,
+            occurred_at_unix_ms,
+            recorded_at_unix_ms,
+            event,
+        }
+    }
+
+    fn validate_header(&self) -> Result<()> {
+        let (node, attempt, phase) = self.event.identity();
+        ensure!(
+            !self.run_id.is_empty()
+                && self.event_id == format!("{}/{}", self.run_id, self.sequence)
+                && self.node.as_deref() == node
+                && self.attempt == attempt
+                && self.phase == phase
+                && self.transaction_start > 0
+                && self.transaction_start <= self.sequence,
+            "journal event identity differs"
+        );
+        Ok(())
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -96,6 +181,7 @@ pub enum AttemptState {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Attempt {
     pub number: u64,
+    pub effect: Effect,
     pub state: AttemptState,
     pub output: Option<Value>,
     pub output_valid: bool,
@@ -105,6 +191,7 @@ pub struct Attempt {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Projection {
+    pub run_id: String,
     pub sequence: u64,
     pub generation: u64,
     pub binding: String,
@@ -135,8 +222,10 @@ impl Projection {
         else {
             anyhow::bail!("journal must start with a run");
         };
+        first.validate_header()?;
         graph.validate()?;
         let mut state = Self {
+            run_id: first.run_id.clone(),
             sequence: 1,
             generation: 0,
             binding: binding.clone(),
@@ -147,18 +236,27 @@ impl Projection {
             attempts: BTreeMap::new(),
         };
         for record in &records[1..] {
-            state.apply(record)?;
+            // Replay owns disposable state, so failure discards the entire result.
+            state.transition(record)?;
         }
         Ok(state)
     }
     /// Validate against a copy so rejected transitions cannot partially mutate state.
     pub fn apply(&mut self, record: &Record) -> Result<()> {
+        self.apply_batch(std::slice::from_ref(record))
+    }
+    /// One disposable copy per transaction; errors never change the caller's state.
+    pub fn apply_batch(&mut self, records: &[Record]) -> Result<()> {
         let mut next = self.clone();
-        next.transition(record)?;
+        for record in records {
+            next.transition(record)?;
+        }
         *self = next;
         Ok(())
     }
     fn transition(&mut self, record: &Record) -> Result<()> {
+        record.validate_header()?;
+        ensure!(record.run_id == self.run_id, "journal run identity differs");
         ensure!(
             record.schema == JOURNAL_SCHEMA
                 && record.sequence
@@ -185,7 +283,7 @@ impl Projection {
             Event::Control { control } => {
                 ensure!(
                     record.generation == self.generation,
-                    "stale control generation"
+                    EngineError::StaleOwner
                 );
                 ensure!(
                     self.control != Control::Stop || *control == Control::Stop,
@@ -196,15 +294,16 @@ impl Projection {
             event => {
                 ensure!(
                     record.generation == self.generation && self.generation > 0,
-                    "stale owner"
+                    EngineError::StaleOwner
                 );
                 match event {
                     Event::Admitted {
                         node,
                         attempt,
                         bound,
+                        effect,
                     } => {
-                        ensure!(self.control == Control::Run, "run is not admitting work");
+                        ensure!(self.control == Control::Run, EngineError::NotAdmitting);
                         let task = self
                             .graph
                             .nodes
@@ -235,6 +334,7 @@ impl Projection {
                             node.clone(),
                             Attempt {
                                 number: *attempt,
+                                effect: *effect,
                                 state: AttemptState::Admitted,
                                 output: None,
                                 output_valid: false,
@@ -244,7 +344,7 @@ impl Projection {
                         );
                     }
                     Event::Dispatched { node, attempt } => {
-                        ensure!(self.control == Control::Run, "run stopped before dispatch");
+                        ensure!(self.control == Control::Run, EngineError::NotAdmitting);
                         self.attempt(node, *attempt, AttemptState::Admitted)?.state =
                             AttemptState::Dispatched;
                     }
@@ -288,7 +388,8 @@ impl Projection {
                             AttemptState::Rejected;
                     }
                     Event::Failed { node, attempt, .. } => {
-                        self.attempt(node, *attempt, AttemptState::Dispatched)?;
+                        let a = self.attempt(node, *attempt, AttemptState::Dispatched)?;
+                        ensure!(a.effect == Effect::Pure, EngineError::UnsupportedEffect);
                         // Local-only provider contract: errors carry no external effects or charges.
                         self.budget.settle(&call_key(node, *attempt), NanoUsd(0))?;
                         self.attempts.get_mut(node).unwrap().state = AttemptState::Failed;
@@ -298,6 +399,7 @@ impl Projection {
                             .attempts
                             .get(node)
                             .ok_or_else(|| anyhow!("missing attempt"))?;
+                        ensure!(a.effect == Effect::Pure, EngineError::UnsupportedEffect);
                         ensure!(
                             a.number == *attempt
                                 && matches!(

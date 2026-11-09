@@ -1,4 +1,5 @@
 //! Native campaign runner: committed source bytes and a clean tree are required.
+#![allow(clippy::disallowed_methods)] // Report/benchmark timing only.
 mod provenance;
 use anyhow::{Context, Result, ensure};
 use provenance::{committed_sources, hash, require_clean};

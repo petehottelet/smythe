@@ -91,7 +91,7 @@ fn execute(command: Command) -> Result<serde_json::Value> {
                 serde_json::from_str(&bytes)?
             };
             anyhow::ensure!(!resume || id.is_some(), "resume requires --id");
-            let id = id.unwrap_or_else(|| uuid::Uuid::now_v7().to_string());
+            let id = id.unwrap_or_else(|| smythe::seams::Sources::default().ids.next_id());
             let result = Swarm::new(workers, budget_nanousd)?.execute_in(
                 &graph,
                 &OfflineProvider,

@@ -2,9 +2,9 @@
   <img src="assets/wordmark.svg" alt="SMYTHE" width="340">
   <p><em>An open-source framework for task-based agent swarms with dynamic parallelization, routing, and execution topology.</em></p>
   <p>
-    <a href="https://pypi.org/project/smythe/"><img src="assets/badges/pypi.svg" alt="PyPI release"></a>
-    <a href="https://github.com/petehottelet/smythe/actions/workflows/ci.yml?query=branch%3Amain+event%3Apush"><img src="https://github.com/petehottelet/smythe/actions/workflows/ci.yml/badge.svg?branch=main&amp;event=push" alt="CI status on main"></a>
-    <img src="assets/badges/python.svg" alt="Python 3.11, 3.12, and 3.13">
+    <a href="docs/rust.md"><img src="assets/badges/alpha.svg" alt="Rust preview 0.2.0"></a>
+    <a href="https://github.com/petehottelet/smythe/actions/workflows/rust.yml?query=branch%3Afeature%2Frust-noumenon+event%3Apush"><img src="https://github.com/petehottelet/smythe/actions/workflows/rust.yml/badge.svg?branch=feature%2Frust-noumenon&amp;event=push" alt="Rust development CI status"></a>
+    <img src="assets/badges/rust.svg" alt="Rust 1.91 or later">
     <a href="LICENSE"><img src="assets/badges/license.svg" alt="License: MIT"></a>
   </p>
   <p>
@@ -15,23 +15,26 @@
   </p>
 </div>
 
-**Smythe is a Python framework that plans and runs agent workflows.** Give it a
-goal, inspect the generated task graph, and execute independent work in parallel.
-Set spending and concurrency limits, verify outputs, and recover saved work after
-an interruption.
+**Smythe is a Rust framework for running task graphs with durable recovery.**
+Define the work and its dependencies, execute ready tasks in parallel, and
+inspect the journal of outputs and costs. The native engine combines bounded
+concurrency, exact cost reservations, and recovery after a process interruption.
 
-Use it for research pipelines, document production, and artifact generation
-where you need to see what will run and account for results. 
+The **Rust 0.2.0 preview** runs local workflows and the Noumenon glyph
+pipeline without Python or API keys. Model-driven planning, paid providers,
+tools, and MCP are still part of the existing Python implementation; their Rust
+ports are ahead. [Current scope](docs/rust.md).
 
 <p align="center">
-  <img src="assets/noumenon/noumenon-loop.gif" alt="Animated Noumenon rain showing only the 192 revised Smythe glyphs" width="900">
+  <img src="assets/noumenon/noumenon-loop.gif" alt="Animated Noumenon rain showing the 192 authored Smythe glyphs" width="900">
 </p>
-<p align="center"><em><a href="benchmarks/noumenon_benchmark.md">Noumenon</a> is Smythe's parallel-processing example: each glyph is an independent task, and Smythe runs the tasks concurrently.</em></p>
+<p align="center"><em><a href="docs/rust.md#noumenon-acceptance">Noumenon</a> is Smythe's parallel-processing example: each glyph compiles as an independent task, and the Rust pipeline validates and exports the catalog.</em></p>
 
-Example Task: Smythe generated **192 glyphs in 21.7 seconds, 52.3× faster than serial.** Smythe runs the glyph
-set as one 192-node fan-out graph, one node per glyph, with up to 64 nodes; run one node at a time, the same graph took 1,133.3 seconds. Controlled offline run with fixed latency per call measures Smythe's scheduling. Glyphs are compiled, validated, and exported in parallel: 256 SVG glyphs in 8.06 seconds
-median with eight process workers, 2.20× faster than one worker, with no API calls. [Fan-out benchmark](benchmarks/noumenon_benchmark.md) ·
-[SVG workflow benchmark](benchmarks/svg_v2_results.md)
+The native pipeline preserves the existing SVG artwork and names. It supports
+up to **256 authored glyphs**, including the 192 shown above, checks them at
+four raster sizes, and exports SVGs, a catalog, an atlas, and validation reports.
+This is deterministic local work with **zero API calls**. The animation shows
+the catalog in use; it is not a recording of a Rust execution or a timing result.
 
 <p align="center">
   <a href="benchmarks/noumenon/catalog/contact-sheet-128.png">192-glyph sheet</a> ·
@@ -43,190 +46,115 @@ median with eight process workers, 2.20× faster than one worker, with no API ca
 
 ## Quickstart
 
-The unreleased [Rust alpha](docs/rust.md) runs local execution graphs and the
-authored Noumenon glyph pipeline through a shared journaled engine, preserving
-the SVG names and artwork. Python remains the complete framework. The
-[earlier Rust comparison](benchmarks/rust_noumenon_results.md) describes the
-original preview; new native campaigns require a committed, clean source tree.
-
-Python 3.11+:
+Build from this checkout with **Rust 1.91 or later** and a C build toolchain
+for bundled SQLite. The Rust packages are unpublished; the supported path is a
+source build. Run these commands from the repository root:
 
 ```bash
-pip install smythe
+cargo fetch --locked
+cargo build --release --locked --offline -p smythe-cli
 ```
 
-Plan, run, and recover a workflow with no API key:
+Once dependencies are fetched, the examples run offline. Using `cargo run`
+selects the Rust executable even if the Python CLI is also on your PATH.
 
-```python
-from smythe import OfflineProvider, SQLiteWorkflowStore, Swarm, Task
+### Run, inspect, and resume a graph
 
-# The plan a model would generate. OfflineProvider returns it to the planner
-# and echoes each step, so everything below runs without an API key.
-plan = {
-    "topology": ["fork_join"],
-    "nodes": [
-        {"id": "sqlite", "label": "Assess SQLite"},
-        {"id": "postgres", "label": "Assess PostgreSQL"},
-        {"id": "duckdb", "label": "Assess DuckDB"},
-        {"id": "pick", "label": "Recommend one database",
-         "depends_on": ["sqlite", "postgres", "duckdb"]},
-    ],
-}
-
-with SQLiteWorkflowStore("smythe-runs.db") as store:
-    swarm = Swarm(
-        provider=OfflineProvider(plan=plan),
-        run_store=store,
-        max_budget_usd=1.00,
-        parallel=True,
-    )
-    graph = swarm.plan(Task("Compare SQLite, PostgreSQL, and DuckDB for a local analytics app."))
-    print(graph)  # inspect the generated graph before anything runs
-
-    result = swarm.execute(graph)
-    print(result.output)
-
-    replay = swarm.resume(result.execution_id)  # replayed from the journal, no new calls
-    print(replay.output == result.output)
-```
-
-`print(graph)` shows the graph before anything runs:
-
-```text
-TaskGraph(topology="fork-join")
-├─ fork (parallel):
-│   ├─ agent-sqlite: Assess SQLite
-│   ├─ agent-postgres: Assess PostgreSQL
-│   └─ agent-duckdb: Assess DuckDB
-└─ join: agent-pick: Recommend one database
-```
-
-The three assessments run in parallel under the $1 budget, and the SQLite
-journal records every call, so `resume` returns the finished run without
-calling the provider again.
-
-### With a real model
-
-Install a provider extra and set its API key. With `OPENAI_API_KEY`,
-[GPT-6 Astra](https://developers.openai.com/api/docs/models/gpt-6-astra)
-writes the plan and the answers:
+The bundled [example graph](examples/native_graph.toml) contains two dependent
+tasks: `research` followed by `summarize`. The local `OfflineProvider` returns
+each task's goal, input, and references to dependency outputs, so you can inspect
+execution and recovery without a model call.
 
 ```bash
-pip install "smythe[openai]"
+cargo run --release --locked --offline --bin smythe -- run --graph examples/native_graph.toml --id example --store smythe_artifacts/native-runs
+cargo run --release --locked --offline --bin smythe -- inspect example --store smythe_artifacts/native-runs --events
+cargo run --release --locked --offline --bin smythe -- run --graph examples/native_graph.toml --id example --store smythe_artifacts/native-runs --resume
 ```
 
-```python
-from smythe import OpenAIResponsesProvider, SQLiteWorkflowStore, Swarm, Task
+The first command executes both nodes and saves their results. `inspect` returns
+the saved state and events as JSON. Resuming the completed run returns the same
+outputs with `reused_nodes: 2`, `provider_calls: 0`, and `cost_nanousd: "0"`.
+Use a new ID for another fresh run, or `--resume` to reopen the existing one.
 
-with SQLiteWorkflowStore("smythe-runs.db") as store:
-    swarm = Swarm(
-        model="gpt-6-astra",
-        provider=OpenAIResponsesProvider(
-            reasoning_effort="medium",
-            max_output_tokens=8192,
-        ),
-        run_store=store,
-        max_budget_usd=50.00,
-        parallel=True,
-        max_concurrency=8,
-    )
-    graph = swarm.plan(Task(
-        goal="Compare SQLite, PostgreSQL, and DuckDB for a local analytics app.",
-        constraints=["Stay under 400 words", "Recommend one database"],
-    ))
-    print(graph)
-    result = swarm.execute(graph)
-    print(result.output)
-```
+Graphs can be TOML or JSON. Set `--workers` to bound parallel work and
+`--budget-nanousd` to set the cost ceiling; their defaults are four workers and
+zero. The bundled provider charges nothing.
 
-With `ANTHROPIC_API_KEY`,
-[Claude Fable 5.1](https://platform.claude.com/docs/en/about-claude/models/overview)
-does the same through the native Claude Messages provider:
+### Generate the Noumenon catalog
 
 ```bash
-pip install "smythe[anthropic]"
+cargo run --release --locked --offline --bin smythe -- noumenon --glyphs 256 --workers 8 --out smythe_artifacts/native-glyphs
+cargo run --release --locked --offline --bin smythe -- noumenon --glyphs 256 --workers 8 --out smythe_artifacts/native-glyphs --resume
 ```
 
-```python
-from smythe import AnthropicMessagesProvider, SQLiteWorkflowStore, Swarm, Task
+A fresh run requires a new output directory. Full mode compiles the glyphs,
+renders at 16, 32, 64, and 128 pixels, checks topology and pairwise distinctness,
+and writes SVGs, `catalog.json`, `validation.json`, `atlas.png`, and `report.json`.
+Use `--mode compile` for compilation only. A completed resume validates the
+saved exports and makes no new provider calls.
 
-with SQLiteWorkflowStore("smythe-runs.db") as store:
-    swarm = Swarm(
-        model="claude-fable-5-1",
-        provider=AnthropicMessagesProvider(
-            reasoning_effort="medium",
-            max_output_tokens=8192,
-        ),
-        run_store=store,
-        max_budget_usd=50.00,
-        parallel=True,
-        max_concurrency=8,
-    )
-    graph = swarm.plan(Task(
-        goal="Compare SQLite, PostgreSQL, and DuckDB for a local analytics app.",
-        constraints=["Stay under 400 words", "Recommend one database"],
-    ))
-    print(graph)
-    result = swarm.execute(graph)
-    print(result.output)
-```
-
-Both examples make paid API calls under a **$50 run allowance**. The SQLite
-ledger accounts for planning and execution, reserves requests before dispatch,
-and retains responses for recovery. See [budget scope](docs/budgets.md),
-[durable text workflows](docs/workflow-accounting.md) and
-[native Claude Messages](docs/anthropic-messages.md), which covers the
-`claude-fable-5-1` text workflows it supports. Gemini installs the same way,
-with `smythe[gemini]`; durable run stores accept the OpenAI Responses and Claude
-Messages providers. [More examples](examples/README.md).
+[Native commands and recovery](docs/rust.md) · [Examples](examples/README.md).
 
 ## How it works
 
-**The graph defines the work.** Smythe generates a directed acyclic graph for
-the task, including dependencies and agent assignments. Inspect or export it
-before execution. Use approved templates or a graph you write yourself when
-the workflow is already known.
+**The graph defines the work.** Each node names a task and its dependencies.
+Smythe validates the graph before execution and dispatches a ready child as
+soon as its dependencies are accepted. Independent tasks share a bounded worker
+pool; an unrelated slow sibling does not hold up a ready branch. The Rust alpha
+executes graphs you supply. Generating a task-specific topology from a goal
+remains on the Rust roadmap.
 
-**The execution envelope governs the run.** Budgets, bounded concurrency,
-verification, traces, artifacts, and recovery apply as the graph executes.
-Durable Jobs add manifest approval, attempt history, selective rerolls, and
-local HTML reports.
+**The execution envelope governs the run.** A single coordinator owns
+admissions, cost reservations, and state transitions. It records dispatch intent,
+stores outputs as immutable hashed blobs, and journals receipts and settlement
+in SQLite. Recovery can reuse recorded results and complete pending settlement;
+interrupted local work without a saved result may run again.
 
-<p align="center">
-  <img src="assets/diligence_pipeline.svg" alt="Acquisition diligence: parallel specialists, synthesis, adversarial review, and a final memo" width="900">
-</p>
-
-The [acquisition-diligence example](examples/acquisition_diligence/) shows
-three specialists feeding an editor, a red-team review, and a final decision
-memo. Its saved graph, trace, and expected output make the workflow inspectable.
-
-| You need to… | Smythe provides |
+| You need to… | The Rust alpha provides |
 |---|---|
-| Adapt the workflow to the task | Generated graphs, approved templates, deterministic planning, [routing rules](docs/architecture.md#routing-rules) that send stable tasks to a single worker, and [evidence-triggered supervision](docs/supervisor.md#evidence-triggered-review) that revises pending work only when a stage or an anomaly calls for it |
-| Give agents skills and tools | [MCP servers](docs/mcp.md), [Agent Skills](docs/skills.md) directories that route work by capability tag and grant nothing, and [Python-backed skills](docs/skills.md#python-backed-skills): tools in your own code, offered only to the agents you name |
-| Control spending and parallel work | Request reservations and bounded concurrency |
-| Recover interrupted work | Checkpoints, native response replay, [recorded read steps](docs/workflow-accounting.md#recorded-read-steps), and durable job journals |
-| Check the deliverable | Output verification, opt-in strict acceptance of the exact output returned, [source-evidence checks](docs/source-evidence.md) that quotes and listed contradictions hold, and artifact receipts |
-| Keep accepted documents current | Opt-in [artifact lineage](docs/lineage.md) for durable runs: a read-only repair plan shows what a changed source, a changed validator or a damaged file affects, and applying it keeps the results that still stand |
-| Reuse what worked | Versioned [template records](docs/learning.md) learned from accepted runs, evaluated against their predecessor and a single worker in [Autotune](docs/optimize.md) campaigns, put in effect only by a reviewed decision and rolled back without touching running work; learning never changes acceptance, budgets or tools |
-| Understand a run | Graph exports, traces, costs, inspection reports, and [read-only run inspection](docs/runs.md) that reports execution, acceptance and cost separately, with a research run's sources, reads, evidence and open questions |
+| Define the workflow | Validated TOML or JSON graphs with explicit dependencies |
+| Bound parallel work | Readiness-driven execution through a bounded Rayon worker pool |
+| Account for cost | Checked integer nanoUSD, reservations before dispatch, and idempotent settlement; current providers are local and zero-cost |
+| Recover interrupted work | SQLite journals, immutable output blobs, and integrity checks before reuse |
+| Inspect or control a run | JSON results, saved events, and persisted pause, continue, and stop commands |
+| Produce the glyph catalog | Authored SVG compilation, raster validation, distinctness checks, and resumable exports |
+| Embed the engine | The `smythe` crate's `Swarm`, local `Provider` contract, store, and tracing types |
 
-[Architecture](docs/architecture.md) · [Execution](docs/execution.md) ·
-[Jobs](docs/jobs.md) · [Verification](docs/verifier.md) · [MCP tools](docs/mcp.md).
+Pause and stop prevent new admissions while active local calls drain. Recovery
+guarantees cover local process crashes. Remote effects, distributed workers,
+and power-loss guarantees are outside this alpha's scope.
+
+The current native journal uses schema 2; older alpha runs require a new
+directory. Resume checks semantic compatibility and saved outputs, so unrelated
+source edits do not invalidate a run. See the [recovery contract](docs/rust.md#journal-and-recovery).
+
+[Scheduling and accounting](docs/rust.md#workspace-and-scheduling) ·
+[Journal and run controls](docs/rust.md#journal-and-recovery) ·
+[Glyph acceptance](docs/rust.md#noumenon-acceptance).
 
 ## Measured results
 
-Each result links to its protocol and retained records. Charts are generated
-from the committed records.
+**The journaled Rust alpha has no claimable performance headline yet.** The
+retained Rust/Python comparison measures the earlier native preview. Its
+compilation clock excludes durability work now performed by the shared engine,
+so those timings do not describe this implementation.
 
-| Study | Recorded result | Scope |
+| Evidence | What it establishes | Scope |
 |---|---|---|
-| [Framework comparison](benchmarks/README.md#corrected-framework-head-to-head-langgraph-and-crewai-2026-07-12) | 77% fewer mean tokens and 28% less mean wall time than CrewAI | Five tasks, three repetitions; matched executor and fixed pipeline; blind judging |
-| [Interruption and recovery](benchmarks/durability_benchmark.md) | 8 repeated dispatches versus LangGraph's 32 | Three matched hard-kill trials with 64 operations |
-| [Generated topology](benchmarks/shape_suite.md) | 14% less wall time than a fixed pipeline, planning included | Five task shapes, three repetitions; wall time and observed quality |
-| [SVG catalog workflow](benchmarks/svg_v2_results.md) | 256 SVGs in 8.06 seconds median; 2.20× the serial baseline | Local compilation, validation, and export of authored designs; no API calls |
-| [Noumenon glyph fan-out](benchmarks/noumenon_benchmark.md) | 52.3× faster than serial at concurrency 64 | Controlled offline runs at 64 to 256 nodes; simulated provider latency |
-| [Jobs at 5,000 operations](benchmarks/jobs_scale_5000_20260907_results.md) | 5,000 accepted artifacts after a hard kill and recovery | One offline campaign with identical fixtures; correctness, not speed |
+| [Original Rust preview comparison](benchmarks/rust_noumenon_results.md) | Matching SVG bytes across Rust and both Python backends; independent validation of native catalogs | Historical diagnostic preview; different full-workflow clocks do not establish an end-to-end speedup |
+| [Native measurement guide](docs/rust.md#verification-and-native-measurements) | How to record fresh CLI runs with source and binary provenance | Diagnostic runner for the journaled engine; CPU and peak-memory measurements are still pending |
+| [Python benchmark collection](benchmarks/README.md) | Recorded framework, topology, artifact, and recovery results | Evidence for the Python implementation, within each report's stated limits |
+
+The Python [SVG workflow](benchmarks/svg_v2_results.md),
+[Noumenon fan-out](benchmarks/noumenon_benchmark.md),
+[interruption study](benchmarks/durability_benchmark.md), and
+[Astra/Sol findings](benchmarks/astra_findings.md) remain available with their
+protocols and records. They are not Rust performance claims.
+
+## Historical Python benchmark results
+
+The following measurements and charts describe the Python implementation.
+They remain scoped to their linked protocols and are not Rust performance claims.
 
 ### Framework efficiency
 
@@ -322,36 +250,25 @@ identical fixtures, so this shows recovery correctness, not speed.
 
 ## Project status
 
-**Smythe 0.10.0** is the current library release. It adds strict acceptance
-of the exact delivered output and a tested matrix of supported
-configurations. See the
-[release notes and upgrade guide](docs/release-0.10.0.md).
+**Rust workspace: 0.2.0, source preview.** APIs and journal formats are
+experimental. The workspace contains `smythe-core` for graph and accounting
+contracts, `smythe` for the shared runtime, `smythe-cli` for the executable,
+`smythe-noumenon` for the glyph pipeline, and `xtask` for native measurements.
+Rust CI covers Linux and Windows.
 
-Next priorities are a held-out comparison of graph selection and broader
-external-task benchmarks, including separately controlled Astra scheduler
-and framework studies.
-See the [roadmap](ROADMAP.md) for status and acceptance criteria.
-The [support matrix](docs/support-matrix.md) shows what each execution path
-accepts today and what owns each execution responsibility on it, with the test
-behind each cell. The
-[source-to-artifact example](examples/16_source_to_artifact.py) runs a
-durable research workflow offline and without keys, from bundled sources
-through an interruption and resume to an accepted document whose evidence
-`smythe runs inspect` reports. In preview,
-[external actions](docs/actions.md) deliver a strict durable run's accepted
-output to another service under an approval your host verifies; the
-offline [governed-publication example](examples/19_governed_publication.py)
-loses a write's answer and reconciles it from the service's records without
-writing again. The offline
-[template-lifecycle example](examples/21_template_lifecycle.py) records a
-template from accepted runs, rejects a harmful candidate on held-out tasks,
-and rolls back a version that a fooled evaluator promoted.
+Native development focuses on measurement and testability, followed by
+remote accounting, provider integrations, tools, planning, supervision, and
+Jobs. See the [roadmap](ROADMAP.md#rust-alpha-020).
 
-The [Noumenon screensaver](https://github.com/petehottelet/noumenon) renders
-Smythe's glyph catalog, with a web explorer and native Windows, macOS and Linux
-ports in its own repository. Distribution is source only, but you're welcome to
-compile your own binary.
+The **Python 0.10 line** remains in the repository during the transition. Its
+[quickstart](docs/python-quickstart.md), [examples](examples/README.md#python-examples),
+and [release guide](docs/release-0.10.0.md) describe capabilities that have not
+all been ported. Rust runs do not require a Python installation.
 
-[Documentation](docs/index.md) · [Contributing](CONTRIBUTING.md) ·
-[Releases](https://github.com/petehottelet/smythe/releases) ·
+The [Noumenon screensaver](https://github.com/petehottelet/noumenon) is a separate
+project that renders the glyph catalog. Smythe's native command produces the
+catalog; it does not build or run the screensaver.
+
+[Documentation](docs/index.md) · [Native development checks](docs/rust.md#verification-and-native-measurements) ·
+[Contributing](CONTRIBUTING.md) · [Changelog](CHANGELOG.md) ·
 [Security](SECURITY.md) · [MIT license](LICENSE).

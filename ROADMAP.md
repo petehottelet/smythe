@@ -8,18 +8,28 @@ evidence.** Every public
 performance claim links to its protocol and committed result record;
 superseded campaigns remain available as diagnostic history.
 
-Status: pre-1.0. Minor versions may break APIs (see [CHANGELOG.md](CHANGELOG.md) for the versioning policy).
+Status: the Rust workspace is `0.2.0`, an experimental source preview.
+The Python 0.10 line remains available during the transition. Rust interfaces
+are experimental; the Python pre-1.0 versioning policy is in
+[CHANGELOG.md](CHANGELOG.md).
 
-## Rust alpha (unreleased)
+## Rust alpha (0.2.0)
 
 The [native engine](docs/rust.md) runs ordinary local graphs and Noumenon through
 the same journaled state machine, with readiness-driven CPU scheduling, exact
 money, immutable outputs and local recovery. The 192/256 glyph artwork is retained.
 The [54-trial compiler comparison](benchmarks/rust_noumenon_results.md) remains
 diagnostic evidence for the original preview. Native campaigns now require clean,
-committed sources. Next are complete native measurements and simulation seams,
+committed sources. Native development focuses on measurements and testability,
 followed by remote accounting, providers, tools, planning, supervision and Jobs.
-The existing Python line remains available during native development.
+Schema-2 journals now record effect classes and event metadata, with injected
+clock and storage boundaries, grouped local commits, semantic resume bindings,
+and concurrent crash-recovery tests. Full simulated network/process runtimes
+and validation tasks inside the shared journal remain future work.
+The [README](README.md) now leads with native build and execution commands.
+The shipped milestones and feature details below describe the Python line;
+they are not a Rust parity checklist. Its [quickstart](docs/python-quickstart.md)
+and examples remain available during native development.
 
 ## Shipped (v0.2 line)
 

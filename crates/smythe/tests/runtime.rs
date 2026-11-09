@@ -51,6 +51,9 @@ struct Sum {
 }
 impl Provider for Sum {
     type Output = u64;
+    fn effect(&self) -> smythe::Effect {
+        smythe::Effect::Pure
+    }
     fn binding(&self) -> String {
         "test-sum-v1".into()
     }
@@ -106,11 +109,13 @@ fn rejected_atomic_admission_leaves_no_partial_reservation() {
                 1,
                 vec![
                     Event::Admitted {
+                        effect: smythe::Effect::Pure,
                         node: "a".into(),
                         attempt: 1,
                         bound: NanoUsd(1)
                     },
                     Event::Admitted {
+                        effect: smythe::Effect::Pure,
                         node: "b".into(),
                         attempt: 1,
                         bound: NanoUsd(1)
@@ -130,6 +135,7 @@ fn rejected_atomic_admission_leaves_no_partial_reservation() {
             1,
             vec![
                 Event::Admitted {
+                    effect: smythe::Effect::Pure,
                     node: "a".into(),
                     attempt: 1,
                     bound: NanoUsd(1),
@@ -152,6 +158,9 @@ fn pause_drains_current_work_and_resume_only_dispatches_remaining_nodes() {
     }
     impl Provider for Pausing {
         type Output = u64;
+        fn effect(&self) -> smythe::Effect {
+            smythe::Effect::Pure
+        }
         fn binding(&self) -> String {
             "pausing-v1".into()
         }
@@ -230,6 +239,9 @@ fn ready_child_runs_while_an_unrelated_parent_is_still_running() {
     }
     impl Provider for Straggler {
         type Output = u64;
+        fn effect(&self) -> smythe::Effect {
+            smythe::Effect::Pure
+        }
         fn binding(&self) -> String {
             "straggler-v1".into()
         }
@@ -465,6 +477,7 @@ fn stop_is_durable_and_stale_owners_cannot_admit() {
                 state.sequence,
                 1,
                 Event::Admitted {
+                    effect: smythe::Effect::Pure,
                     node: "a".into(),
                     attempt: 1,
                     bound: NanoUsd(1)
@@ -494,6 +507,9 @@ fn failure_keeps_successful_siblings_settled() {
     struct Broken;
     impl Provider for Broken {
         type Output = u64;
+        fn effect(&self) -> smythe::Effect {
+            smythe::Effect::Pure
+        }
         fn binding(&self) -> String {
             "broken-v1".into()
         }
@@ -528,6 +544,9 @@ fn invalid_output_preserves_known_cost_and_never_runs_children() {
     struct Invalid;
     impl Provider for Invalid {
         type Output = f64;
+        fn effect(&self) -> smythe::Effect {
+            smythe::Effect::Pure
+        }
         fn binding(&self) -> String {
             "invalid-output-v1".into()
         }
@@ -566,6 +585,9 @@ fn a_later_quote_failure_drains_and_settles_an_already_dispatched_sibling() {
     struct QuoteFailure;
     impl Provider for QuoteFailure {
         type Output = u64;
+        fn effect(&self) -> smythe::Effect {
+            smythe::Effect::Pure
+        }
         fn binding(&self) -> String {
             "quote-failure-v1".into()
         }

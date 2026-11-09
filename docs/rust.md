@@ -1,9 +1,15 @@
 # Rust alpha: journaled local execution
 
-The native workspace is `1.0.0-alpha.1`. It runs local execution graphs and the
+The native workspace is `0.2.0`. It runs local execution graphs and the
 existing authored Noumenon glyph pipeline without Python. The Python 0.10 line
 remains in this checkout while the native product is developed. These Rust
 packages are unpublished and their interfaces are experimental.
+
+The [README quickstart](../README.md#quickstart) is the native entry point.
+For the existing model-driven workflows, see the
+[Python 0.10 quickstart](python-quickstart.md) and
+[Python examples](../examples/README.md#python-examples). Their planning,
+provider, tool, supervision, and Jobs APIs are not Rust APIs.
 
 ## Build and run
 
@@ -55,22 +61,31 @@ returned in graph order. Invalid graphs and unaffordable admissions fail before
 that work dispatches. Successful in-flight siblings settle before an ordinary
 provider failure is returned.
 
+Ready admissions that fit both free slots and the cumulative allowance share a
+transaction. Already available completions may also share a transaction, without
+waiting for a slow sibling. Workers serialize and publish output blobs; only the
+coordinator commits acceptance and enables dependent tasks. A publication or
+serialization failure retains the successful call's known cost.
+
 `NanoUsd` stores checked unsigned 64-bit amounts and serializes them as decimal
 strings. Reservations have unique call identities; settlement is idempotent.
 Known overruns remain recorded and stop new admissions. The local provider
 contract requires failures to carry no charge or external effect; remote calls
-are not supported by this contract.
+are not supported by this contract. Every provider explicitly declares `Effect`.
+External effects are refused before execution, and journal transitions cannot
+release an external reservation through local failure or replay.
 
 ## Journal and recovery
 
 Every local run uses the same state machine. Ephemeral execution uses an
 in-memory SQLite store; `run` and Noumenon compilation use a disk journal.
 The store worker owns its connection and acknowledges durable commits. Disk
-stores use bundled SQLite with the WAL-reset fix, WAL mode and full synchronous
-commits. Money remains decimal strings in event payloads, avoiding SQLite's
+stores use bundled SQLite with the WAL-reset fix, WAL mode and
+`synchronous=NORMAL`. Commits survive application-process crashes; a power loss
+or operating-system crash can lose recent commits. Money remains decimal strings in event payloads, avoiding SQLite's
 signed integer limit for amounts.
 
-Admissions and dispatch intent precede work. Output blobs are hashed, flushed and
+Admissions and dispatch intent precede work. Output blobs are hashed, fully written and
 published immutably before their journal receipts. Received, settled and accepted
 states are distinct. On recovery, received evidence completes without another
 provider call; interrupted pure local work may repeat. Sequence checks and
@@ -78,13 +93,30 @@ ownership generations reject stale writes. A process lock prevents two disk
 coordinators from owning the same run. Corrupt journals and missing or changed
 blobs fail closed.
 
+Native journals now use schema 2. Earlier alpha schema-1 journals and preview
+directories are refused; start a new run in a new directory. No automatic alpha
+migration is provided. CLI result envelopes remain schema 1. Each event records
+its run, node and attempt identities, a run or execution phase, transaction
+boundary, and occurrence/recording times as UTC Unix milliseconds. The event ID
+is derived from run ID and sequence. Sequence orders events even when clocks
+move backward. `seams::Sources` injects clocks, fresh identities and storage
+boundary observers for tests; production uses real clocks, UUIDs and a no-op
+observer. Typed `EngineError` variants govern admission and conflict handling.
+
 Noumenon compilation uses this journal inside its output directory. Validation
 also retains immutable batches of up to 16 glyphs. A crash after compilation but
 before batch publication can reuse the compilation outputs without invoking the
 contour provider again. Missing derived SVGs can be reconstructed; changed
 existing artifacts are refused. A completed report still requires valid final
-exports. Counts, modes and bindings must match on resume; worker count may change.
-The preview's earlier run format is not compatible with this alpha.
+exports. Resume binds the protocol, contour source digest, compiler semantics,
+glyph count, mode, raster version and gate version; worker count may change.
+Unrelated source or CLI edits do not invalidate a run. Source hashes remain
+report provenance. Every recovered compilation output is compared with the
+authored recipe, including outputs saved before any batch receipt existed.
+Compilation and validation evidence must agree; conflicts are integrity errors.
+The compilation journal owns compiled outputs, validation batches own their
+validated measurements, and missing derived SVGs are reconstructible. A completed
+compilation journal alone never proves full catalog acceptance.
 
 ```bash
 cargo run --release --bin smythe -- control example pause --store smythe_artifacts/native-runs
@@ -118,9 +150,17 @@ its live provider integration.
 cargo fmt --all -- --check
 cargo clippy --workspace --all-targets --locked --offline -- -D warnings
 cargo test --workspace --locked --offline
+cargo test --release --locked --offline -p smythe-noumenon release_compile_256_has_bounded_journal_cost -- --ignored --nocapture
 cargo run --release -p xtask -- provenance
 cargo run --release -p xtask -- benchmark smythe_artifacts/native-campaign 3
 ```
+
+The release compilation gate checks 256 glyphs against a generous platform
+timeout and verifies grouped journal transactions. It is a regression alarm,
+not a speed claim. Recovery tests include seeded completion schedules, event
+prefixes, and actual process termination before/after SQL commits and blob
+publication. A subprocess fixture is invoked by its parent test; the release
+performance gate is run explicitly in CI.
 
 The native runner requires a committed, clean tree, including untracked files;
 ignored local output does not make it dirty. It rejects hidden Git index entries,

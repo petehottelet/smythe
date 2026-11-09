@@ -79,13 +79,15 @@ Every public diagram carries the same pure black-and-white init header, kept as
 
 ## Badges
 
-Use the repository-native SVG badges in `assets/badges/` for release, Python,
-and license information. Each uses the
+Use the repository-native SVG badges in `assets/badges/` for the experimental
+Rust workspace version, minimum Rust version, and license. Each uses the
 conventional two-tone split—a black label field with white type and a white
 value field with black type—inside a complete one-pixel black rectangular
-border. Keep their values synchronized with the release.
+border. Keep Rust badge values synchronized with `Cargo.toml`. The older
+Python and PyPI assets remain available for historical Python documentation.
 
-The CI badge uses GitHub's live workflow badge, scoped to push runs on `main`.
+The README CI badge uses GitHub's live `rust.yml` workflow badge, scoped to
+push runs on the Rust development branch, `feature/rust-noumenon`, until cutover.
 Its status color is an intentional exception: green means the latest applicable
 run passed, and failures change the badge automatically. Do not replace it with
 a static passing badge.

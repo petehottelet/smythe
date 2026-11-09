@@ -42,6 +42,7 @@
     "test_memory_ab.py": "Planner memory benchmark and example process helper",
     "test_publish_svg_catalog.py": "SVG benchmark catalog publisher",
     "test_readme_charts.py": "Landing-page charts and committed records",
+    "test_readme_quickstart.py": "Python quickstart guide retained in repository documentation",
     "test_recovery_chart.py": "Recovery chart renderer",
     "test_rust_noumenon.py": "Native Noumenon comparison harness",
     "test_support_matrix_docs.py": "Support matrix documentation page",

@@ -1,16 +1,30 @@
 # Smythe documentation
 
-Smythe generates an execution graph for a goal, exposes that graph for
-inspection, and runs it inside a durable envelope of cost, concurrency,
-verification, trace, artifact, and recovery controls.
+Smythe is being rewritten in Rust around task-specific execution graphs and a
+durable execution envelope. The `0.2.0` Rust preview runs supplied local
+graphs and the Noumenon glyph pipeline with bounded concurrency, exact cost
+accounting, SQLite journals, and recovery. Generated planning and remote
+integrations remain in the Python 0.10 line during the transition.
 
 ## Start here
 
-- [Rust alpha](rust.md) — journaled local graphs, run controls, Noumenon recovery and native benchmark provenance; [original preview results](../benchmarks/rust_noumenon_results.md)
-- [README](../README.md) — product overview, measured evidence, and quickstart
+- [README](../README.md) — Rust product overview, source-build quickstart, and evidence scope
+- [Rust alpha](rust.md) — prerequisites, journaled local graphs, run controls, Noumenon recovery, and native development checks
+- [Native journal compatibility](rust.md#journal-and-recovery) — schema 2, semantic resume bindings, effect declarations, and process-crash guarantees
+- [Examples](../examples/README.md) — native commands followed by the Python example collection
+- [Rust measurement status](rust.md#verification-and-native-measurements) — diagnostic runner and the limits of the historical preview comparison
+
+## Python 0.10 documentation
+
+The feature guides and studies below describe the Python implementation unless
+explicitly labeled Rust. Provider guides use “native” to mean a provider's own
+API; that does not mean a Rust integration. These capabilities have not all
+been ported to the alpha.
+
+- [Python quickstart](python-quickstart.md) — offline planning and recovery, plus paid provider examples
 - [Architecture](architecture.md) — the two core abstractions and component boundaries
 - [Support matrix](support-matrix.md) — which providers, verifiers, tools, stores and Jobs profiles each execution path accepts, and who owns each execution responsibility on each path, from admission, dispatch and cost to cancellation, leases, recovery and upgrades with work in flight, with the test behind each cell
-- [Examples](../examples/README.md) — offline-first feature tours plus explicitly gated live integrations
+- [Python examples](../examples/README.md#python-examples) — offline feature tours plus explicitly gated live integrations
 - [Benchmarks](../benchmarks/README.md) — evidence status, protocols, and raw records
 - [Smythe 0.10.0](release-0.10.0.md) — strict delivery acceptance, durable research workflows, external actions in preview, artifact lineage and repair, experimental scheduling policies and reviewable learning; upgrading from 0.9.1
 - [Smythe 0.9.1](release-0.9.1.md) — patch release: missing Gemini images fail their node, Gemini 3.1 image defaults, and account identifiers and local paths kept out of benchmark records; upgrading from 0.9.0
@@ -49,7 +63,7 @@ verification, trace, artifact, and recovery controls.
 
 ## Connect models and tools
 
-- [GPT-6 Astra and Claude Fable 5.1 quickstarts](../README.md#with-a-real-model) — native text planning and execution within one saved $50 allowance
+- [GPT-6 Astra and Claude Fable 5.1 quickstarts](python-quickstart.md#with-a-real-model) — Python text planning and execution within one saved $50 allowance
 - [Native OpenAI Responses](openai-responses.md) — Astra/Sol function tools, exact token prices, request quotes, and retained failure receipts
 - [Original Astra pilot results](../benchmarks/results/astra_20260913/README.md) — historical 24-workflow calibration snapshot with complete native receipts
 - [What the Astra study found](../benchmarks/astra_findings.md) — scoped findings and an offline reproduction supplement

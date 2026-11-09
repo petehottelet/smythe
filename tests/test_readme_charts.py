@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+import tomllib
 from copy import deepcopy
 from pathlib import Path
 
@@ -97,12 +98,20 @@ def test_readme_badges_use_live_ci_and_bordered_black_and_white_metadata():
     readme = ROOT.joinpath("README.md").read_text(encoding="utf-8")
     badge_paths = re.findall(r'src="(assets/badges/[^"]+\.svg)"', readme)
     assert len(badge_paths) == 3
+    assert set(badge_paths) == {
+        "assets/badges/alpha.svg", "assets/badges/rust.svg", "assets/badges/license.svg",
+    }
+    workspace = tomllib.loads(ROOT.joinpath("Cargo.toml").read_text(encoding="utf-8"))
+    package = workspace["workspace"]["package"]
+    assert package["version"] in ROOT.joinpath("assets/badges/alpha.svg").read_text()
+    assert package["rust-version"] + "+" in ROOT.joinpath("assets/badges/rust.svg").read_text()
+    assert "pypi.org" not in readme
     for relative in badge_paths:
         svg = ROOT.joinpath(relative).read_text(encoding="utf-8")
         assert set(HEX_COLOR.findall(svg)) == MONOCHROME
         assert 'fill="#ffffff" stroke="#000000"' in svg
     assert ('src="https://github.com/petehottelet/smythe/actions/workflows/'
-            'ci.yml/badge.svg?branch=main&amp;event=push"') in readme
+            'rust.yml/badge.svg?branch=feature%2Frust-noumenon&amp;event=push"') in readme
     assert 'src="assets/badges/ci.svg"' not in readme
 
 
@@ -134,10 +143,20 @@ def test_noumenon_scaling_chart_uses_all_four_isolated_records():
 
 def test_readme_links_benchmark_evidence_and_the_noumenon_showcase():
     readme = ROOT.joinpath("README.md").read_text(encoding="utf-8")
+    assert "An open-source framework for task-based agent swarms with dynamic parallelization, routing, and execution topology." in readme
+    historical = readme.split("## Historical Python benchmark results", 1)[1]
+    assert "not Rust performance claims" in historical
+    for name in (
+        "framework_callouts.svg", "framework_comparison.svg", "recovery.svg",
+        "shape_efficiency.svg", "svg_v2_workflow.svg", "svg_v2_memory.svg",
+        "noumenon_scaling.svg", "jobs_scale.svg",
+    ):
+        assert f'src="assets/benchmarks/{name}"' in historical
     # Claims must remain traceable when the product page's layout changes.
     destinations = set(re.findall(r"\[[^\]]+\]\(([^)]+)\)", readme))
     for target in (
         "benchmarks/README.md",
+        "benchmarks/rust_noumenon_results.md",
         "benchmarks/astra_findings.md",
         "benchmarks/durability_benchmark.md",
         "benchmarks/svg_v2_results.md",
