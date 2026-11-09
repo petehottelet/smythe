@@ -24,6 +24,8 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
 
 ## [Unreleased]
 
+- Refuse the journaled runtime in the historical Rust/Python comparison harness,
+  whose compilation clock excludes the new journal's durability work.
 - Add a shared native local engine with a SQLite journal, immutable output blobs,
   readiness-driven scheduling, decimal-string nanoUSD, replayable settlement and
   run controls. Ordinary graphs and Noumenon compilation use the same engine.

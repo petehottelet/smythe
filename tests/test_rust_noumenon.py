@@ -1,9 +1,12 @@
 """Evidence gates for the optional native preview; no Rust installation needed."""
 from copy import deepcopy
+import json
+import subprocess
 
 import pytest
 
 from benchmarks.run_rust_noumenon import review
+from benchmarks import run_rust_noumenon as benchmark
 
 
 def record():
@@ -40,3 +43,26 @@ def test_comparison_refuses_misleading_evidence(damage):
         trial["svg_sha256"].pop()
     with pytest.raises(ValueError):
         review(damaged)
+
+
+@pytest.mark.parametrize("resume", [False, True])
+@pytest.mark.parametrize("protocol", ["noumenon-rust-v1", "noumenon-rust-journal-v1", None])
+def test_historical_comparison_refuses_a_different_timing_contract(tmp_path, monkeypatch, resume, protocol):
+    source = tmp_path / "source.rs"
+    source.write_bytes(b"fixture")
+    receipt = {
+        "protocol": protocol,
+        "optimized": True,
+        "implementation_sources": {"source.rs": benchmark.digest(b"fixture")},
+    }
+    report = {"saved_report": receipt, "provider_calls": 0} if resume else receipt
+    monkeypatch.setattr(benchmark, "ROOT", tmp_path)
+    monkeypatch.setattr(
+        benchmark.subprocess, "run",
+        lambda *args, **kwargs: subprocess.CompletedProcess([], 0, json.dumps(report)),
+    )
+    if protocol == "noumenon-rust-v1":
+        assert benchmark.native(tmp_path / "smythe", 4, 1, tmp_path / "out", resume=resume)
+    else:
+        with pytest.raises(ValueError, match="historical comparison"):
+            benchmark.native(tmp_path / "smythe", 4, 1, tmp_path / "out", resume=resume)

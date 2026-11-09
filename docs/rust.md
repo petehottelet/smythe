@@ -135,5 +135,7 @@ The [original comparison](../benchmarks/rust_noumenon_results.md) is immutable
 historical evidence for revision `409d367b3cb09a06461127c6d70f2ef52e16a0ce`, which
 contains its producer code. It does not describe this journaled implementation's
 performance. Its recorded checkout hashes include Windows line endings; new
-native records hash committed contents. Python remains necessary only for the
+native records hash committed contents. The historical comparison harness rejects
+the journaled runtime because its compilation clock includes different durability
+work. Python remains necessary only for the
 historical comparison harness and the Python line's own tests during transition.

@@ -92,6 +92,12 @@ def native(binary, count, workers, out, *, mode="compile", resume=False):
         # Do not retain arbitrary subprocess diagnostics in benchmark evidence.
         raise RuntimeError("Native pipeline failed; no comparison is claimable")
     report = json.loads(result.stdout)
+    receipt = report.get("saved_report", {}) if resume else report
+    if receipt.get("protocol") != "noumenon-rust-v1":
+        raise ValueError(
+            "This historical comparison requires the original native preview protocol; "
+            "use the native runner for journaled execution"
+        )
     if not resume:
         if report.get("optimized") is not True:
             raise ValueError("A release binary is required")
