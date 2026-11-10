@@ -200,7 +200,7 @@ could get past the execution envelope's checks. Some fixes change behavior that
 This release adds native Claude Messages, owned Autotune campaigns and reports,
 compact distributions, and the completed Astra publication. See the
 [upgrade guide](docs/release-0.8.0.md) for the required low-level Autotune
-`lease=` arguments and schema-v4 migration.
+`lease=` arguments and schema-v4 migration. 
 
 ### Added
 
