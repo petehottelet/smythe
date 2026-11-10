@@ -28,13 +28,7 @@ future native capabilities. [Current scope](docs/rust.md).
 <p align="center">
   <img src="assets/noumenon/noumenon-loop.gif" alt="Animated Noumenon rain showing the 192 authored Smythe glyphs" width="900">
 </p>
-<p align="center"><em><a href="docs/rust.md#noumenon-acceptance">Noumenon</a> is Smythe's parallel-processing example: each glyph compiles as an independent task, and the Rust pipeline validates and exports the catalog.</em></p>
-
-The native pipeline preserves the existing SVG artwork and names. It supports
-up to **256 authored glyphs**, including the 192 shown above, checks them at
-four raster sizes, and exports SVGs, a catalog, an atlas, and validation reports.
-This is deterministic local work with **zero API calls**. The animation shows
-the catalog in use; it is not a recording of a Rust execution or a timing result.
+<p align="center"><em><a href="docs/rust.md#noumenon-acceptance">Noumenon</a> is an example demonstrating parallel-processing: each glyph compiles as an independent task, and the Rust pipeline validates and exports the catalog to produce the screensaver.</em></p>
 
 <p align="center">
   <a href="benchmarks/noumenon/catalog/contact-sheet-128.png">192-glyph sheet</a> ·
