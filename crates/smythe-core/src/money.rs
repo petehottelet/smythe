@@ -42,13 +42,23 @@ impl NanoUsd {
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct Sentinel {
     pub ceiling: NanoUsd,
     pub spent: NanoUsd,
     reservations: BTreeMap<String, NanoUsd>,
     settlements: BTreeMap<String, NanoUsd>,
+    #[serde(skip)]
+    pending_total: u128,
+}
+pub(crate) struct LedgerUndo {
+    key: String,
+    reservation: Option<NanoUsd>,
+    settlement: Option<NanoUsd>,
+    spent: NanoUsd,
+    pending_total: u128,
+    ceiling: NanoUsd,
 }
 impl Sentinel {
     pub fn new(ceiling: NanoUsd) -> Self {
@@ -57,12 +67,56 @@ impl Sentinel {
             spent: NanoUsd(0),
             reservations: BTreeMap::new(),
             settlements: BTreeMap::new(),
+            pending_total: 0,
         }
     }
     pub fn exposure(&self) -> Result<NanoUsd> {
-        self.reservations
-            .values()
-            .try_fold(self.spent, |sum, &amount| sum.checked_add(amount))
+        Ok(NanoUsd(u64::try_from(
+            u128::from(self.spent.0) + self.pending_total,
+        )?))
+    }
+    pub fn fits(&self, extra_pending: NanoUsd, amount: NanoUsd) -> bool {
+        u128::from(self.spent.0)
+            + self.pending_total
+            + u128::from(extra_pending.0)
+            + u128::from(amount.0)
+            <= u128::from(self.ceiling.0)
+    }
+    pub fn change_ceiling(&mut self, ceiling: NanoUsd) -> Result<()> {
+        ensure!(self.exposure()? <= ceiling, EngineError::BudgetExhausted);
+        self.ceiling = ceiling;
+        Ok(())
+    }
+    pub(crate) fn checkpoint(&self, key: String) -> LedgerUndo {
+        LedgerUndo {
+            reservation: self.reservations.get(&key).copied(),
+            settlement: self.settlements.get(&key).copied(),
+            key,
+            spent: self.spent,
+            pending_total: self.pending_total,
+            ceiling: self.ceiling,
+        }
+    }
+    pub(crate) fn undo(&mut self, old: LedgerUndo) {
+        match old.reservation {
+            Some(n) => {
+                self.reservations.insert(old.key.clone(), n);
+            }
+            None => {
+                self.reservations.remove(&old.key);
+            }
+        }
+        match old.settlement {
+            Some(n) => {
+                self.settlements.insert(old.key, n);
+            }
+            None => {
+                self.settlements.remove(&old.key);
+            }
+        }
+        self.spent = old.spent;
+        self.pending_total = old.pending_total;
+        self.ceiling = old.ceiling;
     }
     pub fn reserve(&mut self, key: &str, amount: NanoUsd) -> Result<()> {
         ensure!(
@@ -71,11 +125,9 @@ impl Sentinel {
                 && !self.settlements.contains_key(key),
             "duplicate reservation identity"
         );
-        ensure!(
-            self.exposure()?.checked_add(amount)? <= self.ceiling,
-            EngineError::BudgetExhausted
-        );
+        ensure!(self.fits(NanoUsd(0), amount), EngineError::BudgetExhausted);
         self.reservations.insert(key.to_owned(), amount);
+        self.pending_total += u128::from(amount.0);
         Ok(())
     }
     /// Returns whether the quote was exceeded, while retaining all known spend.
@@ -92,6 +144,7 @@ impl Sentinel {
         let spent = self.spent.checked_add(actual)?;
         self.spent = spent;
         self.reservations.remove(key);
+        self.pending_total -= u128::from(bound.0);
         self.settlements.insert(key.into(), actual);
         Ok(actual > bound
             || self

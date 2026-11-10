@@ -1,5 +1,7 @@
 # Execution and failure policies
 
+> Historical Python reference. The active project is Rust-only. Run this guide's commands from [source revision 12f1470](https://github.com/petehottelet/smythe/tree/12f14704beff344228fffffce40d995daa1f7cce); see the [native guide](rust.md) for current behavior.
+
 Serial and parallel execution apply the same node failure policies. A terminal
 failure stops new provider dispatch, preserves the original exception, and
 retains completed results and recorded charges.
@@ -811,6 +813,6 @@ still rechecks pending work after each step so supervision and verification
 can change the remaining graph. Flat artifact fan-out has a separate
 [Jobs scale and recovery protocol](../benchmarks/jobs_scale_benchmark.md).
 
-[YAML example](../examples/01_pipeline.yaml) ·
-[Crash and resume example](../examples/04_resume_after_crash.py) ·
+[YAML example](https://github.com/petehottelet/smythe/blob/12f14704beff344228fffffce40d995daa1f7cce/examples/01_pipeline.yaml) ·
+[Crash and resume example](https://github.com/petehottelet/smythe/blob/12f14704beff344228fffffce40d995daa1f7cce/examples/04_resume_after_crash.py) ·
 [Architecture](architecture.md).

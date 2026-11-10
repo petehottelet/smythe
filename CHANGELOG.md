@@ -24,38 +24,30 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
 
 ## [Unreleased]
 
-- Version the Rust source preview as 0.2.0 and run native CI on Rust feature
-  branches. Keep historical Python measurements labeled separately from native results.
-- Reduce native journal overhead with WAL NORMAL synchronization, worker-side
-  blob publication, and grouped admissions and completions while preserving
-  dispatch and acceptance ordering. Retain known costs on output publication failures.
-- Add explicit provider effects, typed admission errors, schema-2 event identities
-  and timestamps, injected clocks and storage boundaries, and concurrent
-  process-crash recovery tests. Older alpha journals require fresh run directories.
-- Bind Noumenon resume to semantic versions and revalidate compilation outputs
-  even before batch receipts exist. Keep source hashes as provenance, remove
-  unused Tokio dependencies, and add a release compilation regression gate.
-- Make the README's quickstart, capability table, badges, and project status
-  describe the Rust alpha. Retain Python quickstarts in a separate guide and
-  distinguish historical benchmark evidence from the journaled native engine.
-- Refuse the journaled runtime in the historical Rust/Python comparison harness,
-  whose compilation clock excludes the new journal's durability work.
-- Add a shared native local engine with a SQLite journal, immutable output blobs,
-  readiness-driven scheduling, decimal-string nanoUSD, replayable settlement and
-  run controls. Ordinary graphs and Noumenon compilation use the same engine.
-- Split the Rust alpha into core, library, CLI, Noumenon and native tooling crates;
-  add `run`, `inspect` and `control`, and replace `fs2` with standard file locking.
-- Add a native diagnostic runner that rejects uncommitted trees and hashes
-  committed Git blob contents independently of checkout line endings.
-- Add an optional Rust workspace with `smythe-core` and `smythe-noumenon`:
-  validated execution graphs, bounded local providers, integer cost reservations
-  and the native `smythe noumenon` command.
-- Compile the existing Noumenon contours into identical SVGs; add versioned native
-  raster gates, distinctness checks, catalog and atlas exports, immutable batch
-  checkpoints and interrupted-process recovery.
-- Add a frozen Rust/Python compilation comparison, independent Python validation
-  of native catalogs, and Linux/Windows CI for the native preview. Python remains
-  the complete framework; the native preview has no paid provider integrations.
+- Make the active repository Rust-only at workspace version 0.2.0. Retire Python
+  implementation, tests, packaging and publishing workflows while retaining
+  historical source in Git, benchmark records and the Noumenon GIF.
+- Introduce schema-3 journals with named phases, graph revisions, transitive
+  invalidation, saved resource limits and revision-scoped reservation identities.
+  Schema-1 and schema-2 stores require fresh directories.
+- Separate operator intent, admission closure and terminal disposition. Preserve
+  final-node overruns as completed work; add explicit bounded pure retries and
+  budget changes without changing semantic run bindings.
+- Move scheduling into a pure coordinator with 5,000-seed ChaCha8 simulation,
+  incremental readiness and accounting, and rollback of touched state.
+- Commit small outputs and receipts atomically in SQLite; retain immutable large
+  blobs with hash-directory fanout and locked staging cleanup. Bound automatic
+  WAL checkpoints to reduce inline storage overhead.
+- Pass lazy dependency handles, return output references, and report output,
+  referenced and loaded bytes. Add node, edge, attempt, output and deadline limits.
+- Add typed JSON errors and exit codes, read-only inspect/list, verified output
+  retrieval, cursor paging and derived owner health.
+- Run Noumenon compilation and validation through the shared journal, revalidate
+  saved evidence in parallel and retire separate batch receipts. Preserve authored
+  SVG hashes and the local process-crash recovery contract.
+- Keep native measurement provenance bound to clean committed Git blob contents.
+  Add release gates for 2,000/8,000-node scaling, a 5,000-node chain, inline disk
+  overhead and 256-glyph compilation. Historical Python comparisons remain diagnostic.
 
 ## [0.10.0] - 2026-10-24
 

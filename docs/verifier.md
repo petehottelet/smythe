@@ -1,5 +1,7 @@
 # Verification that gates
 
+> Historical Python reference. The active project is Rust-only. Run this guide's commands from [source revision 12f1470](https://github.com/petehottelet/smythe/tree/12f14704beff344228fffffce40d995daa1f7cce); see the [native guide](rust.md) for current behavior.
+
 A verifier can reject an output and trigger bounded regeneration. Verification
 is an ordinary node: planned, budgeted, traced, and checkpointed. It declares
 which node it judges:
@@ -385,7 +387,7 @@ else:
     print(result.acceptance.decision, result.acceptance.reasons)
 ```
 
-[`examples/15_strict_acceptance.py`](../examples/15_strict_acceptance.py) runs
+[`examples/15_strict_acceptance.py`](https://github.com/petehottelet/smythe/blob/12f14704beff344228fffffce40d995daa1f7cce/examples/15_strict_acceptance.py) runs
 this offline: a draft passes its gate, a later step drops the required
 section, and the strict run keeps the defective text as `rejected_output`.
 

@@ -27,6 +27,8 @@ jobs:
       - run: cargo +1.91.0 build --release --locked --offline
       - name: Bound native compilation overhead
         run: cargo +1.91.0 test --release --locked --offline -p smythe-noumenon release_compile_256_has_bounded_journal_cost -- --ignored --nocapture
+      - name: Bound scheduler and inline storage scaling
+        run: cargo +1.91.0 test --release --locked --offline -p smythe --test scaling -- --ignored --nocapture
       - name: Validate all native glyphs
         run: cargo run --release --locked --offline --bin smythe -- noumenon --glyphs 256 --workers 8 --out smythe_artifacts/rust-smoke
       - name: Verify completed recovery

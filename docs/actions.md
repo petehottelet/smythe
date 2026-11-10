@@ -1,5 +1,7 @@
 # External actions (preview)
 
+> Historical Python reference. The active project is Rust-only. Run this guide's commands from [source revision 12f1470](https://github.com/petehottelet/smythe/tree/12f14704beff344228fffffce40d995daa1f7cce); see the [native guide](rust.md) for current behavior.
+
 **Preview.** `smythe.actions` defines the contract types for actions that
 write accepted content to a service outside Smythe, such as publishing a post.
 It [prepares actions](#prepared-actions) in a durable run's
@@ -1100,7 +1102,7 @@ connector.
 
 ## An offline walkthrough
 
-[`examples/19_governed_publication.py`](../examples/19_governed_publication.py)
+[`examples/19_governed_publication.py`](https://github.com/petehottelet/smythe/blob/12f14704beff344228fffffce40d995daa1f7cce/examples/19_governed_publication.py)
 runs the whole path without keys or network access:
 
 1. A strict durable run publishes a release announcement, and a final

@@ -1,5 +1,7 @@
 # Packages, source checkouts and typing
 
+> Historical Python reference. The active project is Rust-only. Run this guide's commands from [source revision 12f1470](https://github.com/petehottelet/smythe/tree/12f14704beff344228fffffce40d995daa1f7cce); see the [native guide](rust.md) for current behavior.
+
 These distribution improvements ship in [Smythe 0.8.0](release-0.8.0.md).
 Historical 0.7.0 artifacts remain unchanged.
 
@@ -66,7 +68,7 @@ python -m pytest tests/ --distribution -q
 
 The explicit profile excludes repository-only test modules before importing
 them and deselects the committed example-manifest case. Its complete inventory
-and reasons are in [the profile manifest](../tests/distribution_profile.json).
+and reasons are in [the profile manifest](https://github.com/petehottelet/smythe/blob/12f14704beff344228fffffce40d995daa1f7cce/tests/distribution_profile.json).
 A module entry is an exact file name or a glob pattern, so one entry can cover
 a family of repository-only modules; each entry must name at least one test
 module. Library behavior, budgets, recovery, journals, tools and CLI tests remain

@@ -1,5 +1,7 @@
 # Smythe 0.10.0
 
+> Historical Python reference. The active project is Rust-only. Run this guide's commands from [source revision 12f1470](https://github.com/petehottelet/smythe/tree/12f14704beff344228fffffce40d995daa1f7cce); see the [native guide](rust.md) for current behavior.
+
 [GitHub release](https://github.com/petehottelet/smythe/releases/tag/v0.10.0) ·
 [PyPI package](https://pypi.org/project/smythe/0.10.0/)
 
@@ -29,7 +31,7 @@ pip install "smythe[openai]==0.10.0"
   Jobs record each decision apart from execution and cost.
   [Verification](verifier.md#strict-delivery-acceptance) ·
   [Jobs validators](jobs.md#registered-validators) ·
-  [example 15](../examples/15_strict_acceptance.py).
+  [example 15](https://github.com/petehottelet/smythe/blob/12f14704beff344228fffffce40d995daa1f7cce/examples/15_strict_acceptance.py).
 - **Supported configurations.** The [support matrix](support-matrix.md) states
   which providers, verifiers, tools, stores and Jobs profiles each execution
   path accepts and who owns each execution responsibility, with the test
@@ -44,7 +46,7 @@ pip install "smythe[openai]==0.10.0"
   reject quotes that are not in their sources. A removed source leaves a
   tombstone that withholds decisions resting on it, and a completed run can
   be re-evaluated or decided by an authorized operator. The offline
-  [source-to-artifact example](../examples/16_source_to_artifact.py) plans,
+  [source-to-artifact example](https://github.com/petehottelet/smythe/blob/12f14704beff344228fffffce40d995daa1f7cce/examples/16_source_to_artifact.py) plans,
   reads, is interrupted, resumes and delivers an accepted document.
   [Recorded reads](workflow-accounting.md#recorded-read-steps) ·
   [source evidence](source-evidence.md).
@@ -60,14 +62,14 @@ pip install "smythe[openai]==0.10.0"
   lost answer and revocation that takes precedence over dispatch. The API may
   change before it leaves preview, and `import smythe` does not load it.
   [External actions](actions.md) ·
-  [example 19](../examples/19_governed_publication.py).
+  [example 19](https://github.com/petehottelet/smythe/blob/12f14704beff344228fffffce40d995daa1f7cce/examples/19_governed_publication.py).
 - **Artifact lineage and selective repair.** Strict durable runs can record
   the sources, validators and tools their accepted artifacts depend on. A
   read-only repair plan shows what will be reused, rechecked, rendered again
   or regenerated, and `Swarm.repair` applies a reviewed plan under an explicit
   allowance. Jobs can repair a damaged accepted file, recheck accepted files
   under changed validators and preview rerolls.
-  [Lineage](lineage.md) · [example 18](../examples/18_archive_maintenance.py).
+  [Lineage](lineage.md) · [example 18](https://github.com/petehottelet/smythe/blob/12f14704beff344228fffffce40d995daa1f7cce/examples/18_archive_maintenance.py).
 - **Failure-aware scheduling, experimental and off by default.** A classified
   [retry policy](execution.md#retry-policy) with one retry owner,
   per-model [capacity limits](execution.md#provider-capacity),
@@ -87,7 +89,7 @@ pip install "smythe[openai]==0.10.0"
   `history` manage what is in effect through a separate policy registry.
   [Agent Skills directories](skills.md#agent-skills-directories) lend
   capability tags without granting tools.
-  [Example 21](../examples/21_template_lifecycle.py).
+  [Example 21](https://github.com/petehottelet/smythe/blob/12f14704beff344228fffffce40d995daa1f7cce/examples/21_template_lifecycle.py).
 - **Correctness.** `CallableVerifier` and gate verdicts fail closed,
   `distill_template` keeps gates and execution policies, durable journals stay
   readable after a price or model-list change, checkpoint saves no longer

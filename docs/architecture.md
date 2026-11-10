@@ -1,5 +1,7 @@
 # Architecture
 
+> Historical Python reference. The active project is Rust-only. Run this guide's commands from [source revision 12f1470](https://github.com/petehottelet/smythe/tree/12f14704beff344228fffffce40d995daa1f7cce); see the [native guide](rust.md) for current behavior.
+
 Smythe is organized around two core abstractions: a generated execution graph
 and the durable envelope that governs its execution.
 
@@ -266,7 +268,7 @@ saves it in its graph, and resume replays it without linting again.
 Contributions are expressed with ordinary node fields in graphs and templates
 you write. The schema of a generated plan is unchanged, so a model cannot
 declare them. The
-[contribution templates example](../examples/17_contribution_templates.py)
+[contribution templates example](https://github.com/petehottelet/smythe/blob/12f14704beff344228fffffce40d995daa1f7cce/examples/17_contribution_templates.py)
 defines `SubGraphTemplate` values whose workers each contribute something
 distinct, and a repeated fan-out that the lint flags.
 
@@ -497,7 +499,7 @@ Evaluation, promotion and rollback stay separate operations: an Autotune
 campaign compares a candidate version with its predecessor and a simpler
 reference arm on held-out tasks, a reviewed decision activates it, and a
 rollback restores the previous version for new runs.
-[`examples/21_template_lifecycle.py`](../examples/21_template_lifecycle.py)
+[`examples/21_template_lifecycle.py`](https://github.com/petehottelet/smythe/blob/12f14704beff344228fffffce40d995daa1f7cce/examples/21_template_lifecycle.py)
 runs that lifecycle offline; see
 [a template's lifecycle](learning.md#a-templates-lifecycle).
 

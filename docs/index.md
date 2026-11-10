@@ -4,19 +4,24 @@ Smythe is being rewritten in Rust around task-specific execution graphs and a
 durable execution envelope. The `0.2.0` Rust preview runs supplied local
 graphs and the Noumenon glyph pipeline with bounded concurrency, exact cost
 accounting, SQLite journals, and recovery. Generated planning and remote
-integrations remain in the Python 0.10 line during the transition.
+integrations remain future native capabilities. The active repository is Rust-only;
+the Python 0.10 implementation is retained in Git history.
 
 ## Start here
 
 - [README](../README.md) — Rust product overview, source-build quickstart, and evidence scope
 - [Rust alpha](rust.md) — prerequisites, journaled local graphs, run controls, Noumenon recovery, and native development checks
-- [Native journal compatibility](rust.md#journal-and-recovery) — schema 2, semantic resume bindings, effect declarations, and process-crash guarantees
+- [Native journal compatibility](rust.md#journal-and-recovery) — schema 3, atomic inline receipts, semantic bindings, effects, revisions and process-crash recovery
+- [Controls and limits](rust.md#controls-limits-and-revisions) — explicit retries and budget changes, deadlines and graph revisions
+- [CLI output and inspection](rust.md#cli-output-and-inspection) — typed errors, output references, read-only health and cursor paging
 - [Examples](../examples/README.md) — native commands followed by the Python example collection
 - [Rust measurement status](rust.md#verification-and-native-measurements) — diagnostic runner and the limits of the historical preview comparison
 
 ## Python 0.10 documentation
 
-The feature guides and studies below describe the Python implementation unless
+The feature guides and studies below are historical documentation for
+[source revision 12f1470](https://github.com/petehottelet/smythe/tree/12f14704beff344228fffffce40d995daa1f7cce). Run their commands from that revision.
+They describe the Python implementation unless
 explicitly labeled Rust. Provider guides use “native” to mean a provider's own
 API; that does not mean a Rust integration. These capabilities have not all
 been ported to the alpha.
@@ -38,7 +43,7 @@ been ported to the alpha.
 
 - [Architecture](architecture.md) — planning tiers, declarative routing rules and a single-worker tier, routing decision records, the contribution lint that records parallel workers given identical work, opt-in claim exchange that gives a worker its dependencies' claims in place of their full output, execution flow, and validated planner history with summed node timing
 - [Learning from runs](learning.md) — distilled templates, versioned template records with applicability, prerequisites, evidence and a review of labels that repeat the source goal and of text holding a path, graph structure digests, candidate records promoted from structure that repeated accepted runs share, with failure examples kept as digests, validation of records as untrusted candidates that cannot grant authority or weaken their parent's gates, an append-only content-addressed template catalog, building a template's graph without a planning call, activating and rolling back template versions through the policy registry, pinning an exact template version in durable runs, template applicability checks that stop offering a version when the tools, capabilities, skills, validators, models or MCP allowlists it was proven with change, a template's lifecycle from recorded runs through evaluation, review, activation and rollback, and what learning cannot change: acceptance, budgets, evaluator data or the tools agents are offered
-- [Template-lifecycle example](../examples/21_template_lifecycle.py) — offline and keyless: a template distilled from accepted runs and validated, a candidate rejected by a campaign with a held-out task family, promoted by a fooled evaluator, approved, activated and rolled back
+- [Template-lifecycle example](https://github.com/petehottelet/smythe/blob/12f14704beff344228fffffce40d995daa1f7cce/examples/21_template_lifecycle.py) — offline and keyless: a template distilled from accepted runs and validated, a candidate rejected by a campaign with a held-out task family, promoted by a fooled evaluator, approved, activated and rolled back
 - [Tasks and handoffs](tasks.md) — complete task snapshots across planning, inspected graphs, synthesis, memory, and resume, immutable context snapshots that keep sources as untrusted data in durable runs, and removing a source with a tombstone
 - [Execution policies](execution.md) — halt, retry, skip, timeouts, an opt-in retry policy with one retry owner, `Retry-After`, capped backoff, a shared deadline, attempts that resume cannot refill and kept exposure for calls sent without an answer, an opt-in drain of in-flight work after a failure, security stops that end a run at once and for good when developer code revokes its run control or a tool runtime raises `SecurityStop`, opt-in capacity limits per provider type and model with call spacing, `Retry-After` cooldowns, deferred admission and round-robin turns across branches, queued work, provider checks before any call, developer-declared model profiles that route nodes to approved providers and models and can fall back to another profile on a retry, and 5,000-node deep-graph checks
 - [YAML and jobs](jobs.md) — declarative artifact work and the installed CLI
@@ -50,16 +55,16 @@ been ported to the alpha.
 
 - [Durable text workflows](workflow-accounting.md) — phase-wide native costs, saved graph limits, exact request quotes, fenced ownership, local response replay, recorded read steps with network limits, strict delivery acceptance journaled with each run and explicit re-evaluation under a changed validator, published documents whose acceptance binds their bytes, and journal upgrades
 - [Artifact lineage](lineage.md) — keep an archive of accepted documents current as its sources, tools and validators change: the opt-in lineage policy for strict durable runs, with a declared access scope and the reuse switch, the versioned record of ids, versions and digests that each completed run writes, with its coverage, reuse decisions and their stable reason codes, read-only repair plans with archive heads, predicted work and derived statuses, in-place repair that decides a run again or publishes its damaged document again without running a node, applying a reviewed plan under an explicit allowance with successor runs that keep unaffected results, source restriction, which withdraws a source's text from every run that used it and can purge their published documents, cache and access rules, inspection, and what ordinary runs and Jobs support
-- [Archive-maintenance example](../examples/18_archive_maintenance.py) — offline and keyless: four lineage runs share bundled sources; a revised source, a damaged brief and a bumped validator are repaired from a reviewed plan, and the result is compared with a full recomputation
+- [Archive-maintenance example](https://github.com/petehottelet/smythe/blob/12f14704beff344228fffffce40d995daa1f7cce/examples/18_archive_maintenance.py) — offline and keyless: four lineage runs share bundled sources; a revised source, a damaged brief and a bumped validator are repaired from a reviewed plan, and the result is compared with a full recomputation
 - [Checkpoint format](checkpoint-format.md) — flushed atomic publication, saved state, and resume semantics
 - [Inspect saved runs](runs.md) — read-only `smythe runs inspect` and `list` over checkpoints and durable journals: execution, delivery acceptance and its decision history, the supervisor's revision log, the routing decision that chose the planning tier, a research run's context, reads, evidence and open issues, a lineage summary, external actions, cost, timing, next action, exit codes 10 and 11 for withheld output and 12 for an unresolved external action, a read-only `review` of what in a run or the newest runs needs a decision and the entry point or command for each, and the `revoke-action` fail-safe control
-- [Source-to-artifact example](../examples/16_source_to_artifact.py) — offline and keyless: plan, journaled reads of bundled sources, an interruption, resume, and inspection of the accepted document and its evidence
+- [Source-to-artifact example](https://github.com/petehottelet/smythe/blob/12f14704beff344228fffffce40d995daa1f7cce/examples/16_source_to_artifact.py) — offline and keyless: plan, journaled reads of bundled sources, an interruption, resume, and inspection of the accepted document and its evidence
 - [External actions](actions.md) — preview: deliver a strict durable run's accepted output to another service through your connector, under approvals your host verifies for one action and its exact intent, with one key across attempts, independent readback, reconciliation of lost answers within what the connector declares, revocation, compensation, operator decisions and where actions run
-- [Governed-publication example](../examples/19_governed_publication.py) — offline and keyless: an accepted announcement prepared, approved and published to an in-memory service, a lost answer reconciled without a second write, and inspection
+- [Governed-publication example](https://github.com/petehottelet/smythe/blob/12f14704beff344228fffffce40d995daa1f7cce/examples/19_governed_publication.py) — offline and keyless: an accepted announcement prepared, approved and published to an in-memory service, a lost answer reconciled without a second write, and inspection
 - [Cost guardrails](budgets.md) — strict usage validation, reservations, an opt-in allowance held for verification and synthesis, per-call ceilings, and failed-accounting recovery
 - [Jobs](jobs.md) — preflight, approval, detached workers and host limits, durable pause/resume, fenced ownership, artifact namespaces, delivery acceptance with registered validators and delivery eligibility, database upgrades, inspection, a read-only review of what in a run needs a decision and the command for each, rerolls, integrity repair of corrupted accepted outputs, adoption of published bytes for unknown outcomes, rechecks of accepted outputs under changed validators, a read-only repair preview, and exports
 - [Optimization](optimize.md) — bounded concurrency experiments, reference arms, sample-size and repeated-comparison guidance from the paired promotion bound, evidence ledgers, and campaign ownership, schema-v4 migration, read-only HTML comparison reports, a policy registry with append-only activation history, rollback and retirement, CLI commands to review, activate, roll back and retire, a read-only cross-campaign report of a target's decisions, activations and optimization cost, and bounded exploration with an out-of-process proposer
-- [Concurrent journal initialization checks](../tests/test_jobs_workflow_initialization.py) — WAL contention and atomic schema fixes, with regression evidence
+- [Concurrent journal initialization checks](https://github.com/petehottelet/smythe/blob/12f14704beff344228fffffce40d995daa1f7cce/tests/test_jobs_workflow_initialization.py) — WAL contention and atomic schema fixes, with regression evidence
 
 ## Connect models and tools
 

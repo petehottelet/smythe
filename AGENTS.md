@@ -23,11 +23,11 @@ behavior belongs in the linked guide for that subsystem.
 - Keep diagnostic and superseded campaigns available with their evidence status
   labeled, either in the tree or byte for byte in a SHA-256-pinned evidence
   archive that `benchmarks/archive/` points to. Build archives with
-  `tools/evidence_archive.py`. Do not promote them as current results.
+  the archived evidence tooling at revision `12f1470`. Do not promote them as current results.
 - Prefer exact, positive claims such as “19% lower measured cost” over broad
   superlatives. Preserve scope in the linked protocol.
-- Render landing-page charts from committed records with
-  `python benchmarks/render_readme_charts.py`.
+- Retain existing landing-page charts as historical evidence. Their Python
+  rendering tools remain at revision `12f1470`.
 
 ## Documentation consistency
 
@@ -62,18 +62,18 @@ behavior belongs in the linked guide for that subsystem.
   local user paths.
 - Provider error messages embed some of these. Redact them with
   `redact_account_identifiers` from `benchmarks/artifact_records.py` before
-  writing any benchmark record, and review every staged diff for them before
+  writing historical Python benchmark records at revision `12f1470`, and review every staged diff before
   committing.
-- `tests/test_committed_identifiers.py` fails when a tracked file contains an
-  identifier or key in a known provider format. Extend its patterns when a
-  provider introduces a new format.
+- Review native records and staged files for private identifiers before publication.
 
 ## Code quality
 
 - Read a file in full before making a wide-ranging edit to it.
 - Add regression tests for every fixed defect and run each modified test file.
-- Run `ruff check .` and the full offline test suite before handing off a code
-  change. Paid provider calls never belong in tests.
+- Run `cargo fmt --all -- --check`, `cargo clippy --workspace --all-targets
+  --locked --offline -- -D warnings`, the full `cargo test --workspace --locked
+  --offline` suite, and the documented release gates before handing off code.
+  Ruff is not applicable to the Rust-only active tree. Paid calls never belong in tests.
 - Keep public behavior in code, tests, documentation, and examples aligned.
 
 ## Git safety

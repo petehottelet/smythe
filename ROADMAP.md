@@ -9,9 +9,8 @@ performance claim links to its protocol and committed result record;
 superseded campaigns remain available as diagnostic history.
 
 Status: the Rust workspace is `0.2.0`, an experimental source preview.
-The Python 0.10 line remains available during the transition. Rust interfaces
-are experimental; the Python pre-1.0 versioning policy is in
-[CHANGELOG.md](CHANGELOG.md).
+The active repository is Rust-only; the Python line remains in Git history.
+Rust interfaces are experimental. The stable Rust release will be 1.0.0.
 
 ## Rust alpha (0.2.0)
 
@@ -22,14 +21,19 @@ The [54-trial compiler comparison](benchmarks/rust_noumenon_results.md) remains
 diagnostic evidence for the original preview. Native campaigns now require clean,
 committed sources. Native development focuses on measurements and testability,
 followed by remote accounting, providers, tools, planning, supervision and Jobs.
-Schema-2 journals now record effect classes and event metadata, with injected
-clock and storage boundaries, grouped local commits, semantic resume bindings,
-and concurrent crash-recovery tests. Full simulated network/process runtimes
-and validation tasks inside the shared journal remain future work.
+Schema-3 journals add named phases and graph revisions, separate operator intent
+from admission and terminal disposition, and persist limits and budget changes.
+Small outputs commit inline with receipts; large files use immutable hash paths.
+The pure coordinator has 5,000-seed simulation coverage, and both compilation
+and validation use the shared journal. CLI inspection includes cursor paging,
+owner health, output references and stable typed error codes. Release gates cover
+2,000/8,000-node scaling, a 5,000-node chain and inline disk overhead.
 The [README](README.md) now leads with native build and execution commands.
-The shipped milestones and feature details below describe the Python line;
-they are not a Rust parity checklist. Its [quickstart](docs/python-quickstart.md)
-and examples remain available during native development.
+The milestones and feature details below are historical Python development
+reference, not shipped Rust capabilities. Their source, tests and examples are
+available in [the archived source revision](https://github.com/petehottelet/smythe/tree/12f14704beff344228fffffce40d995daa1f7cce).
+Native planning, remote accounting, provider/tool integrations, supervision and
+Jobs remain ahead. Prompt optimization waits for the first native Architect.
 
 ## Shipped (v0.2 line)
 
@@ -230,7 +234,7 @@ ownership automatically. Read the migration guide before upgrading a ledger.
 - **Concurrent journal initialization** — bounded WAL retries and atomic
   schema creation prevent competing openers from seeing partial stores.
   Existing evidence and identities remain intact.
-  [Concurrent initialization regression checks](tests/test_jobs_workflow_initialization.py).
+  [Concurrent initialization regression checks](https://github.com/petehottelet/smythe/blob/12f14704beff344228fffffce40d995daa1f7cce/tests/test_jobs_workflow_initialization.py).
 
 ## Shipped (v0.8.1): security and correctness fixes
 
@@ -371,7 +375,7 @@ data or the tools agents are offered
   MCP allowlists it was proven with [change](docs/learning.md#applicability);
   a menu built without one offers it as before. Records name no sources, so
   a source change is not part of applicability. The offline
-  [template-lifecycle example](examples/21_template_lifecycle.py) records a
+  [template-lifecycle example](https://github.com/petehottelet/smythe/blob/12f14704beff344228fffffce40d995daa1f7cce/examples/21_template_lifecycle.py) records a
   template, rejects a harmful candidate on held-out tasks, and rolls back the
   same candidate after a fooled evaluator promotes it.
 - **Native Agent Skills support** —
@@ -473,7 +477,7 @@ connector or paid run.
    [source and claim records](docs/source-evidence.md) travel with an
    artifact, and a final validator rejects quotes that are not in their
    sources and listed contradictions that do not reach the artifact. The
-   offline [source-to-artifact example](examples/16_source_to_artifact.py)
+   offline [source-to-artifact example](https://github.com/petehottelet/smythe/blob/12f14704beff344228fffffce40d995daa1f7cce/examples/16_source_to_artifact.py)
    plans, reads, is interrupted, resumes and delivers an accepted document;
    [run inspection](docs/runs.md#research-runs) shows its sources, reads,
    evidence and open questions without their text, and a
@@ -495,7 +499,7 @@ connector or paid run.
    settles its result. A write whose answer is lost is reconciled from
    lookups or a deduplicated retry where the connector declares them, or left
    for an operator's verified decision. The offline
-   [governed-publication example](examples/19_governed_publication.py) runs
+   [governed-publication example](https://github.com/petehottelet/smythe/blob/12f14704beff344228fffffce40d995daa1f7cce/examples/19_governed_publication.py) runs
    the path end to end. Approval gates inside a run's graph are not covered
 3. **Evidence-triggered control** — replace routine model supervision calls
    with deterministic stage and anomaly triggers; reserve LLM review for a
@@ -547,7 +551,7 @@ connector or paid run.
    deleting their published documents. Jobs repair a damaged accepted
    output, recheck accepted outputs under changed validators and preview
    repairs, each within one run. The offline
-   [archive-maintenance example](examples/18_archive_maintenance.py) repairs
+   [archive-maintenance example](https://github.com/petehottelet/smythe/blob/12f14704beff344228fffffce40d995daa1f7cce/examples/18_archive_maintenance.py) repairs
    an archive and compares it with a full recomputation. Reuse across Jobs
    runs and automatic repair are not covered
 6. **Integrate asset policy with Jobs v1** — manifest-native production brand

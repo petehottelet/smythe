@@ -101,7 +101,7 @@ These are authored design targets, not additional measurements of the source:
 
 ## The complete v2 catalog
 
-The [authoring module](../benchmarks/noumenon/glyph_design_v2.py) constructs all 192
+The [authoring module](https://github.com/petehottelet/smythe/blob/12f14704beff344228fffffce40d995daa1f7cce/benchmarks/noumenon/glyph_design_v2.py) constructs all 192
 outlines from [authored contour data](../benchmarks/noumenon/glyph_contours_v2.json).
 It reuses the restricted SVG serializer and rasterizer, not v1 geometry.
 All exposed terminals follow the cut-end policy. No circular punches,

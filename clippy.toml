@@ -1,4 +1,5 @@
 disallowed-methods = [
+    { path = "std::sync::mpsc::Receiver::recv_timeout", reason = "Wait through ControlWatch" },
     { path = "std::time::Instant::now", reason = "Use the injected clock" },
     { path = "std::time::SystemTime::now", reason = "Use the injected clock" },
     { path = "uuid::Uuid::now_v7", reason = "Use the injected identity source" },

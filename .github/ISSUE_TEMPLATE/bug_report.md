@@ -15,7 +15,7 @@ A clear, one-paragraph description of the bug.
 Minimal code that reproduces the issue. A failing test against the smythe
 test suite is ideal.
 
-```python
+```rust
 # Smallest possible repro
 ```
 
@@ -34,10 +34,10 @@ What actually happened. Include the full traceback if there is one.
 ## Environment
 
 - smythe version (or commit SHA if installed from source):
-- Python version (`python --version`):
+- Rust version (`rustc --version`):
 - OS:
-- Provider extras installed (anthropic / openai / gemini / openclaw / none):
-- Model name (e.g. `claude-opus-5-5`, `gpt-4o`, `gemini-3-pro`):
+- Provider implementation (OfflineProvider, Noumenon or custom pure provider):
+- Journal schema and fresh/resumed execution:
 
 ## Additional context
 

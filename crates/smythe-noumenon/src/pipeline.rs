@@ -5,25 +5,25 @@ use anyhow::{Context, Result, ensure};
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
-use smythe::{CompletionResult, ExecutionGraph, Node, Provider, Swarm, Task, Topology};
+use smythe::{
+    CompletionResult, Dependency, EngineError, ExecutionGraph, Node, Provider, Swarm, Task,
+    Topology,
+};
 use std::fs::{self, OpenOptions};
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Instant;
 
-pub const PROTOCOL: &str = "noumenon-rust-journal-v2";
-/// Bump when compilation/output semantics change, independently of source provenance.
+pub const PROTOCOL: &str = "noumenon-rust-journal-v3";
 pub const COMPILER_VERSION: &str = "noumenon-contours-v1";
 static TEMP_ID: AtomicU64 = AtomicU64::new(0);
-
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, clap::ValueEnum)]
 #[serde(rename_all = "snake_case")]
 pub enum Mode {
     Compile,
     Full,
 }
-
 pub struct Options {
     pub glyphs: usize,
     pub workers: usize,
@@ -31,7 +31,6 @@ pub struct Options {
     pub resume: bool,
     pub mode: Mode,
 }
-
 #[derive(Serialize, Deserialize, PartialEq)]
 #[serde(deny_unknown_fields)]
 struct Binding {
@@ -43,7 +42,6 @@ struct Binding {
     raster_version: String,
     gate_version: String,
 }
-
 impl Binding {
     fn for_options(options: &Options) -> Self {
         Self {
@@ -57,31 +55,17 @@ impl Binding {
         }
     }
 }
-
-#[derive(Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Receipt {
     glyph: Glyph,
     measurements: Vec<Measurement>,
 }
-
-#[derive(Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-struct Batch {
-    indices: Vec<usize>,
-    receipts: Vec<Receipt>,
-}
-const CHECKPOINT_BATCH: usize = 16;
-
-/// Publish immutable bytes by hard link after fsync. Existing bytes must match;
-/// this also recovers a crash between artifact publication and receipt writing.
+/// Immutable publication for process-crash recovery. OS/power-loss durability
+/// is not claimed; the journal is the receipt authority for both engine phases.
 fn publish(path: &Path, bytes: &[u8]) -> Result<()> {
-    publish_bytes(path, bytes, true)
-}
-
-fn publish_bytes(path: &Path, bytes: &[u8], durable: bool) -> Result<()> {
     if path.exists() {
-        ensure!(fs::read(path)? == bytes, "existing artifact differs");
+        ensure!(fs::read(path)? == bytes, EngineError::Integrity);
         return Ok(());
     }
     let tmp = path.with_extension(format!(
@@ -92,9 +76,6 @@ fn publish_bytes(path: &Path, bytes: &[u8], durable: bool) -> Result<()> {
     let result = (|| {
         let mut file = OpenOptions::new().write(true).create_new(true).open(&tmp)?;
         file.write_all(bytes)?;
-        if durable {
-            file.sync_all()?;
-        }
         drop(file);
         fs::hard_link(&tmp, path).context("artifact publication requires hard-link support")?;
         Ok(())
@@ -104,13 +85,11 @@ fn publish_bytes(path: &Path, bytes: &[u8], durable: bool) -> Result<()> {
     }
     result
 }
-
 fn json_bytes(value: &impl Serialize) -> Result<Vec<u8>> {
     let mut bytes = serde_json::to_vec_pretty(value)?;
     bytes.push(b'\n');
     Ok(bytes)
 }
-
 struct ContourProvider<'a> {
     recipes: &'a [Recipe],
 }
@@ -125,19 +104,70 @@ impl Provider for ContourProvider<'_> {
     fn cost_bound_nanousd(&self, _: &Task) -> Result<u64> {
         Ok(0)
     }
-    fn complete(&self, task: &Task, _: &[&Glyph]) -> Result<CompletionResult<Glyph>> {
+    fn complete(
+        &self,
+        task: &Task,
+        _: &[Dependency<'_, Glyph>],
+    ) -> Result<CompletionResult<Glyph>> {
         let i = task
             .input
             .as_u64()
             .context("glyph task requires an integer index")? as usize;
-        let recipe = self.recipes.get(i).context("glyph index outside catalog")?;
         Ok(CompletionResult {
-            output: geometry::compile(i, recipe)?,
+            output: geometry::compile(
+                i,
+                self.recipes.get(i).context("glyph index outside catalog")?,
+            )?,
             cost_nanousd: 0,
         })
     }
 }
-
+struct ValidationProvider<'a> {
+    glyphs: &'a [Glyph],
+}
+impl Provider for ValidationProvider<'_> {
+    type Output = Receipt;
+    fn effect(&self) -> smythe::Effect {
+        smythe::Effect::Pure
+    }
+    fn binding(&self) -> String {
+        format!(
+            "{}:{}:{}",
+            validation::RASTER_VERSION,
+            validation::GATE_VERSION,
+            sha(self
+                .glyphs
+                .iter()
+                .flat_map(|g| g.svg_sha256.bytes())
+                .collect::<Vec<_>>()
+                .as_slice())
+        )
+    }
+    fn cost_bound_nanousd(&self, _: &Task) -> Result<u64> {
+        Ok(0)
+    }
+    fn complete(
+        &self,
+        task: &Task,
+        _: &[Dependency<'_, Receipt>],
+    ) -> Result<CompletionResult<Receipt>> {
+        let i = task
+            .input
+            .as_u64()
+            .context("validation requires a glyph index")? as usize;
+        let glyph = self
+            .glyphs
+            .get(i)
+            .context("validation index outside catalog")?;
+        Ok(CompletionResult {
+            output: Receipt {
+                glyph: glyph.clone(),
+                measurements: Verifier.validate(glyph)?.0,
+            },
+            cost_nanousd: 0,
+        })
+    }
+}
 fn graph(indices: &[usize]) -> ExecutionGraph {
     ExecutionGraph {
         topology: vec![Topology::BroadcastReduce],
@@ -150,29 +180,44 @@ fn graph(indices: &[usize]) -> ExecutionGraph {
                     input: i.into(),
                 },
                 depends_on: vec![],
+                phase: Some("compile".into()),
             })
             .collect(),
     }
 }
-
+fn validation_graph(count: usize) -> ExecutionGraph {
+    let mut result = graph(&(0..count).collect::<Vec<_>>());
+    for (i, n) in result.nodes.iter_mut().enumerate() {
+        n.id = format!("validate-{i:03}");
+        n.phase = Some("validation".into());
+        n.task.goal = format!("Validate Noumenon glyph {i}");
+    }
+    result
+}
 pub fn run(options: &Options) -> Result<Value> {
     ensure!(
         (1..=256).contains(&options.glyphs),
-        "glyph count must be 1 through 256"
+        EngineError::InvalidCommand
     );
     ensure!(
         (1..=64).contains(&options.workers),
-        "workers must be 1 through 64"
+        EngineError::InvalidCommand
     );
     let all = geometry::recipes()?;
     let binding = Binding::for_options(options);
     let started = Instant::now();
     let out = &options.out;
     if options.resume {
-        ensure!(out.is_dir(), "resume directory does not exist");
+        ensure!(out.is_dir(), EngineError::RunMissing);
     } else {
         fs::create_dir_all(out.parent().unwrap_or(Path::new(".")))?;
-        fs::create_dir(out).context("output directory already exists or cannot be created")?;
+        fs::create_dir(out).map_err(|e| {
+            if e.kind() == std::io::ErrorKind::AlreadyExists {
+                anyhow::Error::new(EngineError::RunExists)
+            } else {
+                e.into()
+            }
+        })?;
     }
     let lock = OpenOptions::new()
         .read(true)
@@ -181,107 +226,110 @@ pub fn run(options: &Options) -> Result<Value> {
         .truncate(false)
         .open(out.join(".lock"))?;
     lock.try_lock().context("another process owns this run")?;
-    let binding_path = out.join("run.json");
     if options.resume {
-        let saved: Binding = serde_json::from_slice(&fs::read(&binding_path)?)?;
-        ensure!(saved == binding, "resume recipe differs from the saved run");
+        let saved: Binding = serde_json::from_slice(
+            &fs::read(out.join("run.json")).context(EngineError::Integrity)?,
+        )
+        .context(EngineError::Integrity)?;
+        ensure!(
+            saved == binding,
+            anyhow::Error::new(EngineError::InvalidCommand)
+                .context("resume recipe differs from the saved run")
+        );
+        ensure!(
+            out.join(".smythe/journal.sqlite3").exists()
+                || (!out.join("catalog.json").exists() && !out.join("GLYPH-000.svg").exists()),
+            "published outputs require their compilation journal"
+        );
     } else {
-        publish(&binding_path, &json_bytes(&binding)?)?;
+        publish(&out.join("run.json"), &json_bytes(&binding)?)?;
     }
-    fs::create_dir_all(out.join("receipts"))?;
-    let mut records: Vec<Option<Receipt>> = (0..options.glyphs).map(|_| None).collect();
-    for first in 0..options.glyphs {
-        let path = out.join("receipts").join(format!("batch-{first:03}.json"));
-        if options.resume && path.is_file() {
-            let batch: Batch = serde_json::from_slice(&fs::read(path)?)?;
-            ensure!(
-                batch.indices.first() == Some(&first)
-                    && batch.indices.len() <= CHECKPOINT_BATCH
-                    && batch.indices.len() == batch.receipts.len(),
-                "invalid checkpoint batch"
-            );
-            for (i, r) in batch.indices.into_iter().zip(batch.receipts) {
-                ensure!(
-                    i < options.glyphs && records[i].is_none(),
-                    "duplicate or out-of-range receipt"
-                );
-                ensure!(
-                    r.glyph.glyph_id == format!("GLYPH-{i:03}"),
-                    "receipt identity differs"
-                );
-                ensure!(
-                    r.glyph.svg_sha256 == sha(r.glyph.svg.as_bytes()),
-                    "receipt checksum differs"
-                );
-                // Paths and SVG must describe the same trusted authored recipe.
-                let expected = geometry::compile(i, &all[i])?;
-                ensure!(
-                    expected == r.glyph,
-                    "receipt differs from authored contours"
-                );
-                if options.mode == Mode::Full {
-                    let (measurements, _) = Verifier.validate(&r.glyph)?;
-                    ensure!(
-                        measurements == r.measurements,
-                        "saved raster receipt differs"
-                    );
-                } else {
-                    ensure!(r.measurements.is_empty(), "unexpected raster receipt");
-                }
-                // The durable batch owns the bytes. A missing derived SVG can be
-                // restored after a crash; an existing, changed SVG is never replaced.
-                publish_bytes(
-                    &out.join(format!("GLYPH-{i:03}.svg")),
-                    r.glyph.svg.as_bytes(),
-                    false,
-                )?;
-                records[i] = Some(r);
-            }
-        }
-    }
-    let pending: Vec<_> = records
-        .iter()
-        .enumerate()
-        .filter_map(|(i, r)| r.is_none().then_some(i))
-        .collect();
-    let reused = options.glyphs - pending.len();
+    let journal = smythe::store::Store::open(out.join(".smythe"))?;
+    let pool = rayon::ThreadPoolBuilder::new()
+        .num_threads(options.workers)
+        .build()?;
     let compilation_started = Instant::now();
     let swarm = Swarm::new(options.workers, 0)?;
-    let journal = smythe::store::Store::open(out.join(".smythe"))?;
-    let complete_graph = graph(&(0..options.glyphs).collect::<Vec<_>>());
     let engine_resume = !journal.history("noumenon-compile")?.is_empty();
-    ensure!(
-        engine_resume || pending.len() == options.glyphs,
-        "published receipts require their compilation journal"
-    );
-    let mut execution = swarm.execute_in(
-        &complete_graph,
+    let execution = swarm.execute_in(
+        &graph(&(0..options.glyphs).collect::<Vec<_>>()),
         &ContourProvider { recipes: &all },
         &journal,
         "noumenon-compile",
         engine_resume,
     )?;
-    // Accepted compilation blobs may exist before any validation batch is published.
-    // Check them too, before exporting or accepting saved validation evidence.
-    for (i, glyph) in execution.outputs.iter().enumerate() {
-        ensure!(
-            *glyph == geometry::compile(i, &all[i])?,
-            "compilation output differs from authored contours"
-        );
-        if let Some(receipt) = &records[i] {
-            ensure!(
-                receipt.glyph == *glyph,
-                "compilation and validation evidence disagree"
-            );
-        }
-    }
+    let compiled = execution.load_all::<Glyph>()?;
+    pool.install(|| {
+        compiled
+            .par_iter()
+            .enumerate()
+            .try_for_each(|(i, glyph)| -> Result<()> {
+                ensure!(
+                    *glyph == geometry::compile(i, &all[i])?,
+                    "compilation output differs from authored contours"
+                );
+                Ok(())
+            })
+    })?;
+    let reused = execution.reused_nodes;
+    let compilation_wall_s = compilation_started.elapsed().as_secs_f64();
+    let validation_started = Instant::now();
+    let mut validation_calls = 0;
+    let mut reused_validation = 0;
+    let records: Vec<Receipt> = if options.mode == Mode::Full {
+        let validation_resume = !journal.history("noumenon-validate")?.is_empty();
+        let validation = swarm.execute_in(
+            &validation_graph(options.glyphs),
+            &ValidationProvider { glyphs: &compiled },
+            &journal,
+            "noumenon-validate",
+            validation_resume,
+        )?;
+        validation_calls = validation.trace.spans.len();
+        reused_validation = validation.reused_nodes;
+        let receipts = validation.load_all::<Receipt>()?;
+        pool.install(|| {
+            receipts
+                .par_iter()
+                .zip(&compiled)
+                .try_for_each(|(r, g)| -> Result<()> {
+                    ensure!(
+                        r.glyph == *g,
+                        "compilation and validation evidence disagree"
+                    );
+                    if validation_resume {
+                        ensure!(
+                            Verifier.validate(g)?.0 == r.measurements,
+                            "saved raster receipt differs"
+                        );
+                    }
+                    Ok(())
+                })
+        })?;
+        receipts
+    } else {
+        compiled
+            .into_iter()
+            .map(|glyph| Receipt {
+                glyph,
+                measurements: vec![],
+            })
+            .collect()
+    };
+    // Derived exports can be recreated from the engine's accepted immutable outputs.
+    pool.install(|| {
+        records.par_iter().try_for_each(|r| {
+            publish(
+                &out.join(format!("{}.svg", r.glyph.glyph_id)),
+                r.glyph.svg.as_bytes(),
+            )
+        })
+    })?;
     if options.resume && out.join("report.json").exists() {
-        ensure!(pending.is_empty(), "completed run has missing receipts");
         let saved: Value = serde_json::from_slice(&fs::read(out.join("report.json"))?)?;
         let artifacts = saved["artifacts"]
             .as_object()
             .context("missing artifact receipts")?;
-        // Only the fixed output names are read; a journal cannot redirect I/O.
         let names: &[&str] = if options.mode == Mode::Full {
             &["catalog.json", "validation.json", "atlas.png"]
         } else {
@@ -298,72 +346,9 @@ pub fn run(options: &Options) -> Result<Value> {
             );
         }
         return Ok(
-            json!({"status":"passed","replayed":true,"provider_calls":0,"reused_glyphs":options.glyphs,"saved_report":saved}),
+            json!({"status":"passed","replayed":true,"provider_calls":execution.trace.spans.len(),"validation_provider_calls":validation_calls,"reused_glyphs":reused,"reused_validation":reused_validation,"saved_report":saved}),
         );
     }
-    execution.outputs = execution
-        .outputs
-        .into_iter()
-        .enumerate()
-        .filter_map(|(i, g)| pending.binary_search(&i).is_ok().then_some(g))
-        .collect();
-    let compilation_wall_s = compilation_started.elapsed().as_secs_f64();
-    drop(swarm);
-    let validation_started = Instant::now();
-    let pool = rayon::ThreadPoolBuilder::new()
-        .num_threads(options.workers)
-        .build()?;
-    let fresh: Vec<Batch> = pool.install(|| {
-        execution
-            .outputs
-            .par_chunks(CHECKPOINT_BATCH)
-            .enumerate()
-            .map(|(batch_index, glyphs)| {
-                let receipts = glyphs
-                    .iter()
-                    .map(|glyph| {
-                        let measurements = if options.mode == Mode::Full {
-                            Verifier.validate(glyph)?.0
-                        } else {
-                            vec![]
-                        };
-                        let record = Receipt {
-                            glyph: glyph.clone(),
-                            measurements,
-                        };
-                        Ok(record)
-                    })
-                    .collect::<Result<Vec<_>>>()?;
-                let batch = Batch {
-                    indices: pending[batch_index * CHECKPOINT_BATCH
-                        ..(batch_index * CHECKPOINT_BATCH + receipts.len())]
-                        .to_vec(),
-                    receipts,
-                };
-                // One fsync commits a self-contained batch, including every SVG.
-                // Derived files need no independent fsync and are reconstructible.
-                publish(
-                    &out.join("receipts")
-                        .join(format!("batch-{:03}.json", batch.indices[0])),
-                    &json_bytes(&batch)?,
-                )?;
-                for record in &batch.receipts {
-                    publish_bytes(
-                        &out.join(format!("{}.svg", record.glyph.glyph_id)),
-                        record.glyph.svg.as_bytes(),
-                        false,
-                    )?;
-                }
-                Ok(batch)
-            })
-            .collect::<Result<_>>()
-    })?;
-    for batch in fresh {
-        for (i, record) in batch.indices.into_iter().zip(batch.receipts) {
-            records[i] = Some(record);
-        }
-    }
-    let records: Vec<Receipt> = records.into_iter().map(Option::unwrap).collect();
     let pixels = if options.mode == Mode::Full {
         pool.install(|| {
             records
@@ -434,7 +419,7 @@ pub fn run(options: &Options) -> Result<Value> {
         "validation_and_receipts_wall_s":validation_wall_s,"export_wall_s":export_wall_s,
         "end_to_end_wall_s":started.elapsed().as_secs_f64(),"artifacts":artifacts,
         "source_sha256":binding.source_sha256,"compiler_version":binding.compiler_version,"raster_version":binding.raster_version,"gate_version":binding.gate_version,
-        "compared_pairs":distinctness.map(|d|d.compared_pairs),"claimable":false,"checkpoint_batch_size":CHECKPOINT_BATCH,
+        "compared_pairs":distinctness.map(|d|d.compared_pairs),"claimable":false,"journal_schema":3, "validation_provider_calls":validation_calls, "reused_validation":reused_validation,
         "distinctness_wall_s":distinctness_wall_s,
         "implementation_sources":geometry::implementation_sources(),"optimized":!cfg!(debug_assertions)});
     publish(&out.join("report.json"), &json_bytes(&report)?)?;
@@ -473,7 +458,11 @@ mod tests {
             fn cost_bound_nanousd(&self, _: &Task) -> Result<u64> {
                 Ok(0)
             }
-            fn complete(&self, task: &Task, deps: &[&Glyph]) -> Result<CompletionResult<Glyph>> {
+            fn complete(
+                &self,
+                task: &Task,
+                deps: &[smythe::Dependency<'_, Glyph>],
+            ) -> Result<CompletionResult<Glyph>> {
                 let mut result = self.inner.complete(task, deps)?;
                 if self.changed {
                     result.output.recipe = "old-compiler-result".into();
@@ -593,7 +582,10 @@ mod tests {
         assert_eq!(r["compared_pairs"], 6);
         assert!(run(&o).is_err());
         o.resume = true;
-        assert_eq!(run(&o).unwrap()["provider_calls"], 0);
+        let replay = run(&o).unwrap();
+        assert_eq!(replay["provider_calls"], 0);
+        assert_eq!(replay["validation_provider_calls"], 0);
+        assert_eq!(replay["reused_validation"], 4);
         fs::write(o.out.join("GLYPH-000.svg"), "broken").unwrap();
         assert!(run(&o).is_err());
         fs::remove_dir_all(o.out).unwrap();
@@ -627,10 +619,19 @@ mod tests {
         lock.try_lock().unwrap();
         assert!(run(&o).is_err());
         drop(lock);
-        let path = o.out.join("receipts/batch-000.json");
-        let mut batch: Batch = serde_json::from_slice(&fs::read(&path).unwrap()).unwrap();
-        batch.receipts[0].glyph.recipe = "changed".into();
-        fs::write(path, json_bytes(&batch).unwrap()).unwrap();
+        assert!(!o.out.join("receipts").exists());
+        let store = smythe::store::Store::open_read_only(o.out.join(".smythe")).unwrap();
+        let state = store.inspect("noumenon-validate").unwrap();
+        assert!(state.completed());
+        let reference = state.attempts["validate-000"].output.as_ref().unwrap();
+        let conn = rusqlite::Connection::open(o.out.join(".smythe/journal.sqlite3")).unwrap();
+        conn.execute(
+            "UPDATE blobs SET bytes=? WHERE digest=?",
+            rusqlite::params![b"corrupt".as_slice(), reference.sha256],
+        )
+        .unwrap();
+        drop(conn);
+        drop(store);
         assert!(run(&o).is_err());
         fs::remove_dir_all(o.out).unwrap();
     }
@@ -640,16 +641,24 @@ mod tests {
         o.mode = Mode::Compile;
         run(&o).unwrap();
         o.resume = true;
-        let blob = fs::read_dir(o.out.join(".smythe/blobs"))
-            .unwrap()
-            .next()
-            .unwrap()
-            .unwrap()
-            .path();
-        let original = fs::read(&blob).unwrap();
-        fs::write(&blob, b"corrupt").unwrap();
-        assert!(run(&o).unwrap_err().to_string().contains("blob checksum"));
-        fs::write(&blob, original).unwrap();
+        let conn = rusqlite::Connection::open(o.out.join(".smythe/journal.sqlite3")).unwrap();
+        let (hash, original): (String, Vec<u8>) = conn
+            .query_row("SELECT digest,bytes FROM blobs LIMIT 1", [], |r| {
+                Ok((r.get(0)?, r.get(1)?))
+            })
+            .unwrap();
+        conn.execute(
+            "UPDATE blobs SET bytes=? WHERE digest=?",
+            rusqlite::params![b"corrupt".as_slice(), hash],
+        )
+        .unwrap();
+        assert!(run(&o).is_err());
+        conn.execute(
+            "UPDATE blobs SET bytes=? WHERE digest=?",
+            rusqlite::params![original, hash],
+        )
+        .unwrap();
+        drop(conn);
         assert_eq!(run(&o).unwrap()["provider_calls"], 0);
         fs::remove_file(o.out.join(".smythe/journal.sqlite3")).unwrap();
         assert!(

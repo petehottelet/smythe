@@ -3,7 +3,7 @@
   <p><em>An open-source framework for task-based agent swarms with dynamic parallelization, routing, and execution topology.</em></p>
   <p>
     <a href="docs/rust.md"><img src="assets/badges/alpha.svg" alt="Rust preview 0.2.0"></a>
-    <a href="https://github.com/petehottelet/smythe/actions/workflows/rust.yml?query=branch%3Afeature%2Frust-noumenon+event%3Apush"><img src="https://github.com/petehottelet/smythe/actions/workflows/rust.yml/badge.svg?branch=feature%2Frust-noumenon&amp;event=push" alt="Rust development CI status"></a>
+    <a href="https://github.com/petehottelet/smythe/actions/workflows/rust.yml?query=branch%3Amain+event%3Apush"><img src="https://github.com/petehottelet/smythe/actions/workflows/rust.yml/badge.svg?branch=main&amp;event=push" alt="Rust CI status"></a>
     <img src="assets/badges/rust.svg" alt="Rust 1.91 or later">
     <a href="LICENSE"><img src="assets/badges/license.svg" alt="License: MIT"></a>
   </p>
@@ -21,9 +21,9 @@ inspect the journal of outputs and costs. The native engine combines bounded
 concurrency, exact cost reservations, and recovery after a process interruption.
 
 The **Rust 0.2.0 preview** runs local workflows and the Noumenon glyph
-pipeline without Python or API keys. Model-driven planning, paid providers,
-tools, and MCP are still part of the existing Python implementation; their Rust
-ports are ahead. [Current scope](docs/rust.md).
+pipeline without Python or API keys. The active repository is Rust-only.
+Model-driven planning, paid providers, tools, MCP, supervision and Jobs remain
+future native capabilities. [Current scope](docs/rust.md).
 
 <p align="center">
   <img src="assets/noumenon/noumenon-loop.gif" alt="Animated Noumenon rain showing the 192 authored Smythe glyphs" width="900">
@@ -55,8 +55,7 @@ cargo fetch --locked
 cargo build --release --locked --offline -p smythe-cli
 ```
 
-Once dependencies are fetched, the examples run offline. Using `cargo run`
-selects the Rust executable even if the Python CLI is also on your PATH.
+Once dependencies are fetched, the examples run offline.
 
 ### Run, inspect, and resume a graph
 
@@ -68,17 +67,20 @@ execution and recovery without a model call.
 ```bash
 cargo run --release --locked --offline --bin smythe -- run --graph examples/native_graph.toml --id example --store smythe_artifacts/native-runs
 cargo run --release --locked --offline --bin smythe -- inspect example --store smythe_artifacts/native-runs --events
+cargo run --release --locked --offline --bin smythe -- output example research --store smythe_artifacts/native-runs
 cargo run --release --locked --offline --bin smythe -- run --graph examples/native_graph.toml --id example --store smythe_artifacts/native-runs --resume
 ```
 
 The first command executes both nodes and saves their results. `inspect` returns
 the saved state and events as JSON. Resuming the completed run returns the same
-outputs with `reused_nodes: 2`, `provider_calls: 0`, and `cost_nanousd: "0"`.
+output references with `reused_nodes: 2`, `provider_calls: 0`, and `cost_nanousd: "0"`.
+Use `output` to load one verified value, or `run --outputs inline` to load all.
 Use a new ID for another fresh run, or `--resume` to reopen the existing one.
 
 Graphs can be TOML or JSON. Set `--workers` to bound parallel work and
 `--budget-nanousd` to set the cost ceiling; their defaults are four workers and
-zero. The bundled provider charges nothing.
+zero on a fresh run. Resume uses the saved ceiling; change it explicitly with
+`control <id> budget <nanousd>`. The bundled provider charges nothing.
 
 ### Generate the Noumenon catalog
 
@@ -116,7 +118,7 @@ interrupted local work without a saved result may run again.
 | Bound parallel work | Readiness-driven execution through a bounded Rayon worker pool |
 | Account for cost | Checked integer nanoUSD, reservations before dispatch, and idempotent settlement; current providers are local and zero-cost |
 | Recover interrupted work | SQLite journals, immutable output blobs, and integrity checks before reuse |
-| Inspect or control a run | JSON results, saved events, and persisted pause, continue, and stop commands |
+| Inspect or control a run | Typed JSON errors, cursor paging, owner health, and persisted pause, continue, stop, retry and budget commands |
 | Produce the glyph catalog | Authored SVG compilation, raster validation, distinctness checks, and resumable exports |
 | Embed the engine | The `smythe` crate's `Swarm`, local `Provider` contract, store, and tracing types |
 
@@ -124,7 +126,7 @@ Pause and stop prevent new admissions while active local calls drain. Recovery
 guarantees cover local process crashes. Remote effects, distributed workers,
 and power-loss guarantees are outside this alpha's scope.
 
-The current native journal uses schema 2; older alpha runs require a new
+The current native journal uses schema 3; older alpha runs require a new
 directory. Resume checks semantic compatibility and saved outputs, so unrelated
 source edits do not invalidate a run. See the [recovery contract](docs/rust.md#journal-and-recovery).
 
@@ -260,10 +262,10 @@ Native development focuses on measurement and testability, followed by
 remote accounting, provider integrations, tools, planning, supervision, and
 Jobs. See the [roadmap](ROADMAP.md#rust-alpha-020).
 
-The **Python 0.10 line** remains in the repository during the transition. Its
-[quickstart](docs/python-quickstart.md), [examples](examples/README.md#python-examples),
-and [release guide](docs/release-0.10.0.md) describe capabilities that have not
-all been ported. Rust runs do not require a Python installation.
+The Python implementation, tests, packaging and comparison harnesses are retained
+in [Git history at 12f1470](https://github.com/petehottelet/smythe/tree/12f14704beff344228fffffce40d995daa1f7cce).
+Historical benchmark records and the Noumenon artwork remain in this checkout.
+The eventual stable Rust release will be **1.0.0**; this is the **0.2.0** preview.
 
 The [Noumenon screensaver](https://github.com/petehottelet/noumenon) is a separate
 project that renders the glyph catalog. Smythe's native command produces the

@@ -34,8 +34,8 @@ How did you verify this change?
 
 ## Checklist
 
-- [ ] `ruff check smythe/ tests/ benchmarks/ examples/` passes locally
-- [ ] `pytest tests/` passes locally on at least one supported Python version
+- [ ] `cargo fmt --all -- --check` and workspace Clippy pass locally
+- [ ] `cargo test --workspace --locked --offline` and applicable release gates pass
 - [ ] [CHANGELOG.md](../CHANGELOG.md) updated under `[Unreleased]` for any
       user-facing change
 - [ ] Public API additions/changes are documented in docstrings and

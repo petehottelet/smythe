@@ -1,5 +1,7 @@
 # Cost guardrails
 
+> Historical Python reference. The active project is Rust-only. Run this guide's commands from [source revision 12f1470](https://github.com/petehottelet/smythe/tree/12f14704beff344228fffffce40d995daa1f7cce); see the [native guide](rust.md) for current behavior.
+
 `Sentinel` validates cost policy, provider usage, reservations, and restored
 charges before changing its ledger. Monetary values must be finite, nonnegative
 numbers. Token counts must be nonnegative integers. Booleans, numeric strings,
@@ -180,4 +182,4 @@ does not come from usage and is unaffected; `OpenAIImageProvider` has no such
 option.
 
 [Architecture](architecture.md) · [Checkpoint format](checkpoint-format.md) ·
-[Offline budget example](../examples/03_parallel_budget.py).
+[Offline budget example](https://github.com/petehottelet/smythe/blob/12f14704beff344228fffffce40d995daa1f7cce/examples/03_parallel_budget.py).

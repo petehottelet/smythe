@@ -11,6 +11,19 @@ use std::{
     time::Instant,
 };
 
+fn validate_report(report: &Value) -> Result<()> {
+    ensure!(
+        report["protocol"] == "noumenon-rust-journal-v3" && report["journal_schema"] == 3,
+        "native trial protocol differs"
+    );
+    ensure!(
+        report["status"] == "passed"
+            && report["glyphs"] == 256
+            && report["validation_provider_calls"] == 256,
+        "native trial did not pass full acceptance"
+    );
+    Ok(())
+}
 fn execute(root: &Path, out: &Path, repeats: usize) -> Result<Value> {
     let revision = require_clean(root)?;
     let sources = committed_sources(root, &revision)?;
@@ -75,10 +88,7 @@ fn execute(root: &Path, out: &Path, repeats: usize) -> Result<Value> {
             let elapsed = started.elapsed().as_secs_f64();
             ensure!(output.status.success(), "native glyph trial failed");
             let report: Value = serde_json::from_slice(&output.stdout)?;
-            ensure!(
-                report["status"] == "passed" && report["glyphs"] == 256,
-                "native trial did not pass acceptance"
-            );
+            validate_report(&report)?;
             trials.push(json!({"repeat":repeat,"workers":workers,"cold_cli_wall_s":elapsed,"report":report}));
         }
     }
@@ -95,7 +105,7 @@ fn execute(root: &Path, out: &Path, repeats: usize) -> Result<Value> {
         ensure!(output.status.success(), "cannot record compiler version");
         Ok(String::from_utf8(output.stdout)?.trim().to_owned())
     };
-    let record = json!({"protocol":"noumenon-native-journal-v1","claimable":false,"evidence_status":"diagnostic","source_revision":revision,"source_hash_basis":"committed_git_blob_bytes","source_sha256":sources,"binary_sha256":binary_hash,"environment":{"os":std::env::consts::OS,"architecture":std::env::consts::ARCH,"logical_cpus":std::thread::available_parallelism()?.get(),"rustc":tool_version("rustc")?,"cargo":tool_version("cargo")?},"clock":"fresh CLI process through terminal report publication","trials":trials});
+    let record = json!({"protocol":"noumenon-native-journal-v3","claimable":false,"evidence_status":"diagnostic","source_revision":revision,"source_hash_basis":"committed_git_blob_bytes","source_sha256":sources,"binary_sha256":binary_hash,"environment":{"os":std::env::consts::OS,"architecture":std::env::consts::ARCH,"logical_cpus":std::thread::available_parallelism()?.get(),"rustc":tool_version("rustc")?,"cargo":tool_version("cargo")?},"clock":"fresh CLI process through terminal report publication","trials":trials});
     fs::write(
         out.join("results.json"),
         serde_json::to_vec_pretty(&record)?,
@@ -138,4 +148,23 @@ fn main() -> Result<()> {
         _ => anyhow::bail!("usage: cargo run -p xtask -- provenance | benchmark OUTPUT [REPEATS]"),
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn current_campaign_refuses_old_clocks_and_incomplete_validation() {
+        let valid = json!({"protocol":"noumenon-rust-journal-v3","journal_schema":3,"status":"passed","glyphs":256,"validation_provider_calls":256});
+        assert!(validate_report(&valid).is_ok());
+        for (key, value) in [
+            ("protocol", json!("noumenon-rust-journal-v2")),
+            ("journal_schema", json!(2)),
+            ("validation_provider_calls", json!(0)),
+        ] {
+            let mut invalid = valid.clone();
+            invalid[key] = value;
+            assert!(validate_report(&invalid).is_err());
+        }
+    }
 }

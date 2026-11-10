@@ -1,5 +1,7 @@
 # Source evidence
 
+> Historical Python reference. The active project is Rust-only. Run this guide's commands from [source revision 12f1470](https://github.com/petehottelet/smythe/tree/12f14704beff344228fffffce40d995daa1f7cce); see the [native guide](rust.md) for current behavior.
+
 Source evidence records what a deliverable's claims rest on: the sources a
 run drew on, each claim, the passages quoted for and against it, and the
 questions it leaves open. An artifact carries its records, and a final

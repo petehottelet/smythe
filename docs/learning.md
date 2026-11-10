@@ -1,5 +1,7 @@
 # Learning from runs
 
+> Historical Python reference. The active project is Rust-only. Run this guide's commands from [source revision 12f1470](https://github.com/petehottelet/smythe/tree/12f14704beff344228fffffce40d995daa1f7cce); see the [native guide](rust.md) for current behavior.
+
 Smythe learns from finished runs in two reviewable ways. `PlannerMemory`
 recalls the outcomes of earlier runs into later planning prompts (see the
 [learning loop](architecture.md#learning-loop)). Distillation turns a graph
@@ -745,7 +747,7 @@ of the name does, it is stored and activated under a
 ## A template's lifecycle
 
 Each step above is a separate, explicit operation.
-[`examples/21_template_lifecycle.py`](../examples/21_template_lifecycle.py)
+[`examples/21_template_lifecycle.py`](https://github.com/petehottelet/smythe/blob/12f14704beff344228fffffce40d995daa1f7cce/examples/21_template_lifecycle.py)
 runs them in order, offline and without keys:
 
 1. **Record.** Strict runs record their acceptance decision and structure

@@ -1,5 +1,7 @@
 # Inspect saved runs
 
+> Historical Python reference. The active project is Rust-only. Run this guide's commands from [source revision 12f1470](https://github.com/petehottelet/smythe/tree/12f14704beff344228fffffce40d995daa1f7cce); see the [native guide](rust.md) for current behavior.
+
 `smythe runs` reports what a saved run did and whether its output may be
 used, and [reviews](#review-what-needs-a-decision) what in the newest runs
 needs a decision, without resuming or changing them; its one control,
@@ -256,7 +258,7 @@ A restricted run adds a line for each tombstone and purged file:
 A durable run that reads sources and delivers evidence reports what it was
 given, what it read and what its output claims, without printing source
 text, read bodies, quotes or output. The
-[source-to-artifact example](../examples/16_source_to_artifact.py) prints
+[source-to-artifact example](https://github.com/petehottelet/smythe/blob/12f14704beff344228fffffce40d995daa1f7cce/examples/16_source_to_artifact.py) prints
 one such report.
 
 `context`, for a run with [context assembly](tasks.md#context-snapshots):

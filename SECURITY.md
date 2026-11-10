@@ -8,8 +8,8 @@ section will be updated with a longer support window.
 
 | Version  | Supported          |
 | -------- | ------------------ |
-| 0.8.x    | Yes                |
-| < 0.8    | No                 |
+| Rust 0.2.0 source preview | Active development |
+| Historical Python releases | Retained in Git history |
 
 ## Reporting a vulnerability
 
@@ -53,9 +53,15 @@ you request otherwise.
 
 ## Scope and threat model
 
-The threat model for smythe is currently **single-tenant, trusted-operator**:
-a developer runs a swarm against LLM provider APIs they control. The most
-relevant security concerns within that model:
+The native threat model is **single-tenant, trusted-operator**. Local pure Rust
+providers execute with the caller's permissions; this is not a callback sandbox.
+Graph and output limits bound the runtime's accounting and retained evidence,
+but cannot forcibly stop arbitrary callback code. SHA-256 verifies consistency,
+not authenticity against a writer who controls the store. Keep run data private.
+Recovery covers application-process crashes, not power loss or remote effects.
+
+The following concerns describe the historical Python implementation retained
+in Git history and future native integrations; they are not shipped Rust APIs:
 
 - **Prompt injection.** Untrusted task descriptions or tool outputs that
   manipulate the Architect or an agent into making unintended calls, invoking

@@ -1,5 +1,7 @@
 # Artifact lineage
 
+> Historical Python reference. The active project is Rust-only. Run this guide's commands from [source revision 12f1470](https://github.com/petehottelet/smythe/tree/12f14704beff344228fffffce40d995daa1f7cce); see the [native guide](rust.md) for current behavior.
+
 Artifact lineage records how a durable run's accepted artifact was made: the
 run, the published document, the delivery decision, and each node's result
 and the inputs it was given, as ids, versions and SHA-256 digests. A run opts
@@ -870,7 +872,7 @@ added to the journal: the new runs it started, and the read calls, model
 calls, `reuse` operations, publications and acceptance decisions of the run
 it repaired in place or the successor it started. Offline runs cost nothing,
 so these counts, not money, compare a selective repair with computing again
-in full. The [archive-maintenance example](../examples/18_archive_maintenance.py)
+in full. The [archive-maintenance example](https://github.com/petehottelet/smythe/blob/12f14704beff344228fffffce40d995daa1f7cce/examples/18_archive_maintenance.py)
 makes that comparison offline: it revises a source two of four runs share,
 damages one published brief and bumps a validator's version, applies the
 plan, computes the four runs again in full in a second journal and compares
@@ -1126,11 +1128,11 @@ behind each of these.
 Both run offline and without keys, reading bundled sources from a server on
 the loopback address:
 
-- [Source to artifact](../examples/16_source_to_artifact.py) runs one durable
+- [Source to artifact](https://github.com/petehottelet/smythe/blob/12f14704beff344228fffffce40d995daa1f7cce/examples/16_source_to_artifact.py) runs one durable
   research run of the kind a lineage record describes: journaled read steps
   of bundled sources, context snapshots, source evidence, an interruption
   and resume, and a published document accepted under a strict policy.
-- [Archive maintenance](../examples/18_archive_maintenance.py) records the
+- [Archive maintenance](https://github.com/petehottelet/smythe/blob/12f14704beff344228fffffce40d995daa1f7cce/examples/18_archive_maintenance.py) records the
   lineage of four such runs, which share two sources between them. It
   revises one shared source, damages one published brief and bumps a
   validator's version, prints the repair plan, applies it, then computes the

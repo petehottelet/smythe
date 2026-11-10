@@ -1,0 +1,1 @@
+{"seed":42,"mutation":"dispatch_before_admission_commit","expected":"dispatch invariant rejects missing reservation"}

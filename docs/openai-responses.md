@@ -1,5 +1,7 @@
 # Native OpenAI Responses
 
+> Historical Python reference. The active project is Rust-only. Run this guide's commands from [source revision 12f1470](https://github.com/petehottelet/smythe/tree/12f14704beff344228fffffce40d995daa1f7cce); see the [native guide](rust.md) for current behavior.
+
 `OpenAIResponsesProvider` runs text and function-tool requests with
 `gpt-6-astra` and `gpt-5.6-sol`. Each response carries native usage and a
 dated, model-specific token price. Smythe 0.7.0 includes this explicit adapter:

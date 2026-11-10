@@ -1,5 +1,7 @@
 # Durable text workflows
 
+> Historical Python reference. The active project is Rust-only. Run this guide's commands from [source revision 12f1470](https://github.com/petehottelet/smythe/tree/12f14704beff344228fffffce40d995daa1f7cce); see the [native guide](rust.md) for current behavior.
+
 `Swarm(run_store=SQLiteWorkflowStore(...))` binds routing, planning, execution,
 verification, supervision, and synthesis to one persistent call ledger.
 Separate `plan()` and `execute()` calls retain the same run identity and planning
@@ -39,7 +41,7 @@ with SQLiteWorkflowStore("smythe-runs.db") as store:
     print(result.workflow_accounting)
 ```
 
-The [offline example](../examples/14_durable_text_workflow.py) exercises the same
+The [offline example](https://github.com/petehottelet/smythe/blob/12f14704beff344228fffffce40d995daa1f7cce/examples/14_durable_text_workflow.py) exercises the same
 handoff and cached recovery with zero provider API charges.
 
 With `parallel=True`, a failing node cancels calls still in flight, which can

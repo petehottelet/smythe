@@ -1,6 +1,8 @@
+#![allow(clippy::disallowed_methods)]
 use anyhow::Result;
 use smythe::{
-    CompletionResult, ExecutionGraph, Node, Provider, Swarm, Task, Topology, store::Store,
+    CompletionResult, Dependency, ExecutionGraph, Node, Provider, Swarm, Task, Topology,
+    store::Store,
 };
 use smythe_core::{
     NanoUsd,
@@ -20,6 +22,7 @@ fn graph() -> ExecutionGraph {
         topology: vec![Topology::ForkJoin],
         nodes: vec![
             Node {
+                phase: None,
                 id: "a".into(),
                 task: Task {
                     goal: "a".into(),
@@ -28,6 +31,7 @@ fn graph() -> ExecutionGraph {
                 depends_on: vec![],
             },
             Node {
+                phase: None,
                 id: "b".into(),
                 task: Task {
                     goal: "b".into(),
@@ -36,6 +40,7 @@ fn graph() -> ExecutionGraph {
                 depends_on: vec![],
             },
             Node {
+                phase: None,
                 id: "c".into(),
                 task: Task {
                     goal: "c".into(),
@@ -60,10 +65,11 @@ impl Provider for Sum {
     fn cost_bound_nanousd(&self, _: &Task) -> Result<u64> {
         Ok(1)
     }
-    fn complete(&self, task: &Task, deps: &[&u64]) -> Result<CompletionResult<u64>> {
+    fn complete(&self, task: &Task, deps: &[Dependency<'_, u64>]) -> Result<CompletionResult<u64>> {
         self.calls.fetch_add(1, Ordering::SeqCst);
         Ok(CompletionResult {
-            output: task.input.as_u64().unwrap() + deps.iter().map(|v| **v).sum::<u64>(),
+            output: task.input.as_u64().unwrap()
+                + deps.iter().map(|v| v.load().unwrap()).sum::<u64>(),
             cost_nanousd: 1,
         })
     }
@@ -92,6 +98,7 @@ fn rejected_atomic_admission_leaves_no_partial_reservation() {
             0,
             0,
             Event::Started {
+                limits: Default::default(),
                 binding: "fixture".into(),
                 graph: graph(),
                 ceiling: NanoUsd(1),
@@ -105,7 +112,7 @@ fn rejected_atomic_admission_leaves_no_partial_reservation() {
         store
             .append_batch(
                 "atomic",
-                state.sequence,
+                state.last,
                 1,
                 vec![
                     Event::Admitted {
@@ -125,13 +132,13 @@ fn rejected_atomic_admission_leaves_no_partial_reservation() {
             .is_err()
     );
     let restored = store.inspect("atomic").unwrap();
-    assert_eq!(restored.sequence, state.sequence);
+    assert_eq!(restored.sequence, state.last);
     assert!(restored.budget.pending().is_empty());
     assert!(restored.attempts.is_empty());
-    let valid = store
+    let _valid = store
         .append_batch(
             "atomic",
-            state.sequence,
+            state.last,
             1,
             vec![
                 Event::Admitted {
@@ -141,13 +148,17 @@ fn rejected_atomic_admission_leaves_no_partial_reservation() {
                     bound: NanoUsd(1),
                 },
                 Event::Dispatched {
+                    dependency_bytes: 0,
                     node: "a".into(),
                     attempt: 1,
                 },
             ],
         )
         .unwrap();
-    assert_eq!(valid.attempts["a"].state, AttemptState::Dispatched);
+    assert_eq!(
+        store.inspect("atomic").unwrap().attempts["a"].state,
+        AttemptState::Dispatched
+    );
 }
 
 #[test]
@@ -167,7 +178,7 @@ fn pause_drains_current_work_and_resume_only_dispatches_remaining_nodes() {
         fn cost_bound_nanousd(&self, _: &Task) -> Result<u64> {
             Ok(0)
         }
-        fn complete(&self, t: &Task, _: &[&u64]) -> Result<CompletionResult<u64>> {
+        fn complete(&self, t: &Task, _: &[Dependency<'_, u64>]) -> Result<CompletionResult<u64>> {
             if self.calls.fetch_add(1, Ordering::SeqCst) == 0 {
                 self.store.control("paused", Control::Pause)?;
             }
@@ -208,7 +219,7 @@ fn all_local_runs_share_journal_and_resume_without_dispatch() {
     let result = swarm
         .execute_in(&graph(), &p, &store, "test", false)
         .unwrap();
-    assert_eq!(result.outputs, vec![1, 2, 4]);
+    assert_eq!(result.load_all::<u64>().unwrap(), vec![1, 2, 4]);
     assert_eq!(result.total_cost_nanousd, 3);
     let replay = swarm
         .execute_in(&graph(), &p, &store, "test", true)
@@ -217,7 +228,7 @@ fn all_local_runs_share_journal_and_resume_without_dispatch() {
     assert_eq!(replay.reused_nodes, 3);
     assert_eq!(p.calls.load(Ordering::SeqCst), 3);
     assert!(replay.trace.spans.is_empty());
-    assert!(store.inspect("test").unwrap().completed);
+    assert!(store.inspect("test").unwrap().completed());
     assert!(
         swarm
             .execute_in(&graph(), &p, &store, "test", false)
@@ -248,7 +259,11 @@ fn ready_child_runs_while_an_unrelated_parent_is_still_running() {
         fn cost_bound_nanousd(&self, _: &Task) -> Result<u64> {
             Ok(0)
         }
-        fn complete(&self, task: &Task, _: &[&u64]) -> Result<CompletionResult<u64>> {
+        fn complete(
+            &self,
+            task: &Task,
+            _: &[Dependency<'_, u64>],
+        ) -> Result<CompletionResult<u64>> {
             match task.goal.as_str() {
                 "b" => self
                     .rx
@@ -308,7 +323,8 @@ fn canonical_binding_preserves_the_provider_visible_number_contract() {
         swarm
             .execute_in(&g, &p, &store, "numbers", false)
             .unwrap()
-            .outputs,
+            .load_all::<u64>()
+            .unwrap(),
         vec![1]
     );
     g.nodes[0].task.input = serde_json::json!(1);
@@ -348,6 +364,7 @@ fn invalid_node_identities_are_refused_before_dispatch() {
 fn deep_graph_validation_is_iterative() {
     let nodes = (0..2000)
         .map(|i| Node {
+            phase: None,
             id: i.to_string(),
             task: Task {
                 goal: "local".into(),
@@ -375,6 +392,7 @@ fn offline_outputs_reference_dependencies_without_repeating_their_histories() {
         topology: vec![Topology::Serial],
         nodes: (0..40)
             .map(|i| Node {
+                phase: None,
                 id: i.to_string(),
                 task: Task {
                     goal: "local".into(),
@@ -392,7 +410,8 @@ fn offline_outputs_reference_dependencies_without_repeating_their_histories() {
         .unwrap()
         .execute(&graph, &smythe::OfflineProvider)
         .unwrap()
-        .outputs;
+        .load_all::<serde_json::Value>()
+        .unwrap();
     assert!(
         outputs
             .iter()
@@ -416,7 +435,7 @@ fn every_local_crash_boundary_reconstructs_the_same_outputs_and_money() {
         let store = Store::memory().unwrap();
         for record in &records[..boundary] {
             if let Event::Received { output, .. } = &record.event {
-                let bytes = complete.output(output).unwrap();
+                let bytes = complete.output(output.as_ref().unwrap()).unwrap();
                 store.put(&bytes).unwrap();
             }
             store
@@ -433,7 +452,11 @@ fn every_local_crash_boundary_reconstructs_the_same_outputs_and_money() {
             .unwrap()
             .execute_in(&g, &p, &store, "replay", true)
             .unwrap();
-        assert_eq!(result.outputs, vec![1], "boundary {boundary}");
+        assert_eq!(
+            result.load_all::<u64>().unwrap(),
+            vec![1],
+            "boundary {boundary}"
+        );
         assert_eq!(result.total_cost_nanousd, 1);
         let received = records[..boundary]
             .iter()
@@ -455,6 +478,7 @@ fn stop_is_durable_and_stale_owners_cannot_admit() {
             0,
             0,
             Event::Started {
+                limits: Default::default(),
                 binding: "fixture".into(),
                 graph: graph(),
                 ceiling: NanoUsd(3),
@@ -462,19 +486,14 @@ fn stop_is_durable_and_stale_owners_cannot_admit() {
         )
         .unwrap();
     store
-        .append(
-            "control",
-            state.sequence,
-            1,
-            Event::Claimed { generation: 1 },
-        )
+        .append("control", state.last, 1, Event::Claimed { generation: 1 })
         .unwrap();
     state = store.control("control", Control::Stop).unwrap();
     assert!(
         store
             .append(
                 "control",
-                state.sequence,
+                state.last,
                 1,
                 Event::Admitted {
                     effect: smythe::Effect::Pure,
@@ -490,16 +509,17 @@ fn stop_is_durable_and_stale_owners_cannot_admit() {
         store
             .append(
                 "control",
-                state.sequence,
+                state.last,
                 0,
                 Event::Dispatched {
+                    dependency_bytes: 0,
                     node: "a".into(),
                     attempt: 1
                 }
             )
             .is_err()
     );
-    assert_eq!(store.inspect("control").unwrap().sequence, state.sequence);
+    assert_eq!(store.inspect("control").unwrap().sequence, state.last);
 }
 
 #[test]
@@ -516,7 +536,7 @@ fn failure_keeps_successful_siblings_settled() {
         fn cost_bound_nanousd(&self, _: &Task) -> Result<u64> {
             Ok(1)
         }
-        fn complete(&self, t: &Task, _: &[&u64]) -> Result<CompletionResult<u64>> {
+        fn complete(&self, t: &Task, _: &[Dependency<'_, u64>]) -> Result<CompletionResult<u64>> {
             anyhow::ensure!(t.goal != "a", "fixture failure");
             Ok(CompletionResult {
                 output: 2,
@@ -553,7 +573,7 @@ fn invalid_output_preserves_known_cost_and_never_runs_children() {
         fn cost_bound_nanousd(&self, _: &Task) -> Result<u64> {
             Ok(1)
         }
-        fn complete(&self, _: &Task, _: &[&f64]) -> Result<CompletionResult<f64>> {
+        fn complete(&self, _: &Task, _: &[Dependency<'_, f64>]) -> Result<CompletionResult<f64>> {
             Ok(CompletionResult {
                 output: f64::NAN,
                 cost_nanousd: 1,
@@ -595,7 +615,7 @@ fn a_later_quote_failure_drains_and_settles_an_already_dispatched_sibling() {
             anyhow::ensure!(t.goal != "b", "invalid quote");
             Ok(1)
         }
-        fn complete(&self, _: &Task, _: &[&u64]) -> Result<CompletionResult<u64>> {
+        fn complete(&self, _: &Task, _: &[Dependency<'_, u64>]) -> Result<CompletionResult<u64>> {
             Ok(CompletionResult {
                 output: 1,
                 cost_nanousd: 1,

@@ -31,6 +31,39 @@ pub trait IdSource: Send + Sync {
     /// Return a fresh, filesystem-safe identity, including across restarts.
     fn next_id(&self) -> String;
 }
+/// Owns the production wait and external-control polling; deterministic tests can
+/// deliver a control at a chosen poll without sleeping or consulting a wall clock.
+pub trait ControlWatch: Send + Sync {
+    fn poll(
+        &self,
+        store: &crate::store::Store,
+        run: &str,
+        after: u64,
+        wake: &std::sync::mpsc::Receiver<()>,
+    ) -> anyhow::Result<Vec<smythe_core::journal::Record>>;
+}
+struct PollControls;
+impl ControlWatch for PollControls {
+    fn poll(
+        &self,
+        store: &crate::store::Store,
+        run: &str,
+        after: u64,
+        wake: &std::sync::mpsc::Receiver<()>,
+    ) -> anyhow::Result<Vec<smythe_core::journal::Record>> {
+        let _ = wake.recv_timeout(Duration::from_millis(50));
+        store.changes_since(run, after)
+    }
+}
+pub(crate) fn lock_run(file: &std::fs::File) -> anyhow::Result<()> {
+    for _ in 0..20 {
+        if file.try_lock().is_ok() {
+            return Ok(());
+        }
+        std::thread::sleep(Duration::from_millis(5));
+    }
+    anyhow::bail!("another coordinator owns this run")
+}
 struct SystemClock {
     origin: Instant,
 }
@@ -58,6 +91,7 @@ pub struct Sources {
     pub clock: Arc<dyn Clock>,
     pub ids: Arc<dyn IdSource>,
     pub storage: Arc<dyn StorageObserver>,
+    pub controls: Arc<dyn ControlWatch>,
 }
 impl Default for Sources {
     fn default() -> Self {
@@ -67,6 +101,7 @@ impl Default for Sources {
             }),
             ids: Arc::new(UniqueIds),
             storage: Arc::new(NoopObserver),
+            controls: Arc::new(PollControls),
         }
     }
 }

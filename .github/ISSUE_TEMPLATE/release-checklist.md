@@ -1,45 +1,25 @@
 ---
 name: Release checklist
-about: Steps for cutting a release to PyPI
+about: Verify a Rust source or binary release
 title: "Release vX.Y.Z"
 labels: roadmap
 ---
 
-# Release Checklist
+# Release checklist
 
-Follow [RELEASING.md](https://github.com/petehottelet/smythe/blob/main/RELEASING.md). Record the evidence for this release:
+Follow [RELEASING.md](https://github.com/petehottelet/smythe/blob/main/RELEASING.md).
 
-- Version and tested commit:
-- Ruff, full offline suite, and platform check URLs/results:
-- Wheel and sdist filenames with SHA-256 hashes:
-- Installed-wheel/SDK quickstart receipt:
-- Release notes and benchmark evidence links:
-- Native source-export hashes and platform qualification status:
+- [ ] Workspace versions and tested commit identified.
+- [ ] Rust format, Clippy, full offline suite, release build and both performance gates pass.
+- [ ] Linux and Windows CI pass for the exact commit.
+- [ ] All 256 Noumenon glyphs validate and completed recovery reuses the results.
+- [ ] Source and binary provenance are retained; benchmark claims match eligible records.
+- [ ] README, guides, roadmap, examples and changelog agree.
+- [ ] Released changelog sections and existing tags remain unchanged.
+- [ ] No credentials, private notes or local outputs enter artifacts.
+- [ ] Publication is explicitly authorized, with the supplied release title.
+- [ ] Exact source/binary artifacts have verified hashes and usable download locations.
 
-## Preflight
-
-- [ ] Code review, `ruff check .`, the full offline suite, and applicable platform checks pass for the tested commit on `main`.
-- [ ] `pyproject.toml` and `smythe/__init__.py` declare the same new version; no published version is reused.
-- [ ] Completed `Unreleased` entries move to a dated changelog section; older released sections remain unchanged.
-- [ ] README, documentation map, roadmap, examples, subsystem guides, and release notes agree on installation, availability, commands, and evidence status.
-- [ ] A fresh output directory contains only this release's wheel and sdist; `python -m twine check release-dist/*` passes.
-- [ ] `tests/test_pypi_readme.py` passes with Hatchling installed; the sdist rebuild has identical wheel package members and metadata.
-- [ ] PyPI README links resolve against the release tag; only the generically labeled PyPI badge follows `main`.
-- [ ] The wheel installs, imports, reports the expected version, and exercises the installed CLI in a clean venv.
-- [ ] The exact README quickstart has a retained installed-wheel/SDK check. Mocked usage is labeled synthetic, with zero paid calls; it is not a live model, cost, or quality result.
-- [ ] Public benchmark claims cite eligible committed records. Astra paid execution still requires its campaign allowance and calibration gates; offline qualification does not unlock main or judging.
-
-## GitHub
-
-- [ ] The version commit is pushed and its CI checks pass; tag `vX.Y.Z` points to that tested commit.
-- [ ] `.github/workflows/publish.yml` exists and uses the GitHub environment `pypi` with `id-token: write`.
-- [ ] The GitHub release uses the matching tag and reviewed release notes.
-- [ ] Current contact sheets, previews, charts, and documentation pass the [materials check](https://github.com/petehottelet/smythe/blob/main/docs/current-materials.md#completion-check-for-every-benchmark-update).
-
-## PyPI
-
-- [ ] Project `smythe` trusts `petehottelet/smythe`, workflow `publish.yml`, environment `pypi`.
-- [ ] Release workflow publishes successfully.
-- [ ] PyPI wheel and sdist hashes match the publication workflow's retained distributions and `package-hashes.txt`.
-- [ ] `pip install smythe==X.Y.Z` succeeds from PyPI in a fresh venv; its version and installed CLI are checked.
-- [ ] The PyPI badge is updated only after the new published version is available.
+The active Rust preview has no PyPI publication workflow. The historical
+Python `v0.2.0` tag and Rust `rust-v0.2.0` tag identify different immutable
+revisions. Stable Rust 1.0.0 remains ahead.

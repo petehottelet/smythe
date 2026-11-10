@@ -1,5 +1,7 @@
 # Durable artifact jobs
 
+> Historical Python reference. The active project is Rust-only. Run this guide's commands from [source revision 12f1470](https://github.com/petehottelet/smythe/tree/12f14704beff344228fffffce40d995daa1f7cce); see the [native guide](rust.md) for current behavior.
+
 Smythe Jobs v1 runs large sets of independent artifact operations through a
 strict, inspectable contract:
 

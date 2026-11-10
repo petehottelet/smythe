@@ -1,5 +1,7 @@
 # MCP tool support
 
+> Historical Python reference. The active project is Rust-only. Run this guide's commands from [source revision 12f1470](https://github.com/petehottelet/smythe/tree/12f14704beff344228fffffce40d995daa1f7cce); see the [native guide](rust.md) for current behavior.
+
 Agents consume [MCP](https://modelcontextprotocol.io/) servers as tool sources: declare servers on an `AgentProfile`, pass a `MCPToolRuntime` to the Swarm, and nodes assigned to that agent run a bounded tool loop — the model calls tools, results feed back, every call lands in the trace, and the budget meters every iteration.
 
 ```python

@@ -1,5 +1,7 @@
 # Skills
 
+> Historical Python reference. The active project is Rust-only. Run this guide's commands from [source revision 12f1470](https://github.com/petehottelet/smythe/tree/12f14704beff344228fffffce40d995daa1f7cce); see the [native guide](rust.md) for current behavior.
+
 A skill is a capability tag that an agent's inventory lends it. The registry
 asks a skill provider which skills each agent has, maps their names to tags,
 and matches a node's `required_capabilities` against them. The planner sees
@@ -166,7 +168,7 @@ the directory, and the skill's declared `allowed-tools` grant nothing.
 written `__` and read a call's name back the same way, so `LocalTool`
 refuses a name that contains `__`, or `_` right before `.`, which would
 read back as another name and could never be called.
-[Example 20](../examples/20_agent_skills.py) runs one offline.
+[Example 20](https://github.com/petehottelet/smythe/blob/12f14704beff344228fffffce40d995daa1f7cce/examples/20_agent_skills.py) runs one offline.
 
 Who is offered a tool:
 

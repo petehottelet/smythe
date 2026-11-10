@@ -1,5 +1,7 @@
 # Bounded Autotune
 
+> Historical Python reference. The active project is Rust-only. Run this guide's commands from [source revision 12f1470](https://github.com/petehottelet/smythe/tree/12f14704beff344228fffffce40d995daa1f7cce); see the [native guide](rust.md) for current behavior.
+
 Smythe's bounded Autotune package runs repeatable optimization campaigns
 without giving a research agent an unbounded code, time, or spend surface.
 
@@ -322,7 +324,7 @@ mean above `min_improvement` passes with the minimum three pairs and a
 zero-width interval. That describes the evaluator, not measured precision:
 check that seeds and tasks vary what it measures before relying on such a
 decision. The evaluator in
-[`examples/21_template_lifecycle.py`](../examples/21_template_lifecycle.py)
+[`examples/21_template_lifecycle.py`](https://github.com/petehottelet/smythe/blob/12f14704beff344228fffffce40d995daa1f7cce/examples/21_template_lifecycle.py)
 is like this, and each of its decisions rests on three identical pairs.
 
 **Repeated comparisons.** At the default confidence each confirmation or
@@ -426,7 +428,7 @@ repository-only, not part of the installed package: its fixtures establish
 the mechanics only, and no number it records is a product or benchmark
 claim.
 
-[`examples/21_template_lifecycle.py`](../examples/21_template_lifecycle.py)
+[`examples/21_template_lifecycle.py`](https://github.com/petehottelet/smythe/blob/12f14704beff344228fffffce40d995daa1f7cce/examples/21_template_lifecycle.py)
 runs the whole lifecycle offline with an evaluator it defines: a candidate
 that is better on development and confirmation briefings and `worse` on
 held-out incident reviews is rejected, and the registry refuses to approve that

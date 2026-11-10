@@ -1,4 +1,4 @@
-topology = ["fork_join"]
+topology = ["serial"]
 
 [[nodes]]
 id = "research"

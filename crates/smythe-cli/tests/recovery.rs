@@ -3,7 +3,7 @@ use std::process::{Command, Stdio};
 use std::time::Duration;
 
 #[test]
-fn killed_process_reuses_committed_batch_and_finishes_catalog() {
+fn killed_process_reuses_validation_journal_and_finishes_catalog() {
     let sources = smythe::seams::Sources::default();
     let nonce = sources.ids.next_id();
     let out = std::env::temp_dir().join(format!(
@@ -18,7 +18,13 @@ fn killed_process_reuses_committed_batch_and_finishes_catalog() {
         .spawn()
         .unwrap();
     let started = sources.clock.monotonic();
-    while !out.join("receipts/batch-000.json").is_file() {
+    let committed = loop {
+        if let Ok(store) = smythe::store::Store::open_read_only(out.join(".smythe"))
+            && let Ok(state) = store.inspect("noumenon-validate")
+            && state.accepted_nodes > 0
+        {
+            break store.history("noumenon-validate").unwrap();
+        }
         if sources.clock.monotonic().saturating_sub(started) > Duration::from_secs(30)
             || child.try_wait().unwrap().is_some()
         {
@@ -27,10 +33,10 @@ fn killed_process_reuses_committed_batch_and_finishes_catalog() {
             panic!("process did not reach its first checkpoint");
         }
         std::thread::sleep(Duration::from_millis(1));
-    }
+    };
     child.kill().unwrap();
     child.wait().unwrap();
-    let committed = fs::read(out.join("receipts/batch-000.json")).unwrap();
+    assert!(!committed.is_empty());
     let result = Command::new(env!("CARGO_BIN_EXE_smythe"))
         .args([
             "noumenon",
@@ -46,14 +52,19 @@ fn killed_process_reuses_committed_batch_and_finishes_catalog() {
         .unwrap();
     assert!(result.status.success(), "resume failed");
     let report: serde_json::Value = serde_json::from_slice(&result.stdout).unwrap();
-    assert!(report["reused_glyphs"].as_u64().unwrap() >= 16);
+    assert_eq!(report["reused_glyphs"], 32);
+    assert!(report["reused_validation"].as_u64().unwrap() >= 1);
     assert_eq!(report["provider_calls"], 0); // All compilation receipts preceded publication.
     let accepted = report.get("saved_report").unwrap_or(&report);
     assert_eq!(accepted["compared_pairs"], 496);
+    let store = smythe::store::Store::open_read_only(out.join(".smythe")).unwrap();
+    let records = store.history("noumenon-validate").unwrap();
     assert_eq!(
-        fs::read(out.join("receipts/batch-000.json")).unwrap(),
-        committed
+        serde_json::to_value(&records[..committed.len()]).unwrap(),
+        serde_json::to_value(committed).unwrap()
     );
+    assert!(!out.join("receipts").exists());
+    drop(store);
     let reference: Vec<String> = serde_json::from_str(include_str!(
         "../../smythe-noumenon/tests/fixtures/python_svg_sha256.json"
     ))

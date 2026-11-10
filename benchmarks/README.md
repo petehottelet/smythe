@@ -1,5 +1,13 @@
 # Smythe benchmark evidence
 
+The reports below retain historical Python measurements and their original
+evidence. The active repository is Rust-only. Reproduce retired scripts and
+Python tests from [source revision 12f1470](https://github.com/petehottelet/smythe/tree/12f14704beff344228fffffce40d995daa1f7cce);
+paths in frozen reports refer to that historical source tree. The original Rust
+comparison identifies revision 409d367. Neither historical timing protocol is
+a performance claim for the current schema-3 engine. See the
+[native measurement guide](../docs/rust.md#verification-and-native-measurements).
+
 **Smythe used 77% fewer mean tokens and 28% less mean wall time than CrewAI**
 on the same fixed three-stage semantic pipeline. Against LangGraph it used
 8% fewer tokens and 6% less wall time. The generated-topology task-shape

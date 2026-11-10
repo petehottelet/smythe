@@ -1,5 +1,7 @@
 # Adaptive supervision
 
+> Historical Python reference. The active project is Rust-only. Run this guide's commands from [source revision 12f1470](https://github.com/petehottelet/smythe/tree/12f14704beff344228fffffce40d995daa1f7cce); see the [native guide](rust.md) for current behavior.
+
 Generated topology becomes result-aware with a supervisor. The Architect
 creates the initial graph; completed work can then redirect the unexecuted
 remainder without invalidating any result already banked.

@@ -1,5 +1,7 @@
 # Smythe 0.8.1
 
+> Historical Python reference. The active project is Rust-only. Run this guide's commands from [source revision 12f1470](https://github.com/petehottelet/smythe/tree/12f14704beff344228fffffce40d995daa1f7cce); see the [native guide](rust.md) for current behavior.
+
 [GitHub release](https://github.com/petehottelet/smythe/releases/tag/v0.8.1) ·
 [PyPI package](https://pypi.org/project/smythe/0.8.1/)
 
