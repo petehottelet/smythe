@@ -20,10 +20,8 @@ Define the work and its dependencies, execute ready tasks in parallel, and
 inspect the journal of outputs and costs. The native engine combines bounded
 concurrency, exact cost reservations, and recovery after a process interruption.
 
-The **Rust 0.2.0 preview** runs local workflows and the Noumenon glyph
-pipeline without Python or API keys. The active repository is Rust-only.
-Model-driven planning, paid providers, tools, MCP, supervision and Jobs remain
-future native capabilities. [Current scope](docs/rust.md).
+The **Rust 0.2.0 preview** runs local workflows with or without API keys. 
+Model-driven planning, paid providers, tools, MCP, supervision and Jobs are roadmapped. [Current scope](docs/rust.md).
 
 <p align="center">
   <img src="assets/noumenon/noumenon-loop.gif" alt="Animated Noumenon rain showing the 192 authored Smythe glyphs" width="900">
