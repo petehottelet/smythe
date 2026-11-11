@@ -74,7 +74,7 @@ Graphs can be TOML or JSON. Set `--workers` to bound parallel work and
 zero on a fresh run. Resume uses the saved ceiling; change it explicitly with
 `control <id> budget <nanousd>`. The bundled provider charges nothing.
 
-### Generate the Noumenon catalog
+### Benchmark: Generate the Noumenon catalog
 
 ```bash
 cargo run --release --locked --offline --bin smythe -- noumenon --glyphs 256 --workers 8 --out smythe_artifacts/native-glyphs
