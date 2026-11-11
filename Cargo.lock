@@ -857,7 +857,7 @@ checksum = "149309498a5f7334b12ddae0cad8aba81ce785fe91755068867e017cf98fee46"
 
 [[package]]
 name = "smythe"
-version = "0.2.0"
+version = "0.9.0"
 dependencies = [
  "anyhow",
  "rayon",
@@ -872,7 +872,7 @@ dependencies = [
 
 [[package]]
 name = "smythe-cli"
-version = "0.2.0"
+version = "0.9.0"
 dependencies = [
  "anyhow",
  "clap",
@@ -887,7 +887,7 @@ dependencies = [
 
 [[package]]
 name = "smythe-core"
-version = "0.2.0"
+version = "0.9.0"
 dependencies = [
  "anyhow",
  "rand_chacha",
@@ -897,7 +897,7 @@ dependencies = [
 
 [[package]]
 name = "smythe-noumenon"
-version = "0.2.0"
+version = "0.9.0"
 dependencies = [
  "anyhow",
  "clap",
@@ -1176,7 +1176,7 @@ checksum = "1ebf944e87a7c253233ad6766e082e3cd714b5d03812acc24c318f549614536e"
 
 [[package]]
 name = "xtask"
-version = "0.2.0"
+version = "0.9.0"
 dependencies = [
  "anyhow",
  "serde_json",

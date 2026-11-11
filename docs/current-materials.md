@@ -1,6 +1,8 @@
 # Current Smythe materials
 
-Use these links for the revised glyphs, previews, and benchmark reports.
+Use these links for the Rust pipeline, retained glyphs, previews and reports.
+The [Rust 0.9.0 guide](rust.md#noumenon-acceptance) is the current command and
+acceptance reference. The GIF shows the catalog in use, not Rust timing.
 The original catalog under `benchmarks/partitions/glyph_svg_v1/` is historical
 evidence. Its contact sheet contains superseded designs.
 
@@ -18,21 +20,26 @@ evidence. Its contact sheet contains superseded designs.
 
 Noumenon uses the 192 original designs. The 256-glyph set is a benchmark
 extension whose first 192 SVG files match the active catalog exactly.
-Reference characters remain separately credited. Precompiled distribution is
-paused; source exports do not establish platform execution or feature parity.
+Reference characters remain separately credited. Screensaver builds and their
+support status belong to the linked Noumenon project; Smythe produces the
+catalog and does not establish renderer platform execution or feature parity.
 
 ## Benchmark material
 
 | Material | Authoritative location |
 |---|---|
-| Glyph compilation, validation, and export | [192/256 v2 report](../benchmarks/svg_v2_results.md) and its linked raw trials |
-| Parallel glyph generation | [Noumenon fan-out report](../benchmarks/noumenon_benchmark.md) and its 64- to 256-node records |
+| Current Rust validation and measurements | [Native checks and provenance](rust.md#verification-and-native-measurements); diagnostic timings and regression gates |
+| Original Rust/Python comparison | [54-trial report](../benchmarks/rust_noumenon_results.md); diagnostic evidence for the original preview, not the schema-3 engine |
+| Historical Python glyph compilation, validation, and export | [192/256 v2 report](../benchmarks/svg_v2_results.md) and its linked raw trials |
+| Historical parallel glyph generation | [Noumenon fan-out report](../benchmarks/noumenon_benchmark.md) and its 64- to 256-node records |
 | Astra/Sol text comparison | [200-workflow report and review status](../benchmarks/results/astra_20260913_main/README.md) |
 | Fable 5.1 extension | [Native and Code pilots](../benchmarks/results/fable_20260914_pilot/README.md) and [ten-task Code study](../benchmarks/results/fable_code_20260914/README.md); human pilot ratings gate the native main study |
 | All campaigns and outstanding work | [Evidence index](../benchmarks/README.md) · [Retired evidence](../benchmarks/archive/README.md) · [Roadmap](../ROADMAP.md#coming-soon) |
 | Public charts | [Monochrome SVG assets](../assets/benchmarks/) generated from committed records |
 
-The glyph workflow compiles authored contours. The Astra/Sol and Fable
+The Astra/Sol, Fable and other Python campaigns retain their historical scope;
+they do not measure the current Rust runtime. The glyph workflow compiles
+authored contours. The Astra/Sol and Fable
 studies measure text workflows; they do not generate a replacement glyph set.
 Model results alone do not require redrawing a contact sheet. A changed glyph
 catalog requires new sheets, previews, exports, and matching artwork evidence.
@@ -48,17 +55,18 @@ catalog requires new sheets, previews, exports, and matching artwork evidence.
 3. Recapture the Noumenon animation when its visible glyphs or effect change.
    Retain capture settings and source hashes; an animation's playback rate is
    not renderer performance evidence.
-4. Run `python benchmarks/render_readme_charts.py`. Check every changed chart
-   against its committed inputs, evidence status, units, denominators, and
-   uncertainty. Preserve the black-and-white chart style. Promote only reviewed,
-   claimable campaigns that have no known measurement defects.
+4. Check every changed chart against its committed inputs, evidence status,
+   producer revision, units, denominators and uncertainty. The historical
+   [Python chart renderer](https://github.com/petehottelet/smythe/blob/12f14704beff344228fffffce40d995daa1f7cce/benchmarks/render_readme_charts.py)
+   runs from its retained checkout. Preserve the black-and-white chart style.
+   Promote only reviewed, claimable campaigns without known measurement defects.
 5. Update the README, documentation map, roadmap, unreleased changelog, examples,
    benchmark index and affected subsystem guides together.
    Link current showcase images directly; label historical evidence at entry.
 6. Validate Markdown and HTML asset links and inspect the contact sheets and
    changed charts. Run code checks appropriate to any implementation changes.
-7. Push the reviewed changes and verify GitHub serves the intended files and
-   commit. Use the [release checklist](../RELEASING.md) for an actual release;
+7. After explicit push authorization, verify GitHub serves the intended files
+   and commit. Use the [release checklist](../RELEASING.md) for an actual release;
    completing a benchmark does not itself publish a package version.
 
 The 13 September materials check and other retired records are in the

@@ -4,6 +4,8 @@ use serde_json::{Value, json};
 use smythe::{EngineError, ExecutionGraph, Limits, NanoUsd, OfflineProvider, Swarm, store::Store};
 use smythe_noumenon::pipeline::{self, Mode, Options};
 use std::path::PathBuf;
+mod diagnostics;
+use smythe_core::diagnostics::{GraphDiagnostic, GraphFormat};
 
 #[derive(Parser)]
 #[command(
@@ -96,7 +98,7 @@ enum Command {
         events: bool,
         #[arg(long, requires = "events")]
         after: Option<u64>,
-        #[arg(long, default_value_t = 1000, requires = "events")]
+        #[arg(long, default_value_t = 1000, requires = "after")]
         limit: usize,
     },
     /// List existing runs without replaying their journals.
@@ -162,9 +164,33 @@ fn execute(command: Command) -> Result<Value> {
         } => {
             let text = std::fs::read_to_string(&graph).context(EngineError::InvalidCommand)?;
             let graph: ExecutionGraph = if graph.extension().is_some_and(|e| e == "toml") {
-                toml::from_str(&text).context(EngineError::InvalidCommand)?
+                toml::from_str(&text)
+                    .map_err(|error: toml::de::Error| {
+                        let prefix = text
+                            .get(..error.span().map_or(0, |s| s.start))
+                            .unwrap_or("");
+                        let line = prefix.bytes().filter(|b| *b == b'\n').count() + 1;
+                        let column = prefix.rsplit('\n').next().unwrap_or("").chars().count() + 1;
+                        anyhow::Error::new(error.clone()).context(GraphDiagnostic::new(
+                            GraphFormat::Toml,
+                            error.message(),
+                            line,
+                            column,
+                        ))
+                    })
+                    .context(EngineError::InvalidCommand)?
             } else {
-                serde_json::from_str(&text).context(EngineError::InvalidCommand)?
+                serde_json::from_str(&text)
+                    .map_err(|error: serde_json::Error| {
+                        let diagnostic = GraphDiagnostic::new(
+                            GraphFormat::Json,
+                            &error.to_string(),
+                            error.line(),
+                            error.column(),
+                        );
+                        anyhow::Error::new(error).context(diagnostic)
+                    })
+                    .context(EngineError::InvalidCommand)?
             };
             ensure!(!resume || id.is_some(), EngineError::InvalidCommand);
             let id = id.context(EngineError::InvalidCommand)?;
@@ -305,7 +331,11 @@ fn main() {
             let _ = error.print();
             return;
         }
-        Err(error) => failure(None, EngineError::InvalidCommand, &error.to_string()),
+        Err(error) => failure(
+            None,
+            EngineError::InvalidCommand,
+            &diagnostics::arguments(&error),
+        ),
     };
     if let Command::Run {
         id, resume: false, ..
@@ -328,12 +358,11 @@ fn main() {
                 .downcast_ref::<EngineError>()
                 .copied()
                 .unwrap_or(EngineError::ProviderFailed);
-            let message = if error.downcast_ref::<EngineError>().is_some() {
-                error.to_string()
-            } else {
-                class.to_string()
-            };
-            failure(run_id.as_deref(), class, &message)
+            let message = smythe_core::diagnostics::message(&error);
+            let run_id = run_id
+                .as_deref()
+                .filter(|id| smythe::store::validate_id(id).is_ok());
+            failure(run_id, class, &message)
         }
     }
 }

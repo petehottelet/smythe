@@ -34,8 +34,10 @@ double rule, or a dashed outline on white.
 
 ## Charts and callouts
 
-- Render charts from committed result records with
-  `python benchmarks/render_readme_charts.py`.
+- Build new charts from committed result records with their evidence status
+  and producer revision. The retained Python charts can be reproduced with
+  [their renderer at revision 12f1470](https://github.com/petehottelet/smythe/blob/12f14704beff344228fffffce40d995daa1f7cce/benchmarks/render_readme_charts.py).
+  That command requires the historical checkout; it is not a current Rust tool.
 - Prefer small multiples with direct values over decorative dashboard cards.
 - Encode Smythe as solid black, the primary comparison as white with a black
   outline, and a third comparison with black hatching on white.
@@ -70,8 +72,9 @@ and gentle Mermaid curves for generated graphs.
 
 ## Mermaid
 
-Every public diagram carries the same pure black-and-white init header, kept as
-`MERMAID_THEME` in `smythe/graph.py`:
+Every public Mermaid diagram carries this pure black-and-white init header.
+Keep it directly in authored diagrams; the historical Python graph exporter
+does not exist in the active Rust workspace.
 
 ```text
 %%{init: {"theme":"base","themeVariables":{"fontFamily":"Georgia, 'Times New Roman', serif","fontSize":"14px","primaryColor":"#ffffff","primaryTextColor":"#000000","primaryBorderColor":"#000000","lineColor":"#000000","secondaryColor":"#ffffff","tertiaryColor":"#ffffff","background":"#ffffff","mainBkg":"#ffffff","clusterBkg":"#ffffff","clusterBorder":"#000000"},"flowchart":{"curve":"basis","nodeSpacing":48,"rankSpacing":58}}}%%
@@ -83,11 +86,11 @@ Use the repository-native SVG badges in `assets/badges/` for the experimental
 Rust workspace version, minimum Rust version, and license. Each uses the
 conventional two-tone split—a black label field with white type and a white
 value field with black type—inside a complete one-pixel black rectangular
-border. Keep Rust badge values synchronized with `Cargo.toml`. The older
-Python and PyPI assets remain available for historical Python documentation.
+border. Keep Rust badge values synchronized with `Cargo.toml`. Python and PyPI
+badges have been retired from the active repository.
 
 The README CI badge uses GitHub's live `rust.yml` workflow badge, scoped to
-push runs on the Rust development branch, `feature/rust-noumenon`, until cutover.
+push runs on `main`.
 Its status color is an intentional exception: green means the latest applicable
 run passed, and failures change the badge automatically. Do not replace it with
 a static passing badge.
@@ -101,7 +104,9 @@ black-and-white charts.
 
 ## Operator reports
 
-Local Jobs and Autotune reports use the same black-and-white editorial system. Put run
+Historical Python Jobs and Autotune reports use the same black-and-white
+editorial system. Rust inspection currently emits JSON; these HTML reports
+are not native preview features. For future report interfaces, put run
 state or saved decisions, exceptional counts, and exact cost balances before detailed
 records. Keep completeness and estimate qualifiers beside the cost table.
 Use native disclosures for prompts, responses, and lineage. On narrow screens,

@@ -537,7 +537,7 @@ fn failure_keeps_successful_siblings_settled() {
             Ok(1)
         }
         fn complete(&self, t: &Task, _: &[Dependency<'_, u64>]) -> Result<CompletionResult<u64>> {
-            anyhow::ensure!(t.goal != "a", "fixture failure");
+            anyhow::ensure!(t.goal != "a", "{}", ["org", "-", "fixtureprivate"].concat());
             Ok(CompletionResult {
                 output: 2,
                 cost_nanousd: 1,
@@ -545,11 +545,18 @@ fn failure_keeps_successful_siblings_settled() {
         }
     }
     let store = Store::memory().unwrap();
+    let error = Swarm::new(2, 3)
+        .unwrap()
+        .execute_in(&graph(), &Broken, &store, "failure", false)
+        .err()
+        .unwrap();
+    let secret = ["org", "-", "fixtureprivate"].concat();
+    assert!(!format!("{error:#}").contains(&secret));
+    assert!(!smythe_core::diagnostics::message(&error).contains(&secret));
     assert!(
-        Swarm::new(2, 3)
+        !serde_json::to_string(&store.history("failure").unwrap())
             .unwrap()
-            .execute_in(&graph(), &Broken, &store, "failure", false)
-            .is_err()
+            .contains(&secret)
     );
     let state = store.inspect("failure").unwrap();
     assert_eq!(state.budget.spent, NanoUsd(1));
@@ -630,6 +637,9 @@ fn a_later_quote_failure_drains_and_settles_an_already_dispatched_sibling() {
             .is_err()
     );
     let state = store.inspect("quote").unwrap();
+    assert_eq!(state.status(), "quote_blocked");
+    assert!(state.disposition.is_none());
+    assert!(state.failure_reason.is_none());
     assert_eq!(state.budget.spent, NanoUsd(1));
     assert!(state.budget.pending().is_empty());
     assert_eq!(state.attempts["a"].state, AttemptState::Accepted);

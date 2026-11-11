@@ -1,7 +1,10 @@
 # Changelog archive
 
-Released sections of the **smythe** changelog from 0.1.0 through 0.8.1, moved
-unchanged from [CHANGELOG.md](CHANGELOG.md), which records newer releases.
+Historical **Python** release entries from 0.1.0 through 0.8.1, preserved
+unchanged from [CHANGELOG.md](CHANGELOG.md). These version numbers belong to
+the Python line. The active project is the Rust 0.9.0 source preview; see the
+[native guide](docs/rust.md) and [roadmap](ROADMAP.md) for current capabilities.
+New Rust changes belong under `[Unreleased]` in the main changelog.
 
 ---
 

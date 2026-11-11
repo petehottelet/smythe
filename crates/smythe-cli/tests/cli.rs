@@ -209,3 +209,224 @@ fn cli_pause_stop_and_budget_errors_preserve_run_identity() {
     assert_eq!(result["run_id"], "budget");
     drop(store);
 }
+
+fn diagnostic(output: Output, code: i32, class: &str, forbidden: &[&str]) -> String {
+    for bytes in [&output.stdout, &output.stderr] {
+        let text = String::from_utf8(bytes.clone()).unwrap();
+        for value in forbidden {
+            assert!(!text.contains(value), "private diagnostic escaped");
+        }
+    }
+    let stderr = String::from_utf8(output.stderr.clone()).unwrap();
+    let value = check(output, code, Some(class));
+    let message = value["error"]["message"].as_str().unwrap();
+    assert!(message.len() <= smythe_core::diagnostics::MAX_DIAGNOSTIC_BYTES);
+    assert_eq!(stderr.trim_end(), format!("Smythe: {message}"));
+    message.into()
+}
+
+#[test]
+fn graph_diagnostics_explain_cycles_and_misspelled_fields_without_source_snippets() {
+    let mut f = Fixture::new();
+    fs::write(
+        &f.graph,
+        r#"{"nodes":[{"id":"a","task":{"goal":"fixture","input":0},"depends_on":["a"]}]}"#,
+    )
+    .unwrap();
+    assert!(diagnostic(f.run("cycle", &[]), 2, "invalid_command", &[]).contains("cycle"));
+    for (extension, text) in [
+        (
+            "json",
+            r#"{"nodes":[{"id":"a","task":{"goal":"fixture","input":0},"depend_on":[] }]}"#,
+        ),
+        (
+            "toml",
+            "[[nodes]]\nid = 'a'\ndepend_on = []\n[nodes.task]\ngoal = 'fixture'\ninput = 0\n",
+        ),
+    ] {
+        f.graph.set_extension(extension);
+        fs::write(&f.graph, text).unwrap();
+        let message = diagnostic(f.run("field", &[]), 2, "invalid_command", &["fixture"]);
+        assert!(message.contains("unknown field `depend_on`"));
+        assert!(message.contains("line") && message.contains("column"));
+    }
+}
+
+#[test]
+fn parser_and_argument_diagnostics_omit_sensitive_values_paths_and_long_unicode() {
+    let mut f = Fixture::new();
+    let secrets = [
+        ["org", "-", "syntheticaccount"].concat(),
+        ["sk", "-", "syntheticcredential"].concat(),
+        ["proj", "_", "syntheticproject"].concat(),
+        ["fixture", "@", "example.invalid"].concat(),
+        ["/", "home", "/fixture/private"].concat(),
+        ["C:", "\\", "Users", "\\Fixture\\private"].concat(),
+        "雪🙂".repeat(2000),
+    ];
+    for secret in &secrets {
+        for extension in ["json", "toml"] {
+            f.graph.set_extension(extension);
+            // Invalid type, unknown field, and syntax error: all parser paths
+            // must omit both the sensitive value and the source excerpt.
+            let quoted = serde_json::to_string(secret).unwrap();
+            let cases = if extension == "json" {
+                vec![
+                    format!("{{\"nodes\":{quoted}}}"),
+                    format!("{{{quoted}:0,\"nodes\":[]}}"),
+                    format!("{{\"nodes\":[] {quoted}}}"),
+                ]
+            } else {
+                vec![
+                    format!("nodes = {quoted}"),
+                    format!("{quoted} = 0\nnodes = []"),
+                    format!("nodes = []\ninvalid {quoted}"),
+                ]
+            };
+            for text in cases {
+                fs::write(&f.graph, &text).unwrap();
+                let message = diagnostic(
+                    f.run("private", &[]),
+                    2,
+                    "invalid_command",
+                    &[secret, &text],
+                );
+                assert!(message.contains("graph at line"));
+            }
+        }
+        diagnostic(
+            f.run("argument", &["--workers", secret]),
+            2,
+            "invalid_command",
+            &[secret],
+        );
+        diagnostic(
+            f.run("argument", &[secret]),
+            2,
+            "invalid_command",
+            &[secret],
+        );
+    }
+    f.graph = f.root.join("missing.json");
+    let path = f.graph.to_str().unwrap();
+    assert!(
+        diagnostic(f.run("missing-file", &[]), 2, "invalid_command", &[path])
+            .contains("file or directory not found")
+    );
+}
+
+#[test]
+fn ownership_diagnostics_keep_the_existing_class_and_explain_the_live_owner() {
+    let f = Fixture::new();
+    check(f.run("owned", &[]), 0, None);
+    let store = Store::open(&f.store).unwrap();
+    let _lease = store.lease("owned").unwrap();
+    let message = diagnostic(f.run("owned", &["--resume"]), 1, "provider_failed", &[]);
+    assert!(message.contains("another coordinator owns this run"));
+}
+
+#[test]
+fn explicit_limits_require_a_cursor_and_paging_keeps_its_existing_shape() {
+    let f = Fixture::new();
+    check(f.run("pages", &[]), 0, None);
+    let message = diagnostic(
+        f.cmd(&["inspect", "pages", "--events", "--limit", "2"]),
+        2,
+        "invalid_command",
+        &[],
+    );
+    assert!(message.contains("--after"));
+    let full = check(f.cmd(&["inspect", "pages", "--events"]), 0, None);
+    assert!(full["state"].is_object() && full["next_sequence"].is_null());
+    let expected = full["events"].as_array().unwrap();
+    let mut collected = vec![];
+    let mut after = 0;
+    loop {
+        let page = check(
+            f.cmd(&[
+                "inspect",
+                "pages",
+                "--events",
+                "--after",
+                &after.to_string(),
+                "--limit",
+                "2",
+            ]),
+            0,
+            None,
+        );
+        assert!(page["state"].is_null());
+        let events = page["events"].as_array().unwrap();
+        assert!(events.len() <= 2);
+        if events.is_empty() {
+            break;
+        }
+        collected.extend(events.iter().cloned());
+        after = page["next_sequence"].as_u64().unwrap();
+    }
+    assert_eq!(&collected, expected);
+    let default = check(
+        f.cmd(&["inspect", "pages", "--events", "--after", "0"]),
+        0,
+        None,
+    );
+    assert_eq!(default["events"].as_array().unwrap(), expected);
+    for limit in ["0", "10001"] {
+        check(
+            f.cmd(&[
+                "inspect", "pages", "--events", "--after", "0", "--limit", limit,
+            ]),
+            2,
+            Some("invalid_command"),
+        );
+    }
+}
+
+#[test]
+fn provider_error_text_never_reaches_the_journal_or_resumed_cli_diagnostic() {
+    use smythe::{CompletionResult, Dependency, Provider, Task};
+    struct Broken(String);
+    impl Provider for Broken {
+        type Output = Value;
+        fn effect(&self) -> smythe::Effect {
+            smythe::Effect::Pure
+        }
+        // A fixture deliberately shares the offline binding so the CLI can
+        // inspect the persisted failure without another provider dispatch.
+        fn binding(&self) -> String {
+            OfflineProvider.binding()
+        }
+        fn cost_bound_nanousd(&self, _: &Task) -> anyhow::Result<u64> {
+            Ok(0)
+        }
+        fn complete(
+            &self,
+            _: &Task,
+            _: &[Dependency<'_, Value>],
+        ) -> anyhow::Result<CompletionResult<Value>> {
+            anyhow::bail!(self.0.clone())
+        }
+    }
+    let f = Fixture::new();
+    let secret = ["org", "-", "fixtureprivate"].concat();
+    let store = Store::open(&f.store).unwrap();
+    let graph: ExecutionGraph = serde_json::from_slice(&fs::read(&f.graph).unwrap()).unwrap();
+    let error = Swarm::new(1, 0)
+        .unwrap()
+        .execute_in(&graph, &Broken(secret.clone()), &store, "failure", false)
+        .err()
+        .unwrap();
+    assert!(!format!("{error:#}").contains(&secret));
+    assert!(
+        !serde_json::to_string(&store.history("failure").unwrap())
+            .unwrap()
+            .contains(&secret)
+    );
+    drop(store);
+    diagnostic(
+        f.run("failure", &["--resume"]),
+        1,
+        "provider_failed",
+        &[&secret],
+    );
+}

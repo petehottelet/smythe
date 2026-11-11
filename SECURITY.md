@@ -1,103 +1,85 @@
-# Security Policy
+# Security policy
 
-## Supported versions
+## Supported code
 
-While **smythe** is on a `0.x` line the API is not stable, and only the latest
-minor release receives security fixes. Once a `1.0.0` release ships, this
-section will be updated with a longer support window.
+Security work targets the **Rust 0.9.0 source preview on main**. Report the exact
+commit because the preview version number also covers subsequent fixes. APIs
+and journal formats remain experimental; stable Rust 1.0.0 is still ahead.
 
-| Version  | Supported          |
-| -------- | ------------------ |
-| Rust 0.2.0 source preview | Active development |
-| Historical Python releases | Retained in Git history |
+| Code line | Status |
+|---|---|
+| Rust preview on main | Active development and security fixes |
+| Original Rust preview tags | Historical snapshots; use main for subsequent fixes |
+| Python releases through 0.10.0 | Retained history; not the active implementation |
+
+See [source builds](docs/distribution.md) for version identities and
+[release verification](RELEASING.md) for the current checks.
 
 ## Reporting a vulnerability
 
-**Please do not report security issues through public GitHub issues, pull
-requests, or discussions.**
+Please report vulnerabilities through the repository's
+[private security advisory form](https://github.com/petehottelet/smythe/security/advisories/new).
+Keep exploit details out of public issues, pull requests and discussions.
 
-Instead, use GitHub's private security advisory flow:
+Include:
 
-1. Go to the
-   [Security Advisories page](https://github.com/petehottelet/smythe/security/advisories/new)
-   for this repository.
-2. Click **Report a vulnerability**.
-3. Describe the issue, including:
-   - The version of smythe affected.
-   - A minimal reproduction (if available).
-   - Whether the reproduction uses serial or parallel execution, tools,
-     artifacts, checkpoints, or resume.
-   - The impact you believe the vulnerability has (e.g. credential leak,
-     unbounded resource use, prompt-injection-driven exfiltration).
-   - Any mitigations or workarounds you are aware of.
+- The commit, operating system and Rust toolchain used.
+- A minimal graph or command that reproduces the problem.
+- Whether the failure concerns admission, accounting, journal recovery, output
+  loading, controls or Noumenon exports.
+- The impact and any known workaround.
 
-Remove API keys, access tokens, private prompts, customer data, and sensitive
-generated artifacts from the report. If a secret is required to reproduce the
-issue, coordinate a secure transfer with the maintainer rather than pasting it
-into an advisory comment.
+Remove credentials, private prompts, customer data, sensitive output and local
+account paths from the report. A sanitized graph and relevant error class are
+preferable to an entire run store. If sensitive material is essential,
+coordinate its transfer privately before including it.
 
 You should receive an acknowledgement within **5 business days**. If you do
-not, please ping [@petehottelet](https://github.com/petehottelet) on the
-repository (without disclosing details) so the report can be re-routed.
+not, contact [@petehottelet](https://github.com/petehottelet) on the repository
+without disclosing the vulnerability details.
 
 ## Disclosure timeline
 
 - **Acknowledgement:** within 5 business days.
-- **Initial assessment and severity classification:** within 10 business days
-  of acknowledgement.
-- **Fix and coordinated disclosure:** target 30-90 days from acknowledgement,
-  depending on severity and complexity. We will keep you updated.
+- **Initial assessment:** within 10 business days of acknowledgement.
+- **Fix and coordinated disclosure:** target 30–90 days from acknowledgement,
+  depending on severity and complexity.
 
-We will credit reporters in the release notes for the fixing version unless
-you request otherwise.
+Reporters are credited in the fixing release's notes unless they request
+otherwise. Coordinate privately before submitting a test that discloses an
+exploitable weakness.
 
-## Scope and threat model
+## Native threat model
 
-The native threat model is **single-tenant, trusted-operator**. Local pure Rust
-providers execute with the caller's permissions; this is not a callback sandbox.
-Graph and output limits bound the runtime's accounting and retained evidence,
-but cannot forcibly stop arbitrary callback code. SHA-256 verifies consistency,
-not authenticity against a writer who controls the store. Keep run data private.
-Recovery covers application-process crashes, not power loss or remote effects.
+The runtime is **single-tenant, trusted-operator** software. Local provider
+callbacks execute with the caller's permissions. A run store and the process
+that owns it must be trusted.
 
-The following concerns describe the historical Python implementation retained
-in Git history and future native integrations; they are not shipped Rust APIs:
+| Boundary | Current behavior and limit |
+|---|---|
+| Execution | Graph, concurrency, attempt, deadline and output limits constrain the runtime; they cannot sandbox or forcibly terminate arbitrary callback code |
+| Accounting | Checked integer nanoUSD, reservations before dispatch and retained known spend; the preview does not implement paid remote providers |
+| Stored evidence | Hash and length verification detect changed output bytes; SHA-256 is not authentication against a writer who controls the store |
+| Ownership | Local process locks and generation/sequence checks reject stale writes; this is not a distributed or multi-tenant isolation boundary |
+| Recovery | SQLite WAL with synchronous NORMAL covers application-process crashes; power loss, OS crashes and network filesystems are outside the guarantee |
+| External effects | The runtime refuses external-effect execution; its pure retry contract does not establish safe replay of remote actions |
 
-- **Prompt injection.** Untrusted task descriptions or tool outputs that
-  manipulate the Architect or an agent into making unintended calls, invoking
-  an allowed tool unsafely, or exfiltrating data. Treat model output as
-  untrusted input and keep tool allowlists narrow.
-- **Secrets and sensitive outputs at rest.** Traces, `PlannerMemory` JSONL,
-  benchmark records, generated artifacts, and checkpoint JSON can contain
-  prompts, tool results, file paths, or customer data. Store these outside
-  shared repositories, restrict access, and sanitize them before reporting a
-  bug. MCP `env_passthrough` stores variable names in configuration, but the
-  launched tool process still receives their values.
-- **Tool authority.** MCP servers and other tool runtimes execute with the
-  permissions of the operator who starts them. Smythe provides allowlists,
-  timeouts, and bounded tool loops; it does not sandbox the server process or
-  make an unsafe tool safe.
-- **Cost and resource exhaustion.** Smythe caps concurrency, tool iterations,
-  and per-node time, and budgeted image calls now fail closed without a
-  conservative whole-call estimate. Provider pricing and caller-supplied
-  `max_cost_per_call_usd` values can still become stale. Start paid runs with a
-  small cap, monitor provider-side usage limits, and treat resumed
-  non-idempotent calls as potentially duplicating spend or side effects.
-- **Artifact and checkpoint integrity.** Files are atomically finalized, but
-  local users with write access can replace or edit persisted evidence. Do not
-  treat an untrusted artifact directory or checkpoint store as authenticated.
-- **Dependency vulnerabilities.** smythe pins minimum versions of provider
-  SDKs but does not vendor them. Provider-side issues should be reported
-  upstream.
+Keep run stores and exported artifacts outside shared source repositories.
+Restrict access to their directories and inspect records before sharing them:
+task input, outputs, diagnostics and journals can contain sensitive material.
+Deleting a source checkout does not remove run stores elsewhere.
 
-Out of scope:
+## Future integrations and historical behavior
 
-- Multi-tenant isolation (smythe is not currently designed to be safe across
-  mutually distrusting tenants in a single process).
-- Sandboxing of arbitrary tool or provider execution.
-- Security guarantees for third-party MCP servers, model providers, or files
-  supplied by an untrusted checkpoint/artifact backend.
+Model-driven planning, paid providers, tools, MCP, supervision and Jobs are not
+shipped native integrations. The [roadmap](ROADMAP.md) requires explicit tool
+authority, bounded calls, untrusted-source handling and reconciliation before
+those integrations can establish their own guarantees.
 
-Security hardening priorities are tracked in [ROADMAP.md](ROADMAP.md). Pull
-requests are welcome, but please coordinate privately first when a proposed
-test would disclose an exploitable weakness.
+The [historical Python security policy](https://github.com/petehottelet/smythe/blob/12f14704beff344228fffffce40d995daa1f7cce/SECURITY.md)
+describes the retired provider and tool paths. Its protections and APIs should
+not be inferred from the Rust preview.
+
+Multi-tenant isolation, callback sandboxing and security guarantees for
+third-party services are outside the current scope. Report dependency issues
+that affect Smythe, including a minimal reproduction where possible.

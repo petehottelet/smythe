@@ -15,7 +15,13 @@ While the project is on a `0.x` line, the public API is **not yet stable**:
 - `0.x.y` patch bumps (e.g. `0.1.0` -> `0.1.1`) are **non-breaking** and contain only
   bug fixes, documentation, or internal improvements.
 - The first stable release will be `1.0.0`. Until then, pin to a specific minor
-  version (`smythe~=0.1.0`) if API stability matters to you.
+  version and exact source revision when reproducing preview behavior. Rust
+  packages are currently unpublished; retain `Cargo.lock` with the checkout.
+
+The active Rust workspace is the **0.9.0 source preview**. The released entries
+below describe the historical Python line, whose version numbers and tags
+remain unchanged. See [Releasing](RELEASING.md#version-identities) for the
+distinction between `v0.2.0`, `rust-v0.2.0` and ongoing development on `main`.
 
 Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
 [changelog archive](CHANGELOG-ARCHIVE.md).
@@ -24,6 +30,32 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
 
 ## [Unreleased]
 
+- Set the native workspace to 0.9.0, still an experimental source preview.
+  Historical Python release numbers and existing tags remain unchanged.
+- Report bounded, sanitized CLI diagnostics with parser locations and useful
+  validation and ownership reasons; preserve typed classes and exit codes.
+  Omit source snippets, arbitrary causes and provider error text.
+- Require `--after` when `inspect --events` has an explicit `--limit`, preserving
+  existing full-history and paged envelope shapes.
+- Include the coordinator and diagnostic modules in Noumenon report hashes;
+  check coverage of every runtime Rust source and manifest. Source hashes
+  remain informational and do not invalidate semantic resume compatibility.
+- Make failed cost quotes resumable after admitted siblings drain and settle,
+  without duplicating attempts, reservations or quote-block events.
+- Reset retry allowance on transitive invalidation while preserving monotonic
+  attempt identities. Retries and crash recovery still exhaust their own limit.
+- Amend schema 3 in place with quote blocks and an optional local-replay base
+  marker. Preserve earlier journal projections at every prefix; existing terminal
+  quote/attempt failures remain failed and older readers are not forward-compatible.
+- Extend the 5,000-seed simulation with quote recovery, retries, expansion,
+  revision and graph-change crashes; retain a lifetime-limit counterexample
+  and four original schema-3 compatibility fixtures.
+- Document implemented recovery, diagnostics, paging and report provenance;
+  clarify remaining local and raster qualification gaps,
+  the path to 1.0, optional telemetry, and learning deferred beyond 1.0.
+- Refresh the roadmap, documentation index, source-build instructions and
+  community guidance for the Rust preview; distinguish current capabilities
+  from historical Python releases and retained benchmark evidence.
 - Make the active repository Rust-only at workspace version 0.2.0. Retire Python
   implementation, tests, packaging and publishing workflows while retaining
   historical source in Git, benchmark records and the Noumenon GIF.

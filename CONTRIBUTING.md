@@ -1,6 +1,6 @@
 # Contributing to Smythe
 
-Smythe's active implementation is Rust. The current workspace is a 0.2.0 source
+Smythe's active implementation is Rust. The current workspace is a 0.9.0 source
 preview; stable Rust 1.0.0 remains ahead. Follow the [Code of Conduct](CODE_OF_CONDUCT.md)
 and report sensitive issues through [private security reporting](SECURITY.md).
 
@@ -20,6 +20,26 @@ The full offline suite includes deterministic scheduling simulation and real
 process-kill recovery. Paid calls do not belong in tests. Linux and Windows CI
 run the suite and the explicit [release performance gates](docs/rust.md#verification-and-native-measurements).
 Ruff is not applicable: active Python implementation and tests have been retired.
+
+## Where changes belong
+
+| Package | Responsibility |
+|---|---|
+| `smythe-core` | Graphs, exact accounting, journal transitions and the pure coordinator |
+| `smythe` | Runtime, providers, output loading, storage and I/O seams |
+| `smythe-cli` | Commands, JSON envelopes, exit codes and inspection |
+| `smythe-noumenon` | Authored contours, compilation, validation and exports |
+| `xtask` | Committed-source provenance and native measurements |
+
+Start with the [native guide](docs/rust.md), [examples](examples/README.md#rust-alpha-examples)
+and [roadmap](ROADMAP.md). For executable locations, dependency caching and
+preview version identities, see [source builds](docs/distribution.md).
+
+For documentation-only changes, check local links and heading fragments, run
+any changed command examples, and confirm that retained evidence and released
+changelog sections are unchanged. Historical Python guides must remain labeled
+and point to the revision that supports their commands. Do not describe planned
+native integrations as shipped features.
 
 ## Project conventions
 

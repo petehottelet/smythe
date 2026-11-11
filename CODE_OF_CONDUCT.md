@@ -66,10 +66,12 @@ automated workflow is unacceptable behavior.
 ## Enforcement
 
 Instances of abusive, harassing, or otherwise unacceptable behavior may be
-reported to the project maintainers via a private GitHub message to
-[@petehottelet](https://github.com/petehottelet) or by opening a confidential
-[security advisory](https://github.com/petehottelet/smythe/security/advisories/new)
-on this repository.
+reported to the project maintainers through this repository's confidential
+[advisory form](https://github.com/petehottelet/smythe/security/advisories/new).
+State that the report concerns community conduct. Include links to the relevant
+interaction and only the information needed to understand the incident; keep
+private details out of public issues and pull requests. For software
+vulnerabilities, follow the [Security Policy](SECURITY.md).
 
 All complaints will be reviewed and investigated promptly and fairly.
 

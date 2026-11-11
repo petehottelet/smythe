@@ -5,6 +5,7 @@ use std::{error::Error, fmt};
 pub enum EngineError {
     JournalChanged,
     BudgetExhausted,
+    QuoteBlocked,
     NotAdmitting,
     StaleOwner,
     UnsupportedEffect,
@@ -22,6 +23,7 @@ impl fmt::Display for EngineError {
         f.write_str(match self {
             Self::JournalChanged => "journal revision differs; reload before admission",
             Self::BudgetExhausted => "insufficient remaining allowance before dispatch",
+            Self::QuoteBlocked => "cost quote unavailable; correct the provider and resume the run",
             Self::NotAdmitting => "run is not admitting work",
             Self::StaleOwner => "stale owner generation",
             Self::UnsupportedEffect => "external effects require an uncertain-outcome runtime",
@@ -49,6 +51,7 @@ impl EngineError {
             Self::Integrity => "integrity",
             Self::ProviderFailed => "provider_failed",
             Self::BudgetExhausted => "budget_blocked",
+            Self::QuoteBlocked => "quote_blocked",
             Self::InvalidCommand => "invalid_command",
             Self::JournalChanged => "journal_changed",
             Self::NotAdmitting => "not_admitting",

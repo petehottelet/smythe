@@ -6,9 +6,9 @@ use rand_chacha::{
 use smythe_core::{
     ExecutionGraph, Limits, NanoUsd, Node, OutputRef, Task,
     coordinator::{Command, Completion, Coordinator, Finish, Input, Outcome},
-    journal::{AttemptState, Control, Event, Projection, Record, call_key},
+    journal::{Admission, AttemptState, Control, Event, Projection, Record, call_key},
 };
-use std::collections::{HashSet, VecDeque};
+use std::collections::{HashMap, HashSet, VecDeque};
 
 fn graph() -> ExecutionGraph {
     ExecutionGraph {
@@ -33,21 +33,30 @@ fn graph() -> ExecutionGraph {
 }
 fn records(state: Option<&Projection>, events: Vec<(Event, u64)>) -> Vec<Record> {
     let first = state.map_or(1, |s| s.sequence + 1);
+    let mut revision = state.map_or(0, |s| s.revision);
+    let mut generation = state.map_or(0, |s| s.generation);
     events
         .into_iter()
         .enumerate()
         .map(|(i, (event, time))| {
-            let phase = event.identity().0.map(|_| "simulation".into());
+            revision = event.revision(revision);
+            if let Event::Claimed { generation: next } = &event {
+                generation = *next;
+            }
+            let phase = event
+                .identity()
+                .0
+                .and_then(|n| state.unwrap().node(n).unwrap().phase.clone());
             Record::new(
                 "sim",
                 first + i as u64,
-                state.map_or(0, |s| s.generation),
+                generation,
                 first,
                 event,
                 time,
                 time.saturating_sub(5),
             )
-            .in_revision(0, phase)
+            .in_revision(revision, phase)
         })
         .collect()
 }
@@ -66,24 +75,78 @@ fn assert_invariants(state: &Projection, journal: &[Record]) {
             .count()
     );
     let mut expected = 0;
+    let mut received = HashMap::new();
+    let mut settled = HashSet::new();
+    let mut reservations = HashSet::new();
+    let mut accepted = HashSet::new();
+    let mut expected_nodes = graph().nodes;
+    let mut numbers = HashMap::new();
+    let mut bases = HashMap::new();
     for r in journal {
-        if let Event::Settled { node, attempt } = &r.event {
-            expected += journal
-                .iter()
-                .find_map(|prior| match &prior.event {
-                    Event::Received {
-                        node: n,
-                        attempt: a,
-                        cost,
-                        ..
-                    } if n == node && a == attempt => Some(cost.0),
-                    _ => None,
-                })
-                .unwrap();
+        match &r.event {
+            Event::Received {
+                node,
+                attempt,
+                cost,
+                ..
+            } => {
+                assert!(received.insert((node.clone(), *attempt), cost.0).is_none());
+            }
+            Event::Settled { node, attempt } => {
+                assert!(settled.insert((node.clone(), *attempt)));
+                expected += received[&(node.clone(), *attempt)];
+            }
+            Event::Admitted { node, attempt, .. } => {
+                assert!(reservations.insert(call_key(r.revision, node, *attempt)));
+                assert_eq!(*attempt, numbers.get(node).copied().unwrap_or(0) + 1);
+                numbers.insert(node.clone(), *attempt);
+            }
+            Event::Accepted { node, .. } => {
+                accepted.insert(node.clone());
+            }
+            Event::Expanded { nodes, .. } => {
+                expected_nodes.extend(nodes.clone());
+            }
+            Event::Revised { invalidated, .. } => {
+                // Independent lineage oracle: do not ask Projection which nodes it invalidated.
+                let mut invalid: HashSet<_> = invalidated.iter().cloned().collect();
+                loop {
+                    let len = invalid.len();
+                    for n in &expected_nodes {
+                        if n.depends_on.iter().any(|d| invalid.contains(d)) {
+                            invalid.insert(n.id.clone());
+                        }
+                    }
+                    if invalid.len() == len {
+                        break;
+                    }
+                }
+                for node in invalid {
+                    accepted.remove(&node);
+                    bases.insert(node.clone(), numbers.get(&node).copied().unwrap_or(0));
+                }
+            }
+            Event::RunFailed { .. } => panic!("reachable local run failure"),
+            _ => {}
         }
     }
+    assert_eq!(
+        state.graph.nodes, expected_nodes,
+        "expansion must restore exactly its recorded children"
+    );
+    assert_eq!(
+        accepted,
+        state
+            .attempts
+            .iter()
+            .filter(|(_, a)| a.state == AttemptState::Accepted)
+            .map(|(n, _)| n.clone())
+            .collect()
+    );
     assert_eq!(state.budget.spent.0, expected);
     for (node, a) in &state.attempts {
+        assert_eq!(a.revision_base, bases.get(node).copied().unwrap_or(0));
+        assert!(a.number - a.revision_base <= state.limits.max_attempts_per_node);
         if matches!(
             a.state,
             AttemptState::Admitted | AttemptState::Dispatched | AttemptState::Received
@@ -103,6 +166,49 @@ fn assert_invariants(state: &Projection, journal: &[Record]) {
         assert!(state.budget.pending().is_empty());
     }
 }
+#[derive(Default, Debug)]
+struct Coverage {
+    quotes: usize,
+    retries: usize,
+    expansions: usize,
+    revisions: usize,
+    expansion_crashes: usize,
+    revision_crashes: usize,
+    beyond_lifetime: usize,
+}
+fn restart(
+    state: &mut Projection,
+    journal: &mut Vec<Record>,
+    quotes: &[Option<NanoUsd>],
+    time: u64,
+) -> (Coordinator, VecDeque<Command>) {
+    assert!(state.disposition.is_none());
+    let claim = records(
+        Some(state),
+        vec![(
+            Event::Claimed {
+                generation: state.generation + 1,
+            },
+            time,
+        )],
+    );
+    state.apply_batch(&claim).unwrap();
+    journal.extend(claim);
+    let mut coordinator = Coordinator::new(
+        Projection::replay(journal).unwrap(),
+        quotes.to_vec(),
+        3,
+        time,
+    )
+    .unwrap();
+    let commands = coordinator
+        .step(Input::Recovered {
+            invalid_outputs: HashSet::new(),
+        })
+        .unwrap()
+        .into();
+    (coordinator, commands)
+}
 fn dispatch_is_committed(state: &Projection, node: usize, attempt: u64) -> bool {
     state
         .attempts
@@ -121,7 +227,7 @@ fn dispatch_is_committed(state: &Projection, node: usize, attempt: u64) -> bool 
                     .all(|p| state.attempts[p].state == AttemptState::Accepted)
         })
 }
-fn simulate(seed: u64) -> Result<(), String> {
+fn simulate(seed: u64) -> Result<Coverage, String> {
     let result = std::panic::catch_unwind(|| {
         let mut rng = ChaCha8Rng::seed_from_u64(seed);
         let uninterrupted_equivalent = seed.is_multiple_of(5);
@@ -133,7 +239,6 @@ fn simulate(seed: u64) -> Result<(), String> {
                     graph: graph(),
                     ceiling: NanoUsd(12),
                     limits: Limits {
-                        max_attempts_per_node: 16,
                         wall_deadline_ms: if !uninterrupted_equivalent && seed.is_multiple_of(7) {
                             Some(1200)
                         } else {
@@ -155,8 +260,11 @@ fn simulate(seed: u64) -> Result<(), String> {
             1000,
         ));
         let mut committed = Projection::replay(&journal).unwrap();
-        let mut coordinator =
-            Coordinator::new(committed.clone(), vec![Some(NanoUsd(2)); 6], 3, 1000).unwrap();
+        let mut quotes = vec![Some(NanoUsd(2)); 6];
+        if !uninterrupted_equivalent && seed % 3 == 1 {
+            quotes[1] = None;
+        }
+        let mut coordinator = Coordinator::new(committed.clone(), quotes.clone(), 3, 1000).unwrap();
         let mut commands: VecDeque<_> = coordinator
             .step(Input::Recovered {
                 invalid_outputs: HashSet::new(),
@@ -165,8 +273,10 @@ fn simulate(seed: u64) -> Result<(), String> {
             .into();
         let mut active = Vec::new();
         let mut crashes = 0;
+        let mut graph_changes = 0;
+        let mut coverage = Coverage::default();
         let mut time = 1000;
-        for step in 0..500 {
+        for step in 0..2000 {
             if let Some(command) = commands.pop_front() {
                 match command {
                     Command::Append { events, .. } => {
@@ -199,7 +309,8 @@ fn simulate(seed: u64) -> Result<(), String> {
                             let changes = records(Some(&committed), events);
                             committed.apply_batch(&changes).unwrap();
                             journal.extend(changes.clone());
-                            if rng.next_u32() % 13 == 0
+                            if !uninterrupted_equivalent
+                                && rng.next_u32() % 13 == 0
                                 && crashes < 3
                                 && committed.disposition.is_none()
                             {
@@ -207,32 +318,8 @@ fn simulate(seed: u64) -> Result<(), String> {
                                 crashes += 1;
                                 active.clear();
                                 commands.clear();
-                                let generation = committed.generation + 1;
-                                let claim = Record::new(
-                                    "sim",
-                                    committed.sequence + 1,
-                                    generation,
-                                    committed.sequence + 1,
-                                    Event::Claimed { generation },
-                                    time,
-                                    time,
-                                );
-                                committed.apply(&claim).unwrap();
-                                journal.push(claim);
-                                coordinator = Coordinator::new(
-                                    Projection::replay(&journal).unwrap(),
-                                    vec![Some(NanoUsd(2)); 6],
-                                    3,
-                                    time,
-                                )
-                                .unwrap();
-                                commands.extend(
-                                    coordinator
-                                        .step(Input::Recovered {
-                                            invalid_outputs: HashSet::new(),
-                                        })
-                                        .unwrap(),
-                                );
+                                (coordinator, commands) =
+                                    restart(&mut committed, &mut journal, &quotes, time);
                             } else {
                                 commands
                                     .extend(coordinator.step(Input::Committed(changes)).unwrap());
@@ -243,6 +330,9 @@ fn simulate(seed: u64) -> Result<(), String> {
                     Command::Dispatch { node, attempt, .. } => {
                         assert!(dispatch_is_committed(&committed, node, attempt));
                         assert!(!active.iter().any(|&(n, _)| n == node));
+                        if attempt > committed.limits.max_attempts_per_node {
+                            coverage.beyond_lifetime += 1;
+                        }
                         active.push((node, attempt));
                     }
                     Command::Finish(Finish::Paused) => {
@@ -273,8 +363,107 @@ fn simulate(seed: u64) -> Result<(), String> {
                         journal.extend(changes.clone());
                         commands.extend(coordinator.step(Input::Foreign(changes)).unwrap());
                     }
-                    Command::Finish(_) => {
+                    Command::Finish(Finish::QuoteBlocked) => {
+                        assert!(
+                            active.is_empty()
+                                && committed.quote_blocked
+                                && committed.disposition.is_none()
+                        );
+                        coverage.quotes += 1;
+                        quotes.fill(Some(NanoUsd(2)));
+                        (coordinator, commands) =
+                            restart(&mut committed, &mut journal, &quotes, time);
+                    }
+                    Command::Finish(finish) => {
                         assert_invariants(&committed, &journal);
+                        assert!(active.is_empty());
+                        if !uninterrupted_equivalent && committed.admission == Admission::Open {
+                            let retry = committed
+                                .graph
+                                .nodes
+                                .iter()
+                                .filter_map(|n| {
+                                    let a = committed.attempts.get(&n.id)?;
+                                    (matches!(
+                                        a.state,
+                                        AttemptState::Failed | AttemptState::Rejected
+                                    ) && a.number - a.revision_base
+                                        < committed.limits.max_attempts_per_node)
+                                        .then(|| Event::Retried {
+                                            node: n.id.clone(),
+                                            attempt: a.number,
+                                        })
+                                })
+                                .collect::<Vec<_>>();
+                            if finish == Finish::Failed
+                                && !retry.is_empty()
+                                && rng.next_u32() % 2 == 0
+                            {
+                                let event = retry[rng.next_u32() as usize % retry.len()].clone();
+                                let changes = records(Some(&committed), vec![(event, time)]);
+                                committed.apply_batch(&changes).unwrap();
+                                journal.extend(changes);
+                                coverage.retries += 1;
+                                (coordinator, commands) =
+                                    restart(&mut committed, &mut journal, &quotes, time);
+                                continue;
+                            }
+                            if graph_changes < 3 && rng.next_u32() % 4 != 0 {
+                                graph_changes += 1;
+                                let parent = rng.next_u32() as usize % committed.graph.nodes.len();
+                                let expand = rng.next_u32() % 2 == 0;
+                                let event = if expand {
+                                    let i = committed.graph.nodes.len();
+                                    coverage.expansions += 1;
+                                    Event::Expanded {
+                                        parent_revision: committed.revision,
+                                        revision: committed.revision + 1,
+                                        input_manifest_sha256: format!("{seed:064x}"),
+                                        nodes: vec![Node {
+                                            id: i.to_string(),
+                                            phase: Some("simulation".into()),
+                                            task: Task {
+                                                goal: "expanded".into(),
+                                                input: i.into(),
+                                            },
+                                            depends_on: vec![
+                                                committed.graph.nodes[parent].id.clone(),
+                                            ],
+                                        }],
+                                    }
+                                } else {
+                                    coverage.revisions += 1;
+                                    Event::Revised {
+                                        revision: committed.revision + 1,
+                                        reason: "fixture".into(),
+                                        invalidated: vec![committed.graph.nodes[parent].id.clone()],
+                                    }
+                                };
+                                let changes = records(Some(&committed), vec![(event, time)]);
+                                committed.apply_batch(&changes).unwrap();
+                                journal.extend(changes.clone());
+                                quotes.resize(committed.graph.nodes.len(), Some(NanoUsd(2)));
+                                assert_invariants(&committed, &journal);
+                                if rng.next_u32() % 2 == 0 {
+                                    // Crash after the graph commit, before the old coordinator observes it.
+                                    if expand {
+                                        coverage.expansion_crashes += 1;
+                                    } else {
+                                        coverage.revision_crashes += 1;
+                                    }
+                                    (coordinator, commands) =
+                                        restart(&mut committed, &mut journal, &quotes, time);
+                                } else {
+                                    commands
+                                        .extend(coordinator.step(Input::Foreign(changes)).unwrap());
+                                    coordinator.set_quotes(quotes.clone()).unwrap();
+                                    commands.extend(
+                                        coordinator.step(Input::Tick { now_ms: time }).unwrap(),
+                                    );
+                                }
+                                continue;
+                            }
+                        }
                         if uninterrupted_equivalent {
                             assert!(committed.completed());
                             assert_eq!(committed.budget.spent, NanoUsd(6));
@@ -288,8 +477,10 @@ fn simulate(seed: u64) -> Result<(), String> {
                                     format!("{node:064x}")
                                 );
                             }
+                            assert_eq!(graph_changes, 0);
+                            assert_eq!(crashes, 0);
                         }
-                        return;
+                        return coverage;
                     }
                 }
             } else if !active.is_empty() && rng.next_u32() % 3 != 0 {
@@ -337,16 +528,43 @@ fn simulate(seed: u64) -> Result<(), String> {
                 };
                 commands.extend(coordinator.step(Input::Tick { now_ms: time }).unwrap());
             }
-            assert!(step < 499, "scheduler failed to terminate");
+            assert!(step < 1999, "scheduler failed to terminate");
         }
+        unreachable!()
     });
     result.map_err(|_| format!("ChaCha8 seed {seed}; replay this exact seed"))
 }
 #[test]
 fn five_thousand_seeded_schedules_replay_committed_prefixes() {
+    let mut total = Coverage::default();
     for seed in 0..5000 {
-        simulate(seed).unwrap();
+        let c = simulate(seed).unwrap();
+        total.quotes += c.quotes;
+        total.retries += c.retries;
+        total.expansions += c.expansions;
+        total.revisions += c.revisions;
+        total.expansion_crashes += c.expansion_crashes;
+        total.revision_crashes += c.revision_crashes;
+        total.beyond_lifetime += c.beyond_lifetime;
     }
+    assert!(
+        total.quotes > 0
+            && total.retries > 0
+            && total.expansions > 0
+            && total.revisions > 0
+            && total.expansion_crashes > 0
+            && total.revision_crashes > 0
+            && total.beyond_lifetime > 0,
+        "{total:?}"
+    );
+    println!("{total:?}");
+}
+#[test]
+fn recorded_counterexample_detects_lifetime_attempt_limit() {
+    let fixture: serde_json::Value =
+        serde_json::from_str(include_str!("fixtures/revision-attempt-limit.json")).unwrap();
+    let coverage = simulate(fixture["seed"].as_u64().unwrap()).unwrap();
+    assert!(coverage.revisions > 0 && coverage.beyond_lifetime > 0);
 }
 #[test]
 fn recorded_counterexample_detects_dispatch_before_commit() {

@@ -1,10 +1,15 @@
 # Rust alpha: journaled local execution
 
-The native workspace is **0.2.0**, a Rust-only source preview. Its packages are
+The native workspace is **0.9.0**, a Rust-only source preview. Its packages are
 unpublished and interfaces are experimental. The eventual stable Rust release
 will be 1.0.0. Historical Python source, tests and comparison harnesses remain at
 [12f1470](https://github.com/petehottelet/smythe/tree/12f14704beff344228fffffce40d995daa1f7cce).
 They are not required to build or run the active repository.
+
+See [source builds and distribution](distribution.md) for executable locations
+and version identities, and the [roadmap](../ROADMAP.md) for the path to 1.0.
+The local engine is still being qualified; the [known preview limitations](#known-preview-limitations)
+below describe gaps that remain in the current implementation.
 
 ## Build and run
 
@@ -61,6 +66,18 @@ boundary, and occurrence/recording times. Sequence orders events despite clock
 skew. Schema 1 and 2 journals are refused without modification; use a fresh
 directory. CLI envelopes remain schema 1.
 
+Schema 3 is amended in place: the current reader preserves the original fields
+of older schema-3 journal projections, including every recorded prefix. It adds
+resumable `quote_blocked` events and derives an attempt's `revision_base` from
+invalidation. New `local_replay` events carry an optional checked base marker;
+older events without it retain their original lifetime-limit meaning. Older
+binaries are not forward-compatible with these events and attempt sequences;
+use the amended reader for stores written by this implementation.
+
+Already-terminal `RunFailed` journals with `quote_failed` or `attempt_limit`
+remain failed. They need a new run ID; this amendment does not rewrite history
+or provide a recovery override.
+
 One process lock owns each run. Generation and sequence checks reject stale
 writes. Every dispatch follows committed admission. Received evidence, settlement
 and acceptance remain distinct. Recovery reuses valid receipts without another
@@ -84,6 +101,11 @@ include revision, node and attempt. Known spend survives output rejection.
 An overrun closes admission without changing operator intent; complete graph
 coverage still yields `completed`. Otherwise closure drains in-flight work.
 A budget-blocked run remains nonterminal and can continue after its ceiling grows.
+A failed cost quote also leaves the run nonterminal with status `quote_blocked`.
+Already-admitted siblings drain and settle first. Correct the provider and
+resume the same run: quotes are recomputed, accepted outputs are reused and
+prior settlement is preserved. Repeated unsuccessful resumes add no duplicate
+quote-block event or attempt. Provider diagnostic text is not journaled.
 
 ## Controls, limits and revisions
 
@@ -102,7 +124,8 @@ After the coordinator exits, record continue/retry as appropriate and invoke
 spent plus reserved money. Budget changes are outside the semantic run binding.
 External effects are refused by the runtime and cannot use pure retry or replay.
 
-Saved limits default to 10,000 nodes, 100,000 edges, three attempts per node,
+Saved limits default to 10,000 nodes, 100,000 edges, three attempts per node
+since its last invalidation,
 64 MiB per output and 1 GiB total received output. Configure them with
 `--max-nodes`, `--max-edges`, `--max-attempts-per-node`,
 `--max-output-bytes`, and `--max-total-output-bytes`.
@@ -117,16 +140,30 @@ reused. Duplicate identities, missing dependencies, cycles, stale revisions and
 changes with unsettled work are refused. These events are foundations for later
 planning and supervision, not a model-driven planner.
 
+Attempt numbers remain monotonic across revisions. Invalidation resets only
+the affected node's retry allowance, including descendants; ordinary retries,
+resumes and expansions do not refill it. Three failures or interrupted attempts
+within that allowance still exhaust the default limit. A separate cap on the
+number of revisions belongs to future supervision and is not enforced here.
+
 ## CLI output and inspection
 
 Normal commands emit JSON to stdout. Failures emit a schema-1 error envelope
 containing `run_id` when known and `error.class` and `error.message`; stderr
 also contains a human-readable diagnostic. `--json` is accepted explicitly.
 
+The same public diagnostic appears in JSON and stderr, bounded to 1,024 UTF-8
+bytes with `[truncated]` when shortened. Recognized causes explain cycles,
+validation and ownership failures. Parser diagnostics include format, line and
+column; schema names and single-edit field typos are retained. Other field names,
+source snippets, argument values and arbitrary cause text are omitted. Unsupported
+causes use the fixed class message. Provider callback errors remain suppressed
+before journaling. Classes and exit codes remain the decision interface.
+
 | Exit | Meaning |
 |---|---|
 | 0 | Success |
-| 1 | Execution/provider failure |
+| 1 | Execution/provider failure or resumable `quote_blocked` |
 | 2 | Invalid arguments or configuration |
 | 3 | Paused or stopped |
 | 4 | Budget blocked |
@@ -147,6 +184,21 @@ Plain inspect verifies the complete journal and reports shape, accepted coverage
 unresolved reservations, last progress and derived owner `live`/`absent` health.
 Paged inspection uses sequence cursors; pages can split transaction groups.
 Concatenating pages reconstructs the same event stream as full history.
+An explicit `--limit` requires `--after`, which requires `--events`; omitting
+the cursor is an argument error. With a cursor, the default limit is 1,000
+and the allowed range is 1–10,000. Without a cursor, `--events` retains the
+full inspection envelope and event history.
+
+## Known preview limitations
+
+These qualification gaps remain in the current schema-3 preview. The roadmap
+lists the work still required before 1.0.
+
+| Area | Current behavior |
+|---|---|
+| Local acceptance | Shared raster-reference approval, catalog style acceptance and full-workflow measurement qualification remain open |
+| Native tooling | Tracked-file identifier scanning, local-link tooling and dependency advisory/license gates remain planned |
+| Remote workflows | Paid providers, external-effect recovery, generated planning, tools and supervision remain future capabilities |
 
 ## Noumenon acceptance
 
@@ -166,12 +218,24 @@ Resume checks saved compilation and validation evidence in parallel, reconstruct
 missing derived SVGs, and refuses changed artifacts. Semantic protocol, recipe,
 compiler, raster and gate versions bind recovery; worker count may change.
 
+Reports hash every Rust source beneath `src/` in the four runtime crates, their manifests,
+the workspace manifest, lockfile and Clippy configuration. A completeness test
+detects unlisted source files and checks the embedded hashes against their bytes.
+These hashes are informational: source edits do not change semantic resume
+bindings. Clean committed-source and binary provenance remains the separate
+`xtask provenance` contract.
+
 Full mode renders at 16, 32, 64 and 128 pixels, checks topology and all-pairs
 distinctness under crop normalization, translation and reflection at 0.85 IoU,
 and writes SVGs, catalog, atlas, validation and report files. Native raster
 hashes differ from Pillow. Stroke, spacing, counters, skeleton orientation and
 symmetry measurements have analytic fixtures but do not yet establish catalog-wide
 style acceptance. `--mode compile` omits validation. Both modes make zero API calls.
+
+SVG hashes have a committed reference. Native pixel, atlas and catalog hashes
+are checked for consistency within runs, but are not yet compared with a shared,
+approved raster manifest across Windows and Linux. That reference and catalog
+style acceptance are separate remaining qualification requirements.
 
 ## Verification and native measurements
 
@@ -188,11 +252,19 @@ cargo run --release --locked --offline -p xtask -- benchmark smythe_artifacts/na
 
 Ruff is not applicable to the Rust-only active repository. Linux and Windows CI
 run the offline suite, including 5,000 deterministic ChaCha8 scheduler seeds,
-committed-prefix replay, controls, clock skew and crash-before-acknowledgement
-schedules. Separate real-process tests kill writers around SQL commits and blob
+committed-prefix replay, controls, clock skew, quote-block recovery, explicit
+retries, expansion, revision and crash-before-acknowledgement schedules. Separate
+real-process tests kill writers around SQL commits and blob
 publication. Release gates compare per-node time at 2,000 and 8,000 independent
 nodes (at most 1.5× growth), execute a 5,000-node chain, and bound 256-node inline
 disk overhead to 3× memory. Large-file disk timing is diagnostic.
+
+The simulation checks accepted lineage, per-invalidation attempt allowance,
+unique reservations, single settlement and recovery of recorded expansions.
+Saved counterexamples cover dispatch before commit and a deliberately restored
+lifetime attempt limit. Four journals captured from the earlier schema-3
+implementation preserve original projections at every prefix. These local
+checks do not qualify remote effects or complete [local qualification](../ROADMAP.md#local-qualification).
 
 The measurement runner refuses uncommitted trees and hidden index entries,
 hashes committed Git blob contents, builds locked dependencies and rechecks

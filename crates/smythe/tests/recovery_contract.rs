@@ -380,6 +380,7 @@ fn external_interruption_keeps_exposure_and_rejected_transitions_are_atomic() {
         Event::LocalReplay {
             node: "a".into(),
             attempt: 1,
+            revision_base: Some(0),
         },
     ] {
         let mut projection = state.clone();

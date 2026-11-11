@@ -2,7 +2,7 @@
   <img src="assets/wordmark.svg" alt="SMYTHE" width="340">
   <p><em>An open-source framework for task-based agent swarms with dynamic parallelization, routing, and execution topology.</em></p>
   <p>
-    <a href="docs/rust.md"><img src="assets/badges/alpha.svg" alt="Rust preview 0.2.0"></a>
+    <a href="docs/rust.md"><img src="assets/badges/alpha.svg" alt="Rust preview 0.9.0"></a>
     <a href="https://github.com/petehottelet/smythe/actions/workflows/rust.yml?query=branch%3Amain+event%3Apush"><img src="https://github.com/petehottelet/smythe/actions/workflows/rust.yml/badge.svg?branch=main&amp;event=push" alt="Rust CI status"></a>
     <img src="assets/badges/rust.svg" alt="Rust 1.91 or later">
     <a href="LICENSE"><img src="assets/badges/license.svg" alt="License: MIT"></a>
@@ -20,8 +20,9 @@ Define the work and its dependencies, execute ready tasks in parallel, and
 inspect the journal of outputs and costs. The native engine combines bounded
 concurrency, exact cost reservations, and recovery after a process interruption.
 
-The **Rust 0.2.0 preview** runs local workflows with or without API keys. 
-Model-driven planning, paid providers, tools, MCP, supervision and Jobs are roadmapped. [Current scope](docs/rust.md).
+The **Rust 0.9.0 preview** runs local workflows with or without API keys.
+Model-driven planning, paid providers, tools, MCP, supervision and Jobs are
+roadmapped. [Current scope](docs/rust.md).
 
 <p align="center">
   <img src="assets/noumenon/noumenon-loop.gif" alt="Animated Noumenon rain showing the 192 authored Smythe glyphs" width="900">
@@ -110,7 +111,7 @@ interrupted local work without a saved result may run again.
 | Bound parallel work | Readiness-driven execution through a bounded Rayon worker pool |
 | Account for cost | Checked integer nanoUSD, reservations before dispatch, and idempotent settlement; current providers are local and zero-cost |
 | Recover interrupted work | SQLite journals, immutable output blobs, and integrity checks before reuse |
-| Inspect or control a run | Typed JSON errors, cursor paging, owner health, and persisted pause, continue, stop, retry and budget commands |
+| Inspect or control a run | Typed JSON errors with bounded sanitized diagnostics, explicit cursor paging, owner health, and persisted pause, continue, stop, retry and budget commands |
 | Produce the glyph catalog | Authored SVG compilation, raster validation, distinctness checks, and resumable exports |
 | Embed the engine | The `smythe` crate's `Swarm`, local `Provider` contract, store, and tracing types |
 
@@ -118,9 +119,12 @@ Pause and stop prevent new admissions while active local calls drain. Recovery
 guarantees cover local process crashes. Remote effects, distributed workers,
 and power-loss guarantees are outside this alpha's scope.
 
-The current native journal uses schema 3; older alpha runs require a new
-directory. Resume checks semantic compatibility and saved outputs, so unrelated
-source edits do not invalidate a run. See the [recovery contract](docs/rust.md#journal-and-recovery).
+The current native journal uses amended schema 3 and reads earlier schema-3
+journals; schemas 1 and 2 require a new directory. Failed cost quotes are resumable,
+and invalidation gives affected nodes fresh retry allowance while attempt numbers
+keep increasing. Already-terminal quote/attempt failures retain their outcome.
+Resume checks semantic compatibility and saved outputs, so unrelated source edits
+do not invalidate a run. See the [recovery contract](docs/rust.md#journal-and-recovery).
 
 [Scheduling and accounting](docs/rust.md#workspace-and-scheduling) ·
 [Journal and run controls](docs/rust.md#journal-and-recovery) ·
@@ -244,25 +248,29 @@ identical fixtures, so this shows recovery correctness, not speed.
 
 ## Project status
 
-**Rust workspace: 0.2.0, source preview.** APIs and journal formats are
+**Rust workspace: 0.9.0, source preview.** APIs and journal formats are
 experimental. The workspace contains `smythe-core` for graph and accounting
 contracts, `smythe` for the shared runtime, `smythe-cli` for the executable,
 `smythe-noumenon` for the glyph pipeline, and `xtask` for native measurements.
 Rust CI covers Linux and Windows.
 
-Native development focuses on measurement and testability, followed by
-remote accounting, provider integrations, tools, planning, supervision, and
-Jobs. See the [roadmap](ROADMAP.md#rust-alpha-020).
+The local engine is still being qualified. Quote/revision recovery, expanded
+simulation, bounded diagnostics, paging validation and report source coverage
+are implemented. Near-term work completes native checks, raster and measurement
+acceptance. See [known preview limitations](docs/rust.md#known-preview-limitations)
+and the [roadmap](ROADMAP.md#local-qualification). Remote accounting and
+generated planning follow, then tools, supervision and Jobs. Learning remains
+after 1.0; optional telemetry belongs to the planned 1.0 interfaces.
 
 The Python implementation, tests, packaging and comparison harnesses are retained
 in [Git history at 12f1470](https://github.com/petehottelet/smythe/tree/12f14704beff344228fffffce40d995daa1f7cce).
 Historical benchmark records and the Noumenon artwork remain in this checkout.
-The eventual stable Rust release will be **1.0.0**; this is the **0.2.0** preview.
+The eventual stable Rust release will be **1.0.0**; this is the **0.9.0** preview.
 
 The [Noumenon screensaver](https://github.com/petehottelet/noumenon) is a separate
 project that renders the glyph catalog. Smythe's native command produces the
 catalog; it does not build or run the screensaver.
 
-[Documentation](docs/index.md) · [Native development checks](docs/rust.md#verification-and-native-measurements) ·
+[Documentation](docs/index.md) · [Source builds](docs/distribution.md) · [Native development checks](docs/rust.md#verification-and-native-measurements) ·
 [Contributing](CONTRIBUTING.md) · [Changelog](CHANGELOG.md) ·
 [Security](SECURITY.md) · [MIT license](LICENSE).

@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet, VecDeque};
 
 pub mod coordinator;
+pub mod diagnostics;
 pub mod errors;
 pub mod journal;
 pub mod money;

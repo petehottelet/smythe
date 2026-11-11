@@ -1,99 +1,71 @@
-# Packages, source checkouts and typing
+# Source builds and distribution
 
-> Historical Python reference. The active project is Rust-only. Run this guide's commands from [source revision 12f1470](https://github.com/petehottelet/smythe/tree/12f14704beff344228fffffce40d995daa1f7cce); see the [native guide](rust.md) for current behavior.
+Smythe **0.9.0** is a Rust source preview. The workspace packages have
+`publish = false`; there is no current crates.io package or Rust binary release
+to install. Build from a checkout of `main` or an exact commit. Historical PyPI
+packages contain the retired Python implementation.
 
-These distribution improvements ship in [Smythe 0.8.0](release-0.8.0.md).
-Historical 0.7.0 artifacts remain unchanged.
+## Choose a source
 
-## Choose a distribution
-
-| Need | Distribution |
+| Need | Source |
 |---|---|
-| Use Smythe's Python API or CLI | Install the wheel with `pip install smythe` and the required provider extra |
-| Build and test the library from source | Use the source distribution and its explicit library test profile |
-| Reproduce benchmarks | Clone the repository or download its GitHub source archive |
-| Build the Noumenon screensaver | Clone the [Noumenon repository](https://github.com/petehottelet/noumenon) |
-| Build the unreleased Rust glyph pipeline | Clone this repository and follow the [Rust guide](rust.md); the Cargo workspace is separate from Python packages |
-| Audit another project with Repo Doctor | Use the [repodoctor repository](https://github.com/petehottelet/repodoctor) |
+| Current Rust runtime and CLI | This repository's `main` branch; record the exact commit when reproducing behavior |
+| Original Rust 0.2.0 snapshot | The immutable `rust-v0.2.0` tag; later fixes are on `main` |
+| Historical Python implementation | [Revision 12f1470](https://github.com/petehottelet/smythe/tree/12f14704beff344228fffffce40d995daa1f7cce) and the [historical packaging guide](https://github.com/petehottelet/smythe/blob/12f14704beff344228fffffce40d995daa1f7cce/docs/distribution.md) |
+| Noumenon screensaver | The separate [Noumenon repository](https://github.com/petehottelet/noumenon) |
+| Repo Doctor | The separate [repodoctor repository](https://github.com/petehottelet/repodoctor) |
 
-The wheel contains Smythe, its typing marker, license and package metadata.
-The source distribution adds tests, build and audit tools, README, changelog
-and build configuration. Benchmark archives and media stay in the
-repository. The `benchmarks` extra installs dependencies;
-the benchmark scripts themselves require a checkout.
+## Build the CLI
 
-## Build and verify a source package
-
-From the repository root:
+Use Rust **1.91 or later** and a C build toolchain for bundled SQLite. From the
+repository root:
 
 ```bash
-python -m pip install build hatchling
-python -m build --outdir dist
-python tools/distribution.py --dist dist
-python tools/package_smoke.py --dist dist --work /path/to/fresh/package-check
+cargo fetch --locked
+cargo build --release --locked --offline -p smythe-cli
+cargo run --release --locked --offline --bin smythe -- --help
 ```
 
-Use fresh output directories. The audit enforces an exact file inventory,
-a 2,000,000-byte compressed source limit and an 800,000-byte wheel limit.
-The limits catch accidental inclusions such as generated output or large
-fixtures. Delivery acceptance, recorded tools and context, governed external
-actions, artifact lineage and the evaluation additions raised them from
-1,000,000 and 400,000 bytes. Raise a limit only in the same change that
-documents why.
-It checks metadata, CLI entry points, release-tag README links and matching
-package bytes. The smoke check compares checkout and source-rebuilt wheels,
-installs into a clean environment, runs an offline graph and CLI, verifies
-consumer types, then runs the source archive's tests. It installs test/build
-dependencies from the package index but makes no provider API calls.
+`cargo fetch` downloads dependencies. Subsequent `--offline` commands require
+that cache. The executable is `target/release/smythe` on Unix and
+`target/release/smythe.exe` on Windows. No Python environment or API key is
+required. Linux and Windows are the platforms covered by the current CI matrix.
 
-When adding or removing library, test or maintenance files, stage those
-specific paths and update the reviewed inventory:
+Run a local graph, then inspect its journal:
 
 ```bash
-python tools/distribution.py --write-manifest
+cargo run --release --locked --offline --bin smythe -- run --graph examples/native_graph.toml --id example --store smythe_artifacts/native-runs
+cargo run --release --locked --offline --bin smythe -- inspect example --store smythe_artifacts/native-runs
 ```
 
-Review `tools/distribution-files.json` before committing it. Unexpected files
-inside allowed folders still fail the archive audit. Keep internal plans,
-review notes and local measurements in gitignored `00_project_files/`.
+Use a fresh run ID for new work; use the same graph, ID and store with
+`run --resume` to recover it. See the [native guide](rust.md) for controls,
+output retrieval and the 256-glyph Noumenon example.
 
-## Test an extracted source distribution
+## Reproduce a build or measurement
 
-From its extracted root:
+Keep `Cargo.lock` with the source and record the exact Git revision and Rust
+toolchain. Use `--locked` to reject dependency resolution changes. A version
+label alone does not identify later fixes on `main`.
 
-```bash
-python -m pip install ".[dev]" hatchling
-python -m pytest tests/ --distribution -q
-```
+The [native measurement runner](rust.md#verification-and-native-measurements)
+requires Git metadata and a clean committed tree, hashes committed blob bytes,
+and records the built binary. An extracted source archive can supply build
+inputs but does not meet that runner's provenance contract without the original
+Git history. LF/CRLF conversion does not change committed source hashes.
 
-The explicit profile excludes repository-only test modules before importing
-them and deselects the committed example-manifest case. Its complete inventory
-and reasons are in [the profile manifest](https://github.com/petehottelet/smythe/blob/12f14704beff344228fffffce40d995daa1f7cce/tests/distribution_profile.json).
-A module entry is an exact file name or a glob pattern, so one entry can cover
-a family of repository-only modules; each entry must name at least one test
-module. Library behavior, budgets, recovery, journals, tools and CLI tests remain
-enabled. Unknown missing imports still fail collection.
+## Compatibility and publication
 
-Normal `python -m pytest tests/ -q` requires the full repository and preserves
-its coverage. It fails if required repository materials disappear. Nothing
-switches test profiles automatically because a directory is missing.
+Rust APIs and journal formats remain experimental. Schema-3 runs require fresh
+directories when moving from schema 1 or 2. Python checkpoints and Jobs stores
+are not Rust run stores. Keep old data with the version that wrote it.
 
-## Python typing
+The historical `v0.2.0` tag belongs to Python. The Rust `rust-v0.2.0` tag remains
+unchanged, and stable Rust **1.0.0** is still ahead. Pushing source to GitHub
+does not create a package or GitHub Release. See [Releasing](../RELEASING.md)
+for the separate verification and publication requirements.
 
-The package includes `py.typed`. Public consumer checks verify `Task`, `Swarm`,
-`SwarmResult`, graph types and awaited results; three deliberately invalid
-calls must produce argument-type errors. They run against an installed wheel
-outside the source tree, so successful imports alone cannot satisfy the gate.
-
-Run `python -m mypy` to check the explicit strict module set in
-`pyproject.toml`. Imported signatures remain visible; internal errors in
-modules outside that set are not part of the blocking gate. Expand that set
-only after resolving the next module's diagnostics.
-
-## Repo Doctor
-
-Repo Doctor, the release-readiness auditor built on Smythe, is now its own
-project with its own releases: [repodoctor](https://github.com/petehottelet/repodoctor).
-
-For a smaller contributor checkout and evidence retention rules, see
-[Contributing](../CONTRIBUTING.md#working-with-a-slim-checkout).
+Keep generated stores, credentials and local outputs outside distributions.
+The [MIT license](../LICENSE) and copyright notice accompany the software.
+Run the [contributor checks](../CONTRIBUTING.md#development-setup) before
+proposing implementation changes.

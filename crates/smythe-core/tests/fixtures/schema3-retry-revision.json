@@ -1,0 +1,1924 @@
+{
+  "producer_revision": "a6f4ef31307425410cf5aa382163e1ab6ce60363",
+  "projections": [
+    {
+      "accepted_nodes": 0,
+      "admission": {
+        "status": "open"
+      },
+      "attempts": {},
+      "binding": "89de6871e54c833ea9e23c0e60a0550aa31b2094b6b85062f275cf904ec8918c",
+      "budget": {
+        "ceiling": "20",
+        "reservations": {},
+        "settlements": {},
+        "spent": "0"
+      },
+      "budget_blocked": false,
+      "control": "run",
+      "deadline_closed": false,
+      "dependency_bytes": 0,
+      "disposition": null,
+      "failure_reason": null,
+      "generation": 0,
+      "graph": {
+        "nodes": [
+          {
+            "depends_on": [],
+            "id": "n0",
+            "phase": "fixture",
+            "task": {
+              "goal": "fixture",
+              "input": 7
+            }
+          }
+        ],
+        "topology": []
+      },
+      "last_progress_unix_ms": null,
+      "limits": {
+        "max_attempts_per_node": 3,
+        "max_edges": 100000,
+        "max_nodes": 10000,
+        "max_output_bytes": 67108864,
+        "max_total_output_bytes": 1073741824,
+        "wall_deadline_ms": null
+      },
+      "output_bytes": 0,
+      "overrun": false,
+      "revision": 0,
+      "run_id": "retry-revision",
+      "sequence": 1
+    },
+    {
+      "accepted_nodes": 0,
+      "admission": {
+        "status": "open"
+      },
+      "attempts": {},
+      "binding": "89de6871e54c833ea9e23c0e60a0550aa31b2094b6b85062f275cf904ec8918c",
+      "budget": {
+        "ceiling": "20",
+        "reservations": {},
+        "settlements": {},
+        "spent": "0"
+      },
+      "budget_blocked": false,
+      "control": "run",
+      "deadline_closed": false,
+      "dependency_bytes": 0,
+      "disposition": null,
+      "failure_reason": null,
+      "generation": 1,
+      "graph": {
+        "nodes": [
+          {
+            "depends_on": [],
+            "id": "n0",
+            "phase": "fixture",
+            "task": {
+              "goal": "fixture",
+              "input": 7
+            }
+          }
+        ],
+        "topology": []
+      },
+      "last_progress_unix_ms": null,
+      "limits": {
+        "max_attempts_per_node": 3,
+        "max_edges": 100000,
+        "max_nodes": 10000,
+        "max_output_bytes": 67108864,
+        "max_total_output_bytes": 1073741824,
+        "wall_deadline_ms": null
+      },
+      "output_bytes": 0,
+      "overrun": false,
+      "revision": 0,
+      "run_id": "retry-revision",
+      "sequence": 2
+    },
+    {
+      "accepted_nodes": 0,
+      "admission": {
+        "status": "open"
+      },
+      "attempts": {
+        "n0": {
+          "cost": null,
+          "dependency_bytes": 0,
+          "effect": "pure",
+          "elapsed_s": 0.0,
+          "number": 1,
+          "output": null,
+          "output_valid": false,
+          "reason": null,
+          "revision": 0,
+          "state": "admitted"
+        }
+      },
+      "binding": "89de6871e54c833ea9e23c0e60a0550aa31b2094b6b85062f275cf904ec8918c",
+      "budget": {
+        "ceiling": "20",
+        "reservations": {
+          "0/n0/1": "2"
+        },
+        "settlements": {},
+        "spent": "0"
+      },
+      "budget_blocked": false,
+      "control": "run",
+      "deadline_closed": false,
+      "dependency_bytes": 0,
+      "disposition": null,
+      "failure_reason": null,
+      "generation": 1,
+      "graph": {
+        "nodes": [
+          {
+            "depends_on": [],
+            "id": "n0",
+            "phase": "fixture",
+            "task": {
+              "goal": "fixture",
+              "input": 7
+            }
+          }
+        ],
+        "topology": []
+      },
+      "last_progress_unix_ms": null,
+      "limits": {
+        "max_attempts_per_node": 3,
+        "max_edges": 100000,
+        "max_nodes": 10000,
+        "max_output_bytes": 67108864,
+        "max_total_output_bytes": 1073741824,
+        "wall_deadline_ms": null
+      },
+      "output_bytes": 0,
+      "overrun": false,
+      "revision": 0,
+      "run_id": "retry-revision",
+      "sequence": 3
+    },
+    {
+      "accepted_nodes": 0,
+      "admission": {
+        "status": "open"
+      },
+      "attempts": {
+        "n0": {
+          "cost": null,
+          "dependency_bytes": 0,
+          "effect": "pure",
+          "elapsed_s": 0.0,
+          "number": 1,
+          "output": null,
+          "output_valid": false,
+          "reason": null,
+          "revision": 0,
+          "state": "dispatched"
+        }
+      },
+      "binding": "89de6871e54c833ea9e23c0e60a0550aa31b2094b6b85062f275cf904ec8918c",
+      "budget": {
+        "ceiling": "20",
+        "reservations": {
+          "0/n0/1": "2"
+        },
+        "settlements": {},
+        "spent": "0"
+      },
+      "budget_blocked": false,
+      "control": "run",
+      "deadline_closed": false,
+      "dependency_bytes": 0,
+      "disposition": null,
+      "failure_reason": null,
+      "generation": 1,
+      "graph": {
+        "nodes": [
+          {
+            "depends_on": [],
+            "id": "n0",
+            "phase": "fixture",
+            "task": {
+              "goal": "fixture",
+              "input": 7
+            }
+          }
+        ],
+        "topology": []
+      },
+      "last_progress_unix_ms": null,
+      "limits": {
+        "max_attempts_per_node": 3,
+        "max_edges": 100000,
+        "max_nodes": 10000,
+        "max_output_bytes": 67108864,
+        "max_total_output_bytes": 1073741824,
+        "wall_deadline_ms": null
+      },
+      "output_bytes": 0,
+      "overrun": false,
+      "revision": 0,
+      "run_id": "retry-revision",
+      "sequence": 4
+    },
+    {
+      "accepted_nodes": 0,
+      "admission": {
+        "status": "open"
+      },
+      "attempts": {
+        "n0": {
+          "cost": null,
+          "dependency_bytes": 0,
+          "effect": "pure",
+          "elapsed_s": 0.0,
+          "number": 1,
+          "output": null,
+          "output_valid": false,
+          "reason": "local_provider_failed",
+          "revision": 0,
+          "state": "failed"
+        }
+      },
+      "binding": "89de6871e54c833ea9e23c0e60a0550aa31b2094b6b85062f275cf904ec8918c",
+      "budget": {
+        "ceiling": "20",
+        "reservations": {},
+        "settlements": {
+          "0/n0/1": "0"
+        },
+        "spent": "0"
+      },
+      "budget_blocked": false,
+      "control": "run",
+      "deadline_closed": false,
+      "dependency_bytes": 0,
+      "disposition": null,
+      "failure_reason": null,
+      "generation": 1,
+      "graph": {
+        "nodes": [
+          {
+            "depends_on": [],
+            "id": "n0",
+            "phase": "fixture",
+            "task": {
+              "goal": "fixture",
+              "input": 7
+            }
+          }
+        ],
+        "topology": []
+      },
+      "last_progress_unix_ms": null,
+      "limits": {
+        "max_attempts_per_node": 3,
+        "max_edges": 100000,
+        "max_nodes": 10000,
+        "max_output_bytes": 67108864,
+        "max_total_output_bytes": 1073741824,
+        "wall_deadline_ms": null
+      },
+      "output_bytes": 0,
+      "overrun": false,
+      "revision": 0,
+      "run_id": "retry-revision",
+      "sequence": 5
+    },
+    {
+      "accepted_nodes": 0,
+      "admission": {
+        "status": "open"
+      },
+      "attempts": {
+        "n0": {
+          "cost": null,
+          "dependency_bytes": 0,
+          "effect": "pure",
+          "elapsed_s": 0.0,
+          "number": 1,
+          "output": null,
+          "output_valid": false,
+          "reason": "local_provider_failed",
+          "revision": 0,
+          "state": "failed"
+        }
+      },
+      "binding": "89de6871e54c833ea9e23c0e60a0550aa31b2094b6b85062f275cf904ec8918c",
+      "budget": {
+        "ceiling": "20",
+        "reservations": {},
+        "settlements": {
+          "0/n0/1": "0"
+        },
+        "spent": "0"
+      },
+      "budget_blocked": false,
+      "control": "run",
+      "deadline_closed": false,
+      "dependency_bytes": 0,
+      "disposition": "failed",
+      "failure_reason": null,
+      "generation": 1,
+      "graph": {
+        "nodes": [
+          {
+            "depends_on": [],
+            "id": "n0",
+            "phase": "fixture",
+            "task": {
+              "goal": "fixture",
+              "input": 7
+            }
+          }
+        ],
+        "topology": []
+      },
+      "last_progress_unix_ms": null,
+      "limits": {
+        "max_attempts_per_node": 3,
+        "max_edges": 100000,
+        "max_nodes": 10000,
+        "max_output_bytes": 67108864,
+        "max_total_output_bytes": 1073741824,
+        "wall_deadline_ms": null
+      },
+      "output_bytes": 0,
+      "overrun": false,
+      "revision": 0,
+      "run_id": "retry-revision",
+      "sequence": 6
+    },
+    {
+      "accepted_nodes": 0,
+      "admission": {
+        "status": "open"
+      },
+      "attempts": {
+        "n0": {
+          "cost": null,
+          "dependency_bytes": 0,
+          "effect": "pure",
+          "elapsed_s": 0.0,
+          "number": 1,
+          "output": null,
+          "output_valid": false,
+          "reason": "local_provider_failed",
+          "revision": 0,
+          "state": "replayed"
+        }
+      },
+      "binding": "89de6871e54c833ea9e23c0e60a0550aa31b2094b6b85062f275cf904ec8918c",
+      "budget": {
+        "ceiling": "20",
+        "reservations": {},
+        "settlements": {
+          "0/n0/1": "0"
+        },
+        "spent": "0"
+      },
+      "budget_blocked": false,
+      "control": "run",
+      "deadline_closed": false,
+      "dependency_bytes": 0,
+      "disposition": null,
+      "failure_reason": null,
+      "generation": 1,
+      "graph": {
+        "nodes": [
+          {
+            "depends_on": [],
+            "id": "n0",
+            "phase": "fixture",
+            "task": {
+              "goal": "fixture",
+              "input": 7
+            }
+          }
+        ],
+        "topology": []
+      },
+      "last_progress_unix_ms": null,
+      "limits": {
+        "max_attempts_per_node": 3,
+        "max_edges": 100000,
+        "max_nodes": 10000,
+        "max_output_bytes": 67108864,
+        "max_total_output_bytes": 1073741824,
+        "wall_deadline_ms": null
+      },
+      "output_bytes": 0,
+      "overrun": false,
+      "revision": 0,
+      "run_id": "retry-revision",
+      "sequence": 7
+    },
+    {
+      "accepted_nodes": 0,
+      "admission": {
+        "status": "open"
+      },
+      "attempts": {
+        "n0": {
+          "cost": null,
+          "dependency_bytes": 0,
+          "effect": "pure",
+          "elapsed_s": 0.0,
+          "number": 1,
+          "output": null,
+          "output_valid": false,
+          "reason": "local_provider_failed",
+          "revision": 0,
+          "state": "replayed"
+        }
+      },
+      "binding": "89de6871e54c833ea9e23c0e60a0550aa31b2094b6b85062f275cf904ec8918c",
+      "budget": {
+        "ceiling": "20",
+        "reservations": {},
+        "settlements": {
+          "0/n0/1": "0"
+        },
+        "spent": "0"
+      },
+      "budget_blocked": false,
+      "control": "run",
+      "deadline_closed": false,
+      "dependency_bytes": 0,
+      "disposition": null,
+      "failure_reason": null,
+      "generation": 2,
+      "graph": {
+        "nodes": [
+          {
+            "depends_on": [],
+            "id": "n0",
+            "phase": "fixture",
+            "task": {
+              "goal": "fixture",
+              "input": 7
+            }
+          }
+        ],
+        "topology": []
+      },
+      "last_progress_unix_ms": null,
+      "limits": {
+        "max_attempts_per_node": 3,
+        "max_edges": 100000,
+        "max_nodes": 10000,
+        "max_output_bytes": 67108864,
+        "max_total_output_bytes": 1073741824,
+        "wall_deadline_ms": null
+      },
+      "output_bytes": 0,
+      "overrun": false,
+      "revision": 0,
+      "run_id": "retry-revision",
+      "sequence": 8
+    },
+    {
+      "accepted_nodes": 0,
+      "admission": {
+        "status": "open"
+      },
+      "attempts": {
+        "n0": {
+          "cost": null,
+          "dependency_bytes": 0,
+          "effect": "pure",
+          "elapsed_s": 0.0,
+          "number": 2,
+          "output": null,
+          "output_valid": false,
+          "reason": null,
+          "revision": 0,
+          "state": "admitted"
+        }
+      },
+      "binding": "89de6871e54c833ea9e23c0e60a0550aa31b2094b6b85062f275cf904ec8918c",
+      "budget": {
+        "ceiling": "20",
+        "reservations": {
+          "0/n0/2": "2"
+        },
+        "settlements": {
+          "0/n0/1": "0"
+        },
+        "spent": "0"
+      },
+      "budget_blocked": false,
+      "control": "run",
+      "deadline_closed": false,
+      "dependency_bytes": 0,
+      "disposition": null,
+      "failure_reason": null,
+      "generation": 2,
+      "graph": {
+        "nodes": [
+          {
+            "depends_on": [],
+            "id": "n0",
+            "phase": "fixture",
+            "task": {
+              "goal": "fixture",
+              "input": 7
+            }
+          }
+        ],
+        "topology": []
+      },
+      "last_progress_unix_ms": null,
+      "limits": {
+        "max_attempts_per_node": 3,
+        "max_edges": 100000,
+        "max_nodes": 10000,
+        "max_output_bytes": 67108864,
+        "max_total_output_bytes": 1073741824,
+        "wall_deadline_ms": null
+      },
+      "output_bytes": 0,
+      "overrun": false,
+      "revision": 0,
+      "run_id": "retry-revision",
+      "sequence": 9
+    },
+    {
+      "accepted_nodes": 0,
+      "admission": {
+        "status": "open"
+      },
+      "attempts": {
+        "n0": {
+          "cost": null,
+          "dependency_bytes": 0,
+          "effect": "pure",
+          "elapsed_s": 0.0,
+          "number": 2,
+          "output": null,
+          "output_valid": false,
+          "reason": null,
+          "revision": 0,
+          "state": "dispatched"
+        }
+      },
+      "binding": "89de6871e54c833ea9e23c0e60a0550aa31b2094b6b85062f275cf904ec8918c",
+      "budget": {
+        "ceiling": "20",
+        "reservations": {
+          "0/n0/2": "2"
+        },
+        "settlements": {
+          "0/n0/1": "0"
+        },
+        "spent": "0"
+      },
+      "budget_blocked": false,
+      "control": "run",
+      "deadline_closed": false,
+      "dependency_bytes": 0,
+      "disposition": null,
+      "failure_reason": null,
+      "generation": 2,
+      "graph": {
+        "nodes": [
+          {
+            "depends_on": [],
+            "id": "n0",
+            "phase": "fixture",
+            "task": {
+              "goal": "fixture",
+              "input": 7
+            }
+          }
+        ],
+        "topology": []
+      },
+      "last_progress_unix_ms": null,
+      "limits": {
+        "max_attempts_per_node": 3,
+        "max_edges": 100000,
+        "max_nodes": 10000,
+        "max_output_bytes": 67108864,
+        "max_total_output_bytes": 1073741824,
+        "wall_deadline_ms": null
+      },
+      "output_bytes": 0,
+      "overrun": false,
+      "revision": 0,
+      "run_id": "retry-revision",
+      "sequence": 10
+    },
+    {
+      "accepted_nodes": 0,
+      "admission": {
+        "status": "open"
+      },
+      "attempts": {
+        "n0": {
+          "cost": "1",
+          "dependency_bytes": 0,
+          "effect": "pure",
+          "elapsed_s": 0.0,
+          "number": 2,
+          "output": {
+            "bytes": 1,
+            "sha256": "7902699be42c8a8e46fbbb4501726517e86b22c56a189f7625a6da49081b2451"
+          },
+          "output_valid": true,
+          "reason": null,
+          "revision": 0,
+          "state": "received"
+        }
+      },
+      "binding": "89de6871e54c833ea9e23c0e60a0550aa31b2094b6b85062f275cf904ec8918c",
+      "budget": {
+        "ceiling": "20",
+        "reservations": {
+          "0/n0/2": "2"
+        },
+        "settlements": {
+          "0/n0/1": "0"
+        },
+        "spent": "0"
+      },
+      "budget_blocked": false,
+      "control": "run",
+      "deadline_closed": false,
+      "dependency_bytes": 0,
+      "disposition": null,
+      "failure_reason": null,
+      "generation": 2,
+      "graph": {
+        "nodes": [
+          {
+            "depends_on": [],
+            "id": "n0",
+            "phase": "fixture",
+            "task": {
+              "goal": "fixture",
+              "input": 7
+            }
+          }
+        ],
+        "topology": []
+      },
+      "last_progress_unix_ms": 1000,
+      "limits": {
+        "max_attempts_per_node": 3,
+        "max_edges": 100000,
+        "max_nodes": 10000,
+        "max_output_bytes": 67108864,
+        "max_total_output_bytes": 1073741824,
+        "wall_deadline_ms": null
+      },
+      "output_bytes": 1,
+      "overrun": false,
+      "revision": 0,
+      "run_id": "retry-revision",
+      "sequence": 11
+    },
+    {
+      "accepted_nodes": 0,
+      "admission": {
+        "status": "open"
+      },
+      "attempts": {
+        "n0": {
+          "cost": "1",
+          "dependency_bytes": 0,
+          "effect": "pure",
+          "elapsed_s": 0.0,
+          "number": 2,
+          "output": {
+            "bytes": 1,
+            "sha256": "7902699be42c8a8e46fbbb4501726517e86b22c56a189f7625a6da49081b2451"
+          },
+          "output_valid": true,
+          "reason": null,
+          "revision": 0,
+          "state": "settled"
+        }
+      },
+      "binding": "89de6871e54c833ea9e23c0e60a0550aa31b2094b6b85062f275cf904ec8918c",
+      "budget": {
+        "ceiling": "20",
+        "reservations": {},
+        "settlements": {
+          "0/n0/1": "0",
+          "0/n0/2": "1"
+        },
+        "spent": "1"
+      },
+      "budget_blocked": false,
+      "control": "run",
+      "deadline_closed": false,
+      "dependency_bytes": 0,
+      "disposition": null,
+      "failure_reason": null,
+      "generation": 2,
+      "graph": {
+        "nodes": [
+          {
+            "depends_on": [],
+            "id": "n0",
+            "phase": "fixture",
+            "task": {
+              "goal": "fixture",
+              "input": 7
+            }
+          }
+        ],
+        "topology": []
+      },
+      "last_progress_unix_ms": 1000,
+      "limits": {
+        "max_attempts_per_node": 3,
+        "max_edges": 100000,
+        "max_nodes": 10000,
+        "max_output_bytes": 67108864,
+        "max_total_output_bytes": 1073741824,
+        "wall_deadline_ms": null
+      },
+      "output_bytes": 1,
+      "overrun": false,
+      "revision": 0,
+      "run_id": "retry-revision",
+      "sequence": 12
+    },
+    {
+      "accepted_nodes": 1,
+      "admission": {
+        "status": "open"
+      },
+      "attempts": {
+        "n0": {
+          "cost": "1",
+          "dependency_bytes": 0,
+          "effect": "pure",
+          "elapsed_s": 0.0,
+          "number": 2,
+          "output": {
+            "bytes": 1,
+            "sha256": "7902699be42c8a8e46fbbb4501726517e86b22c56a189f7625a6da49081b2451"
+          },
+          "output_valid": true,
+          "reason": null,
+          "revision": 0,
+          "state": "accepted"
+        }
+      },
+      "binding": "89de6871e54c833ea9e23c0e60a0550aa31b2094b6b85062f275cf904ec8918c",
+      "budget": {
+        "ceiling": "20",
+        "reservations": {},
+        "settlements": {
+          "0/n0/1": "0",
+          "0/n0/2": "1"
+        },
+        "spent": "1"
+      },
+      "budget_blocked": false,
+      "control": "run",
+      "deadline_closed": false,
+      "dependency_bytes": 0,
+      "disposition": null,
+      "failure_reason": null,
+      "generation": 2,
+      "graph": {
+        "nodes": [
+          {
+            "depends_on": [],
+            "id": "n0",
+            "phase": "fixture",
+            "task": {
+              "goal": "fixture",
+              "input": 7
+            }
+          }
+        ],
+        "topology": []
+      },
+      "last_progress_unix_ms": 1000,
+      "limits": {
+        "max_attempts_per_node": 3,
+        "max_edges": 100000,
+        "max_nodes": 10000,
+        "max_output_bytes": 67108864,
+        "max_total_output_bytes": 1073741824,
+        "wall_deadline_ms": null
+      },
+      "output_bytes": 1,
+      "overrun": false,
+      "revision": 0,
+      "run_id": "retry-revision",
+      "sequence": 13
+    },
+    {
+      "accepted_nodes": 1,
+      "admission": {
+        "status": "open"
+      },
+      "attempts": {
+        "n0": {
+          "cost": "1",
+          "dependency_bytes": 0,
+          "effect": "pure",
+          "elapsed_s": 0.0,
+          "number": 2,
+          "output": {
+            "bytes": 1,
+            "sha256": "7902699be42c8a8e46fbbb4501726517e86b22c56a189f7625a6da49081b2451"
+          },
+          "output_valid": true,
+          "reason": null,
+          "revision": 0,
+          "state": "accepted"
+        }
+      },
+      "binding": "89de6871e54c833ea9e23c0e60a0550aa31b2094b6b85062f275cf904ec8918c",
+      "budget": {
+        "ceiling": "20",
+        "reservations": {},
+        "settlements": {
+          "0/n0/1": "0",
+          "0/n0/2": "1"
+        },
+        "spent": "1"
+      },
+      "budget_blocked": false,
+      "control": "run",
+      "deadline_closed": false,
+      "dependency_bytes": 0,
+      "disposition": "completed",
+      "failure_reason": null,
+      "generation": 2,
+      "graph": {
+        "nodes": [
+          {
+            "depends_on": [],
+            "id": "n0",
+            "phase": "fixture",
+            "task": {
+              "goal": "fixture",
+              "input": 7
+            }
+          }
+        ],
+        "topology": []
+      },
+      "last_progress_unix_ms": 1000,
+      "limits": {
+        "max_attempts_per_node": 3,
+        "max_edges": 100000,
+        "max_nodes": 10000,
+        "max_output_bytes": 67108864,
+        "max_total_output_bytes": 1073741824,
+        "wall_deadline_ms": null
+      },
+      "output_bytes": 1,
+      "overrun": false,
+      "revision": 0,
+      "run_id": "retry-revision",
+      "sequence": 14
+    },
+    {
+      "accepted_nodes": 0,
+      "admission": {
+        "status": "open"
+      },
+      "attempts": {
+        "n0": {
+          "cost": "1",
+          "dependency_bytes": 0,
+          "effect": "pure",
+          "elapsed_s": 0.0,
+          "number": 2,
+          "output": {
+            "bytes": 1,
+            "sha256": "7902699be42c8a8e46fbbb4501726517e86b22c56a189f7625a6da49081b2451"
+          },
+          "output_valid": true,
+          "reason": null,
+          "revision": 0,
+          "state": "invalidated"
+        }
+      },
+      "binding": "89de6871e54c833ea9e23c0e60a0550aa31b2094b6b85062f275cf904ec8918c",
+      "budget": {
+        "ceiling": "20",
+        "reservations": {},
+        "settlements": {
+          "0/n0/1": "0",
+          "0/n0/2": "1"
+        },
+        "spent": "1"
+      },
+      "budget_blocked": false,
+      "control": "run",
+      "deadline_closed": false,
+      "dependency_bytes": 0,
+      "disposition": null,
+      "failure_reason": null,
+      "generation": 2,
+      "graph": {
+        "nodes": [
+          {
+            "depends_on": [],
+            "id": "n0",
+            "phase": "fixture",
+            "task": {
+              "goal": "fixture",
+              "input": 7
+            }
+          }
+        ],
+        "topology": []
+      },
+      "last_progress_unix_ms": 1000,
+      "limits": {
+        "max_attempts_per_node": 3,
+        "max_edges": 100000,
+        "max_nodes": 10000,
+        "max_output_bytes": 67108864,
+        "max_total_output_bytes": 1073741824,
+        "wall_deadline_ms": null
+      },
+      "output_bytes": 1,
+      "overrun": false,
+      "revision": 1,
+      "run_id": "retry-revision",
+      "sequence": 15
+    },
+    {
+      "accepted_nodes": 0,
+      "admission": {
+        "status": "open"
+      },
+      "attempts": {
+        "n0": {
+          "cost": "1",
+          "dependency_bytes": 0,
+          "effect": "pure",
+          "elapsed_s": 0.0,
+          "number": 2,
+          "output": {
+            "bytes": 1,
+            "sha256": "7902699be42c8a8e46fbbb4501726517e86b22c56a189f7625a6da49081b2451"
+          },
+          "output_valid": true,
+          "reason": null,
+          "revision": 0,
+          "state": "invalidated"
+        }
+      },
+      "binding": "89de6871e54c833ea9e23c0e60a0550aa31b2094b6b85062f275cf904ec8918c",
+      "budget": {
+        "ceiling": "20",
+        "reservations": {},
+        "settlements": {
+          "0/n0/1": "0",
+          "0/n0/2": "1"
+        },
+        "spent": "1"
+      },
+      "budget_blocked": false,
+      "control": "run",
+      "deadline_closed": false,
+      "dependency_bytes": 0,
+      "disposition": null,
+      "failure_reason": null,
+      "generation": 3,
+      "graph": {
+        "nodes": [
+          {
+            "depends_on": [],
+            "id": "n0",
+            "phase": "fixture",
+            "task": {
+              "goal": "fixture",
+              "input": 7
+            }
+          }
+        ],
+        "topology": []
+      },
+      "last_progress_unix_ms": 1000,
+      "limits": {
+        "max_attempts_per_node": 3,
+        "max_edges": 100000,
+        "max_nodes": 10000,
+        "max_output_bytes": 67108864,
+        "max_total_output_bytes": 1073741824,
+        "wall_deadline_ms": null
+      },
+      "output_bytes": 1,
+      "overrun": false,
+      "revision": 1,
+      "run_id": "retry-revision",
+      "sequence": 16
+    },
+    {
+      "accepted_nodes": 0,
+      "admission": {
+        "status": "open"
+      },
+      "attempts": {
+        "n0": {
+          "cost": null,
+          "dependency_bytes": 0,
+          "effect": "pure",
+          "elapsed_s": 0.0,
+          "number": 3,
+          "output": null,
+          "output_valid": false,
+          "reason": null,
+          "revision": 1,
+          "state": "admitted"
+        }
+      },
+      "binding": "89de6871e54c833ea9e23c0e60a0550aa31b2094b6b85062f275cf904ec8918c",
+      "budget": {
+        "ceiling": "20",
+        "reservations": {
+          "1/n0/3": "2"
+        },
+        "settlements": {
+          "0/n0/1": "0",
+          "0/n0/2": "1"
+        },
+        "spent": "1"
+      },
+      "budget_blocked": false,
+      "control": "run",
+      "deadline_closed": false,
+      "dependency_bytes": 0,
+      "disposition": null,
+      "failure_reason": null,
+      "generation": 3,
+      "graph": {
+        "nodes": [
+          {
+            "depends_on": [],
+            "id": "n0",
+            "phase": "fixture",
+            "task": {
+              "goal": "fixture",
+              "input": 7
+            }
+          }
+        ],
+        "topology": []
+      },
+      "last_progress_unix_ms": 1000,
+      "limits": {
+        "max_attempts_per_node": 3,
+        "max_edges": 100000,
+        "max_nodes": 10000,
+        "max_output_bytes": 67108864,
+        "max_total_output_bytes": 1073741824,
+        "wall_deadline_ms": null
+      },
+      "output_bytes": 1,
+      "overrun": false,
+      "revision": 1,
+      "run_id": "retry-revision",
+      "sequence": 17
+    },
+    {
+      "accepted_nodes": 0,
+      "admission": {
+        "status": "open"
+      },
+      "attempts": {
+        "n0": {
+          "cost": null,
+          "dependency_bytes": 0,
+          "effect": "pure",
+          "elapsed_s": 0.0,
+          "number": 3,
+          "output": null,
+          "output_valid": false,
+          "reason": null,
+          "revision": 1,
+          "state": "dispatched"
+        }
+      },
+      "binding": "89de6871e54c833ea9e23c0e60a0550aa31b2094b6b85062f275cf904ec8918c",
+      "budget": {
+        "ceiling": "20",
+        "reservations": {
+          "1/n0/3": "2"
+        },
+        "settlements": {
+          "0/n0/1": "0",
+          "0/n0/2": "1"
+        },
+        "spent": "1"
+      },
+      "budget_blocked": false,
+      "control": "run",
+      "deadline_closed": false,
+      "dependency_bytes": 0,
+      "disposition": null,
+      "failure_reason": null,
+      "generation": 3,
+      "graph": {
+        "nodes": [
+          {
+            "depends_on": [],
+            "id": "n0",
+            "phase": "fixture",
+            "task": {
+              "goal": "fixture",
+              "input": 7
+            }
+          }
+        ],
+        "topology": []
+      },
+      "last_progress_unix_ms": 1000,
+      "limits": {
+        "max_attempts_per_node": 3,
+        "max_edges": 100000,
+        "max_nodes": 10000,
+        "max_output_bytes": 67108864,
+        "max_total_output_bytes": 1073741824,
+        "wall_deadline_ms": null
+      },
+      "output_bytes": 1,
+      "overrun": false,
+      "revision": 1,
+      "run_id": "retry-revision",
+      "sequence": 18
+    },
+    {
+      "accepted_nodes": 0,
+      "admission": {
+        "status": "open"
+      },
+      "attempts": {
+        "n0": {
+          "cost": "1",
+          "dependency_bytes": 0,
+          "effect": "pure",
+          "elapsed_s": 0.0,
+          "number": 3,
+          "output": {
+            "bytes": 1,
+            "sha256": "7902699be42c8a8e46fbbb4501726517e86b22c56a189f7625a6da49081b2451"
+          },
+          "output_valid": true,
+          "reason": null,
+          "revision": 1,
+          "state": "received"
+        }
+      },
+      "binding": "89de6871e54c833ea9e23c0e60a0550aa31b2094b6b85062f275cf904ec8918c",
+      "budget": {
+        "ceiling": "20",
+        "reservations": {
+          "1/n0/3": "2"
+        },
+        "settlements": {
+          "0/n0/1": "0",
+          "0/n0/2": "1"
+        },
+        "spent": "1"
+      },
+      "budget_blocked": false,
+      "control": "run",
+      "deadline_closed": false,
+      "dependency_bytes": 0,
+      "disposition": null,
+      "failure_reason": null,
+      "generation": 3,
+      "graph": {
+        "nodes": [
+          {
+            "depends_on": [],
+            "id": "n0",
+            "phase": "fixture",
+            "task": {
+              "goal": "fixture",
+              "input": 7
+            }
+          }
+        ],
+        "topology": []
+      },
+      "last_progress_unix_ms": 1000,
+      "limits": {
+        "max_attempts_per_node": 3,
+        "max_edges": 100000,
+        "max_nodes": 10000,
+        "max_output_bytes": 67108864,
+        "max_total_output_bytes": 1073741824,
+        "wall_deadline_ms": null
+      },
+      "output_bytes": 2,
+      "overrun": false,
+      "revision": 1,
+      "run_id": "retry-revision",
+      "sequence": 19
+    },
+    {
+      "accepted_nodes": 0,
+      "admission": {
+        "status": "open"
+      },
+      "attempts": {
+        "n0": {
+          "cost": "1",
+          "dependency_bytes": 0,
+          "effect": "pure",
+          "elapsed_s": 0.0,
+          "number": 3,
+          "output": {
+            "bytes": 1,
+            "sha256": "7902699be42c8a8e46fbbb4501726517e86b22c56a189f7625a6da49081b2451"
+          },
+          "output_valid": true,
+          "reason": null,
+          "revision": 1,
+          "state": "settled"
+        }
+      },
+      "binding": "89de6871e54c833ea9e23c0e60a0550aa31b2094b6b85062f275cf904ec8918c",
+      "budget": {
+        "ceiling": "20",
+        "reservations": {},
+        "settlements": {
+          "0/n0/1": "0",
+          "0/n0/2": "1",
+          "1/n0/3": "1"
+        },
+        "spent": "2"
+      },
+      "budget_blocked": false,
+      "control": "run",
+      "deadline_closed": false,
+      "dependency_bytes": 0,
+      "disposition": null,
+      "failure_reason": null,
+      "generation": 3,
+      "graph": {
+        "nodes": [
+          {
+            "depends_on": [],
+            "id": "n0",
+            "phase": "fixture",
+            "task": {
+              "goal": "fixture",
+              "input": 7
+            }
+          }
+        ],
+        "topology": []
+      },
+      "last_progress_unix_ms": 1000,
+      "limits": {
+        "max_attempts_per_node": 3,
+        "max_edges": 100000,
+        "max_nodes": 10000,
+        "max_output_bytes": 67108864,
+        "max_total_output_bytes": 1073741824,
+        "wall_deadline_ms": null
+      },
+      "output_bytes": 2,
+      "overrun": false,
+      "revision": 1,
+      "run_id": "retry-revision",
+      "sequence": 20
+    },
+    {
+      "accepted_nodes": 1,
+      "admission": {
+        "status": "open"
+      },
+      "attempts": {
+        "n0": {
+          "cost": "1",
+          "dependency_bytes": 0,
+          "effect": "pure",
+          "elapsed_s": 0.0,
+          "number": 3,
+          "output": {
+            "bytes": 1,
+            "sha256": "7902699be42c8a8e46fbbb4501726517e86b22c56a189f7625a6da49081b2451"
+          },
+          "output_valid": true,
+          "reason": null,
+          "revision": 1,
+          "state": "accepted"
+        }
+      },
+      "binding": "89de6871e54c833ea9e23c0e60a0550aa31b2094b6b85062f275cf904ec8918c",
+      "budget": {
+        "ceiling": "20",
+        "reservations": {},
+        "settlements": {
+          "0/n0/1": "0",
+          "0/n0/2": "1",
+          "1/n0/3": "1"
+        },
+        "spent": "2"
+      },
+      "budget_blocked": false,
+      "control": "run",
+      "deadline_closed": false,
+      "dependency_bytes": 0,
+      "disposition": null,
+      "failure_reason": null,
+      "generation": 3,
+      "graph": {
+        "nodes": [
+          {
+            "depends_on": [],
+            "id": "n0",
+            "phase": "fixture",
+            "task": {
+              "goal": "fixture",
+              "input": 7
+            }
+          }
+        ],
+        "topology": []
+      },
+      "last_progress_unix_ms": 1000,
+      "limits": {
+        "max_attempts_per_node": 3,
+        "max_edges": 100000,
+        "max_nodes": 10000,
+        "max_output_bytes": 67108864,
+        "max_total_output_bytes": 1073741824,
+        "wall_deadline_ms": null
+      },
+      "output_bytes": 2,
+      "overrun": false,
+      "revision": 1,
+      "run_id": "retry-revision",
+      "sequence": 21
+    },
+    {
+      "accepted_nodes": 1,
+      "admission": {
+        "status": "open"
+      },
+      "attempts": {
+        "n0": {
+          "cost": "1",
+          "dependency_bytes": 0,
+          "effect": "pure",
+          "elapsed_s": 0.0,
+          "number": 3,
+          "output": {
+            "bytes": 1,
+            "sha256": "7902699be42c8a8e46fbbb4501726517e86b22c56a189f7625a6da49081b2451"
+          },
+          "output_valid": true,
+          "reason": null,
+          "revision": 1,
+          "state": "accepted"
+        }
+      },
+      "binding": "89de6871e54c833ea9e23c0e60a0550aa31b2094b6b85062f275cf904ec8918c",
+      "budget": {
+        "ceiling": "20",
+        "reservations": {},
+        "settlements": {
+          "0/n0/1": "0",
+          "0/n0/2": "1",
+          "1/n0/3": "1"
+        },
+        "spent": "2"
+      },
+      "budget_blocked": false,
+      "control": "run",
+      "deadline_closed": false,
+      "dependency_bytes": 0,
+      "disposition": "completed",
+      "failure_reason": null,
+      "generation": 3,
+      "graph": {
+        "nodes": [
+          {
+            "depends_on": [],
+            "id": "n0",
+            "phase": "fixture",
+            "task": {
+              "goal": "fixture",
+              "input": 7
+            }
+          }
+        ],
+        "topology": []
+      },
+      "last_progress_unix_ms": 1000,
+      "limits": {
+        "max_attempts_per_node": 3,
+        "max_edges": 100000,
+        "max_nodes": 10000,
+        "max_output_bytes": 67108864,
+        "max_total_output_bytes": 1073741824,
+        "wall_deadline_ms": null
+      },
+      "output_bytes": 2,
+      "overrun": false,
+      "revision": 1,
+      "run_id": "retry-revision",
+      "sequence": 22
+    }
+  ],
+  "records": [
+    {
+      "attempt": null,
+      "event": {
+        "binding": "89de6871e54c833ea9e23c0e60a0550aa31b2094b6b85062f275cf904ec8918c",
+        "ceiling": "20",
+        "graph": {
+          "nodes": [
+            {
+              "depends_on": [],
+              "id": "n0",
+              "phase": "fixture",
+              "task": {
+                "goal": "fixture",
+                "input": 7
+              }
+            }
+          ],
+          "topology": []
+        },
+        "kind": "started",
+        "limits": {
+          "max_attempts_per_node": 3,
+          "max_edges": 100000,
+          "max_nodes": 10000,
+          "max_output_bytes": 67108864,
+          "max_total_output_bytes": 1073741824,
+          "wall_deadline_ms": null
+        }
+      },
+      "event_id": "retry-revision/1",
+      "generation": 0,
+      "node": null,
+      "occurred_at_unix_ms": 1000,
+      "phase": null,
+      "recorded_at_unix_ms": 1000,
+      "revision": 0,
+      "run_id": "retry-revision",
+      "schema": 3,
+      "scope": "run",
+      "sequence": 1,
+      "transaction_start": 1
+    },
+    {
+      "attempt": null,
+      "event": {
+        "generation": 1,
+        "kind": "claimed"
+      },
+      "event_id": "retry-revision/2",
+      "generation": 1,
+      "node": null,
+      "occurred_at_unix_ms": 1000,
+      "phase": null,
+      "recorded_at_unix_ms": 1000,
+      "revision": 0,
+      "run_id": "retry-revision",
+      "schema": 3,
+      "scope": "run",
+      "sequence": 2,
+      "transaction_start": 2
+    },
+    {
+      "attempt": 1,
+      "event": {
+        "attempt": 1,
+        "bound": "2",
+        "effect": "pure",
+        "kind": "admitted",
+        "node": "n0"
+      },
+      "event_id": "retry-revision/3",
+      "generation": 1,
+      "node": "n0",
+      "occurred_at_unix_ms": 1000,
+      "phase": "fixture",
+      "recorded_at_unix_ms": 1000,
+      "revision": 0,
+      "run_id": "retry-revision",
+      "schema": 3,
+      "scope": "execution",
+      "sequence": 3,
+      "transaction_start": 3
+    },
+    {
+      "attempt": 1,
+      "event": {
+        "attempt": 1,
+        "dependency_bytes": 0,
+        "kind": "dispatched",
+        "node": "n0"
+      },
+      "event_id": "retry-revision/4",
+      "generation": 1,
+      "node": "n0",
+      "occurred_at_unix_ms": 1000,
+      "phase": "fixture",
+      "recorded_at_unix_ms": 1000,
+      "revision": 0,
+      "run_id": "retry-revision",
+      "schema": 3,
+      "scope": "execution",
+      "sequence": 4,
+      "transaction_start": 3
+    },
+    {
+      "attempt": 1,
+      "event": {
+        "attempt": 1,
+        "kind": "failed",
+        "node": "n0",
+        "reason": "local_provider_failed"
+      },
+      "event_id": "retry-revision/5",
+      "generation": 1,
+      "node": "n0",
+      "occurred_at_unix_ms": 1000,
+      "phase": "fixture",
+      "recorded_at_unix_ms": 1000,
+      "revision": 0,
+      "run_id": "retry-revision",
+      "schema": 3,
+      "scope": "execution",
+      "sequence": 5,
+      "transaction_start": 5
+    },
+    {
+      "attempt": null,
+      "event": {
+        "disposition": "failed",
+        "kind": "ended"
+      },
+      "event_id": "retry-revision/6",
+      "generation": 1,
+      "node": null,
+      "occurred_at_unix_ms": 1000,
+      "phase": null,
+      "recorded_at_unix_ms": 1000,
+      "revision": 0,
+      "run_id": "retry-revision",
+      "schema": 3,
+      "scope": "run",
+      "sequence": 6,
+      "transaction_start": 6
+    },
+    {
+      "attempt": 1,
+      "event": {
+        "attempt": 1,
+        "kind": "retried",
+        "node": "n0"
+      },
+      "event_id": "retry-revision/7",
+      "generation": 1,
+      "node": "n0",
+      "occurred_at_unix_ms": 1000,
+      "phase": "fixture",
+      "recorded_at_unix_ms": 1000,
+      "revision": 0,
+      "run_id": "retry-revision",
+      "schema": 3,
+      "scope": "execution",
+      "sequence": 7,
+      "transaction_start": 7
+    },
+    {
+      "attempt": null,
+      "event": {
+        "generation": 2,
+        "kind": "claimed"
+      },
+      "event_id": "retry-revision/8",
+      "generation": 2,
+      "node": null,
+      "occurred_at_unix_ms": 1000,
+      "phase": null,
+      "recorded_at_unix_ms": 1000,
+      "revision": 0,
+      "run_id": "retry-revision",
+      "schema": 3,
+      "scope": "run",
+      "sequence": 8,
+      "transaction_start": 8
+    },
+    {
+      "attempt": 2,
+      "event": {
+        "attempt": 2,
+        "bound": "2",
+        "effect": "pure",
+        "kind": "admitted",
+        "node": "n0"
+      },
+      "event_id": "retry-revision/9",
+      "generation": 2,
+      "node": "n0",
+      "occurred_at_unix_ms": 1000,
+      "phase": "fixture",
+      "recorded_at_unix_ms": 1000,
+      "revision": 0,
+      "run_id": "retry-revision",
+      "schema": 3,
+      "scope": "execution",
+      "sequence": 9,
+      "transaction_start": 9
+    },
+    {
+      "attempt": 2,
+      "event": {
+        "attempt": 2,
+        "dependency_bytes": 0,
+        "kind": "dispatched",
+        "node": "n0"
+      },
+      "event_id": "retry-revision/10",
+      "generation": 2,
+      "node": "n0",
+      "occurred_at_unix_ms": 1000,
+      "phase": "fixture",
+      "recorded_at_unix_ms": 1000,
+      "revision": 0,
+      "run_id": "retry-revision",
+      "schema": 3,
+      "scope": "execution",
+      "sequence": 10,
+      "transaction_start": 9
+    },
+    {
+      "attempt": 2,
+      "event": {
+        "attempt": 2,
+        "cost": "1",
+        "elapsed_s": 0.0,
+        "kind": "received",
+        "node": "n0",
+        "output": {
+          "bytes": 1,
+          "sha256": "7902699be42c8a8e46fbbb4501726517e86b22c56a189f7625a6da49081b2451"
+        },
+        "output_valid": true
+      },
+      "event_id": "retry-revision/11",
+      "generation": 2,
+      "node": "n0",
+      "occurred_at_unix_ms": 1000,
+      "phase": "fixture",
+      "recorded_at_unix_ms": 1000,
+      "revision": 0,
+      "run_id": "retry-revision",
+      "schema": 3,
+      "scope": "execution",
+      "sequence": 11,
+      "transaction_start": 11
+    },
+    {
+      "attempt": 2,
+      "event": {
+        "attempt": 2,
+        "kind": "settled",
+        "node": "n0"
+      },
+      "event_id": "retry-revision/12",
+      "generation": 2,
+      "node": "n0",
+      "occurred_at_unix_ms": 1000,
+      "phase": "fixture",
+      "recorded_at_unix_ms": 1000,
+      "revision": 0,
+      "run_id": "retry-revision",
+      "schema": 3,
+      "scope": "execution",
+      "sequence": 12,
+      "transaction_start": 11
+    },
+    {
+      "attempt": 2,
+      "event": {
+        "attempt": 2,
+        "kind": "accepted",
+        "node": "n0"
+      },
+      "event_id": "retry-revision/13",
+      "generation": 2,
+      "node": "n0",
+      "occurred_at_unix_ms": 1000,
+      "phase": "fixture",
+      "recorded_at_unix_ms": 1000,
+      "revision": 0,
+      "run_id": "retry-revision",
+      "schema": 3,
+      "scope": "execution",
+      "sequence": 13,
+      "transaction_start": 11
+    },
+    {
+      "attempt": null,
+      "event": {
+        "disposition": "completed",
+        "kind": "ended"
+      },
+      "event_id": "retry-revision/14",
+      "generation": 2,
+      "node": null,
+      "occurred_at_unix_ms": 1000,
+      "phase": null,
+      "recorded_at_unix_ms": 1000,
+      "revision": 0,
+      "run_id": "retry-revision",
+      "schema": 3,
+      "scope": "run",
+      "sequence": 14,
+      "transaction_start": 14
+    },
+    {
+      "attempt": null,
+      "event": {
+        "invalidated": [
+          "n0"
+        ],
+        "kind": "revised",
+        "reason": "fixture",
+        "revision": 1
+      },
+      "event_id": "retry-revision/15",
+      "generation": 2,
+      "node": null,
+      "occurred_at_unix_ms": 1000,
+      "phase": null,
+      "recorded_at_unix_ms": 1000,
+      "revision": 1,
+      "run_id": "retry-revision",
+      "schema": 3,
+      "scope": "run",
+      "sequence": 15,
+      "transaction_start": 15
+    },
+    {
+      "attempt": null,
+      "event": {
+        "generation": 3,
+        "kind": "claimed"
+      },
+      "event_id": "retry-revision/16",
+      "generation": 3,
+      "node": null,
+      "occurred_at_unix_ms": 1000,
+      "phase": null,
+      "recorded_at_unix_ms": 1000,
+      "revision": 1,
+      "run_id": "retry-revision",
+      "schema": 3,
+      "scope": "run",
+      "sequence": 16,
+      "transaction_start": 16
+    },
+    {
+      "attempt": 3,
+      "event": {
+        "attempt": 3,
+        "bound": "2",
+        "effect": "pure",
+        "kind": "admitted",
+        "node": "n0"
+      },
+      "event_id": "retry-revision/17",
+      "generation": 3,
+      "node": "n0",
+      "occurred_at_unix_ms": 1000,
+      "phase": "fixture",
+      "recorded_at_unix_ms": 1000,
+      "revision": 1,
+      "run_id": "retry-revision",
+      "schema": 3,
+      "scope": "execution",
+      "sequence": 17,
+      "transaction_start": 17
+    },
+    {
+      "attempt": 3,
+      "event": {
+        "attempt": 3,
+        "dependency_bytes": 0,
+        "kind": "dispatched",
+        "node": "n0"
+      },
+      "event_id": "retry-revision/18",
+      "generation": 3,
+      "node": "n0",
+      "occurred_at_unix_ms": 1000,
+      "phase": "fixture",
+      "recorded_at_unix_ms": 1000,
+      "revision": 1,
+      "run_id": "retry-revision",
+      "schema": 3,
+      "scope": "execution",
+      "sequence": 18,
+      "transaction_start": 17
+    },
+    {
+      "attempt": 3,
+      "event": {
+        "attempt": 3,
+        "cost": "1",
+        "elapsed_s": 0.0,
+        "kind": "received",
+        "node": "n0",
+        "output": {
+          "bytes": 1,
+          "sha256": "7902699be42c8a8e46fbbb4501726517e86b22c56a189f7625a6da49081b2451"
+        },
+        "output_valid": true
+      },
+      "event_id": "retry-revision/19",
+      "generation": 3,
+      "node": "n0",
+      "occurred_at_unix_ms": 1000,
+      "phase": "fixture",
+      "recorded_at_unix_ms": 1000,
+      "revision": 1,
+      "run_id": "retry-revision",
+      "schema": 3,
+      "scope": "execution",
+      "sequence": 19,
+      "transaction_start": 19
+    },
+    {
+      "attempt": 3,
+      "event": {
+        "attempt": 3,
+        "kind": "settled",
+        "node": "n0"
+      },
+      "event_id": "retry-revision/20",
+      "generation": 3,
+      "node": "n0",
+      "occurred_at_unix_ms": 1000,
+      "phase": "fixture",
+      "recorded_at_unix_ms": 1000,
+      "revision": 1,
+      "run_id": "retry-revision",
+      "schema": 3,
+      "scope": "execution",
+      "sequence": 20,
+      "transaction_start": 19
+    },
+    {
+      "attempt": 3,
+      "event": {
+        "attempt": 3,
+        "kind": "accepted",
+        "node": "n0"
+      },
+      "event_id": "retry-revision/21",
+      "generation": 3,
+      "node": "n0",
+      "occurred_at_unix_ms": 1000,
+      "phase": "fixture",
+      "recorded_at_unix_ms": 1000,
+      "revision": 1,
+      "run_id": "retry-revision",
+      "schema": 3,
+      "scope": "execution",
+      "sequence": 21,
+      "transaction_start": 19
+    },
+    {
+      "attempt": null,
+      "event": {
+        "disposition": "completed",
+        "kind": "ended"
+      },
+      "event_id": "retry-revision/22",
+      "generation": 3,
+      "node": null,
+      "occurred_at_unix_ms": 1000,
+      "phase": null,
+      "recorded_at_unix_ms": 1000,
+      "revision": 1,
+      "run_id": "retry-revision",
+      "schema": 3,
+      "scope": "run",
+      "sequence": 22,
+      "transaction_start": 22
+    }
+  ]
+}

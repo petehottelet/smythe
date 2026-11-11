@@ -34,6 +34,18 @@ pub fn source_sha() -> String {
 pub fn implementation_sources() -> std::collections::BTreeMap<&'static str, String> {
     [
         (
+            "crates/smythe-core/src/coordinator.rs",
+            include_bytes!("../../smythe-core/src/coordinator.rs").as_slice(),
+        ),
+        (
+            "crates/smythe-core/src/diagnostics.rs",
+            include_bytes!("../../smythe-core/src/diagnostics.rs").as_slice(),
+        ),
+        (
+            "crates/smythe-cli/src/diagnostics.rs",
+            include_bytes!("../../smythe-cli/src/diagnostics.rs").as_slice(),
+        ),
+        (
             "crates/smythe/src/seams.rs",
             include_bytes!("../../smythe/src/seams.rs").as_slice(),
         ),

@@ -75,6 +75,9 @@ pub enum Event {
         node: String,
         bound: NanoUsd,
     },
+    QuoteBlocked {
+        node: String,
+    },
     RunFailed {
         reason: String,
     },
@@ -118,6 +121,10 @@ pub enum Event {
     LocalReplay {
         node: String,
         attempt: u64,
+        /// Absent in original schema-3 events, which used the lifetime limit.
+        /// New writers bind the derived base to preserve old replay semantics.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        revision_base: Option<u64>,
     },
     Retried {
         node: String,
@@ -167,7 +174,7 @@ impl Event {
             | Self::Accepted { node, attempt }
             | Self::Rejected { node, attempt, .. }
             | Self::Failed { node, attempt, .. }
-            | Self::LocalReplay { node, attempt }
+            | Self::LocalReplay { node, attempt, .. }
             | Self::Retried { node, attempt } => (Some(node), Some(*attempt), Scope::Execution),
             _ => (None, None, Scope::Run),
         }
@@ -245,6 +252,9 @@ pub enum AttemptState {
 pub struct Attempt {
     pub revision: u32,
     pub number: u64,
+    /// Last attempt number at invalidation; identities remain monotonic.
+    #[serde(default)]
+    pub revision_base: u64,
     pub effect: Effect,
     pub state: AttemptState,
     pub output: Option<OutputRef>,
@@ -271,6 +281,7 @@ pub struct Projection {
     pub overrun: bool,
     pub deadline_closed: bool,
     pub budget_blocked: bool,
+    pub quote_blocked: bool,
     pub budget: Sentinel,
     pub attempts: BTreeMap<String, Attempt>,
     pub accepted_nodes: usize,
@@ -290,6 +301,7 @@ struct Undo {
     overrun: bool,
     deadline_closed: bool,
     budget_blocked: bool,
+    quote_blocked: bool,
     accepted_nodes: usize,
     output_bytes: u64,
     dependency_bytes: u64,
@@ -322,6 +334,7 @@ impl Projection {
                 Admission::Paused => "paused",
                 Admission::Closed { .. } => "draining",
                 Admission::Open if self.budget_blocked => "budget_blocked",
+                Admission::Open if self.quote_blocked => "quote_blocked",
                 _ => "running",
             },
         }
@@ -362,6 +375,7 @@ impl Projection {
             overrun: false,
             deadline_closed: false,
             budget_blocked: false,
+            quote_blocked: false,
             budget: Sentinel::new(*ceiling),
             attempts: BTreeMap::new(),
             accepted_nodes: 0,
@@ -449,6 +463,7 @@ impl Projection {
             overrun: self.overrun,
             deadline_closed: self.deadline_closed,
             budget_blocked: self.budget_blocked,
+            quote_blocked: self.quote_blocked,
             accepted_nodes: self.accepted_nodes,
             output_bytes: self.output_bytes,
             dependency_bytes: self.dependency_bytes,
@@ -476,6 +491,7 @@ impl Projection {
         self.overrun = old.overrun;
         self.deadline_closed = old.deadline_closed;
         self.budget_blocked = old.budget_blocked;
+        self.quote_blocked = old.quote_blocked;
         self.accepted_nodes = old.accepted_nodes;
         self.output_bytes = old.output_bytes;
         self.dependency_bytes = old.dependency_bytes;
@@ -576,6 +592,7 @@ impl Projection {
                 Event::CeilingChanged { ceiling } => {
                     self.budget.change_ceiling(*ceiling)?;
                     self.budget_blocked = false;
+                    self.quote_blocked = false;
                 }
                 Event::RunFailed { reason } => {
                     ensure!(!reason.is_empty(), "failure needs a reason");
@@ -601,6 +618,16 @@ impl Projection {
                         "run is not budget blocked"
                     );
                     self.budget_blocked = true;
+                    self.quote_blocked = false;
+                }
+                Event::QuoteBlocked { node } => {
+                    self.node(node)?;
+                    ensure!(
+                        self.admission == Admission::Open && self.budget.pending().is_empty(),
+                        "run is not quote blocked"
+                    );
+                    self.quote_blocked = true;
+                    self.budget_blocked = false;
                 }
                 Event::Admitted {
                     node,
@@ -618,6 +645,7 @@ impl Projection {
                         "unaccepted dependency"
                     );
                     let previous = self.attempts.get(node);
+                    let revision_base = previous.map_or(0, |a| a.revision_base);
                     ensure!(
                         previous.is_none_or(|a| matches!(
                             a.state,
@@ -630,7 +658,9 @@ impl Projection {
                             == previous
                                 .map_or(Some(1), |a| a.number.checked_add(1))
                                 .context("attempt overflow")?
-                            && *attempt <= self.limits.max_attempts_per_node,
+                            && attempt
+                                .checked_sub(revision_base)
+                                .is_some_and(|n| n <= self.limits.max_attempts_per_node),
                         "attempt limit or identity differs"
                     );
                     self.budget
@@ -640,6 +670,7 @@ impl Projection {
                         Attempt {
                             revision: self.revision,
                             number: *attempt,
+                            revision_base,
                             effect: *effect,
                             state: AttemptState::Admitted,
                             output: None,
@@ -651,6 +682,7 @@ impl Projection {
                         },
                     );
                     self.budget_blocked = false;
+                    self.quote_blocked = false;
                 }
                 Event::Dispatched {
                     node,
@@ -761,7 +793,11 @@ impl Projection {
                     a.state = AttemptState::Failed;
                     a.reason = Some(reason.clone());
                 }
-                Event::LocalReplay { node, attempt } => {
+                Event::LocalReplay {
+                    node,
+                    attempt,
+                    revision_base,
+                } => {
                     let a = self.attempts.get(node).context("missing attempt")?;
                     ensure!(a.effect == Effect::Pure, EngineError::UnsupportedEffect);
                     ensure!(
@@ -769,10 +805,19 @@ impl Projection {
                             && matches!(a.state, AttemptState::Admitted | AttemptState::Dispatched),
                         "only interrupted local work can replay"
                     );
+                    ensure!(
+                        revision_base.is_none_or(|base| base == a.revision_base),
+                        "replay revision base differs"
+                    );
+                    // Original schema-3 journals can already contain a failed
+                    // replay at the lifetime limit after an earlier revision.
+                    let used = attempt
+                        .checked_sub(revision_base.unwrap_or(0))
+                        .context("invalid revision attempt base")?;
                     self.budget
                         .settle(&call_key(a.revision, node, *attempt), NanoUsd(0))?;
                     let a = self.attempts.get_mut(node).unwrap();
-                    a.state = if *attempt < self.limits.max_attempts_per_node {
+                    a.state = if used < self.limits.max_attempts_per_node {
                         AttemptState::Replayed
                     } else {
                         a.reason = Some("attempt_limit".into());
@@ -794,7 +839,9 @@ impl Projection {
                     ensure!(
                         a.number == *attempt
                             && matches!(a.state, AttemptState::Failed | AttemptState::Rejected)
-                            && a.number < limit,
+                            && a.number
+                                .checked_sub(a.revision_base)
+                                .is_some_and(|n| n < limit),
                         "attempt cannot be retried"
                     );
                     a.state = AttemptState::Replayed;
@@ -824,6 +871,7 @@ impl Projection {
                     self.revision = *revision;
                     self.disposition = None;
                     self.budget_blocked = false;
+                    self.quote_blocked = false;
                 }
                 Event::Revised {
                     revision,
@@ -841,11 +889,13 @@ impl Projection {
                                 self.accepted_nodes -= 1;
                             }
                             a.state = AttemptState::Invalidated;
+                            a.revision_base = a.number;
                         }
                     }
                     self.revision = *revision;
                     self.disposition = None;
                     self.budget_blocked = false;
+                    self.quote_blocked = false;
                 }
                 Event::Ended { disposition } => {
                     ensure!(self.budget.pending().is_empty(), "unresolved reservations");

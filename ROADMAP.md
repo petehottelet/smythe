@@ -1,644 +1,137 @@
-# Smythe Roadmap
+# Smythe roadmap
 
-Where the project is going, in order. Everything here converges on one
-standard: **generated execution graphs that do real tool-using and
-artifact-producing work at high fan-out, under bounded cost, with inspectable
-plans, durable recovery, verified deliverables, and claimable benchmark
-evidence.** Every public
-performance claim links to its protocol and committed result record;
-superseded campaigns remain available as diagnostic history.
+Smythe's destination is a Rust framework that turns goals into inspectable task
+graphs, executes them within explicit limits, and delivers verified outputs
+with durable recovery. The active workspace is the **0.9.0 source preview**.
+The first stable Rust release will be **1.0.0** when its acceptance criteria
+are met; this roadmap does not assign a release date.
 
-Status: the Rust workspace is `0.2.0`, an experimental source preview.
-The active repository is Rust-only; the Python line remains in Git history.
-Rust interfaces are experimental. The stable Rust release will be 1.0.0.
+## Rust alpha (0.9.0)
 
-## Rust alpha (0.2.0)
+The [native guide](docs/rust.md) describes the implemented behavior:
 
-The [native engine](docs/rust.md) runs ordinary local graphs and Noumenon through
-the same journaled state machine, with readiness-driven CPU scheduling, exact
-money, immutable outputs and local recovery. The 192/256 glyph artwork is retained.
-The [54-trial compiler comparison](benchmarks/rust_noumenon_results.md) remains
-diagnostic evidence for the original preview. Native campaigns now require clean,
-committed sources. Native development focuses on measurements and testability,
-followed by remote accounting, providers, tools, planning, supervision and Jobs.
-Schema-3 journals add named phases and graph revisions, separate operator intent
-from admission and terminal disposition, and persist limits and budget changes.
-Small outputs commit inline with receipts; large files use immutable hash paths.
-The pure coordinator has 5,000-seed simulation coverage, and both compilation
-and validation use the shared journal. CLI inspection includes cursor paging,
-owner health, output references and stable typed error codes. Release gates cover
-2,000/8,000-node scaling, a 5,000-node chain and inline disk overhead.
-The [README](README.md) now leads with native build and execution commands.
-The milestones and feature details below are historical Python development
-reference, not shipped Rust capabilities. Their source, tests and examples are
-available in [the archived source revision](https://github.com/petehottelet/smythe/tree/12f14704beff344228fffffce40d995daa1f7cce).
-Native planning, remote accounting, provider/tool integrations, supervision and
-Jobs remain ahead. Prompt optimization waits for the first native Architect.
+| Area | Available now |
+|---|---|
+| Local execution | Supplied TOML/JSON graphs, pure Rust providers, dependency-driven scheduling and bounded workers |
+| Accounting and control | Exact nanoUSD reservations, saved resource limits, explicit retries, budget changes, pause, continue and stop |
+| Recovery | Schema-3 SQLite journals, committed admission before dispatch, resumable quote blocks, atomic inline outputs and receipts, immutable large blobs and process-crash recovery |
+| Graph changes | Named phases, revision identities, quiescent expansion and revision, transitive invalidation, fresh retry allowance for invalidated nodes and reuse of unaffected outputs |
+| Inspection | Output references and explicit loading, read-only run lists, verified inspection, event cursors, owner health and typed CLI errors |
+| Noumenon | Shared compilation and validation runtime, the authored 192/256-glyph catalogs, SVG parity, exports and completed-run recovery |
+| Verification | Linux and Windows CI, 5,000 deterministic scheduler seeds, real-process crash tests and explicit release performance gates |
+| Provenance | A native measurement runner that refuses uncommitted trees and hashes committed Git blob contents |
 
-## Shipped (v0.2 line)
+The active implementation has no Python dependency. Model-driven planning,
+remote providers, tools, MCP, supervision, Jobs and learning remain future
+native capabilities. Graph-revision events provide a foundation for these
+features; they do not supply a planner or supervisor by themselves.
 
-- ✅ Durable, resumable execution — per-node checkpointing, `swarm.resume()`, pluggable stores ([docs](docs/checkpoint-format.md))
-- ✅ Per-node timeouts and bounded parallel concurrency
-- ✅ Graph export — `to_mermaid()`, `to_dot()`, `to_json()`
-- ✅ `OfflineProvider` — evaluate the full pipeline with no API keys; the core
-  suite and most examples run offline, while live MCP examples are explicitly
-  environment-gated
-- ✅ Provider tool contract — neutral tool-calling types mapped to Anthropic, OpenAI, and Gemini native tool use
-- ✅ **MCP tool support** — agents use MCP servers (stdio + streamable HTTP) through a bounded, budget-enforced tool loop; secrets via `env_passthrough`; capability hydration and planner tool awareness; examples for filesystem, GitHub, and SaaS servers ([docs/mcp.md](docs/mcp.md))
-- ✅ OpenAI-compatible `base_url` (Ollama, LM Studio, vLLM)
-- ✅ v0.2.0 on PyPI (`pip install smythe`)
-- ✅ **Acquisition-diligence example** — fixture mode (no keys) and real mode, with committed graph, trace, and expected output ([examples/acquisition_diligence/](examples/acquisition_diligence/))
+## Local qualification
 
-## Shipped (v0.5 line)
+The project is qualifying the local engine. Passing recovery and scaling tests
+establishes the covered behavior; the remaining correctness and acceptance
+work still gates the next milestone. Quote recovery and per-invalidation retry
+limits are implemented, with expanded simulation and schema-3 compatibility
+fixtures. Existing terminal quote/attempt failures retain their recorded outcome;
+see [compatibility](docs/rust.md#journal-and-recovery). Bounded sanitized CLI
+diagnostics, enforced event-paging arguments and complete runtime source hashes
+in Noumenon reports are implemented. Remaining [qualification gaps](docs/rust.md#known-preview-limitations)
+still prevent a 1.0 readiness claim; version 0.9.0 remains a source preview.
 
-- ✅ **Multimodal artifact pipeline** — image generation (Gemini, GPT Image)
-  with per-image cost accounting, execution-scoped artifact persistence,
-  and cost-aware parallel budget reservations
-- ✅ **Vision input** — nodes see their dependencies' images
-  (`attach_dep_artifacts`); the select-from-N art-director pattern
-- ✅ **Image concurrency benchmark, published** — 6.6× wall-clock at k=8,
-  25 images in 10.2 s at k=25, objective metrics only
-  ([benchmarks/image_benchmarks.md](benchmarks/image_benchmarks.md))
-- ✅ **Repo Doctor MVP** — offline-first release-readiness auditor built
-  on smythe, now its own project: [repodoctor](https://github.com/petehottelet/repodoctor)
+The immediate priorities are:
 
-## Shipped (v0.6 line)
+1. Add native identifier/link checks and dependency advisory/license checks.
+   This work can proceed independently of raster-reference approval.
+2. Approve a shared native raster reference, complete catalog style acceptance,
+   and measure full-workflow CPU and peak memory with committed provenance.
 
-- ✅ **Brand-locked asset factory** — eight exact-spec formats, shared logo
-  vision input, deterministic typography, and vision-based consistency judging
-- ✅ **Benchmark fault-finding loop** — an ecological LangGraph/CrewAI
-  comparison exposed payload, assembly, and measurement defects; the fixes
-  now feed the claimable task-shape and durability suites
-- ✅ **Corrected framework comparison** — delivered-output measurement across
-  matched fixed-pipeline Smythe, LangGraph, and CrewAI implementations, with
-  Smythe leading blind quality, mean tokens, and mean wall time
-- ✅ **Judge variance measurement + bounded optimizer smoke test** — noisy
-  candidates are reverted and every experiment is journaled
-
-## Shipped (v0.7.0): trust at production fan-out
-
-Version 0.7.0 is available on [PyPI](https://pypi.org/project/smythe/0.7.0/)
-and [GitHub](https://github.com/petehottelet/smythe/releases/tag/v0.7.0).
-It adds the following runtime guarantees and measured evidence:
-
-1. **Fail-closed budget reservations** for image and other non-token outputs,
-   using explicit inclusive per-call price ceilings
-2. **Bounded scheduling and cancellation** so a wide ready wave does not create
-   thousands of live coroutines or leave sibling provider calls running after
-   a fatal failure
-3. **Crash-safe artifacts and checkpoints** with atomic writes and configurable
-   batched full snapshots. The batch size trades write amplification against
-   crash granularity and possible duplicate spend: at most the unflushed tail
-   of a batch is replayed.
-4. **Portable benchmark evidence** — installable optional harness dependencies,
-   repo-relative artifact references, protocol metadata, and offline CI coverage
-5. **Durable artifact Jobs v1** — strict manifests, deterministic preflight,
-   plan-and-ceiling approvals, a SQLite dispatch/event journal, conservative
-   unknown outcomes, selective rerolls, portable exports, and an installed CLI
-6. **Typed production asset contracts** — concept-versus-production brand
-   rules, exact master/text compositing, atomic finishing, hash receipts, and
-   deterministic validation gates separated from advisory judgments
-7. **Noumenon fan-out example** — isolated 64-, 128-, 192-, and 256-node
-   partitions with objectively validated unique tiles, realistic-latency
-   concurrency sweeps through k=64, live Gemini and GPT Image lanes, and assembled
-   preview/GIF/atlas/HTML deliverables. The screensaver's web, Windows, macOS,
-   and Linux X11 ports use 56 reference and 192 original SVG shapes with a 10%
-   original mix and now live, as source, in the
-   [Noumenon repository](https://github.com/petehottelet/noumenon). Historical rendering checks cover Windows,
-   Apple Silicon, Intel Mac, and Ubuntu 22.04/24.04; their checksums and
-   receipts are in the [evidence archive](benchmarks/archive/README.md)
-8. **Bounded Autotune v1**: immutable hash-bound contracts and allowlisted
-   candidates, a zero-API-spend offline concurrency campaign, plan-bound async
-   orchestration, atomic dispatch claims, paired confirmation and sealed
-   per-campaign holdout, exact gate inventories, typed mutation domains,
-   bounded statistical/CPU work, immutable budget-visible evidence, and
-   read-only `inspect` alongside the `concurrency` command
-   ([docs](docs/optimize.md))
-9. **Result-aware control and reuse** — acceptance criteria reach planning and
-   execution, declarative verification gates regenerate rejected subtrees,
-   supervisors revise only pending work under a persisted revision cap, and
-   successful graphs distill into constrained-planning templates
-10. **Current task-shape evidence** — generated plans record 14% lower wall
-    time, including planning, with observed quality in the fixed pipeline's
-    measured band. Historical cost totals cover execution and synthesis only;
-    complete-workflow cost comparisons require new measurements
-    ([report](benchmarks/shape_suite.md))
-11. **Current framework evidence** — on the same fixed three-stage semantic
-    pipeline, Smythe records the highest blind quality, fewest mean tokens, and
-    lowest mean wall time across Smythe, LangGraph, and CrewAI
-    ([report](benchmarks/README.md#corrected-framework-head-to-head-langgraph-and-crewai-2026-07-12))
-12. **Original SVG workflow and web explorer** — independently authored filled
-    contours, measured style gates, duplicate detection, and hash-bound contact
-    sheets. The web explorer, now in the Noumenon repository, adapts the
-    MIT-licensed m8e/Rezmason renderer and 56 visible base glyphs plus their
-    blank slot, with a 10% original-glyph mix, Classic/3D/Operator presets,
-    Matrix green rain, simple VT323 pixel controls, and a Trajan Bold outline
-    logo on black. Browser interaction checks pass. A six-session headless
-    timing study and a ten-minute stability check are complete and archived;
-    visible presentation and quantified reference parity remain pending.
-    The [workflow protocol](benchmarks/svg_glyph_benchmark.md) measures fresh
-    generation, validation, and assembly across repeated thread/process runs;
-    browser frame timing is measured separately.
-13. **Strict cost and usage validation** — reject malformed policy, estimates,
-    provider usage, and restored charges before ledger mutation. Invalid
-    accounting stops new work and blocks resume until reconciliation.
-    [Cost guardrails](docs/budgets.md).
-14. **Consistent terminal failures** — serial halt and exhausted retries stop
-    later dispatch immediately, preserve the original exception, and retain
-    completed work. [Execution policies](docs/execution.md).
-15. **Durable verification decisions** — persist pending verdicts and
-    regeneration intents, settle active descendants before resetting their
-    generation, and resume unfinished control transitions before new calls.
-    [Verification](docs/verifier.md).
-16. **Complete task propagation** — carry detached goal, constraints, source
-    context, and acceptance criteria through routing, planning, graph handoffs,
-    execution, supervision, synthesis, memory, and recovery.
-    [Tasks and handoffs](docs/tasks.md).
-17. **Native Astra and Sol Responses** — explicit endpoint, reasoning effort,
-    and service tier; preserved function-tool continuation; exact native token
-    pricing; request-bound quotes; and retained billing evidence for unusable
-    responses. [Provider guide](docs/openai-responses.md).
-18. **Durable text-workflow accounting** — one exact ledger across every
-    supported phase, request-bound reservations, fenced dispatch, saved native
-    responses, and atomic graph/control consumption. Separate planning and
-    execution retain their charges; recovery replays persisted responses locally.
-    [Workflow guide](docs/workflow-accounting.md).
-19. **Jobs operator inspection** — read-only run lists and paged inspection,
-    exact cost balances, prompts, responses, attempt lineage, recent events,
-    and local artifact integrity in a self-contained black-and-white HTML report.
-    [Inspection commands](docs/jobs.md#list-and-inspect-runs).
-20. **Deep graph execution** — iterative validation, cycle checks, dependency
-    ordering, and depth calculation preserve existing traversal order. Offline
-    regressions execute a reverse-ordered 5,000-node chain and verify deep
-    revisions before mutation. [Execution guide](docs/execution.md#deep-graphs).
-21. **Saved graph limits** — bind node count, effective execution models,
-    retries, and regeneration to the durable workflow recipe. Plan replay,
-    handoffs, recovery, and revisions enforce the same limits.
-    [Graph policy guide](docs/workflow-accounting.md#freeze-graph-limits).
-22. **Jobs ownership fencing** — bind every worker mutation to a live lease
-    epoch so expired workers cannot alter recovered journal state. Schema
-    upgrades preserve historical attempt provenance and reject live legacy
-    leases. [Upgrade and ownership scope](docs/jobs.md#jobs-database-upgrades).
-23. **Detached operator runtime** — keep approved work running after its
-    launcher exits on supported hosts, follow it through read-only attachment, and request a durable
-    drain/pause. Generation-bound resume preserves later stop requests.
-    [Operator commands](docs/jobs.md#detached-execution-and-attachment).
-24. **Artifact directory ownership** — persistent namespaces separate custom
-    run IDs and databases sharing an output root. Directory claims precede
-    dispatch; exclusive publication preserves existing bytes. Migrated runs
-    retain their receipt paths. [Journal and artifacts](docs/jobs.md#the-dispatch-journal).
-25. **Atomic file checkpoints** — independent save attempts use exclusive
-    temporary files, flush complete snapshots, and atomically replace the
-    checkpoint. Failure cleanup preserves other writers' files.
-    [Persistence and ownership scope](docs/checkpoint-format.md).
-26. **Observed recovery at 5,000 operations** — one offline schema-v3 campaign
-    retained accepted artifacts after a hard kill, completed pending work, and
-    rerolled eight explicitly acknowledged unknown outcomes. All 5,000 files,
-    call identities, and zero-cost balances pass independent reconciliation.
-    [Scope and retained evidence](benchmarks/jobs_scale_5000_20260907_results.md).
-
-## Shipped (v0.8.0): owned campaigns and reproducible evidence
-
-The [0.8.0 release](docs/release-0.8.0.md) adds these capabilities.
-Low-level Autotune callers must supply explicit lease tokens; the CLI manages
-ownership automatically. Read the migration guide before upgrading a ledger.
-
-- **Native Claude Messages** — exact Fable cache billing, conservative request
-  quotes and saved-response recovery. [Provider guide](docs/anthropic-messages.md).
-- **Planner-only instructions** — graph requirements stay separate from answer
-  constraints. [Workflow policy](docs/workflow-accounting.md#freeze-graph-limits).
-
-- **Offline test enforcement** — external Python socket dispatch is blocked;
-  paid provider probes require an explicit command outside the test suite.
-- **Release qualification** — PyPI publishing requires a matching version tag
-  and successful main CI at that exact commit.
-
-- **Distribution and typing** — explicit source-package contents and library
-  test profile, clean source rebuilds, and installed consumer type checks.
-  Repo Doctor ZIPs now ship from the repodoctor repository.
-  [Packages, tests and installation](docs/distribution.md).
-
-- **Autotune inspection reports** — export saved decisions, paired comparison
-  intervals, policies, trial details, and exact costs as a standalone monochrome
-  page. Read-only validation and exclusive publication preserve the ledger and
-  existing files. [Report command and evidence scope](docs/optimize.md#export-a-campaign-report).
-- **Planner history validation** — skip malformed recalled fields without
-  rewriting history or changing valid ranking. Prompts identify summed node
-  time explicitly. [Learning loop](docs/architecture.md#learning-loop).
-- **Autotune campaign ownership** — one live owner and epoch govern trial
-  mutations and decisions. Heartbeats survive event-loop statistical work;
-  cancellation drains evaluators before release. Transactional v3-to-v4
-  migration preserves evidence and blocks already-open legacy writers.
-  Explicit `lease=` tokens are a new low-level API requirement.
-  [Ownership and migration scope](docs/optimize.md#campaign-ownership).
-- **Concurrent journal initialization** — bounded WAL retries and atomic
-  schema creation prevent competing openers from seeing partial stores.
-  Existing evidence and identities remain intact.
-  [Concurrent initialization regression checks](https://github.com/petehottelet/smythe/blob/12f14704beff344228fffffce40d995daa1f7cce/tests/test_jobs_workflow_initialization.py).
-
-## Shipped (v0.8.1): security and correctness fixes
-
-The [0.8.1 release](docs/release-0.8.1.md) stops a model-generated plan from
-starting local programs and tightens the execution envelope's checks. Some
-fixes change behavior that 0.8.0 accepted; read the upgrade notes first.
-
-- **Generated plans are data** — a strict plan schema with node and depth
-  limits; MCP servers come only from developer configuration, including on
-  checkpoint resume. [Planning tiers](docs/architecture.md#planning-tiers).
-- **Fail-closed judgment** — strict verifier verdicts, supervisor proposals and
-  router matching; truncated output fails its node.
-  [Execution policies](docs/execution.md).
-- **Budgets and durable runs** — retries reserve their estimate before
-  dispatch; durable runs settle pre-generation provider rejections at zero
-  cost. [Durable accounting](docs/workflow-accounting.md).
-- **Untrusted inputs** — image decoding limited to PNG, JPEG, GIF and WebP;
-  owner-only prompt and response files on POSIX.
-- **Autotune statistics** — paired Student-t promotion and sealed holdouts.
-  [Promotion rule](docs/optimize.md).
-
-## Shipped (v0.8.2): correctness fixes
-
-The [0.8.2 release](docs/release-0.8.2.md) closes gaps in the execution
-envelope. Some fixes tighten rules that 0.8.1 accepted; read the upgrade notes
-first.
-
-- **Durable plan repair** — a generated plan that the run's graph policy or
-  plain-text rule rejects goes back to the model inside the planner's retry
-  loop instead of wedging the run.
-  [Durable planning](docs/workflow-accounting.md#freeze-graph-limits).
-- **Protected verification gates** — no revision can drop a gate or its
-  target or cut the gate off from its target; a generated plan has at most one
-  gate, which depends on its target; supervised growth is bounded.
-  [Supervisor](docs/supervisor.md).
-- **Refused output fails its node** — SDK provider refusals, content filters and
-  unfinished Gemini responses raise `OutputRefusedError` after billing.
-  [Execution policies](docs/execution.md).
-- **Bounded image decoding** — every GIF frame and WebP canvas is checked before
-  Jobs or the design checks allocate memory. [Jobs](docs/jobs.md).
-
-## Shipped (v0.9.0): Noumenon and pinned evidence
-
-The [0.9.0 release](docs/release-0.9.0.md) narrows the repository to the
-framework and its evidence. The Python API changes only by addition.
-
-- **Transparent GPT Image output** — `OpenAIImageProvider(background=...)`
-  requests transparent backgrounds from models that support them.
-- **Noumenon benchmark** — the glyph fan-out example, renamed and re-run under
-  its unchanged protocol, with live transparent-PNG and SVG lanes.
-  [Report](benchmarks/noumenon_benchmark.md).
-- **Separate repositories** — the screensaver apps in
-  [Noumenon](https://github.com/petehottelet/noumenon) and Repo Doctor in
-  [repodoctor](https://github.com/petehottelet/repodoctor).
-- **Pinned evidence archive** — retired records stay verifiable byte for byte
-  from a release asset pinned by SHA-256.
-  [Archive](benchmarks/archive/README.md).
-
-## Shipped (v0.9.1): Gemini image reliability and clean records
-
-The [0.9.1 release](docs/release-0.9.1.md) is a patch release. The Python API
-is unchanged.
-
-- **Missing Gemini images fail their node** — an image request that Gemini
-  finishes with no image raises `OutputRefusedError` after billing, so a
-  `RETRY` policy can recover it. [Execution policies](docs/execution.md).
-- **Gemini 3.1 image defaults** — image benchmarks and examples use
-  `gemini-3.1-flash-image` before `gemini-2.5-flash-image` shuts down on
-  October 2, 2026.
-- **Clean benchmark records** — records carry no provider account
-  identifiers or local paths, and a repository test fails on any tracked file
-  that does.
-
-## Shipped (v0.10.0): accepted deliverables
-
-The [0.10.0 release](docs/release-0.10.0.md) carries the execution envelope
-from a finished run to an accepted deliverable. Each capability is opt-in:
-nothing is promoted or activated automatically, and every new scheduling
-and learning policy is off by default. Some earlier behavior now fails closed;
-read the upgrade notes first. What each area still needs is listed under
-[Then](#then-recorded-context-governed-actions-and-reuse).
-No template, skill or campaign can change acceptance, budgets, evaluator
-data or the tools agents are offered
-([what learning cannot change](docs/learning.md#what-learning-cannot-change)).
-
-- **Supported-configuration matrix** — the
-  [support matrix](docs/support-matrix.md) states which providers,
-  verifiers, tools, stores and Jobs profiles ordinary runs, durable text
-  workflows and Jobs accept, and
-  [who owns each execution responsibility](docs/support-matrix.md#who-owns-each-execution-responsibility),
-  with the test behind each cell. Combinations that a provider declares
-  unsupported fail before any call; an image input that only a generated
-  plan asks for is refused after planning, before any node call.
-- **Strict final acceptance** — an opt-in
-  [strict policy](docs/verifier.md#strict-delivery-acceptance) decides on the
-  exact output returned, after synthesis and after any step a supervisor
-  added, and never accepts exhausted regeneration, an unreadable verdict or a
-  failed validator; the rejected output stays inspectable. Versioned
-  [final validators](docs/verifier.md#built-in-final-validators) check
-  required sections, paths and JSON shape. Durable workflows
-  [decide on the same policy](docs/verifier.md#strict-acceptance-in-durable-workflows),
-  and Jobs decide delivery eligibility with
-  [registered validators](docs/jobs.md#registered-validators).
-- **Elapsed-time and outcome records** —
-  [`SwarmResult.timing`](docs/execution.md#timing) reports elapsed time apart
-  from summed node time, with time per phase and waiting time by reason, and
-  `smythe runs inspect` shows it beside the acceptance result. Durable runs
-  report lease sessions on the journal's clock and no phase totals.
-- **Deterministic validators in durable workflows** — registered
-  [gate validators](docs/verifier.md#gate-validators-in-durable-workflows)
-  and final validators, each decision stored with the output it judged.
-  Resume revalidates when a decision is missing, and a changed validator
-  needs an explicit [re-evaluation](docs/verifier.md#re-evaluation) or
-  [operator decision](docs/verifier.md#operator-decisions).
-- **Recorded context, governed actions, failure-aware scheduling and
-  lineage** — the first releases of
-  [Then](#then-recorded-context-governed-actions-and-reuse) items 1 to 5,
-  each described there with what it still needs. External actions are in
-  preview.
-- **Reviewable template lifecycle** — distilled graphs become
-  [versioned template records](docs/learning.md#template-records) in an
-  append-only catalog, validated as untrusted candidates that cannot grant
-  authority. Each record is compared with the parent it names, and every
-  version of a name after the first must name a stored one, so a later
-  version cannot weaken its parent's gates. Planner history keeps
-  verification and acceptance evidence and, opt-in, failed runs, and
-  structure that repeated accepted runs share becomes a
-  [candidate record](docs/learning.md#promote-repeated-accepted-structure).
-  An Autotune campaign
-  [evaluates a version](docs/optimize.md#evaluate-template-versions) against
-  its predecessor and a simpler reference arm on held-out task families; a
-  reviewed decision [activates it](docs/learning.md#activate-and-roll-back-templates)
-  for new runs, a rollback restores the previous version without changing
-  running work, and durable runs pin the exact versions they started with. A
-  record [builds its graph without a planning call](docs/learning.md#build-a-template-without-planning).
-  A menu the caller builds with the environment a run would use leaves out
-  a template once the tools, capabilities, skills, validators, models or
-  MCP allowlists it was proven with [change](docs/learning.md#applicability);
-  a menu built without one offers it as before. Records name no sources, so
-  a source change is not part of applicability. The offline
-  [template-lifecycle example](https://github.com/petehottelet/smythe/blob/12f14704beff344228fffffce40d995daa1f7cce/examples/21_template_lifecycle.py) records a
-  template, rejects a harmful candidate on held-out tasks, and rolls back the
-  same candidate after a fooled evaluator promotes it.
-- **Native Agent Skills support** —
-  [Agent Skills directories](docs/skills.md#agent-skills-directories) are
-  discovered directly, beside the OpenClaw and MCP skill providers, and lend
-  agents capability tags only: declared `allowed-tools` are recorded and
-  never granted, instructions never enter a prompt, and durable runs pin a
-  static snapshot of the tags.
-  [Python-backed skills](docs/skills.md#python-backed-skills) are developer
-  tools that a local tool runtime offers only to the agent ids you list, on
-  ordinary runs. Running a skill's bundled scripts, putting its instructions
-  into prompts and tools in durable text workflows are not covered.
-- **Bounded Autotune generalization** — no campaign or exploring proposer
-  may vary a [reserved path](docs/optimize.md#experiment-contracts-and-budgets)
-  such as acceptance, budgets, tools or the holdout, and a campaign can hold
-  each challenger to one change. The guide gives
-  [sample-size and repeated-comparison guidance](docs/optimize.md#choosing-sample-sizes)
-  from the paired promotion bound. The CLI
-  [reviews, activates, rolls back and retires](docs/optimize.md#review-and-change-targets-from-the-cli)
-  policies, and `smythe optimize history` gives a read-only
-  [cross-campaign report](docs/optimize.md#cross-campaign-target-report) of a
-  target's campaigns, decisions, activations and optimization cost, never
-  netted against inference savings. Trials can run as
-  [durable workflows](docs/optimize.md#durable-workflow-trials), and
-  [bounded exploration](docs/optimize.md#bounded-exploration) runs campaigns
-  on an out-of-process proposer's challengers under campaign, exposure and
-  proposer-spend caps.
-
-## Completed benchmark evidence
-
-Every benchmark publication includes the [materials completion check](docs/current-materials.md#completion-check-for-every-benchmark-update): current glyph sheets, previews, exports, charts, links, and consistent documentation.
-
-The [12 September glyph review](docs/glyph-contour-review-2026-09-12.md)
-identifies contour defects missed by the old numerical gates. The complete
-[192-glyph v2 catalog](benchmarks/noumenon/catalog/README.md) and its small-size
-sheets are updated, and Noumenon's web previews and native source exports use
-it. The [192/256-glyph v2 benchmark](benchmarks/svg_v2_results.md) completes 36
-matched compilation, validation and export workflows, with timing and memory
-evidence. The
-[benchmark index](benchmarks/README.md#coming-soon) lists separate outstanding
-measurements and their evidence scope.
-
-**Astra status — 13 September 2026:** human calibration passed, and the
-final pilot passed all 12 output contracts. Four pilot stages total 48
-workflows and $2.6596199. A 31-workflow diagnostic cost $1.7646655 and remains
-excluded from the amended main comparison. The
-[amendment](benchmarks/astra_method_amendment_20260913.md) preserves the
-input-contract defects and every earlier charge within the original $300 cap.
-
-The [main comparison](benchmarks/results/astra_20260913_main/README.md) now
-contains all 200 scheduled outcomes, with 191 accepted by the frozen automatic rule.
-The [approved continuation](benchmarks/astra_connection_continuation_20260913.md)
-retains one failed call and its full $0.169645 unresolved reserve. Timing,
-quality, graph sizes and phase costs are audited; affected exact cost contrasts
-remain withheld. Scheduler, framework and tool experiments are separate
-[follow-up studies](benchmarks/astra_benchmark_plan.md#separate-follow-up-studies).
-
-Human review is complete: all eight flagged main answers were accepted at 4/4.
-The records are claimable within their documented descriptive scope; the
-191/200 automatic classifications and affected cost bounds are retained.
-
-The [Astra findings](benchmarks/astra_findings.md) and
-[offline reproduction](benchmarks/results/astra_20260913_main/README.md#publication-reproduction)
-close the primary publication without changing its sealed evidence.
+The Rust-only repository is already in place. Native evidence-tool replacements,
+free-campaign reruns and installation qualification remain required work; the
+source cutover does not establish beta readiness.
 
 ## Coming soon
 
-Version 0.10.0 carried the execution envelope from a finished run to an
-accepted deliverable. The next releases measure which of its controls earn
-their place: choose an appropriate plan, execute within agreed limits,
-preserve useful work, verify the exact output returned, and learn which
-approaches work. New behavior is opt-in. A default changes only after a
-measured comparison on held-out tasks, and the local single-machine path keeps
-working without extra services.
+The following milestones build on the same execution and accounting contracts.
+Each integration must first work against deterministic fixtures or a local fake
+service. Paid evaluations require a separately authorized budget.
 
-### Next: measured selection and cost
-
-| Priority | Change | Acceptance criteria |
+| Order | Milestone | Acceptance criteria |
 |---|---|---|
-| P2 | Graph selection | Compare a strong single worker, fixed templates and generated plans on newly frozen held-out tasks, charging selection, planning, failed attempts and checks. Record why each run chose its tier. Current evidence is mixed: generated plans recorded lower wall time on the [task-shape suite](benchmarks/shape_suite.md) and higher mean wall time on [Astra's supplied-source tasks](benchmarks/astra_findings.md). Shipped in 0.10.0: a `WhiteRabbit` router records each [routing decision](docs/architecture.md#routing-decisions) on the planned graph, with the classifier's usage or, in durable runs, its journal calls. Declarative [routing rules](docs/architecture.md#routing-rules), evaluated on the submitted task before any classifier call, can send a task to a first-class single-worker tier, a template or a generated plan, and durable recipes record the rules and their policy version. An offline [selector comparison](benchmarks/README.md#selector-comparison-offline-mechanics) runs the arms with fixture models and records mechanics only. The held-out comparison is not run yet. |
-| P2 | Broader complete-workflow cost evidence | Extend the completed Astra evidence to harder external tasks using the native ledger, declared prices, failed attempts and all optimization trials. |
+| 1 | Qualify the local engine | Close the correctness and acceptance gaps above; keep Linux/Windows recovery and scaling gates green; retain source, binary and output identities |
+| 2 | Remote accounting and providers | Prove one complete workflow against a fake service, including lost responses, retained exposure, reconciliation and resume without duplicate dispatch or settlement; then extend adapter coverage |
+| 3 | Planning and routing | Preserve the Architect and WhiteRabbit naming; validate generated graphs before execution; compare a single worker, deterministic templates and generated graphs including planning cost |
+| 4 | Tools, MCP and context | Bound tool loops and reads; keep tool authority in developer configuration; treat retrieved content as untrusted; journal context and reusable read receipts |
+| 5 | Verification and supervision | Judge the exact delivered output; preserve verification obligations through revisions; record what a revision keeps, invalidates and adds; keep retries and revisions bounded |
+| 6 | Jobs and governed actions | Add inspectable artifact jobs, approval-bound external actions and reconciliation after lost acknowledgements; demonstrate recovery with a fake service before live use |
+| 7 | Interfaces, evidence and distribution | Qualify the control API, MCP server, optional OpenTelemetry export, documentation examples, native free campaigns and clean installation; telemetry failure must not affect execution |
 
-### Then: recorded context, governed actions and reuse
+Prompt optimization follows the first native Architect. A new execution policy
+becomes a default only after measurements show it preserves accepted outcomes.
+The local, single-machine path must continue to work without a service cluster.
+Optional OpenTelemetry export is part of the 1.0 interface milestone, with
+execution independent of whether it is enabled.
 
-These build on strict acceptance and can proceed in parallel. Each is proven
-against deterministic fixtures and a fake external service before any live
-connector or paid run.
+## Noumenon and performance evidence
 
-1. **Recorded tools and context in durable workflows** — one versioned
-   read-only tool whose saved response is reused on resume instead of called
-   again; immutable snapshots of the context each worker saw, with source
-   content marked untrusted; and evidence records that carry claims, sources
-   and contradictions through synthesis. A source-to-artifact example runs
-   offline, survives interruption and resumes. Shipped in 0.10.0: durable workflows
-   journal [read steps](docs/workflow-accounting.md#recorded-read-steps) of
-   declared, versioned HTTP read profiles with byte, time, redirect and
-   destination limits; a saved response is reused on resume, verified by
-   killing a real process against a fake service. Versioned
-   [source and claim records](docs/source-evidence.md) travel with an
-   artifact, and a final validator rejects quotes that are not in their
-   sources and listed contradictions that do not reach the artifact. The
-   offline [source-to-artifact example](https://github.com/petehottelet/smythe/blob/12f14704beff344228fffffce40d995daa1f7cce/examples/16_source_to_artifact.py)
-   plans, reads, is interrupted, resumes and delivers an accepted document;
-   [run inspection](docs/runs.md#research-runs) shows its sources, reads,
-   evidence and open questions without their text, and a
-   [removed source](docs/tasks.md#remove-a-source) leaves a tombstone that
-   withholds a decision resting on it until it is re-evaluated
-2. **Approval gates and reconciled external actions** — pause, approve or
-   reject with state that survives restart. Approval binds a verified
-   principal to the exact action or artifact, with expiry and revocation
-   checked again before dispatch. One connector gets a stable action identity
-   across retries, a receipt per action and independent readback: a write
-   whose acknowledgment is lost is reconciled or reported as unresolved, never
-   blindly repeated. Shipped in 0.10.0: a completed durable run whose strict
-   delivery acceptance is `accepted` can [deliver that output](docs/actions.md)
-   through a host connector. An approval binds a principal your host verifies
-   to one action and its exact intent, with a ceiling and an expiry; it is checked again
-   before every dispatch, and rejection, revocation and a run's action stop
-   are kept in the journal across restarts. Each action sends one key on
-   every attempt and records each receipt, and only a read of the target
-   settles its result. A write whose answer is lost is reconciled from
-   lookups or a deduplicated retry where the connector declares them, or left
-   for an operator's verified decision. The offline
-   [governed-publication example](https://github.com/petehottelet/smythe/blob/12f14704beff344228fffffce40d995daa1f7cce/examples/19_governed_publication.py) runs
-   the path end to end. Approval gates inside a run's graph are not covered
-3. **Evidence-triggered control** — replace routine model supervision calls
-   with deterministic stage and anomaly triggers; reserve LLM review for a
-   result that supplies evidence the pending plan should change. A replan
-   records what it keeps, invalidates and adds, and cannot bypass final
-   acceptance. Shipped in 0.10.0: an opt-in
-   [evidence-triggered supervisor](docs/supervisor.md#evidence-triggered-review)
-   reviews only when a declared stage or an anomaly in the run's recorded state
-   fires, such as a skipped input, an exhausted gate, listed contradictions or
-   empty output, and gives the reviewer that evidence; a developer action can
-   replan with no model call. Every replan is logged with the triggers that
-   prompted it and keeps gate protection and strict acceptance. A default
-   change waits for an ablation that shows no loss of accepted outcomes
-4. **Failure-aware scheduling** — classify failures before retrying, with one
-   retry owner and a shared deadline per operation; an opt-in drain policy
-   that stops new paid work while in-flight results settle; and admission that
-   respects provider rate limits and reserves allowance for verification and
-   synthesis. Security events and revoked authority stop work immediately.
-   Shipped in 0.10.0, each experimental and off by default: an opt-in
-   [retry policy](docs/execution.md#retry-policy) classifies failures, with
-   one retry owner, a shared deadline and attempt caps that resume cannot
-   refill; [capacity limits](docs/execution.md#provider-capacity) admit work
-   per provider type and model; a
-   [drain policy](docs/execution.md#draining-in-flight-work) lets in-flight
-   calls settle after a failure; a
-   [held allowance](docs/budgets.md#held-allowance-for-checks) keeps budget for
-   verification and synthesis; a
-   [security stop](docs/execution.md#security-stops) ends a run at once and for
-   good; and [model profiles](docs/execution.md#model-profiles) route nodes to
-   approved models and [fall back](docs/execution.md#profile-fallback) on a
-   retry. [Evidence-triggered supervision](docs/supervisor.md#evidence-triggered-review),
-   [claim exchange](docs/architecture.md#claim-exchange) and
-   [routing rules](docs/architecture.md#routing-rules) are opt-in as well, and
-   the [contribution lint](docs/architecture.md#contribution-lint) only
-   records. No default changes without a held-out evaluation
-5. **Artifact lineage and selective repair** — accepted artifacts record the
-   sources, validators and tools they depend on. A changed source or validator
-   invalidates its dependents, and a repair plan shows what will be reused,
-   rechecked or regenerated before dispatch. Shipped in 0.10.0: strict durable runs
-   opt into [lineage records](docs/lineage.md) of ids, versions and digests.
-   A read-only [repair plan](docs/lineage.md#plan-a-repair) shows each run's
-   decision, derived status and predicted work before anything runs, and
-   `Swarm.repair` [applies a reviewed plan](docs/lineage.md#apply-a-repair-plan)
-   under an explicit allowance: it decides a run again under a changed
-   validator, publishes a damaged document again, or starts a successor run
-   that keeps the unaffected results, and `reuse=False` computes affected
-   work again in full. A [source restriction](docs/lineage.md#restrict-a-source)
-   withdraws a source's text from every run that used it, optionally
-   deleting their published documents. Jobs repair a damaged accepted
-   output, recheck accepted outputs under changed validators and preview
-   repairs, each within one run. The offline
-   [archive-maintenance example](https://github.com/petehottelet/smythe/blob/12f14704beff344228fffffce40d995daa1f7cce/examples/18_archive_maintenance.py) repairs
-   an archive and compares it with a full recomputation. Reuse across Jobs
-   runs and automatic repair are not covered
-6. **Integrate asset policy with Jobs v1** — manifest-native production brand
-   masters, OCR and perceptual brand validators, select-from-N curation, and
-   deterministic export bundles built from accepted attempt pointers
-7. **Reviewable continual learning** — a candidate becomes active only after
-   it beats its predecessor and a simpler alternative on held-out tasks,
-   without mutating the base planner. The
-   [template lifecycle](#shipped-v0100-accepted-deliverables) shipped in
-   0.10.0 and its mechanics are shown offline. Still open: promoting failure
-   lessons, capability descriptions and reusable procedures into versioned
-   supplemental state, since template records hold graph structure only and
-   failure rows are opt-in planner history; and a template version measured
-   better than its predecessor and a simpler alternative on held-out live
-   tasks, under decided thresholds and an approved evaluation budget. Offline
-   fixtures rank no template
-8. **Autotune generalization** — run evaluators in a separately supervised
-   process that can be stopped at a deadline, and add conservative
-   live-evaluator adapters with per-trial price ceilings after the offline
-   campaign. Optimizers cannot change acceptance criteria, spend ceilings,
-   permissions or held-out data. Reserved paths, sample-size guidance,
-   cross-campaign reports, registry commands and bounded exploration
-   [shipped in 0.10.0](#shipped-v0100-accepted-deliverables). Statistical
-   comparison across campaigns and a correction for repeated comparisons are
-   not built
+Noumenon remains the primary benchmark example. Keep the existing names, SVG
+reference hashes, contact sheets and [README animation](assets/noumenon/noumenon-loop.gif).
+The animation shows the catalog in use; it is not a recording of a Rust run or
+a timing result. The screensaver itself lives in the
+[Noumenon repository](https://github.com/petehottelet/noumenon).
 
-### Evidence and scale
+Current regression gates cover 2,000/8,000-node per-node scaling, a 5,000-node
+chain, inline disk overhead and 256-glyph compilation. Full acceptance also
+validates all 256 glyphs and resumes a completed run without new provider calls.
+These checks detect regressions; they are not public speed claims.
 
-The [Fable 5.1 extension](benchmarks/fable_51_benchmark_plan.md) has a native
-Messages runner for its 12-workflow pilot and 100-workflow main schedule.
-Usage accounting and saved-response recovery are integrated into the durable
-ledger. [All 12 native pilot workflows and the separate Code Workflow pilot](benchmarks/results/fable_20260914_pilot/README.md)
-passed contract checks and blind judging. Human pilot ratings gate the native
-main study. The [ten-task Code Workflow study](benchmarks/results/fable_code_20260914/README.md)
-is complete; its five earlier diagnostic attempts and charges remain recorded.
-Both studies share the $100 sublimit inside the existing $300 ceiling.
+The [original Rust/Python comparison](benchmarks/rust_noumenon_results.md)
+describes an earlier preview and remains diagnostic. It does not measure the
+schema-3 engine. A new comparison must identify both producer revisions, use
+matched work and clocks, and preserve every failure and output check. The
+[measurement guide](docs/rust.md#verification-and-native-measurements) and
+[evidence index](benchmarks/README.md) define the current scope.
 
-- **Scale ladder** — extend the reviewed offline 5,000-operation recovery
-  observation to bounded paid 50/250/1,000-item trials with kill-and-resume
-  and duplicate detection; measure the current schema-v4 runtime separately.
-  Measure the write and storage overhead that acceptance, context and lineage
-  records add at the same scale
-- **Benchmarks, continued** — a discriminating judge, human calibration,
-  repeated k=25 cells, repeated glyph live cells, and held-out
-  brand-consistency comparisons; save delivered text and judge reasoning so
-  independent reviewers can rescore each quality result
+## Requirements for 1.0
 
-### Noumenon
-
-The screensaver, web explorer, and native ports continue in the
-[Noumenon repository](https://github.com/petehottelet/noumenon): web renderer
-parity and visible-display timing, the Windows Defender review of the withdrawn
-v0.7.0 Windows package, native exploration modes, macOS signing and
-notarization, and Wayland support. Precompiled distribution remains suspended.
-The original-glyph generation benchmark stays in Smythe.
+- Document the supported native API, CLI, provider combinations and stability
+  policy, with examples that run from the released source.
+- Complete the native execution paths above with offline acceptance, accounting,
+  authority and recovery tests; identify any explicitly deferred integrations.
+- Keep local quote/revision recovery and the expanded simulation qualified on
+  supported platforms; establish an approved raster reference and catalog style acceptance.
+- Establish a tested journal compatibility and upgrade policy. Schema-1/2 Rust
+  preview runs currently require fresh directories; Python stores are historical.
+- Qualify installation and distribution independently of a developer checkout,
+  with reproducible source identities and platform-specific build checks.
+- Retain Noumenon output parity and publish performance claims only from a
+  campaign whose report marks them claimable within a stated scope.
+- Keep private data out of artifacts and records, and document the limits of
+  the trusted-operator security model.
+- Complete native privacy and evidence tooling, dependency checks and release
+  artifact qualification. Passing source-tree tests alone is insufficient.
 
 ## Later
 
-- One optional durable backend adapter and one external worker adapter, when a
-  workload needs multi-process recovery, long waits or service boundaries that
-  the local path should not grow into. Both must pass the same acceptance,
-  authority and accounting tests as local runs
-- Coordination of external coding harnesses: bounded tasks in separate
-  workspaces, review packets that name the exact decision needed, as
-  [`smythe jobs review`](docs/jobs.md#review-what-needs-attention) already
-  does for Jobs runs and
-  [`smythe runs review`](docs/runs.md#review-what-needs-a-decision) for saved
-  checkpoints and durable journals, and launch limits set by review
-  capacity, with no automatic merge rights
-- Autonomous Autotune proposal strategies after the bounded runner and
-  evidence protocol are calibrated on more than the concurrency workload
-- Recursive subgraph decomposition, with depth limits and shared
-  budget/trace/failure machinery
-- Direct messaging between retained agent runs with bounded family-scoped
-  routing and persisted delivery receipts
-- Provider hardening: retry with backoff, streaming, response caching
-- Template/starter library and a `smythe init` command
-- Docs site, OpenTelemetry export, local-model capability metadata
+Learning, Autotune, policy and template lifecycle, memory, distillation and
+learned reuse are after 1.0. Reusing verified outputs within a run and bounded
+revision remain in 1.0; deterministic planning templates do not imply learning.
 
-## Out of scope (deliberately)
+External workers, optional durable backends, a live dashboard, recursive
+decomposition and coordination of coding harnesses can follow demonstrated
+workload needs.
+They must preserve the same accounting, authority and recovery contracts.
+Hosted services, marketplaces and general-purpose infrastructure are outside
+the current core scope.
 
-- A hosted SaaS or agent marketplace — the OSS core comes first
-- A Go rewrite
-- Infrastructure Smythe should integrate rather than build: a general
-  workflow engine, event broker, compute scheduler, vector or graph database,
-  or credential platform. Local use never requires a cluster
+## Python history
 
-## Contributing
+Python releases through 0.10.0 remain in Git history, along with their provider,
+Jobs, learning and optimization implementations. Their milestones are recorded
+in the [changelog](CHANGELOG.md), [changelog archive](CHANGELOG-ARCHIVE.md),
+[historical guides](docs/index.md#python-010-reference) and
+[previous roadmap](https://github.com/petehottelet/smythe/blob/12f14704beff344228fffffce40d995daa1f7cce/ROADMAP.md).
+Historical benchmark records remain available with their original scope.
+Python release numbers do not identify Rust releases.
 
-Issues tagged `good first issue` are curated entry points; see [CONTRIBUTING.md](CONTRIBUTING.md). If you want to work on a roadmap item, open an issue first so we can align on design.
+See [Contributing](CONTRIBUTING.md) for development checks and ways to propose
+work against these milestones.

@@ -1,6 +1,5 @@
 # Preserve byte hashes for the original SVG campaign across Windows and Unix. 
 /benchmarks/results/durability_kill_resume_v2.json text eol=lf
-/benchmarks/*svg*.py text eol=lf
 /benchmarks/results/glyph_svg_v1*.json text eol=lf
 /benchmarks/partitions/glyph_svg_v1/**/*.json text eol=lf
 /benchmarks/partitions/glyph_svg_v1/**/*.svg text eol=lf
@@ -11,16 +10,13 @@
 /benchmarks/partitions/glyph_svg_v2_256/**/*.png -text
 /benchmarks/partitions/glyph_svg_v2_256/*.json text eol=lf
 /benchmarks/results/glyph_svg_v2_20260913.json -text
-/benchmarks/run_svg_v2_benchmark.py text eol=lf
-/benchmarks/svg_v2_evidence.py text eol=lf
 /benchmarks/svg_v2_protocol.md text eol=lf
 /docs/data/glyph-style-summary.json text eol=lf
 
 # These measured files include original CRLF bytes. Preserve their recorded hashes.
 /assets/wordmark.svg -text
 
-# The Noumenon generator and catalog carry the SVG hashes that benchmarks record.
-/benchmarks/noumenon/glyph_design_v2.py text eol=lf
+# The Noumenon contours and catalog carry the SVG hashes that benchmarks record.
 /benchmarks/noumenon/glyph_contours_v2.json text eol=lf
 /benchmarks/noumenon/catalog/*.svg text eol=lf
 /benchmarks/noumenon/catalog/*.json text eol=lf
@@ -28,16 +24,12 @@
 /benchmarks/noumenon/catalog/*.png -text
 /assets/noumenon/noumenon_specimens.svg text eol=lf
 
-# Recovery evidence preserves original raw bytes and reproducible review code.
-/benchmarks/archive_jobs_scale.py text eol=lf
-/tests/test_jobs_scale_archive.py text eol=lf
+# Historical recovery evidence preserves original raw bytes.
 /benchmarks/results/jobs_scale_5000_20260907_f1/*.json -text
 /benchmarks/results/jobs_scale_5000_20260907_f1/*.zip -text
 /benchmarks/results/astra_pilot_runtime_20260907/* -text
 
-# Live Astra calibration keeps native receipts and measured source identities.
-/benchmarks/astra_*.py text eol=lf
-/tests/test_astra_*.py text eol=lf
+# Historical Astra calibration keeps provider receipts and source identities.
 /benchmarks/results/astra_20260913/*.json -text
 /benchmarks/results/astra_20260913/*.zip -text
 /benchmarks/results/astra_20260913_main/*.json -text

@@ -1,0 +1,7 @@
+{
+  "seed": 16,
+  "rng": "ChaCha8",
+  "mutation": "Coordinator admission subtracts zero instead of the derived revision_base",
+  "expected_failure": "reachable local run failure: attempt_limit after revised work",
+  "expected_behavior": "Revised work dispatches beyond attempt 3 while each revision remains within its own allowance"
+}

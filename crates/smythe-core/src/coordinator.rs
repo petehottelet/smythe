@@ -57,6 +57,7 @@ pub enum Finish {
     Failed,
     Paused,
     BudgetBlocked,
+    QuoteBlocked,
 }
 #[derive(Clone, Debug)]
 pub enum Command {
@@ -160,6 +161,7 @@ impl Coordinator {
                                 events.push(Event::LocalReplay {
                                     node: node.clone(),
                                     attempt: a.number,
+                                    revision_base: Some(a.revision_base),
                                 })
                             }
                             AttemptState::Received | AttemptState::Settled => {
@@ -507,7 +509,21 @@ impl Coordinator {
                 .get(index)
                 .context("missing quote for recorded expansion")?
             else {
-                self.fault = Some("quote_failed".into());
+                if self.active.is_empty() && admissions.is_empty() {
+                    if self.state.quote_blocked {
+                        return Ok(vec![Command::Finish(Finish::QuoteBlocked)]);
+                    }
+                    return Ok(self.append(
+                        vec![(
+                            Event::QuoteBlocked {
+                                node: node.id.clone(),
+                            },
+                            self.now_ms,
+                        )],
+                        vec![],
+                        Purpose::Other,
+                    ));
+                }
                 break;
             };
             let attempt = self
@@ -516,7 +532,16 @@ impl Coordinator {
                 .get(&node.id)
                 .map_or(Some(1), |a| a.number.checked_add(1))
                 .context("attempt overflow")?;
-            if attempt > self.state.limits.max_attempts_per_node {
+            let revision_base = self
+                .state
+                .attempts
+                .get(&node.id)
+                .map_or(0, |a| a.revision_base);
+            if attempt
+                .checked_sub(revision_base)
+                .context("invalid revision attempt base")?
+                > self.state.limits.max_attempts_per_node
+            {
                 self.fault = Some("attempt_limit".into());
                 break;
             }

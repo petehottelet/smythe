@@ -2,10 +2,11 @@
 
 ## Rust alpha examples
 
-The `0.2.0` Rust preview runs local graphs and the authored Noumenon
+The `0.9.0` Rust preview runs local graphs and the authored Noumenon
 pipeline without Python or API keys. Build from this checkout with Rust 1.91
 or later and a C build toolchain for bundled SQLite; see the
-[source-build quickstart](../README.md#quickstart).
+[source-build guide](../docs/distribution.md) and
+[quickstart](../README.md#quickstart).
 
 ```bash
 cargo run --release --locked --offline --bin smythe -- noumenon --glyphs 256 --workers 8 --out smythe_artifacts/native-glyphs
@@ -20,8 +21,15 @@ Ordinary native runs use [native_graph.toml](native_graph.toml). The
 shows the complete command sequence; the [native guide](../docs/rust.md)
 documents controls and recovery limits.
 
-Use fresh directories for the schema-3 native journal. Earlier alpha journals
-are refused; see [format compatibility](../docs/rust.md#journal-and-recovery).
+These examples exercise supplied local graphs and glyph processing. Local
+qualification is still open; read the [known preview limitations](../docs/rust.md#known-preview-limitations)
+for remaining acceptance and tooling work. For bounded event pages, supply
+`--events --after 0 --limit 100`; a limit without a cursor is rejected. Remote
+workflows and generated planning remain [roadmap milestones](../ROADMAP.md#coming-soon).
+
+Schemas 1 and 2 need fresh directories. The amended reader accepts earlier
+schema-3 journals, preserving terminal failures. New quote blocks can resume
+after the provider is corrected; see [format compatibility](../docs/rust.md#journal-and-recovery).
 
 ## Python examples
 
@@ -133,7 +141,7 @@ savings.
 
 | Example | What it shows |
 |---|---|
-| [Packages and typing](../docs/distribution.md) | Build and test a slim source package and verify typed sync/async consumers against an installed wheel. |
+| [Historical packages and typing](https://github.com/petehottelet/smythe/blob/12f14704beff344228fffffce40d995daa1f7cce/docs/distribution.md) | Build and test a Python source package and verify typed consumers against an installed wheel from the retained checkout. |
 | [Current materials](../docs/current-materials.md) | Revised 192/256 contact sheets, detail sheets, animation, still image, native source exports, and each benchmark's evidence status. |
 | [GPT-6 Astra and Claude Fable 5.1 quickstarts](../docs/python-quickstart.md#with-a-real-model) | Generate, inspect, and execute a Python text-only task graph through native Responses or native Claude Messages, with a $50 run allowance, concurrency eight, and planning included in the SQLite ledger. |
 | [Native Astra/Sol Responses](../docs/openai-responses.md) | Smythe counts and quotes an exact request before generation, records native token prices, and retains function-tool continuation and failed-response receipts. |

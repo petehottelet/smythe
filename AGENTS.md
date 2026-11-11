@@ -15,6 +15,11 @@ Keep public documentation centered on those two ideas. The README is the
 concise product page; `docs/index.md` is the documentation map; detailed
 behavior belongs in the linked guide for that subsystem.
 
+The active implementation is the Rust 0.9.0 source preview. Use `docs/rust.md`
+for shipped behavior and `ROADMAP.md` for future native capabilities. Historical
+Python guides and benchmark records must stay explicitly identified as such;
+their use of a provider's native API does not imply a Rust integration.
+
 ## Evidence and claims
 
 - Treat committed benchmark records as the source of truth for numbers.

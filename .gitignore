@@ -1,41 +1,18 @@
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
-# Python build output.
+# Rust build products and local run stores.
+target/
+.smythe/
+smythe_artifacts/
 /dist/
 build/
-*.egg-info/
-*.egg
-.eggs/
-*.whl
-.venv/
-.venv-h2h/
-smythe/.verify-venv/
-smythe/tmp/
-venv/
-env/
+*.so
+*.log
+
+# Credentials and sensitive local configuration.
 .env
 .env.*
 *.pem
 *.key
 credentials*
-smythe_artifacts/
-smythe/output/
-*.log
-.mypy_cache/
-.pytest_cache/
-.ruff_cache/
-.tox/
-.coverage
-htmlcov/
-.idea/
-.vscode/
-*.swp
-*.swo
-*~
-.DS_Store
-Thumbs.db
 
 # Private plans, proposals, reviews, scorecards, and working notes; never publish.
 00_project_files/
@@ -48,6 +25,34 @@ Thumbs.db
 /docs/windows-defender-*.md
 .claude/
 
-# Rust compiler and benchmark output.
-target/
-.smythe/
+# Legacy Python artifacts can remain locally after switching source revisions.
+# These ignores do not imply an active Python build or runtime.
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+*.egg
+.eggs/
+*.whl
+.venv/
+.venv-h2h/
+smythe/.verify-venv/
+smythe/tmp/
+venv/
+env/
+smythe/output/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+.tox/
+.coverage
+htmlcov/
+
+# Editor and operating-system files.
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db

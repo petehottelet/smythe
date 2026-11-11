@@ -496,6 +496,7 @@ impl Swarm {
             Finish::Stopped => anyhow::bail!(EngineError::Stopped),
             Finish::Failed => anyhow::bail!(EngineError::ProviderFailed),
             Finish::BudgetBlocked => anyhow::bail!(EngineError::BudgetExhausted),
+            Finish::QuoteBlocked => anyhow::bail!(EngineError::QuoteBlocked),
         }
         let state = coordinator.state;
         let outputs = state
