@@ -30,6 +30,16 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
 
 ## [Unreleased]
 
+- Preserve active sibling completions, costs and dependent readiness when an
+  eligible failed node is explicitly retried during execution.
+- Refresh the scheduler clock after output serialization/publication, journal
+  commits and external controls before admitting more work.
+- Persist native campaign provenance, trial starts, timings, exit outcomes and
+  sanitized failure classes incrementally in `trials.jsonl`, preserving prior
+  evidence when a trial fails or final source/binary checks invalidate a campaign.
+- Restore benchmark-index links to retired harnesses at their pinned historical
+  revision. Add storage lifecycle qualification and remote timeout, cancellation,
+  preflight and retry-ownership requirements to the native roadmap.
 - Set the native workspace to 0.9.0, still an experimental source preview.
   Historical Python release numbers and existing tags remain unchanged.
 - Report bounded, sanitized CLI diagnostics with parser locations and useful

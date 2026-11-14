@@ -145,6 +145,12 @@ impl Coordinator {
     pub fn needs_recovery(&self) -> bool {
         !self.recovered
     }
+    /// Observe the shell's current clock before making decisions for this input.
+    /// Event occurrence times do not include output publication or commit latency.
+    pub fn step_at(&mut self, input: Input, now_ms: u64) -> Result<Vec<Command>> {
+        self.now_ms = self.now_ms.max(now_ms);
+        self.step(input)
+    }
     pub fn step(&mut self, input: Input) -> Result<Vec<Command>> {
         match input {
             Input::Tick { now_ms } => {
@@ -277,7 +283,15 @@ impl Coordinator {
                         Event::Retried { .. } | Event::Expanded { .. } | Event::Revised { .. }
                     )
                 }) {
-                    ensure!(self.active.is_empty(), "revision while workers are active");
+                    if records
+                        .iter()
+                        .any(|r| matches!(r.event, Event::Expanded { .. } | Event::Revised { .. }))
+                    {
+                        ensure!(self.active.is_empty(), "revision while workers are active");
+                    }
+                    // A failed node can be retried while siblings are still running.
+                    // Rebuild readiness from the journal without losing active workers
+                    // or completions restored after an append conflict.
                     self.rebuild_schedule()?;
                     return Ok(vec![]);
                 } else {

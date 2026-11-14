@@ -119,6 +119,12 @@ Pause and stop prevent new admissions while active local calls drain. Recovery
 guarantees cover local process crashes. Remote effects, distributed workers,
 and power-loss guarantees are outside this alpha's scope.
 
+Eligible retries preserve active siblings and their settled costs. Admission
+deadlines include time spent publishing outputs and committing the journal.
+See the [native guide](docs/rust.md#controls-limits-and-revisions) for these
+boundaries and the [roadmap](ROADMAP.md#local-qualification) for remaining
+storage lifecycle and acceptance requirements.
+
 The current native journal uses amended schema 3 and reads earlier schema-3
 journals; schemas 1 and 2 require a new directory. Failed cost quotes are resumable,
 and invalidation gives affected nodes fresh retry allowance while attempt numbers

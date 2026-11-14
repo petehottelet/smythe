@@ -38,12 +38,23 @@ diagnostics, enforced event-paging arguments and complete runtime source hashes
 in Noumenon reports are implemented. Remaining [qualification gaps](docs/rust.md#known-preview-limitations)
 still prevent a 1.0 readiness claim; version 0.9.0 remains a source preview.
 
+Local qualification also covers retries while sibling workers are active and
+deadlines crossed during output serialization, publication or journal commits.
+These boundaries have deterministic regression tests. Native campaigns retain
+incremental provenance, trial timings and sanitized failure records, including
+unsuccessful trials.
+
 The immediate priorities are:
 
 1. Add native identifier/link checks and dependency advisory/license checks.
    This work can proceed independently of raster-reference approval.
 2. Approve a shared native raster reference, complete catalog style acceptance,
    and measure full-workflow CPU and peak memory with committed provenance.
+3. Define and qualify store backup/restore, retention and deletion, orphan-blob
+   reclamation, and storage quotas. Protect active writers and shared output
+   references, preserve retained journals, and test disk-full and interrupted
+   maintenance. Staging cleanup and received-output limits do not establish
+   this storage lifecycle contract.
 
 The Rust-only repository is already in place. Native evidence-tool replacements,
 free-campaign reruns and installation qualification remain required work; the
@@ -57,8 +68,8 @@ service. Paid evaluations require a separately authorized budget.
 
 | Order | Milestone | Acceptance criteria |
 |---|---|---|
-| 1 | Qualify the local engine | Close the correctness and acceptance gaps above; keep Linux/Windows recovery and scaling gates green; retain source, binary and output identities |
-| 2 | Remote accounting and providers | Prove one complete workflow against a fake service, including lost responses, retained exposure, reconciliation and resume without duplicate dispatch or settlement; then extend adapter coverage |
+| 1 | Qualify the local engine | Close the correctness, storage lifecycle and acceptance gaps above; keep concurrent retry and storage-latency deadline regressions, Linux/Windows recovery and scaling gates green; retain source, binary, output and failed-trial identities |
+| 2 | Remote accounting and providers | Prove one complete workflow against a fake service, including lost responses, retained exposure, reconciliation and resume without duplicate dispatch or settlement; require capability preflight, per-call timeouts, cancellation and one owner for rate-limit/backoff retries; then extend adapter coverage |
 | 3 | Planning and routing | Preserve the Architect and WhiteRabbit naming; validate generated graphs before execution; compare a single worker, deterministic templates and generated graphs including planning cost |
 | 4 | Tools, MCP and context | Bound tool loops and reads; keep tool authority in developer configuration; treat retrieved content as untrusted; journal context and reusable read receipts |
 | 5 | Verification and supervision | Judge the exact delivered output; preserve verification obligations through revisions; record what a revision keeps, invalidates and adds; keep retries and revisions bounded |
@@ -101,6 +112,8 @@ matched work and clocks, and preserve every failure and output check. The
   supported platforms; establish an approved raster reference and catalog style acceptance.
 - Establish a tested journal compatibility and upgrade policy. Schema-1/2 Rust
   preview runs currently require fresh directories; Python stores are historical.
+- Qualify store backup and restoration, retention/deletion, orphan reclamation
+  and disk quotas without removing evidence needed by retained or active runs.
 - Qualify installation and distribution independently of a developer checkout,
   with reproducible source identities and platform-specific build checks.
 - Retain Noumenon output parity and publish performance claims only from a

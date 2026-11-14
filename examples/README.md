@@ -21,6 +21,11 @@ Ordinary native runs use [native_graph.toml](native_graph.toml). The
 shows the complete command sequence; the [native guide](../docs/rust.md)
 documents controls and recovery limits.
 
+Eligible retries retain active siblings; admission deadlines account for output
+publication and journal commit time. Native measurement campaigns retain
+individual success/failure records in `trials.jsonl`; see the
+[measurement guide](../docs/rust.md#verification-and-native-measurements).
+
 These examples exercise supplied local graphs and glyph processing. Local
 qualification is still open; read the [known preview limitations](../docs/rust.md#known-preview-limitations)
 for remaining acceptance and tooling work. For bounded event pages, supply

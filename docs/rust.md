@@ -124,6 +124,10 @@ After the coordinator exits, record continue/retry as appropriate and invoke
 spent plus reserved money. Budget changes are outside the semantic run binding.
 External effects are refused by the runtime and cannot use pure retry or replay.
 
+An eligible failed node can also be retried while siblings are active. The
+coordinator retains those workers and their completion receipts, settles their
+costs once, and schedules dependent work from the updated journal.
+
 Saved limits default to 10,000 nodes, 100,000 edges, three attempts per node
 since its last invalidation,
 64 MiB per output and 1 GiB total received output. Configure them with
@@ -132,6 +136,9 @@ since its last invalidation,
 `--wall-deadline-ms` is an optional absolute UTC Unix-millisecond deadline;
 once observed, backward clock movement cannot reopen admission. Resume preserves
 limits. Oversized successful results are rejected while retaining their cost.
+The shell refreshes the clock before scheduling decisions after output
+serialization, publication, journal commits and external controls. Already
+committed admissions still drain; a deadline does not interrupt their callbacks.
 
 The event API supports quiescent graph changes: `Expanded` names its parent and
 new revision and input manifest digest; `Revised` gives a reason and invalidation
@@ -198,6 +205,7 @@ lists the work still required before 1.0.
 |---|---|
 | Local acceptance | Shared raster-reference approval, catalog style acceptance and full-workflow measurement qualification remain open |
 | Native tooling | Tracked-file identifier scanning, local-link tooling and dependency advisory/license gates remain planned |
+| Storage lifecycle | Backup/restore, retention/deletion, orphan-blob reclamation and disk quotas remain unqualified; current cleanup covers abandoned staging directories |
 | Remote workflows | Paid providers, external-effect recovery, generated planning, tools and supervision remain future capabilities |
 
 ## Noumenon acceptance
@@ -272,6 +280,16 @@ source and binary identities after measurement. Checkout LF/CRLF conversion
 does not alter its source hashes. Fresh 256-glyph trials alternate one, four and
 eight workers. Results are diagnostic; CPU and peak-memory campaign measurements
 are still pending. Regression gates are not public speed claims.
+
+Each campaign writes `trials.jsonl` incrementally: committed source and binary
+provenance first, then a start record and a completion record for each trial.
+Completion records retain cold-process time, exit code, outcome and recognized
+CLI error classes. Raw stdout/stderr and arbitrary error messages from failed
+or malformed trials are omitted. A failed trial stops the campaign after its
+record is flushed; earlier trial timings remain available. A start without a
+completion identifies an interrupted trial. Final source/binary checks mark
+changed campaigns invalidated; only a fully checked campaign writes the
+aggregate `results.json`. All records remain diagnostic and nonclaimable.
 
 The [original comparison](../benchmarks/rust_noumenon_results.md) is historical
 evidence for `409d367b3cb09a06461127c6d70f2ef52e16a0ce`. Its checkout hashes include

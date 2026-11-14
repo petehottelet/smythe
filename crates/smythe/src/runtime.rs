@@ -192,6 +192,7 @@ fn refresh<P: Provider>(
     records: Vec<smythe_core::journal::Record>,
     provider: &P,
     store: &Store,
+    sources: &Sources,
 ) -> Result<Vec<Command>> {
     let revised = records.iter().any(|r| {
         matches!(
@@ -199,14 +200,17 @@ fn refresh<P: Provider>(
             Event::Expanded { .. } | Event::Revised { .. } | Event::Retried { .. }
         )
     });
-    let mut commands = coordinator.step(Input::Foreign(records))?;
+    let mut commands = coordinator.step_at(Input::Foreign(records), sources.clock.unix_ms())?;
     if revised {
         coordinator.set_quotes(quotes(&coordinator.state, provider))?;
     }
     if coordinator.needs_recovery() {
-        commands.extend(coordinator.step(Input::Recovered {
-            invalid_outputs: verify_outputs::<P::Output>(&coordinator.state, store)?,
-        })?);
+        commands.extend(coordinator.step_at(
+            Input::Recovered {
+                invalid_outputs: verify_outputs::<P::Output>(&coordinator.state, store)?,
+            },
+            sources.clock.unix_ms(),
+        )?);
     }
     Ok(commands)
 }
@@ -350,15 +354,18 @@ impl Swarm {
                     Event::Expanded { .. } | Event::Revised { .. } | Event::Retried { .. }
                 )
             });
-            coordinator.step(Input::Foreign(foreign))?;
+            coordinator.step_at(Input::Foreign(foreign), self.sources.clock.unix_ms())?;
             if revised {
                 coordinator.set_quotes(quotes(&coordinator.state, provider))?;
             }
         }
         let mut commands: VecDeque<_> = coordinator
-            .step(Input::Recovered {
-                invalid_outputs: invalid,
-            })?
+            .step_at(
+                Input::Recovered {
+                    invalid_outputs: invalid,
+                },
+                self.sources.clock.unix_ms(),
+            )?
             .into();
         let (sender, receiver) = mpsc::sync_channel::<Completion>(self.max_concurrency);
         let (wake_tx, wake_rx) = mpsc::channel();
@@ -376,8 +383,10 @@ impl Swarm {
                                 events,
                                 blobs,
                             ) {
-                                Ok(ack) => commands
-                                    .extend(coordinator.step(Input::Committed(ack.records))?),
+                                Ok(ack) => commands.extend(coordinator.step_at(
+                                    Input::Committed(ack.records),
+                                    self.sources.clock.unix_ms(),
+                                )?),
                                 Err(error) if EngineError::JournalChanged.matches(&error) => {
                                     let foreign =
                                         store.changes_since(id, coordinator.state.sequence)?;
@@ -386,6 +395,7 @@ impl Swarm {
                                         foreign,
                                         provider,
                                         store,
+                                        &self.sources,
                                     )?);
                                 }
                                 Err(error) => return Err(error),
@@ -456,12 +466,21 @@ impl Swarm {
                             });
                         }
                     }
-                    commands.extend(coordinator.step(Input::Completions(completed))?);
+                    commands.extend(
+                        coordinator
+                            .step_at(Input::Completions(completed), self.sources.clock.unix_ms())?,
+                    );
                     continue;
                 }
                 let foreign = store.changes_since(id, coordinator.state.sequence)?;
                 if !foreign.is_empty() {
-                    commands.extend(refresh(&mut coordinator, foreign, provider, store)?);
+                    commands.extend(refresh(
+                        &mut coordinator,
+                        foreign,
+                        provider,
+                        store,
+                        &self.sources,
+                    )?);
                 }
                 if commands.is_empty() {
                     commands.extend(coordinator.step(Input::Tick {
@@ -480,7 +499,13 @@ impl Swarm {
                         &wake_rx,
                     )?;
                     if !foreign.is_empty() {
-                        commands.extend(refresh(&mut coordinator, foreign, provider, store)?);
+                        commands.extend(refresh(
+                            &mut coordinator,
+                            foreign,
+                            provider,
+                            store,
+                            &self.sources,
+                        )?);
                     }
                     if commands.is_empty() {
                         commands.extend(coordinator.step(Input::Tick {

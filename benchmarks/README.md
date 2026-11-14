@@ -168,7 +168,7 @@ smaller than that as noise.
 ### Memory on/off
 
 The learning-Architect claim, measured
-([run_memory_ab.py](run_memory_ab.py), records in
+([run_memory_ab.py](https://github.com/petehottelet/smythe/blob/12f14704beff344228fffffce40d995daa1f7cce/benchmarks/run_memory_ab.py), records in
 [results/memory_ab.json](results/memory_ab.json)): five similar
 competitive-brief tasks run in sequence, with and without
 `PlannerMemory`, two repeats. Recall wiring is observable per record —
@@ -180,7 +180,7 @@ positions; node counts and cost equal. The interpretation matters:
 recalled history can only help where there is a planning mistake to
 correct, and after the v5 calibration the Architect already plans this
 family consistently (3 nodes, every time). The mechanism demonstrably
-*can* change plans — [examples/08_learning_loop.py](../examples/08_learning_loop.py)
+*can* change plans — [examples/08_learning_loop.py](https://github.com/petehottelet/smythe/blob/12f14704beff344228fffffce40d995daa1f7cce/examples/08_learning_loop.py)
 shows a recorded failure steering the next plan — but on a
 well-calibrated planner and a homogeneous task family, it has nothing
 to fix. A harder test (task families with planted failure modes)
@@ -193,7 +193,7 @@ but its protocol differs and its table is not directly comparable.
 
 ## Corrected framework head-to-head: LangGraph and CrewAI (2026-07-12)
 
-The corrected comparison ([run_framework_h2h.py](run_framework_h2h.py), raw
+The corrected comparison ([run_framework_h2h.py](https://github.com/petehottelet/smythe/blob/12f14704beff344228fffffce40d995daa1f7cce/benchmarks/run_framework_h2h.py), raw
 records in
 [results/framework_h2h_rightsized.json](results/framework_h2h_rightsized.json))
 judges each framework's delivered API output. The fixed implementations share
@@ -442,7 +442,7 @@ published anyway: [control_ablation.md](control_ablation.md).
 
 Which graph should a task get: one strong worker, a fixed template, a
 generated plan, or a selector that picks among them per task?
-[run_selector_comparison.py](run_selector_comparison.py) is the harness for
+[run_selector_comparison.py](https://github.com/petehottelet/smythe/blob/12f14704beff344228fffffce40d995daa1f7cce/benchmarks/run_selector_comparison.py) is the harness for
 that comparison, run offline on fixtures. Its model steps answer with fixture
 content and declared usage, so the
 [record](results/selector_comparison_offline.json) establishes mechanics,
@@ -487,7 +487,7 @@ never an arm ranking, and changes no default.
 python benchmarks/run_selector_comparison.py   # writes results/selector_comparison_offline.json
 ```
 
-[offline_arms.py](offline_arms.py) is the shared runner for offline arm
+[offline_arms.py](https://github.com/petehottelet/smythe/blob/12f14704beff344228fffffce40d995daa1f7cce/benchmarks/offline_arms.py) is the shared runner for offline arm
 harnesses: fixture providers, strict acceptance, attempt records, the
 counterbalanced schedule and offline record labels. A harness with arms of
 its own passes its own attempt runner to `run_cell`.
@@ -496,7 +496,7 @@ its own passes its own attempt runner to `run_cell`.
 
 Does removing routine model review lose accepted outcomes once deterministic
 triggers decide when a review happens?
-[run_trigger_ablation.py](run_trigger_ablation.py) is the harness for that
+[run_trigger_ablation.py](https://github.com/petehottelet/smythe/blob/12f14704beff344228fffffce40d995daa1f7cce/benchmarks/run_trigger_ablation.py) is the harness for that
 ablation, run offline on fixtures with the shared runner. A scripted reviewer
 decides every review and the anomalies are planted where the triggers look, so
 the [record](results/trigger_ablation_offline.json) establishes mechanics,
@@ -547,7 +547,7 @@ approved budget and decided thresholds.
 
 Does each opt-in scheduling and synthesis policy change what it should
 against its own baseline, one change at a time?
-[run_policy_ablations.py](run_policy_ablations.py) is the harness for those
+[run_policy_ablations.py](https://github.com/petehottelet/smythe/blob/12f14704beff344228fffffce40d995daa1f7cce/benchmarks/run_policy_ablations.py) is the harness for those
 ablations, run offline on fixtures with planted failures, so the
 [record](results/policy_ablations_offline.json) establishes mechanics, never
 a measured benefit, and changes no default. It lists every policy it covers,
@@ -597,7 +597,7 @@ evaluation needs an approved budget.
 ## Template evaluation (offline mechanics)
 
 Is a new template version better than the version it replaces, and better
-than no template at all? [template_eval.py](template_eval.py) is the harness
+than no template at all? [template_eval.py](https://github.com/petehottelet/smythe/blob/12f14704beff344228fffffce40d995daa1f7cce/benchmarks/template_eval.py) is the harness
 for that evaluation, run offline on fixtures. Every step answers with fixture
 content and declared usage, and each fixture version is designed for one
 outcome, so the [record](results/template_eval_offline.json) establishes
@@ -654,8 +654,8 @@ decided thresholds, and live evaluation needs an approved budget.
 
 ## Prompt-policy optimizer loops (diagnostic)
 
-[run_optimizer.py](run_optimizer.py) tunes the brand asset suite's prompt
-policies, and [run_banner_optimizer.py](run_banner_optimizer.py) the banner
+[run_optimizer.py](https://github.com/petehottelet/smythe/blob/12f14704beff344228fffffce40d995daa1f7cce/benchmarks/run_optimizer.py) tunes the brand asset suite's prompt
+policies, and [run_banner_optimizer.py](https://github.com/petehottelet/smythe/blob/12f14704beff344228fffffce40d995daa1f7cce/benchmarks/run_banner_optimizer.py) the banner
 suite's creative direction. A model proposes one change, the suite runs live,
 a vision judge scores the result, and the change is kept when its mean score
 beats the incumbent's by a fixed margin. That rule has no paired confidence
