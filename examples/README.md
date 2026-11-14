@@ -2,7 +2,7 @@
 
 ## Rust alpha examples
 
-The `0.9.0` Rust preview runs local graphs and the authored Noumenon
+The `0.9.1` Rust preview runs local graphs and the authored Noumenon
 pipeline without Python or API keys. Build from this checkout with Rust 1.91
 or later and a C build toolchain for bundled SQLite; see the
 [source-build guide](../docs/distribution.md) and

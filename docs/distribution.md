@@ -1,6 +1,6 @@
 # Source builds and distribution
 
-Smythe **0.9.0** is a Rust source preview. The workspace packages have
+Smythe **0.9.1** is a Rust source preview. The workspace packages have
 `publish = false`; there is no current crates.io package or Rust binary release
 to install. Build from a checkout of `main` or an exact commit. Historical PyPI
 packages contain the retired Python implementation.
@@ -10,6 +10,7 @@ packages contain the retired Python implementation.
 | Need | Source |
 |---|---|
 | Current Rust runtime and CLI | This repository's `main` branch; record the exact commit when reproducing behavior |
+| Rust 0.9.1 source snapshot | The `rust-v0.9.1` tag; see the [release guide](rust-0.9.1.md) |
 | Original Rust 0.2.0 snapshot | The immutable `rust-v0.2.0` tag; later fixes are on `main` |
 | Historical Python implementation | [Revision 12f1470](https://github.com/petehottelet/smythe/tree/12f14704beff344228fffffce40d995daa1f7cce) and the [historical packaging guide](https://github.com/petehottelet/smythe/blob/12f14704beff344228fffffce40d995daa1f7cce/docs/distribution.md) |
 | Noumenon screensaver | The separate [Noumenon repository](https://github.com/petehottelet/noumenon) |

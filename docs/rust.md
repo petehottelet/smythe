@@ -1,6 +1,6 @@
 # Rust alpha: journaled local execution
 
-The native workspace is **0.9.0**, a Rust-only source preview. Its packages are
+The native workspace is **0.9.1**, a Rust-only source preview. Its packages are
 unpublished and interfaces are experimental. The eventual stable Rust release
 will be 1.0.0. Historical Python source, tests and comparison harnesses remain at
 [12f1470](https://github.com/petehottelet/smythe/tree/12f14704beff344228fffffce40d995daa1f7cce).

@@ -2,7 +2,7 @@
   <img src="assets/wordmark.svg" alt="SMYTHE" width="340">
   <p><em>An open-source framework for task-based agent swarms with dynamic parallelization, routing, and execution topology.</em></p>
   <p>
-    <a href="docs/rust.md"><img src="assets/badges/alpha.svg" alt="Rust preview 0.9.0"></a>
+    <a href="docs/rust.md"><img src="assets/badges/alpha.svg" alt="Rust preview 0.9.1"></a>
     <a href="https://github.com/petehottelet/smythe/actions/workflows/rust.yml?query=branch%3Amain+event%3Apush"><img src="https://github.com/petehottelet/smythe/actions/workflows/rust.yml/badge.svg?branch=main&amp;event=push" alt="Rust CI status"></a>
     <img src="assets/badges/rust.svg" alt="Rust 1.91 or later">
     <a href="LICENSE"><img src="assets/badges/license.svg" alt="License: MIT"></a>
@@ -20,9 +20,10 @@ Define the work and its dependencies, execute ready tasks in parallel, and
 inspect the journal of outputs and costs. The native engine combines bounded
 concurrency, exact cost reservations, and recovery after a process interruption.
 
-The **Rust 0.9.0 preview** runs local workflows with or without API keys.
+The **Rust 0.9.1 preview** runs local workflows with or without API keys.
 Model-driven planning, paid providers, tools, MCP, supervision and Jobs are
 roadmapped. [Current scope](docs/rust.md).
+See the [Rust 0.9.1 changes](docs/rust-0.9.1.md) and source-build instructions.
 
 <p align="center">
   <img src="assets/noumenon/noumenon-loop.gif" alt="Animated Noumenon rain showing the 192 authored Smythe glyphs" width="900">
@@ -254,7 +255,7 @@ identical fixtures, so this shows recovery correctness, not speed.
 
 ## Project status
 
-**Rust workspace: 0.9.0, source preview.** APIs and journal formats are
+**Rust workspace: 0.9.1, source preview.** APIs and journal formats are
 experimental. The workspace contains `smythe-core` for graph and accounting
 contracts, `smythe` for the shared runtime, `smythe-cli` for the executable,
 `smythe-noumenon` for the glyph pipeline, and `xtask` for native measurements.
@@ -271,7 +272,7 @@ after 1.0; optional telemetry belongs to the planned 1.0 interfaces.
 The Python implementation, tests, packaging and comparison harnesses are retained
 in [Git history at 12f1470](https://github.com/petehottelet/smythe/tree/12f14704beff344228fffffce40d995daa1f7cce).
 Historical benchmark records and the Noumenon artwork remain in this checkout.
-The eventual stable Rust release will be **1.0.0**; this is the **0.9.0** preview.
+The eventual stable Rust release will be **1.0.0**; this is the **0.9.1** preview.
 
 The [Noumenon screensaver](https://github.com/petehottelet/noumenon) is a separate
 project that renders the glyph catalog. Smythe's native command produces the

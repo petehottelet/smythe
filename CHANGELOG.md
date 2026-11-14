@@ -18,8 +18,8 @@ While the project is on a `0.x` line, the public API is **not yet stable**:
   version and exact source revision when reproducing preview behavior. Rust
   packages are currently unpublished; retain `Cargo.lock` with the checkout.
 
-The active Rust workspace is the **0.9.0 source preview**. The released entries
-below describe the historical Python line, whose version numbers and tags
+The active Rust workspace is the **0.9.1 source preview**. Unprefixed released
+entries describe the historical Python line, whose version numbers and tags
 remain unchanged. See [Releasing](RELEASING.md#version-identities) for the
 distinction between `v0.2.0`, `rust-v0.2.0` and ongoing development on `main`.
 
@@ -30,16 +30,6 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
 
 ## [Unreleased]
 
-- Preserve active sibling completions, costs and dependent readiness when an
-  eligible failed node is explicitly retried during execution.
-- Refresh the scheduler clock after output serialization/publication, journal
-  commits and external controls before admitting more work.
-- Persist native campaign provenance, trial starts, timings, exit outcomes and
-  sanitized failure classes incrementally in `trials.jsonl`, preserving prior
-  evidence when a trial fails or final source/binary checks invalidate a campaign.
-- Restore benchmark-index links to retired harnesses at their pinned historical
-  revision. Add storage lifecycle qualification and remote timeout, cancellation,
-  preflight and retry-ownership requirements to the native roadmap.
 - Set the native workspace to 0.9.0, still an experimental source preview.
   Historical Python release numbers and existing tags remain unchanged.
 - Report bounded, sanitized CLI diagnostics with parser locations and useful
@@ -90,6 +80,23 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
 - Keep native measurement provenance bound to clean committed Git blob contents.
   Add release gates for 2,000/8,000-node scaling, a 5,000-node chain, inline disk
   overhead and 256-glyph compilation. Historical Python comparisons remain diagnostic.
+
+## [Rust 0.9.1] - 2026-11-14
+
+Rust 0.9.1 is an experimental source preview, identified by `rust-v0.9.1`.
+The historical Python `v0.9.1` release is unchanged.
+See the [Rust 0.9.1 guide](docs/rust-0.9.1.md).
+
+- Preserve active sibling completions, costs and dependent readiness when an
+  eligible failed node is explicitly retried during execution.
+- Refresh the scheduler clock after output serialization/publication, journal
+  commits and external controls before admitting more work.
+- Persist native campaign provenance, trial starts, timings, exit outcomes and
+  sanitized failure classes incrementally in `trials.jsonl`, preserving prior
+  evidence when a trial fails or final source/binary checks invalidate a campaign.
+- Restore benchmark-index links to retired harnesses at their pinned historical
+  revision. Add storage lifecycle qualification and remote timeout, cancellation,
+  preflight and retry-ownership requirements to the native roadmap.
 
 ## [0.10.0] - 2026-10-24
 

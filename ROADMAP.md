@@ -2,11 +2,11 @@
 
 Smythe's destination is a Rust framework that turns goals into inspectable task
 graphs, executes them within explicit limits, and delivers verified outputs
-with durable recovery. The active workspace is the **0.9.0 source preview**.
+with durable recovery. The active workspace is the **0.9.1 source preview**.
 The first stable Rust release will be **1.0.0** when its acceptance criteria
 are met; this roadmap does not assign a release date.
 
-## Rust alpha (0.9.0)
+## Rust alpha (0.9.1)
 
 The [native guide](docs/rust.md) describes the implemented behavior:
 
@@ -36,7 +36,7 @@ fixtures. Existing terminal quote/attempt failures retain their recorded outcome
 see [compatibility](docs/rust.md#journal-and-recovery). Bounded sanitized CLI
 diagnostics, enforced event-paging arguments and complete runtime source hashes
 in Noumenon reports are implemented. Remaining [qualification gaps](docs/rust.md#known-preview-limitations)
-still prevent a 1.0 readiness claim; version 0.9.0 remains a source preview.
+still prevent a 1.0 readiness claim; version 0.9.1 remains a source preview.
 
 Local qualification also covers retries while sibling workers are active and
 deadlines crossed during output serialization, publication or journal commits.

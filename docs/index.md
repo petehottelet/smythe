@@ -1,6 +1,6 @@
 # Smythe documentation
 
-The active project is the **Rust 0.9.0 source preview**. It runs supplied local
+The active project is the **Rust 0.9.1 source preview**. It runs supplied local
 task graphs and the Noumenon glyph pipeline with bounded concurrency, exact
 accounting and journaled recovery. Python is not needed to build or run it.
 The stable Rust release will be 1.0.0. Local qualification remains open;
@@ -43,10 +43,11 @@ against all runtime sources. These additions do not complete local qualification
 
 ## Project guides
 
+- [Rust 0.9.1](rust-0.9.1.md): concurrent retries, admission deadlines and retained benchmark failures.
 - [Roadmap](../ROADMAP.md): implemented capabilities, next milestones and 1.0 criteria.
 - [Contributing](../CONTRIBUTING.md): setup, crate responsibilities and checks.
 - [Releasing](../RELEASING.md): preview identities, verification and publication scope.
-- [Changelog](../CHANGELOG.md): unreleased Rust changes and immutable Python releases.
+- [Changelog](../CHANGELOG.md): native changes and immutable historical Python releases.
 - [Security](../SECURITY.md): supported code, reporting and the native threat model.
 - [Code of Conduct](../CODE_OF_CONDUCT.md): community standards and reporting.
 - [House style](style.md): diagrams, charts, badges and evidence presentation.

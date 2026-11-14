@@ -1,6 +1,6 @@
 # Releasing Smythe
 
-The active project is the **Rust 0.9.0 source preview**. Packages remain
+The active project is the **Rust 0.9.1 source preview**. Packages remain
 `publish = false`; there is no automatic package or GitHub Release publication
 workflow. The old PyPI publishing workflow has been retired. Existing Python
 releases and tags remain historical.
@@ -35,10 +35,15 @@ Keep workspace versions aligned in Cargo.toml and Cargo.lock. Rust's stable
 release will be **1.0.0** when its functionality and acceptance gates are ready.
 The existing `v0.2.0` tag belongs to Python history. The immutable
 `rust-v0.2.0` tag identifies the original Rust preview; subsequent fixes do not
-move that published tag. Main continues development of the 0.9.0 preview.
-The 0.9.0 workspace version still denotes an experimental source preview;
+move that published tag. Main continues development of the 0.9.1 preview.
+The 0.9.1 workspace version still denotes an experimental source preview;
 it does not declare M1 complete or establish beta or 1.0 readiness. Historical
 Python tags, including `v0.9.0`, are not Rust release identities.
+
+Rust 0.9.1 uses `rust-v0.9.1`; the historical Python `v0.9.1` tag remains
+unchanged. Its [release guide](docs/rust-0.9.1.md) describes the source snapshot
+and compatibility. Source-preview releases do not publish crates.io packages
+or prebuilt native binaries.
 
 A push does not publish a package or create a release. Release publication is a
 separate, explicitly authorized action. Use the supplied release title exactly.

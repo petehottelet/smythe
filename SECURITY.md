@@ -2,7 +2,7 @@
 
 ## Supported code
 
-Security work targets the **Rust 0.9.0 source preview on main**. Report the exact
+Security work targets the **Rust 0.9.1 source preview on main**. Report the exact
 commit because the preview version number also covers subsequent fixes. APIs
 and journal formats remain experimental; stable Rust 1.0.0 is still ahead.
 

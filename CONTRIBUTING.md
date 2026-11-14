@@ -1,6 +1,6 @@
 # Contributing to Smythe
 
-Smythe's active implementation is Rust. The current workspace is a 0.9.0 source
+Smythe's active implementation is Rust. The current workspace is a 0.9.1 source
 preview; stable Rust 1.0.0 remains ahead. Follow the [Code of Conduct](CODE_OF_CONDUCT.md)
 and report sensitive issues through [private security reporting](SECURITY.md).
 
