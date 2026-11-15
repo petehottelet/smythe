@@ -23,8 +23,8 @@ against all runtime sources. These additions do not complete local qualification
 | Understand the crate boundaries and scheduler | [Workspace and scheduling](rust.md#workspace-and-scheduling) |
 | Understand stored outputs and recovery | [Journal and recovery](rust.md#journal-and-recovery) |
 | Check current recovery and inspection limitations | [Known preview limitations](rust.md#known-preview-limitations) · [Local qualification](../ROADMAP.md#local-qualification) |
-| Change budgets, retry during active work or stop work | [Controls, limits and revisions](rust.md#controls-limits-and-revisions) |
-| Retrieve outputs or page through events | [CLI output and inspection](rust.md#cli-output-and-inspection) |
+| Change budgets, retry during active work, invalidate a damaged output or stop work | [Controls, limits and revisions](rust.md#controls-limits-and-revisions) |
+| Retrieve outputs, verify stored outputs or page through events | [CLI output and inspection](rust.md#cli-output-and-inspection) |
 | Generate and validate Noumenon glyphs | [Noumenon acceptance](rust.md#noumenon-acceptance) |
 | Run checks or inspect native trial successes and failures | [Verification and provenance](rust.md#verification-and-native-measurements) |
 

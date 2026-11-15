@@ -26,6 +26,11 @@ publication and journal commit time. Native measurement campaigns retain
 individual success/failure records in `trials.jsonl`; see the
 [measurement guide](../docs/rust.md#verification-and-native-measurements).
 
+`inspect <id> --verify` also loads every accepted output and names any that is
+missing or altered. `control <id> invalidate <node>` then lets `run --resume`
+recompute that node and its descendants; see
+[journal and recovery](../docs/rust.md#journal-and-recovery).
+
 These examples exercise supplied local graphs and glyph processing. Local
 qualification is still open; read the [known preview limitations](../docs/rust.md#known-preview-limitations)
 for remaining acceptance and tooling work. For bounded event pages, supply

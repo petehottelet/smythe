@@ -37,6 +37,7 @@ pub fn arguments(error: &clap::Error) -> String {
                 "--events",
                 "--after",
                 "--limit",
+                "--verify",
                 "--glyphs",
                 "--out",
                 "--mode",

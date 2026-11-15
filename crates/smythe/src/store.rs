@@ -62,7 +62,7 @@ use sha2::{Digest, Sha256};
 use smythe_core::{
     EngineError, NanoUsd, OutputRef,
     coordinator::Blob,
-    journal::{Control, Disposition, Event, JOURNAL_SCHEMA, Projection, Record},
+    journal::{AttemptState, Control, Disposition, Event, JOURNAL_SCHEMA, Projection, Record},
 };
 use std::{
     collections::{BTreeMap, HashMap, HashSet},
@@ -74,6 +74,9 @@ use std::{
 };
 
 pub const INLINE_BYTES: usize = 64 * 1024;
+/// Callers verify the bytes against the digest first. A stored row that differs
+/// from verified bytes is therefore damaged, and recomputed work replaces it.
+const INSERT_BLOB: &str = "INSERT INTO blobs(digest,bytes) VALUES(?1,?2) ON CONFLICT(digest) DO UPDATE SET bytes=excluded.bytes WHERE blobs.bytes IS NOT excluded.bytes";
 type Cache = BTreeMap<String, Projection>;
 type Operation = Box<dyn FnOnce(&mut Connection, &mut Cache) + Send>;
 #[cfg(test)]
@@ -203,6 +206,36 @@ fn records(c: &Connection, id: &str) -> Result<Vec<Record>> {
     #[cfg(test)]
     HISTORY_READS.with(|n| n.set(n.get() + 1));
     records_after(c, id, 0, usize::MAX)
+}
+/// Events and their run summary commit in one transaction, so any disagreement
+/// is damage: most often a journal that lost its tail. Callers compare both in
+/// one read snapshot, because another process may commit between two reads.
+fn verify_summary(c: &Connection, id: &str, last: u64) -> Result<()> {
+    let differs =
+        || anyhow!(EngineError::Integrity).context("journal differs from its recorded summary");
+    let saved: Option<(Vec<u8>, String)> = c
+        .query_row(
+            "SELECT summary,digest FROM runs WHERE run_id=?",
+            [id],
+            |r| Ok((r.get(0)?, r.get(1)?)),
+        )
+        .optional()?;
+    let Some((bytes, hash)) = saved else {
+        ensure!(last == 0, differs());
+        return Ok(());
+    };
+    ensure!(digest(&bytes) == hash, EngineError::Integrity);
+    let summary: RunSummary = serde_json::from_slice(&bytes).context(EngineError::Integrity)?;
+    ensure!(summary.run_id == id, EngineError::Integrity);
+    ensure!(
+        summary.sequence <= last,
+        anyhow!(EngineError::Integrity).context("journal is shorter than its recorded summary")
+    );
+    ensure!(summary.sequence == last, differs());
+    Ok(())
+}
+fn refused(reason: &'static str) -> anyhow::Error {
+    anyhow!(EngineError::InvalidCommand).context(reason)
 }
 fn blob_path(root: &Path, hash: &str) -> PathBuf {
     root.join("blobs").join(&hash[..2]).join(hash)
@@ -345,7 +378,7 @@ fn append_many(
             );
             ensure!(batch.iter().any(|r| matches!(&r.event,Event::Received { output:Some(reference),.. } if reference==&blob.reference)),"unreferenced inline blob");
             tx.execute(
-                "INSERT OR IGNORE INTO blobs(digest,bytes) VALUES(?,?)",
+                INSERT_BLOB,
                 params![blob.reference.sha256, blob.bytes.as_ref()],
             )?;
         }
@@ -553,10 +586,16 @@ impl Store {
         rx.recv()
             .context("store worker stopped before acknowledgement")?
     }
+    /// The complete journal, refused when it disagrees with its run summary.
     pub fn history(&self, id: &str) -> Result<Vec<Record>> {
         validate_id(id)?;
         let id = id.to_owned();
-        self.call(move |c, _| records(c, &id))
+        self.call(move |c, _| {
+            let snapshot = c.transaction()?;
+            let records = records(&snapshot, &id)?;
+            verify_summary(&snapshot, &id, records.last().map_or(0, |r| r.sequence))?;
+            Ok(records)
+        })
     }
     pub fn inspect(&self, id: &str) -> Result<Projection> {
         let records = self.history(id)?;
@@ -568,10 +607,12 @@ impl Store {
         ensure!(limit > 0, "page limit must be positive");
         let id = id.to_owned();
         self.call(move |c, _| {
-            let end = latest(c, &id)?;
+            let snapshot = c.transaction()?;
+            let end = latest(&snapshot, &id)?;
+            verify_summary(&snapshot, &id, end)?;
             ensure!(end > 0, EngineError::RunMissing);
             ensure!(sequence <= end, EngineError::Integrity);
-            records_after(c, &id, sequence, limit)
+            records_after(&snapshot, &id, sequence, limit)
         })
     }
     pub fn changes_since(&self, id: &str, sequence: u64) -> Result<Vec<Record>> {
@@ -660,6 +701,60 @@ impl Store {
             })
         })
     }
+    /// Record an operator revision that discards one accepted output and every
+    /// descendant, so resume recomputes them. Earlier spend stays settled.
+    pub fn invalidate(&self, id: &str, node: &str) -> Result<Ack> {
+        self.operator(id, |s| {
+            ensure!(s.control != Control::Stop, EngineError::Stopped);
+            ensure!(s.node(node).is_ok(), refused("unknown node"));
+            ensure!(
+                s.attempts
+                    .get(node)
+                    .is_some_and(|a| a.state == AttemptState::Accepted),
+                refused("node has no accepted output")
+            );
+            ensure!(
+                s.budget.pending().is_empty()
+                    && !s.attempts.values().any(|a| matches!(
+                        a.state,
+                        AttemptState::Admitted
+                            | AttemptState::Dispatched
+                            | AttemptState::Received
+                            | AttemptState::Settled
+                    )),
+                refused("invalidation requires a quiescent run")
+            );
+            Ok(Event::Revised {
+                revision: s.revision.checked_add(1).context("revision overflow")?,
+                reason: "operator_invalidation".into(),
+                invalidated: vec![node.into()],
+            })
+        })
+    }
+    /// Accepted nodes whose saved output is missing or fails its hash or length.
+    /// Read-only: nothing is repaired or recorded.
+    pub fn damaged_outputs(&self, state: &Projection) -> Result<Vec<String>> {
+        let accepted: Vec<_> = state
+            .attempts
+            .iter()
+            .filter(|(_, a)| a.state == AttemptState::Accepted)
+            .map(|(node, a)| (node.clone(), a.output.clone()))
+            .collect();
+        let root = self.root.clone();
+        self.call(move |c, _| {
+            let mut damaged = vec![];
+            for (node, reference) in accepted {
+                match reference.map(|r| read_blob(c, root.as_deref(), &r)) {
+                    Some(Ok(_)) => {}
+                    Some(Err(error)) if !EngineError::Integrity.matches(&error) => {
+                        return Err(error);
+                    }
+                    _ => damaged.push(node),
+                }
+            }
+            Ok(damaged)
+        })
+    }
     pub fn lease(&self, id: &str) -> Result<Lease> {
         ensure!(!self.readonly, "store is read-only");
         validate_id(id)?;
@@ -735,8 +830,15 @@ impl Store {
     fn put_file(&self, reference: &OutputRef, bytes: &[u8]) -> Result<()> {
         let root = self.root.as_ref().context("file store unavailable")?;
         let path = blob_path(root, &reference.sha256);
-        if path.exists() {
-            ensure!(fs::read(&path)? == bytes, EngineError::Integrity);
+        // The path names the digest of its content. Different existing content
+        // is damage, which bytes proven to match that digest may replace.
+        let damaged = path.exists() && fs::read(&path)? != bytes;
+        if damaged {
+            ensure!(
+                digest(bytes) == reference.sha256 && bytes.len() as u64 == reference.bytes,
+                EngineError::Integrity
+            );
+        } else if path.exists() {
             return Ok(());
         }
         fs::create_dir_all(path.parent().unwrap())?;
@@ -756,7 +858,10 @@ impl Store {
             file.write_all(bytes)?;
             drop(file);
             self.sources.storage.observe(StorageBoundary::BlobWritten)?;
-            if let Err(error) = fs::hard_link(&temporary, &path) {
+            if damaged {
+                // An atomic replacement: readers see the old file or the new one.
+                fs::rename(&temporary, &path)?;
+            } else if let Err(error) = fs::hard_link(&temporary, &path) {
                 if !path.exists() {
                     return Err(error.into());
                 }
@@ -783,10 +888,7 @@ impl Store {
             let key = reference.sha256.clone();
             let bytes = bytes.to_vec();
             self.call(move |c, _| {
-                c.execute(
-                    "INSERT OR IGNORE INTO blobs(digest,bytes) VALUES(?,?)",
-                    params![key, bytes],
-                )?;
+                c.execute(INSERT_BLOB, params![key, bytes])?;
                 let saved: Vec<u8> =
                     c.query_row("SELECT bytes FROM blobs WHERE digest=?", [key], |r| {
                         r.get(0)
@@ -832,8 +934,9 @@ impl Store {
     }
     pub fn list(&self) -> Result<Vec<RunSummary>> {
         self.call(|c, _| {
+            let snapshot = c.transaction()?;
             let mut statement =
-                c.prepare("SELECT run_id,summary,digest FROM runs ORDER BY run_id")?;
+                snapshot.prepare("SELECT run_id,summary,digest FROM runs ORDER BY run_id")?;
             let rows = statement.query_map([], |r| {
                 Ok((
                     r.get::<_, String>(0)?,
@@ -841,15 +944,26 @@ impl Store {
                     r.get::<_, String>(2)?,
                 ))
             })?;
-            rows.map(|row| {
-                let (id, bytes, hash) = row?;
-                ensure!(digest(&bytes) == hash, EngineError::Integrity);
-                let summary: RunSummary =
-                    serde_json::from_slice(&bytes).context(EngineError::Integrity)?;
-                ensure!(id == summary.run_id, EngineError::Integrity);
-                Ok(summary)
-            })
-            .collect()
+            let summaries = rows
+                .map(|row| {
+                    let (id, bytes, hash) = row?;
+                    ensure!(digest(&bytes) == hash, EngineError::Integrity);
+                    let summary: RunSummary =
+                        serde_json::from_slice(&bytes).context(EngineError::Integrity)?;
+                    ensure!(id == summary.run_id, EngineError::Integrity);
+                    Ok(summary)
+                })
+                .collect::<Result<Vec<_>>>()?;
+            // An indexed lookup per run, not a replay: never list a run whose
+            // journal no longer reaches the sequence its summary records.
+            for summary in &summaries {
+                verify_summary(
+                    &snapshot,
+                    &summary.run_id,
+                    latest(&snapshot, &summary.run_id)?,
+                )?;
+            }
+            Ok(summaries)
         })
     }
 }

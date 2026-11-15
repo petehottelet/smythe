@@ -382,6 +382,171 @@ fn explicit_limits_require_a_cursor_and_paging_keeps_its_existing_shape() {
     }
 }
 
+fn two_node_fixture() -> Fixture {
+    let f = Fixture::new();
+    fs::write(
+        &f.graph,
+        serde_json::to_vec(&json!({"nodes":[
+            {"id":"alpha-node","task":{"goal":"fixture","input":1}},
+            {"id":"beta-node","task":{"goal":"fixture","input":2},"depends_on":["alpha-node"]}
+        ]}))
+        .unwrap(),
+    )
+    .unwrap();
+    f
+}
+
+#[test]
+fn a_truncated_journal_is_refused_by_every_command_that_reads_it() {
+    let f = two_node_fixture();
+    check(f.run("cut", &[]), 0, None);
+    let db = rusqlite::Connection::open(f.store.join("journal.sqlite3")).unwrap();
+    let count = |db: &rusqlite::Connection| -> i64 {
+        db.query_row("SELECT COUNT(*) FROM events WHERE run_id='cut'", [], |r| {
+            r.get(0)
+        })
+        .unwrap()
+    };
+    let remaining = count(&db) - 4;
+    db.execute(
+        "DELETE FROM events WHERE run_id='cut' AND sequence>?",
+        [remaining],
+    )
+    .unwrap();
+    for output in [
+        f.cmd(&["inspect", "cut"]),
+        f.cmd(&["inspect", "cut", "--events", "--after", "0"]),
+        f.cmd(&["list"]),
+        f.cmd(&["output", "cut", "alpha-node"]),
+        f.cmd(&["control", "cut", "pause"]),
+        f.cmd(&["control", "cut", "retry", "alpha-node"]),
+        f.run("cut", &["--resume"]),
+    ] {
+        let message = diagnostic(output, 5, "integrity", &[]);
+        assert!(message.contains("journal is shorter than its recorded summary"));
+    }
+    // No command resumed work or recorded a decision on the damaged journal.
+    assert_eq!(count(&db), remaining);
+}
+
+#[test]
+fn damaged_outputs_are_named_and_repaired_only_by_explicit_invalidation() {
+    let f = two_node_fixture();
+    check(f.run("run", &[]), 0, None);
+    let healthy = check(f.cmd(&["inspect", "run", "--verify"]), 0, None);
+    assert_eq!(healthy["verified_outputs"], 2);
+    let plain = check(f.cmd(&["inspect", "run"]), 0, None);
+    assert!(plain.get("verified_outputs").is_none());
+    let digest = plain["state"]["attempts"]["alpha-node"]["output"]["sha256"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    let db = rusqlite::Connection::open(f.store.join("journal.sqlite3")).unwrap();
+    assert_eq!(
+        db.execute("DELETE FROM blobs WHERE digest=?", [&digest])
+            .unwrap(),
+        1
+    );
+    drop(db);
+
+    // The journal alone still reads as completed; only verification loads outputs.
+    assert_eq!(
+        check(f.cmd(&["inspect", "run"]), 0, None)["status"],
+        "completed"
+    );
+    for output in [
+        f.cmd(&["inspect", "run", "--verify"]),
+        f.run("run", &["--resume"]),
+    ] {
+        let stderr = String::from_utf8(output.stderr.clone()).unwrap();
+        let value = check(output, 5, Some("integrity"));
+        assert_eq!(value["error"]["nodes"], json!(["alpha-node"]));
+        assert_eq!(value["error"]["node_count"], 1);
+        // Node IDs are graph content: structured field only, never message text.
+        let message = value["error"]["message"].as_str().unwrap();
+        assert!(message.contains("accepted output is missing or damaged"));
+        assert!(!message.contains("alpha-node") && !stderr.contains("alpha-node"));
+    }
+
+    let unknown = diagnostic(
+        f.cmd(&["control", "run", "invalidate", "no-such-node"]),
+        2,
+        "invalid_command",
+        &["no-such-node"],
+    );
+    assert!(unknown.contains("unknown node"));
+    check(
+        f.cmd(&["control", "run", "invalidate"]),
+        2,
+        Some("invalid_command"),
+    );
+    check(
+        f.cmd(&["control", "run", "invalidate", "alpha-node"]),
+        0,
+        None,
+    );
+    assert_eq!(
+        check(f.cmd(&["inspect", "run"]), 0, None)["status"],
+        "running"
+    );
+    let resumed = check(f.run("run", &["--resume"]), 0, None);
+    assert_eq!(resumed["provider_calls"], 2);
+    assert_eq!(resumed["reused_nodes"], 0);
+    let repaired = check(f.cmd(&["inspect", "run", "--verify"]), 0, None);
+    assert_eq!(repaired["status"], "completed");
+    assert_eq!(repaired["verified_outputs"], 2);
+}
+
+#[test]
+fn noumenon_resume_checks_artifacts_against_the_journal_not_the_report() {
+    let f = Fixture::new();
+    let out = f.root.join("glyphs");
+    let invoke = |extra: &[&str]| {
+        Command::new(env!("CARGO_BIN_EXE_smythe"))
+            .args(["noumenon", "--glyphs", "2", "--mode", "compile", "--out"])
+            .arg(&out)
+            .args(extra)
+            .output()
+            .unwrap()
+    };
+    // An existing empty directory holds no run and is a fresh destination,
+    // also after a refused resume has looked at it.
+    fs::create_dir(&out).unwrap();
+    check(invoke(&["--resume"]), 6, Some("run_missing"));
+    check(invoke(&[]), 0, None);
+    check(invoke(&[]), 6, Some("run_exists"));
+    assert_eq!(check(invoke(&["--resume"]), 0, None)["replayed"], true);
+
+    let catalog = out.join("catalog.json");
+    let report = out.join("report.json");
+    let original_catalog = fs::read(&catalog).unwrap();
+    let original_report = fs::read(&report).unwrap();
+    let mut edited = original_catalog.clone();
+    edited.push(b'\n');
+    fs::write(&catalog, &edited).unwrap();
+    check(invoke(&["--resume"]), 5, Some("integrity"));
+    // Patching the report to agree with the edited artifact changes nothing.
+    let mut patched: Value = serde_json::from_slice(&original_report).unwrap();
+    patched["artifacts"]["catalog.json"] = smythe::store::digest(&edited).into();
+    fs::write(&report, serde_json::to_vec(&patched).unwrap()).unwrap();
+    check(invoke(&["--resume"]), 5, Some("integrity"));
+    // With the artifact restored, the patched report disagrees with the journal.
+    fs::write(&catalog, &original_catalog).unwrap();
+    check(invoke(&["--resume"]), 5, Some("integrity"));
+    // A malformed report is an integrity failure, never a panic.
+    for damaged in [
+        b"not json".to_vec(),
+        serde_json::to_vec(&json!({})).unwrap(),
+        serde_json::to_vec(&json!({"artifacts":{"other.json":"x"}})).unwrap(),
+        serde_json::to_vec(&json!({"artifacts":"catalog.json"})).unwrap(),
+    ] {
+        fs::write(&report, damaged).unwrap();
+        check(invoke(&["--resume"]), 5, Some("integrity"));
+    }
+    fs::write(&report, &original_report).unwrap();
+    assert_eq!(check(invoke(&["--resume"]), 0, None)["replayed"], true);
+}
+
 #[test]
 fn provider_error_text_never_reaches_the_journal_or_resumed_cli_diagnostic() {
     use smythe::{CompletionResult, Dependency, Provider, Task};

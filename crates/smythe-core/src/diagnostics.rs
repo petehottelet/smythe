@@ -54,6 +54,30 @@ impl fmt::Display for GraphDiagnostic {
 }
 impl Error for GraphDiagnostic {}
 
+/// Accepted nodes whose saved output is missing or fails its hash or length.
+/// Node IDs are graph content, so they travel as a bounded structured field
+/// and never appear in diagnostic text.
+#[derive(Debug)]
+pub struct DamagedOutputs {
+    pub nodes: Vec<String>,
+    pub total: usize,
+}
+impl DamagedOutputs {
+    pub const MAX_NODES: usize = 64;
+    pub fn error(mut nodes: Vec<String>) -> anyhow::Error {
+        nodes.sort();
+        let total = nodes.len();
+        nodes.truncate(Self::MAX_NODES);
+        anyhow::Error::new(EngineError::Integrity).context(Self { nodes, total })
+    }
+}
+impl fmt::Display for DamagedOutputs {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("accepted output is missing or damaged")
+    }
+}
+impl Error for DamagedOutputs {}
+
 // Only schema names and one-edit spelling mistakes are useful here. Unknown
 // names may themselves be credentials, paths or account identifiers.
 fn field_name(name: &str) -> &str {
@@ -133,6 +157,16 @@ pub fn message(error: &anyhow::Error) -> String {
                 "resume uses the journaled budget; change it with smythe control <id> budget <nanousd>" => {
                     "resume uses the journaled budget; change it with smythe control <id> budget <nanousd>"
                 }
+                "journal is shorter than its recorded summary" => {
+                    "journal is shorter than its recorded summary"
+                }
+                "journal differs from its recorded summary" => {
+                    "journal differs from its recorded summary"
+                }
+                "accepted output is missing or damaged" => "accepted output is missing or damaged",
+                "unknown node" => "unknown node",
+                "node has no accepted output" => "node has no accepted output",
+                "invalidation requires a quiescent run" => "invalidation requires a quiescent run",
                 _ => continue,
             }
         };

@@ -9,6 +9,7 @@ use smythe::{
     CompletionResult, Dependency, EngineError, ExecutionGraph, Node, Provider, Swarm, Task,
     Topology,
 };
+use std::collections::BTreeMap;
 use std::fs::{self, OpenOptions};
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -17,6 +18,10 @@ use std::time::Instant;
 
 pub const PROTOCOL: &str = "noumenon-rust-journal-v3";
 pub const COMPILER_VERSION: &str = "noumenon-contours-v1";
+const EXPORT_RUN: &str = "noumenon-export";
+const EXPORT_NODE: &str = "export";
+/// Published file name to SHA-256. The journal holds the authoritative copy.
+type Artifacts = BTreeMap<String, String>;
 static TEMP_ID: AtomicU64 = AtomicU64::new(0);
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, clap::ValueEnum)]
 #[serde(rename_all = "snake_case")]
@@ -89,6 +94,64 @@ fn json_bytes(value: &impl Serialize) -> Result<Vec<u8>> {
     let mut bytes = serde_json::to_vec_pretty(value)?;
     bytes.push(b'\n');
     Ok(bytes)
+}
+/// Saved evidence that disagrees with the journal or the authored catalog.
+fn differs(reason: &'static str) -> anyhow::Error {
+    anyhow::Error::new(EngineError::Integrity).context(reason)
+}
+/// No entries, or only the lock a refused attempt left behind: no run is here.
+fn vacant(out: &Path) -> Result<bool> {
+    for entry in fs::read_dir(out)? {
+        if entry?.file_name() != ".lock" {
+            return Ok(false);
+        }
+    }
+    Ok(true)
+}
+/// Journals the digests of the published exports. A resumed run then checks
+/// its files against the journal, not against the report beside them.
+struct ExportProvider<'a> {
+    artifacts: Option<&'a Artifacts>,
+    evidence: String,
+}
+impl Provider for ExportProvider<'_> {
+    type Output = Artifacts;
+    fn effect(&self) -> smythe::Effect {
+        smythe::Effect::Pure
+    }
+    fn binding(&self) -> String {
+        format!("noumenon-export-v1:{}", self.evidence)
+    }
+    fn cost_bound_nanousd(&self, _: &Task) -> Result<u64> {
+        Ok(0)
+    }
+    fn complete(
+        &self,
+        _: &Task,
+        _: &[Dependency<'_, Artifacts>],
+    ) -> Result<CompletionResult<Artifacts>> {
+        Ok(CompletionResult {
+            output: self
+                .artifacts
+                .context("export receipts require published exports")?
+                .clone(),
+            cost_nanousd: 0,
+        })
+    }
+}
+fn export_graph() -> ExecutionGraph {
+    ExecutionGraph {
+        topology: vec![Topology::Serial],
+        nodes: vec![Node {
+            id: EXPORT_NODE.into(),
+            task: Task {
+                goal: "Record Noumenon export receipts".into(),
+                input: Value::Null,
+            },
+            depends_on: vec![],
+            phase: Some("export".into()),
+        }],
+    }
 }
 struct ContourProvider<'a> {
     recipes: &'a [Recipe],
@@ -208,16 +271,17 @@ pub fn run(options: &Options) -> Result<Value> {
     let started = Instant::now();
     let out = &options.out;
     if options.resume {
-        ensure!(out.is_dir(), EngineError::RunMissing);
+        ensure!(out.is_dir() && !vacant(out)?, EngineError::RunMissing);
     } else {
         fs::create_dir_all(out.parent().unwrap_or(Path::new(".")))?;
-        fs::create_dir(out).map_err(|e| {
-            if e.kind() == std::io::ErrorKind::AlreadyExists {
-                anyhow::Error::new(EngineError::RunExists)
-            } else {
-                e.into()
+        match fs::create_dir(out) {
+            Ok(()) => {}
+            // An existing directory that holds no run is a fresh destination.
+            Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
+                ensure!(out.is_dir() && vacant(out)?, EngineError::RunExists)
             }
-        })?;
+            Err(e) => return Err(e.into()),
+        }
     }
     let lock = OpenOptions::new()
         .read(true)
@@ -239,7 +303,7 @@ pub fn run(options: &Options) -> Result<Value> {
         ensure!(
             out.join(".smythe/journal.sqlite3").exists()
                 || (!out.join("catalog.json").exists() && !out.join("GLYPH-000.svg").exists()),
-            "published outputs require their compilation journal"
+            differs("published outputs require their compilation journal")
         );
     } else {
         publish(&out.join("run.json"), &json_bytes(&binding)?)?;
@@ -266,7 +330,7 @@ pub fn run(options: &Options) -> Result<Value> {
             .try_for_each(|(i, glyph)| -> Result<()> {
                 ensure!(
                     *glyph == geometry::compile(i, &all[i])?,
-                    "compilation output differs from authored contours"
+                    differs("compilation output differs from authored contours")
                 );
                 Ok(())
             })
@@ -295,12 +359,12 @@ pub fn run(options: &Options) -> Result<Value> {
                 .try_for_each(|(r, g)| -> Result<()> {
                     ensure!(
                         r.glyph == *g,
-                        "compilation and validation evidence disagree"
+                        differs("compilation and validation evidence disagree")
                     );
                     if validation_resume {
                         ensure!(
                             Verifier.validate(g)?.0 == r.measurements,
-                            "saved raster receipt differs"
+                            differs("saved raster receipt differs")
                         );
                     }
                     Ok(())
@@ -325,29 +389,80 @@ pub fn run(options: &Options) -> Result<Value> {
             )
         })
     })?;
-    if options.resume && out.join("report.json").exists() {
-        let saved: Value = serde_json::from_slice(&fs::read(out.join("report.json"))?)?;
-        let artifacts = saved["artifacts"]
-            .as_object()
-            .context("missing artifact receipts")?;
-        let names: &[&str] = if options.mode == Mode::Full {
-            &["catalog.json", "validation.json", "atlas.png"]
+    let names: &[&str] = if options.mode == Mode::Full {
+        &["catalog.json", "validation.json", "atlas.png"]
+    } else {
+        &["catalog.json"]
+    };
+    let evidence = format!(
+        "{}:{}:{}:{}",
+        if options.mode == Mode::Full {
+            "full"
         } else {
-            &["catalog.json"]
-        };
-        ensure!(
-            artifacts.len() == names.len(),
-            "invalid artifact receipt set"
-        );
-        for &name in names {
+            "compile"
+        },
+        validation::RASTER_VERSION,
+        validation::GATE_VERSION,
+        sha(records
+            .iter()
+            .flat_map(|r| r.glyph.svg_sha256.bytes())
+            .collect::<Vec<_>>()
+            .as_slice())
+    );
+    // Receipts journaled by a completed export are the authority for its files.
+    let recorded: Option<Artifacts> = match journal.inspect(EXPORT_RUN) {
+        Ok(state) if state.completed() => {
+            let receipts: Artifacts = swarm
+                .execute_in(
+                    &export_graph(),
+                    &ExportProvider {
+                        artifacts: None,
+                        evidence: evidence.clone(),
+                    },
+                    &journal,
+                    EXPORT_RUN,
+                    true,
+                )?
+                .load(EXPORT_NODE)?;
             ensure!(
-                artifacts[name].as_str() == Some(&sha(&fs::read(out.join(name))?)),
-                "export checksum differs"
+                receipts.len() == names.len() && names.iter().all(|n| receipts.contains_key(*n)),
+                differs("invalid artifact receipt set")
+            );
+            Some(receipts)
+        }
+        Ok(_) => None,
+        Err(error) if EngineError::RunMissing.matches(&error) => None,
+        Err(error) => return Err(error),
+    };
+    // The saved report is returned to the caller but never trusted for hashes.
+    let saved_report: Option<Value> = if options.resume && out.join("report.json").exists() {
+        Some(
+            fs::read(out.join("report.json"))
+                .context(EngineError::Integrity)
+                .and_then(|b| serde_json::from_slice(&b).context(EngineError::Integrity))?,
+        )
+    } else {
+        None
+    };
+    let replayed = |saved: &Value, artifacts: &Artifacts| -> Result<Value> {
+        ensure!(
+            saved["artifacts"] == json!(artifacts),
+            differs("report artifact receipts differ from the journal")
+        );
+        Ok(
+            json!({"status":"passed","replayed":true,"provider_calls":execution.trace.spans.len(),"validation_provider_calls":validation_calls,"reused_glyphs":reused,"reused_validation":reused_validation,"saved_report":saved}),
+        )
+    };
+    if let (Some(saved), Some(receipts)) = (&saved_report, &recorded)
+        && names.iter().all(|n| out.join(n).is_file())
+    {
+        for (name, expected) in receipts {
+            ensure!(
+                sha(&fs::read(out.join(name)).context(EngineError::Integrity)?) == *expected,
+                differs("export checksum differs")
             );
         }
-        return Ok(
-            json!({"status":"passed","replayed":true,"provider_calls":execution.trace.spans.len(),"validation_provider_calls":validation_calls,"reused_glyphs":reused,"reused_validation":reused_validation,"saved_report":saved}),
-        );
+        return replayed(saved, receipts);
     }
     let pixels = if options.mode == Mode::Full {
         pool.install(|| {
@@ -382,16 +497,11 @@ pub fn run(options: &Options) -> Result<Value> {
         })
         .collect();
     let catalog = json!({"version":PROTOCOL,"count":records.len(),"glyph_count":records.len(),"canvas":[100,100],"glyphs":glyphs});
-    let mut artifacts = serde_json::Map::new();
-    let bytes = json_bytes(&catalog)?;
-    publish(&out.join("catalog.json"), &bytes)?;
-    artifacts.insert("catalog.json".into(), sha(&bytes).into());
+    let mut exports = vec![("catalog.json", json_bytes(&catalog)?)];
     if options.mode == Mode::Full {
         let validation = json!({"gate_version":validation::GATE_VERSION,"raster_version":validation::RASTER_VERSION,
             "distinctness":distinctness,"glyphs":records.iter().map(|r| json!({"glyph_id":r.glyph.glyph_id,"measurements":r.measurements})).collect::<Vec<_>>()});
-        let bytes = json_bytes(&validation)?;
-        publish(&out.join("validation.json"), &bytes)?;
-        artifacts.insert("validation.json".into(), sha(&bytes).into());
+        exports.push(("validation.json", json_bytes(&validation)?));
         let columns = records.len().min(16);
         let mut atlas = tiny_skia::Pixmap::new(
             (columns * 128) as u32,
@@ -406,9 +516,43 @@ pub fn run(options: &Options) -> Result<Value> {
                     .copy_from_slice(&pixels.data()[y * 128 * 4..(y + 1) * 128 * 4]);
             }
         }
-        let bytes = atlas.encode_png()?;
-        publish(&out.join("atlas.png"), &bytes)?;
-        artifacts.insert("atlas.png".into(), sha(&bytes).into());
+        exports.push(("atlas.png", atlas.encode_png()?));
+    }
+    let artifacts: Artifacts = exports
+        .iter()
+        .map(|(name, bytes)| ((*name).to_owned(), sha(bytes)))
+        .collect();
+    // Check regenerated exports against the journal before touching any file.
+    ensure!(
+        recorded.as_ref().is_none_or(|saved| *saved == artifacts),
+        differs("export differs from its journaled receipt")
+    );
+    for (name, bytes) in &exports {
+        publish(&out.join(name), bytes)?;
+    }
+    if recorded.is_none() {
+        let resume = !journal.history(EXPORT_RUN)?.is_empty();
+        let journaled: Artifacts = swarm
+            .execute_in(
+                &export_graph(),
+                &ExportProvider {
+                    artifacts: Some(&artifacts),
+                    evidence,
+                },
+                &journal,
+                EXPORT_RUN,
+                resume,
+            )?
+            .load(EXPORT_NODE)?;
+        ensure!(
+            journaled == artifacts,
+            differs("export differs from its journaled receipt")
+        );
+    }
+    if let Some(saved) = &saved_report {
+        // A completed run keeps its report, whether an export was restored or
+        // its receipts were journaled just now.
+        return replayed(saved, &artifacts);
     }
     let export_wall_s = export_started.elapsed().as_secs_f64();
     drop(pool);
@@ -590,6 +734,54 @@ mod tests {
         assert!(run(&o).is_err());
         fs::remove_dir_all(o.out).unwrap();
     }
+    #[test]
+    fn export_receipts_are_journaled_and_runs_without_them_adopt_checked_ones() {
+        let mut o = options();
+        o.mode = Mode::Compile;
+        run(&o).unwrap();
+        o.resume = true;
+        let journal = o.out.join(".smythe");
+        let exported = || {
+            smythe::store::Store::open_read_only(&journal)
+                .unwrap()
+                .inspect(EXPORT_RUN)
+                .is_ok_and(|state| state.completed())
+        };
+        assert!(exported());
+        // A run completed before receipts were journaled has no export run.
+        let forget = || {
+            let db = rusqlite::Connection::open(journal.join("journal.sqlite3")).unwrap();
+            for table in ["events", "runs"] {
+                db.execute(&format!("DELETE FROM {table} WHERE run_id=?"), [EXPORT_RUN])
+                    .unwrap();
+            }
+        };
+        let catalog = o.out.join("catalog.json");
+        let original = fs::read(&catalog).unwrap();
+
+        // Its exports are rebuilt from accepted outputs, compared byte for byte
+        // with the published files, and only then journaled. The report is kept.
+        forget();
+        let adopted = run(&o).unwrap();
+        assert_eq!(adopted["replayed"], true);
+        assert_eq!(adopted["provider_calls"], 0);
+        assert!(exported());
+
+        // The same run with an edited artifact is refused and adopts nothing.
+        forget();
+        fs::write(&catalog, b"edited").unwrap();
+        assert!(EngineError::Integrity.matches(&run(&o).unwrap_err()));
+        assert!(!exported());
+        fs::write(&catalog, &original).unwrap();
+        run(&o).unwrap();
+
+        // A missing artifact is restored only if it matches its journaled receipt.
+        fs::remove_file(&catalog).unwrap();
+        assert_eq!(run(&o).unwrap()["replayed"], true);
+        assert_eq!(fs::read(&catalog).unwrap(), original);
+        fs::remove_dir_all(o.out).unwrap();
+    }
+
     #[test]
     fn missing_terminal_export_resumes_and_mismatched_recipe_is_refused() {
         let mut o = options();

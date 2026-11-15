@@ -83,11 +83,11 @@ cargo run --release --locked --offline --bin smythe -- noumenon --glyphs 256 --w
 cargo run --release --locked --offline --bin smythe -- noumenon --glyphs 256 --workers 8 --out smythe_artifacts/native-glyphs --resume
 ```
 
-A fresh run requires a new output directory. Full mode compiles the glyphs,
+A fresh run requires a new or empty output directory. Full mode compiles the glyphs,
 renders at 16, 32, 64, and 128 pixels, checks topology and pairwise distinctness,
 and writes SVGs, `catalog.json`, `validation.json`, `atlas.png`, and `report.json`.
 Use `--mode compile` for compilation only. A completed resume validates the
-saved exports and makes no new provider calls.
+saved exports against their journaled digests and makes no new provider calls.
 
 [Native commands and recovery](docs/rust.md) · [Examples](examples/README.md).
 
@@ -112,7 +112,7 @@ interrupted local work without a saved result may run again.
 | Bound parallel work | Readiness-driven execution through a bounded Rayon worker pool |
 | Account for cost | Checked integer nanoUSD, reservations before dispatch, and idempotent settlement; current providers are local and zero-cost |
 | Recover interrupted work | SQLite journals, immutable output blobs, and integrity checks before reuse |
-| Inspect or control a run | Typed JSON errors with bounded sanitized diagnostics, explicit cursor paging, owner health, and persisted pause, continue, stop, retry and budget commands |
+| Inspect or control a run | Typed JSON errors with bounded sanitized diagnostics, explicit cursor paging, optional output verification, owner health, and persisted pause, continue, stop, retry, invalidate and budget commands |
 | Produce the glyph catalog | Authored SVG compilation, raster validation, distinctness checks, and resumable exports |
 | Embed the engine | The `smythe` crate's `Swarm`, local `Provider` contract, store, and tracing types |
 
@@ -131,7 +131,10 @@ journals; schemas 1 and 2 require a new directory. Failed cost quotes are resuma
 and invalidation gives affected nodes fresh retry allowance while attempt numbers
 keep increasing. Already-terminal quote/attempt failures retain their outcome.
 Resume checks semantic compatibility and saved outputs, so unrelated source edits
-do not invalidate a run. See the [recovery contract](docs/rust.md#journal-and-recovery).
+do not invalidate a run. A journal shorter than its recorded summary is refused,
+and a missing or altered accepted output is named rather than recomputed
+silently; `control <id> invalidate <node>` then lets resume recompute that node
+and its descendants. See the [recovery contract](docs/rust.md#journal-and-recovery).
 
 [Scheduling and accounting](docs/rust.md#workspace-and-scheduling) ·
 [Journal and run controls](docs/rust.md#journal-and-recovery) ·

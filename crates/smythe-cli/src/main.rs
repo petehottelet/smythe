@@ -5,7 +5,7 @@ use smythe::{EngineError, ExecutionGraph, Limits, NanoUsd, OfflineProvider, Swar
 use smythe_noumenon::pipeline::{self, Mode, Options};
 use std::path::PathBuf;
 mod diagnostics;
-use smythe_core::diagnostics::{GraphDiagnostic, GraphFormat};
+use smythe_core::diagnostics::{DamagedOutputs, GraphDiagnostic, GraphFormat};
 
 #[derive(Parser)]
 #[command(
@@ -100,6 +100,9 @@ enum Command {
         after: Option<u64>,
         #[arg(long, default_value_t = 1000, requires = "after")]
         limit: usize,
+        /// Also load every accepted output and check its hash and length.
+        #[arg(long, conflicts_with = "after")]
+        verify: bool,
     },
     /// List existing runs without replaying their journals.
     List {
@@ -120,7 +123,7 @@ enum Command {
         store: PathBuf,
         #[arg(value_enum)]
         action: Action,
-        /// Node ID for retry, or nanoUSD ceiling for budget.
+        /// Node ID for retry or invalidate, or nanoUSD ceiling for budget.
         value: Option<String>,
     },
     /// Generate the authored glyph catalog without network calls.
@@ -148,6 +151,8 @@ enum Action {
     Stop,
     Continue,
     Retry,
+    /// Discard one accepted output and its descendants so resume recomputes them.
+    Invalidate,
     Budget,
 }
 fn execute(command: Command) -> Result<Value> {
@@ -232,6 +237,7 @@ fn execute(command: Command) -> Result<Value> {
             events,
             after,
             limit,
+            verify,
         } => {
             smythe::store::validate_id(&id).context(EngineError::InvalidCommand)?;
             let store = Store::open_read_only(store)?;
@@ -243,9 +249,13 @@ fn execute(command: Command) -> Result<Value> {
                 );
             }
             let state = store.inspect(&id)?;
-            Ok(
-                json!({"schema_version":1,"run_id":id,"status":state.status(),"health":store.health(&state)?,"shape":state.graph.shape()?,"state":state,"events":if events {Some(store.history(&id)?)}else{None}}),
-            )
+            let mut report = json!({"schema_version":1,"run_id":id,"status":state.status(),"health":store.health(&state)?,"shape":state.graph.shape()?,"state":state,"events":if events {Some(store.history(&id)?)}else{None}});
+            if verify {
+                let damaged = store.damaged_outputs(&state)?;
+                ensure!(damaged.is_empty(), DamagedOutputs::error(damaged));
+                report["verified_outputs"] = state.accepted_nodes.into();
+            }
+            Ok(report)
         }
         Command::List { store } => {
             Ok(json!({"schema_version":1,"runs":Store::open_read_only(store)?.list()?}))
@@ -271,7 +281,8 @@ fn execute(command: Command) -> Result<Value> {
             value,
         } => {
             ensure!(
-                matches!(action, Action::Retry | Action::Budget) == value.is_some(),
+                matches!(action, Action::Retry | Action::Invalidate | Action::Budget)
+                    == value.is_some(),
                 EngineError::InvalidCommand
             );
             smythe::store::validate_id(&id).context(EngineError::InvalidCommand)?;
@@ -281,6 +292,7 @@ fn execute(command: Command) -> Result<Value> {
                 Action::Stop => store.control(&id, smythe::Control::Stop)?,
                 Action::Continue => store.control(&id, smythe::Control::Run)?,
                 Action::Retry => store.retry(&id, value.as_deref().unwrap())?,
+                Action::Invalidate => store.invalidate(&id, value.as_deref().unwrap())?,
                 Action::Budget => store.change_ceiling(
                     &id,
                     NanoUsd(
@@ -311,10 +323,21 @@ fn execute(command: Command) -> Result<Value> {
         }),
     }
 }
-fn failure(run_id: Option<&str>, class: EngineError, message: &str) -> ! {
+fn failure(
+    run_id: Option<&str>,
+    class: EngineError,
+    message: &str,
+    damaged: Option<&DamagedOutputs>,
+) -> ! {
+    let mut error = json!({"class":class.class(),"message":message});
+    if let Some(damaged) = damaged {
+        // Node IDs stay in this structured field; the message never repeats them.
+        error["nodes"] = json!(damaged.nodes);
+        error["node_count"] = damaged.total.into();
+    }
     println!(
         "{}",
-        json!({"schema_version":1,"status":"error","run_id":run_id,"error":{"class":class.class(),"message":message}})
+        json!({"schema_version":1,"status":"error","run_id":run_id,"error":error})
     );
     eprintln!("Smythe: {message}");
     std::process::exit(class.exit_code());
@@ -335,6 +358,7 @@ fn main() {
             None,
             EngineError::InvalidCommand,
             &diagnostics::arguments(&error),
+            None,
         ),
     };
     if let Command::Run {
@@ -362,7 +386,12 @@ fn main() {
             let run_id = run_id
                 .as_deref()
                 .filter(|id| smythe::store::validate_id(id).is_ok());
-            failure(run_id, class, &message)
+            failure(
+                run_id,
+                class,
+                &message,
+                error.downcast_ref::<DamagedOutputs>(),
+            )
         }
     }
 }

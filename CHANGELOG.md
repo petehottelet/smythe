@@ -30,6 +30,21 @@ Releases 0.1.0 through 0.8.1 are recorded, unchanged, in the
 
 ## [Unreleased]
 
+- Refuse a journal that is shorter than its recorded run summary, or otherwise
+  disagrees with it, when inspecting, listing, resuming or controlling a run.
+  The failure has class `integrity` and a specific reason; no work is dispatched
+  and no event is recorded.
+- Add `inspect --verify` to load every accepted output and check its hash and
+  length. Verification and resume both name nodes with missing or altered
+  outputs in a bounded `error.nodes` field instead of message text.
+- Add `control <id> invalidate <node>` to discard one accepted output and its
+  descendants on a quiescent run, so resume recomputes only those nodes. A
+  stored output that no longer matches its hash is replaced when recomputed
+  work reproduces the verified bytes.
+- Journal the digests of Noumenon exports and check resumed artifacts against
+  the journal instead of `report.json`. Changed or malformed evidence is class
+  `integrity`; a malformed report no longer ends the process abnormally, and an
+  existing empty output directory accepts a fresh run.
 - Set the native workspace to 0.9.0, still an experimental source preview.
   Historical Python release numbers and existing tags remain unchanged.
 - Report bounded, sanitized CLI diagnostics with parser locations and useful

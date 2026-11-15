@@ -90,6 +90,19 @@ before their receipt commits. Locked per-process staging directories protect
 live writers and allow abandoned temporary files to be reclaimed. Every read
 checks the hash and byte length.
 
+A run's events and its summary commit together. Reading a journal to inspect,
+list, resume or control a run compares the two. A journal that is shorter than
+its recorded summary, or otherwise disagrees with it, is an integrity failure:
+nothing is dispatched and no event is recorded. A store that loses the summary
+and the same events together cannot be told apart from an earlier state.
+
+Resume loads every accepted output. A missing or altered one is an integrity
+failure that names the affected nodes; accepted work is never recomputed
+silently. `control <id> invalidate <node>` records the operator's decision to
+discard that output and its descendants, and `run --resume` then recomputes
+only those nodes. Earlier spend stays settled. A stored output that no longer
+matches its hash is replaced when recomputed work reproduces the verified bytes.
+
 Both memory and disk runs use SQLite. Disk stores use WAL with
 `synchronous=NORMAL`: the guarantee is recovery after an application-process
 crash. OS crashes, power loss, network filesystems, remote effects and distributed
@@ -114,6 +127,7 @@ cargo run --release --bin smythe -- control example pause --store smythe_artifac
 cargo run --release --bin smythe -- control example continue --store smythe_artifacts/native-runs
 cargo run --release --bin smythe -- control example budget 1000000 --store smythe_artifacts/native-runs
 cargo run --release --bin smythe -- control example retry research --store smythe_artifacts/native-runs
+cargo run --release --bin smythe -- control example invalidate research --store smythe_artifacts/native-runs
 cargo run --release --bin smythe -- control example stop --store smythe_artifacts/native-runs
 ```
 
@@ -127,6 +141,13 @@ External effects are refused by the runtime and cannot use pure retry or replay.
 An eligible failed node can also be retried while siblings are active. The
 coordinator retains those workers and their completion receipts, settles their
 costs once, and schedules dependent work from the updated journal.
+
+`invalidate` applies to a node with an accepted output and records a graph
+revision. It requires a quiescent run: no admitted, running or unsettled work
+and no operator stop. An unknown node, a node without an accepted output and a
+run with active work are refused as `invalid_command` without recording anything.
+The node and its descendants get a fresh retry allowance and are charged again
+when they rerun.
 
 Saved limits default to 10,000 nodes, 100,000 edges, three attempts per node
 since its last invalidation,
@@ -167,6 +188,11 @@ source snippets, argument values and arbitrary cause text are omitted. Unsupport
 causes use the fixed class message. Provider callback errors remain suppressed
 before journaling. Classes and exit codes remain the decision interface.
 
+An integrity failure caused by missing or altered outputs also carries
+`error.nodes`, at most 64 sorted node IDs, and `error.node_count`. Node IDs are
+graph content, so they appear only in that field, never in `error.message` or
+stderr.
+
 | Exit | Meaning |
 |---|---|
 | 0 | Success |
@@ -184,11 +210,16 @@ values, or retrieve one output:
 cargo run --release --bin smythe -- output example research --store smythe_artifacts/native-runs
 cargo run --release --bin smythe -- list --store smythe_artifacts/native-runs
 cargo run --release --bin smythe -- inspect example --events --after 0 --limit 100 --store smythe_artifacts/native-runs
+cargo run --release --bin smythe -- inspect example --verify --store smythe_artifacts/native-runs
 ```
 
 Inspect and list open existing stores read-only and never create a missing store.
 Plain inspect verifies the complete journal and reports shape, accepted coverage,
 unresolved reservations, last progress and derived owner `live`/`absent` health.
+It does not load outputs. `inspect --verify` also loads every accepted output
+and checks its hash and length. It adds `verified_outputs` on success, or exits
+5 and names the damaged nodes; it repairs nothing and cannot be combined with
+a cursor.
 Paged inspection uses sequence cursors; pages can split transaction groups.
 Concatenating pages reconstructs the same event stream as full history.
 An explicit `--limit` requires `--after`, which requires `--events`; omitting
@@ -216,7 +247,7 @@ cargo run --release --locked --offline --bin smythe -- noumenon --glyphs 256 --w
 ```
 
 Noumenon accepts 1–256 glyphs and 1–64 workers, defaulting to 192 and four.
-A fresh run needs a new output directory. The 192 authored glyphs remain the
+A fresh run needs a new or empty output directory. The 192 authored glyphs remain the
 prefix of the 256-glyph catalog with identical names and SVG reference hashes.
 The README GIF remains the benchmark example; it is not a Rust timing recording.
 
@@ -225,6 +256,15 @@ named compile/validation phases. Separate batch-receipt files have been retired.
 Resume checks saved compilation and validation evidence in parallel, reconstructs
 missing derived SVGs, and refuses changed artifacts. Semantic protocol, recipe,
 compiler, raster and gate versions bind recovery; worker count may change.
+
+After publication, the digests of the catalog, validation and atlas files are
+journaled by a third `export` run. Resume compares those files with the
+journaled receipts, not with `report.json`. The saved report is returned only
+when its artifact list agrees with the journal. A missing export is rebuilt
+from accepted outputs and must match its receipt. A run completed before
+receipts were journaled is rebuilt once, compared byte for byte with its
+published files, and then journaled. Changed or malformed evidence, including
+an unreadable report, is an integrity failure with exit 5.
 
 Reports hash every Rust source beneath `src/` in the four runtime crates, their manifests,
 the workspace manifest, lockfile and Clippy configuration. A completeness test

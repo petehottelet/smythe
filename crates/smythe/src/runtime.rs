@@ -5,6 +5,7 @@ use serde_json::json;
 use smythe_core::{
     EngineError, ExecutionGraph, Limits, NanoUsd, OutputRef, Task,
     coordinator::{Command, Completion, Coordinator, Finish, Input, Outcome},
+    diagnostics::DamagedOutputs,
     journal::{AttemptState, Effect, Event, Projection},
 };
 use std::{
@@ -150,6 +151,7 @@ fn verify_outputs<T: DeserializeOwned>(
     store: &Store,
 ) -> Result<HashSet<String>> {
     let mut invalid = HashSet::new();
+    let mut damaged = vec![];
     for (node, a) in &state.attempts {
         if matches!(
             a.state,
@@ -162,11 +164,17 @@ fn verify_outputs<T: DeserializeOwned>(
                 .and_then(|r| store.output(r))
                 .and_then(|b| serde_json::from_slice::<T>(&b).context(EngineError::Integrity));
             if checked.is_err() || !a.output_valid {
-                ensure!(a.state != AttemptState::Accepted, EngineError::Integrity);
-                invalid.insert(node.clone());
+                if a.state == AttemptState::Accepted {
+                    damaged.push(node.clone());
+                } else {
+                    invalid.insert(node.clone());
+                }
             }
         }
     }
+    // Accepted work is never silently recomputed: name every damaged node so
+    // an operator can invalidate it explicitly.
+    ensure!(damaged.is_empty(), DamagedOutputs::error(damaged));
     Ok(invalid)
 }
 fn quotes<P: Provider>(state: &Projection, provider: &P) -> Vec<Option<NanoUsd>> {

@@ -13,11 +13,11 @@ The [native guide](docs/rust.md) describes the implemented behavior:
 | Area | Available now |
 |---|---|
 | Local execution | Supplied TOML/JSON graphs, pure Rust providers, dependency-driven scheduling and bounded workers |
-| Accounting and control | Exact nanoUSD reservations, saved resource limits, explicit retries, budget changes, pause, continue and stop |
-| Recovery | Schema-3 SQLite journals, committed admission before dispatch, resumable quote blocks, atomic inline outputs and receipts, immutable large blobs and process-crash recovery |
+| Accounting and control | Exact nanoUSD reservations, saved resource limits, explicit retries, explicit invalidation of accepted outputs, budget changes, pause, continue and stop |
+| Recovery | Schema-3 SQLite journals, committed admission before dispatch, resumable quote blocks, atomic inline outputs and receipts, immutable large blobs, process-crash recovery, and refusal of truncated journals and damaged accepted outputs |
 | Graph changes | Named phases, revision identities, quiescent expansion and revision, transitive invalidation, fresh retry allowance for invalidated nodes and reuse of unaffected outputs |
-| Inspection | Output references and explicit loading, read-only run lists, verified inspection, event cursors, owner health and typed CLI errors |
-| Noumenon | Shared compilation and validation runtime, the authored 192/256-glyph catalogs, SVG parity, exports and completed-run recovery |
+| Inspection | Output references and explicit loading, read-only run lists, journal verification on every inspection, optional verification of stored outputs, event cursors, owner health and typed CLI errors |
+| Noumenon | Shared compilation and validation runtime, the authored 192/256-glyph catalogs, SVG parity, exports with journaled digests and completed-run recovery |
 | Verification | Linux and Windows CI, 5,000 deterministic scheduler seeds, real-process crash tests and explicit release performance gates |
 | Provenance | A native measurement runner that refuses uncommitted trees and hashes committed Git blob contents |
 
@@ -43,6 +43,12 @@ deadlines crossed during output serialization, publication or journal commits.
 These boundaries have deterministic regression tests. Native campaigns retain
 incremental provenance, trial timings and sanitized failure records, including
 unsuccessful trials.
+
+A journal shorter than its recorded summary and a missing or altered accepted
+output are refused with specific reasons. An operator invalidation lets resume
+recompute a damaged node and its descendants. Noumenon exports are checked
+against journaled digests. A store that loses its summary and the same events
+together is not detected; backup and restore qualification remains priority 3.
 
 The immediate priorities are:
 
